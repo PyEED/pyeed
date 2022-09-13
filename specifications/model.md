@@ -7,7 +7,7 @@ Insert a general description ...
 - __name*__
   - Type: string
   - Description: Systematic name of the protein.
-- __amino_acid_seqeunce*__
+- __amino_acid_sequence*__
   - Type: string
   - Description: The amino acid sequence of the protein sequence object.
 - __nr_id__
