@@ -44,8 +44,6 @@ Insert a general description ...
 - __ncbi_taxonomy_id*__
   - Type: string
   - Description: NCBI Taxonomy ID to identify the organism
-  - Min_length: 1
-  - Max_length: 10
 
 ### Domain
 
