@@ -2,10 +2,9 @@ import sdRDM
 
 from typing import Optional, Union
 from pydantic import PrivateAttr
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-
-from pydantic import Field
 
 
 @forge_signature
@@ -15,9 +14,9 @@ class Equivalence(sdRDM.DataModel):
         default_factory=IDGenerator("equivalenceINDEX"),
         xml="@id",
     )
+
     reference_position: int = Field(
-        ...,
-        description="Equivalent position in the reference sequence",
+        ..., description="Equivalent position in the reference sequence"
     )
 
     sequence_position: int = Field(
@@ -31,6 +30,7 @@ class Equivalence(sdRDM.DataModel):
     __repo__: Optional[str] = PrivateAttr(
         default="git://github.com/PyEED/pyeed-data-model.git"
     )
+
     __commit__: Optional[str] = PrivateAttr(
         default="047f17317fa860206980a47dc3790cbc3204f343"
     )
