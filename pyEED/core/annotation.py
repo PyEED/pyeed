@@ -1,12 +1,11 @@
 import sdRDM
 
 from typing import Optional, Union
+from typing import Optional
 from pydantic import PrivateAttr
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-
-from pydantic import Field
-from typing import Optional
 
 
 @forge_signature
@@ -16,6 +15,7 @@ class Annotation(sdRDM.DataModel):
         default_factory=IDGenerator("annotationINDEX"),
         xml="@id",
     )
+
     start_position: int = Field(
         ...,
         description=(
@@ -42,6 +42,7 @@ class Annotation(sdRDM.DataModel):
     __repo__: Optional[str] = PrivateAttr(
         default="git://github.com/PyEED/pyeed-data-model.git"
     )
+
     __commit__: Optional[str] = PrivateAttr(
         default="047f17317fa860206980a47dc3790cbc3204f343"
     )
