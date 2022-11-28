@@ -25,10 +25,8 @@ class Domain(sdRDM.DataModel):
         ..., description="Position in the sequence where the domain ends"
     )
 
-    __repo__: Optional[str] = PrivateAttr(
-        default="git://github.com/PyEED/pyeed-data-model.git"
-    )
+    __repo__: Optional[str] = PrivateAttr(default="git://github.com/maxim945/test5.git")
 
     __commit__: Optional[str] = PrivateAttr(
-        default="047f17317fa860206980a47dc3790cbc3204f343"
+        default="6d73cfc10f69971242fd92fe6867211fe1e1595a"
     )
