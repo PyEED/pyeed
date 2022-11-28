@@ -36,14 +36,7 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
   - Type: integer
   - Description: Position in the sequence where the domain ends
 
-### Equivalence
 
-- __reference_position*__
-  - Type: integer
-  - Description: Equivalent position in the reference sequence
-- __sequence_position*__
-  - Type: integer
-  - Description: Position that is equivalent to the reference sequence position that is also given
   
 
 
