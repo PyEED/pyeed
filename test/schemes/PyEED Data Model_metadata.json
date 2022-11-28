@@ -18,13 +18,5 @@
       }
     },
     "docstring": null
-  },
-  "Organism": {
-    "attributes": {
-      "ncbi_taxonomy_id": {
-        "description": "NCBI Taxonomy ID to identify the organism"
-      }
-    },
-    "docstring": null
   }
 }

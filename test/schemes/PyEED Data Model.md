@@ -8,8 +8,4 @@ classDiagram
         +string uniprot_id
     }
     
-    class Organism {
-        +string ncbi_taxonomy_id*
-    }
-    
 ```
