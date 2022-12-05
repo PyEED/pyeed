@@ -16,10 +16,7 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
 - __uniprot_id__
   - Type: string
   - Description: Identifier for the UniProt database
-- __pdb_id__
-  - Type: string
-  - Description: Identifier for the PDB database
-  - Multiple: True
+
 
 
 ### DNASequence
