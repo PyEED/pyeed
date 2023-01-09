@@ -7,7 +7,6 @@ from pydantic import PrivateAttr
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-
 from .annotation import Annotation
 from .domain import Domain
 from .equivalence import Equivalence
@@ -67,14 +66,23 @@ class ProteinSequence(sdRDM.DataModel):
     )
 
     __commit__: Optional[str] = PrivateAttr(
-        default="047f17317fa860206980a47dc3790cbc3204f343"
+        default="9b23f1fd7a004c59bd50c5619397d5142f5754f0"
     )
 
-    def add_to_domain(self, name: str, start_position: int, end_position: int) -> None:
+    def add_to_domain(
+        self,
+        name: str,
+        start_position: int,
+        end_position: int,
+        id: Optional[str] = None,
+    ) -> None:
         """
         Adds an instance of 'Domain' to the attribute 'domain'.
 
         Args:
+
+
+            id (str): Unique identifier of the 'Domain' object. Defaults to 'None'.
 
 
             name (str): Name of the annotated domain.
@@ -85,13 +93,19 @@ class ProteinSequence(sdRDM.DataModel):
 
             end_position (int): Position in the sequence where the domain ends.
         """
-        domain = [
-            Domain(name=name, start_position=start_position, end_position=end_position)
-        ]
+
+        params = {
+            "name": name,
+            "start_position": start_position,
+            "end_position": end_position,
+        }
+        if id is not None:
+            params["id"] = id
+        domain = [Domain(**params)]
         self.domain = self.domain + domain
 
     def add_to_equivalence(
-        self, reference_position: int, sequence_position: int
+        self, reference_position: int, sequence_position: int, id: Optional[str] = None
     ) -> None:
         """
         Adds an instance of 'Equivalence' to the attribute 'equivalence'.
@@ -99,26 +113,38 @@ class ProteinSequence(sdRDM.DataModel):
         Args:
 
 
+            id (str): Unique identifier of the 'Equivalence' object. Defaults to 'None'.
+
+
             reference_position (int): Equivalent position in the reference sequence.
 
 
             sequence_position (int): Position that is equivalent to the reference sequence position that is also given.
         """
-        equivalence = [
-            Equivalence(
-                reference_position=reference_position,
-                sequence_position=sequence_position,
-            )
-        ]
+
+        params = {
+            "reference_position": reference_position,
+            "sequence_position": sequence_position,
+        }
+        if id is not None:
+            params["id"] = id
+        equivalence = [Equivalence(**params)]
         self.equivalence = self.equivalence + equivalence
 
     def add_to_annotation(
-        self, start_position: int, function: str, end_position: Optional[int] = None
+        self,
+        start_position: int,
+        function: str,
+        end_position: Optional[int] = None,
+        id: Optional[str] = None,
     ) -> None:
         """
         Adds an instance of 'Annotation' to the attribute 'annotation'.
 
         Args:
+
+
+            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
 
 
             start_position (int): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
@@ -129,11 +155,13 @@ class ProteinSequence(sdRDM.DataModel):
 
             end_position (Optional[int]): Optional end position if the annoation contains more than a single amino acid. Defaults to None
         """
-        annotation = [
-            Annotation(
-                start_position=start_position,
-                function=function,
-                end_position=end_position,
-            )
-        ]
+
+        params = {
+            "start_position": start_position,
+            "function": function,
+            "end_position": end_position,
+        }
+        if id is not None:
+            params["id"] = id
+        annotation = [Annotation(**params)]
         self.annotation = self.annotation + annotation
