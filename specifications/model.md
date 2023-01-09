@@ -21,8 +21,8 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
   - Description: Identifier for the PDB database
   - Multiple: True
 - __organism__
+  - Description: Corresponding organism
   - Type: Organism
-  - Description: Corresponding organism 
 - __domain__
   - Type: Domain
   - Description: Domain specification
