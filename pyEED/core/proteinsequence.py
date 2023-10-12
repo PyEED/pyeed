@@ -1,75 +1,81 @@
 import sdRDM
 
-from typing import Optional, Union
-from typing import List
-from typing import Optional
-from pydantic import PrivateAttr
+from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .annotation import Annotation
-from .domain import Domain
+from Bio import SeqIO, Entrez
 from .equivalence import Equivalence
+from .domain import Domain
+from .annotation import Annotation
 from .organism import Organism
+from ..io_handler.sequence import _seqio_to_protein_sequence
 
 
 @forge_signature
 class ProteinSequence(sdRDM.DataModel):
-    id: str = Field(
+    """"""
+
+    id: Optional[str] = Field(
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("proteinsequenceINDEX"),
         xml="@id",
     )
 
-    name: str = Field(..., description="Systematic name of the protein.")
+    name: str = Field(
+        ...,
+        description="Systematic name of the protein.",
+    )
 
     amino_acid_sequence: str = Field(
-        ..., description="The amino acid sequence of the protein sequence object."
+        ...,
+        description="The amino acid sequence of the protein sequence object.",
     )
 
     nr_id: Optional[str] = Field(
-        description="Identifier for the NCBI NR database", default=None
+        default=None,
+        description="Identifier for the NCBI NR database",
     )
 
     uniprot_id: Optional[str] = Field(
-        description="Identifier for the UniProt database", default=None
+        default=None,
+        description="Identifier for the UniProt database",
     )
 
-    pdb_id: List[str] = Field(
-        description="Identifier for the PDB database", default_factory=ListPlus
+    pdb_id: Optional[str] = Field(
+        default=None,
+        description="Identifier for the PDB database",
     )
 
-    organism: Optional[Organism] = Field(
-        description="Corresponding organism", default=None
+    organism: Organism = Field(
+        ...,
+        description="Corresponding organism",
     )
 
-    domain: List[Domain] = Field(
-        description="Domain specification", default_factory=ListPlus
+    domains: List[Domain] = Field(
+        description="Domain specification",
+        default_factory=ListPlus,
+        multiple=True,
     )
 
     reference_sequence: Optional[str] = Field(
-        description="Identifier of the sequence used as reference", default=None
+        default=None,
+        description="Identifier of the sequence used as reference",
     )
 
     equivalence: List[Equivalence] = Field(
         description="Positions where the given sequence is equivalent to the reference",
         default_factory=ListPlus,
+        multiple=True,
     )
 
-    annotation: List[Annotation] = Field(
+    annotations: List[Annotation] = Field(
         description="Position-wise annotation of the amino acid seqeunce",
         default_factory=ListPlus,
+        multiple=True,
     )
 
-    __repo__: Optional[str] = PrivateAttr(
-        default="git://github.com/PyEED/pyeed-data-model.git"
-    )
-
-    __commit__: Optional[str] = PrivateAttr(
-        default="9b23f1fd7a004c59bd50c5619397d5142f5754f0"
-    )
-
-    def add_to_domain(
+    def add_to_domains(
         self,
         name: str,
         start_position: int,
@@ -77,23 +83,14 @@ class ProteinSequence(sdRDM.DataModel):
         id: Optional[str] = None,
     ) -> None:
         """
-        Adds an instance of 'Domain' to the attribute 'domain'.
+        This method adds an object of type 'Domain' to attribute domains
 
         Args:
-
-
             id (str): Unique identifier of the 'Domain' object. Defaults to 'None'.
-
-
-            name (str): Name of the annotated domain.
-
-
-            start_position (int): Position in the sequence where the domain starts.
-
-
-            end_position (int): Position in the sequence where the domain ends.
+            name (): Name of the annotated domain.
+            start_position (): Position in the sequence where the domain starts.
+            end_position (): Position in the sequence where the domain ends.
         """
-
         params = {
             "name": name,
             "start_position": start_position,
@@ -101,67 +98,89 @@ class ProteinSequence(sdRDM.DataModel):
         }
         if id is not None:
             params["id"] = id
-        domain = [Domain(**params)]
-        self.domain = self.domain + domain
+        self.domains.append(Domain(**params))
+        return self.domains[-1]
 
     def add_to_equivalence(
         self, reference_position: int, sequence_position: int, id: Optional[str] = None
     ) -> None:
         """
-        Adds an instance of 'Equivalence' to the attribute 'equivalence'.
+        This method adds an object of type 'Equivalence' to attribute equivalence
 
         Args:
-
-
             id (str): Unique identifier of the 'Equivalence' object. Defaults to 'None'.
-
-
-            reference_position (int): Equivalent position in the reference sequence.
-
-
-            sequence_position (int): Position that is equivalent to the reference sequence position that is also given.
+            reference_position (): Equivalent position in the reference sequence.
+            sequence_position (): Position that is equivalent to the reference sequence position that is also given.
         """
-
         params = {
             "reference_position": reference_position,
             "sequence_position": sequence_position,
         }
         if id is not None:
             params["id"] = id
-        equivalence = [Equivalence(**params)]
-        self.equivalence = self.equivalence + equivalence
+        self.equivalence.append(Equivalence(**params))
+        return self.equivalence[-1]
 
-    def add_to_annotation(
+    def add_to_annotations(
         self,
         start_position: int,
-        function: str,
-        end_position: Optional[int] = None,
+        end_position: int,
+        note: Optional[str] = None,
+        name: Optional[str] = None,
+        db_xref: Optional[str] = None,
         id: Optional[str] = None,
     ) -> None:
         """
-        Adds an instance of 'Annotation' to the attribute 'annotation'.
+        This method adds an object of type 'Annotation' to attribute annotations
 
         Args:
-
-
             id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
-
-
-            start_position (int): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
-
-
-            function (str): Function that is found in the annotated amino acid or sub-sequence.
-
-
-            end_position (Optional[int]): Optional end position if the annoation contains more than a single amino acid. Defaults to None
+            start_position (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
+            end_position (): Optional end position if the annoation contains more than a single amino acid..
+            note (): Function that is found in the annotated amino acid or. Defaults to None
+            name (): Additional note for the annotation. Defaults to None
+            db_xref (): Database cross reference. Defaults to None
         """
-
         params = {
             "start_position": start_position,
-            "function": function,
             "end_position": end_position,
+            "note": note,
+            "name": name,
+            "db_xref": db_xref,
         }
         if id is not None:
             params["id"] = id
-        annotation = [Annotation(**params)]
-        self.annotation = self.annotation + annotation
+        self.annotations.append(Annotation(**params))
+        return self.annotations[-1]
+
+    @classmethod
+    def from_ncbi(cls, accession_id: str) -> "ProteinSequence":
+        """
+        This method creates a 'ProteinSequence' object from a given NCBI ID.
+
+        Args:
+            accession_id (str): NCBI accession ID of the protein sequence.
+
+        Returns:
+            ProteinSequence: 'ProteinSequence' object that corresponds to the given NCBI ID.
+        """
+
+        seq_record = cls._get_ncbi_entry(accession_id, "protein")
+        return _seqio_to_protein_sequence(cls, seq_record)
+
+    def _get_ncbi_entry(
+        accession_id: str, database: str, email: str = "exon@got-spliced.com"
+    ) -> SeqIO.SeqRecord:
+        Entrez.email = email
+
+        databases = {"nucleotide", "protein"}
+        if database not in databases:
+            raise ValueError(f"database must be one of {databases}")
+
+        handle = Entrez.efetch(
+            db=database, id=accession_id, rettype="gb", retmode="text"
+        )
+        seq_record = SeqIO.read(handle, "genbank")
+
+        handle.close()
+        return seq_record

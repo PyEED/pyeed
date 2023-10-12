@@ -1,17 +1,16 @@
-from .annotation import Annotation
-from .dnasequence import DNASequence
+from .proteinsequence import ProteinSequence
+from .organism import Organism
 from .domain import Domain
 from .equivalence import Equivalence
-from .organism import Organism
-from .proteinsequence import ProteinSequence
+from .annotation import Annotation
+from .dnasequence import DNASequence
 
-__doc__ = "PyEED is a Python-encoded data model of an Enzyme Engineering Database. It supports the scalable and reproducible analysis of sequence and structure data of protein families, and makes data and processes findable, accessible, interoperable, and reusable according to the FAIR data principles."
-
+__doc__ = ""
 __all__ = [
-    "Annotation",
-    "DNASequence",
+    "ProteinSequence",
+    "Organism",
     "Domain",
     "Equivalence",
-    "Organism",
-    "ProteinSequence",
+    "Annotation",
+    "DNASequence",
 ]

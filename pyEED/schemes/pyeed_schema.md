@@ -10,15 +10,16 @@ classDiagram
         +string amino_acid_sequence*
         +string nr_id
         +string uniprot_id
-        +string[0..*] pdb_id
-        +Organism organism
-        +Domain[0..*] domain
+        +string pdb_id
+        +Organism organism*
+        +Domain[0..*] domains
         +string reference_sequence
         +Equivalence[0..*] equivalence
-        +Annotation[0..*] annotation
+        +Annotation[0..*] annotations
     }
     
     class Organism {
+        +string name
         +string ncbi_taxonomy_id*
     }
     
@@ -35,8 +36,10 @@ classDiagram
     
     class Annotation {
         +integer start_position*
-        +integer end_position
-        +string function*
+        +integer end_position*
+        +string note
+        +string name
+        +string db_xref
     }
     
     class DNASequence {
