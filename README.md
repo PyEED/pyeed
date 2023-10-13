@@ -1,8 +1,10 @@
 <div align="center">
 <h1 align="center">pyeed
 
-<a href="">![![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)
+</div>
 
+<div align="center">
+  <a href="">[![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)
 </div>
 
 
