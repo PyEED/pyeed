@@ -1,4 +1,4 @@
-# PyEED Data Model 𝌭 
+# PyEED Data Model
 
 The PyEED data model provides a object data structure for protein sequences and their annotations.
 
@@ -29,7 +29,8 @@ Description of a protein sequence and its annotations.
   - Description: Annotations of different sites
   - Multiple: True
 - cds
-  - Type: 
+  - Type: [DNASequence](#DNASequence)
+  - Description: Corresponding DNA coding sequence
 - nr_id
   - Type: string
   - Description: Identifier for the NCBI NR database

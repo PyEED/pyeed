@@ -7,7 +7,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 
 @forge_signature
 class Annotation(sdRDM.DataModel):
-    """"""
+    """Annotation of a protein sequence."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -15,7 +15,7 @@ class Annotation(sdRDM.DataModel):
         xml="@id",
     )
 
-    start_position: int = Field(
+    start: int = Field(
         ...,
         description=(
             "Start position of the annotation. A single start position without an end"
@@ -23,25 +23,25 @@ class Annotation(sdRDM.DataModel):
         ),
     )
 
-    end_position: int = Field(
+    end: int = Field(
         ...,
         description=(
             "Optional end position if the annoation contains more than a single amino"
-            " acid."
+            " acid"
         ),
     )
 
     note: Optional[str] = Field(
         default=None,
-        description="Function that is found in the annotated amino acid or",
+        description="Information found in 'note' of an ncbi protein sequence entry",
     )
 
     name: Optional[str] = Field(
         default=None,
-        description="Additional note for the annotation",
+        description="Name of the annotation",
     )
 
-    db_xref: Optional[str] = Field(
+    cross_reference: Optional[str] = Field(
         default=None,
         description="Database cross reference",
     )

@@ -5,16 +5,16 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
-from .equivalence import Equivalence
-from .domain import Domain
-from .annotation import Annotation
 from .organism import Organism
+from .equivalence import Equivalence
+from .annotation import Annotation
+from .dnasequence import DNASequence
 from ..io_handler.sequence import _seqio_to_protein_sequence
 
 
 @forge_signature
 class ProteinSequence(sdRDM.DataModel):
-    """"""
+    """Description of a protein sequence and its annotations."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -24,12 +24,34 @@ class ProteinSequence(sdRDM.DataModel):
 
     name: str = Field(
         ...,
-        description="Systematic name of the protein.",
+        description="Name of the protein",
     )
 
-    amino_acid_sequence: str = Field(
+    sequence: str = Field(
         ...,
-        description="The amino acid sequence of the protein sequence object.",
+        description="Amino acid sequence",
+    )
+
+    organism: Organism = Field(
+        ...,
+        description="Corresponding organism",
+    )
+
+    regions: List[Annotation] = Field(
+        description="Domains of the protein",
+        default_factory=ListPlus,
+        multiple=True,
+    )
+
+    sites: List[Annotation] = Field(
+        description="Annotations of different sites",
+        default_factory=ListPlus,
+        multiple=True,
+    )
+
+    cds: Optional[DNASequence] = Field(
+        default=None,
+        description="Corresponding DNA coding sequence",
     )
 
     nr_id: Optional[str] = Field(
@@ -47,17 +69,6 @@ class ProteinSequence(sdRDM.DataModel):
         description="Identifier for the PDB database",
     )
 
-    organism: Organism = Field(
-        ...,
-        description="Corresponding organism",
-    )
-
-    domains: List[Domain] = Field(
-        description="Domain specification",
-        default_factory=ListPlus,
-        multiple=True,
-    )
-
     reference_sequence: Optional[str] = Field(
         default=None,
         description="Identifier of the sequence used as reference",
@@ -69,37 +80,69 @@ class ProteinSequence(sdRDM.DataModel):
         multiple=True,
     )
 
-    annotations: List[Annotation] = Field(
-        description="Position-wise annotation of the amino acid seqeunce",
-        default_factory=ListPlus,
-        multiple=True,
-    )
-
-    def add_to_domains(
+    def add_to_regions(
         self,
-        name: str,
-        start_position: int,
-        end_position: int,
+        start: int,
+        end: int,
+        note: Optional[str] = None,
+        name: Optional[str] = None,
+        cross_reference: Optional[str] = None,
         id: Optional[str] = None,
     ) -> None:
         """
-        This method adds an object of type 'Domain' to attribute domains
+        This method adds an object of type 'Annotation' to attribute regions
 
         Args:
-            id (str): Unique identifier of the 'Domain' object. Defaults to 'None'.
-            name (): Name of the annotated domain.
-            start_position (): Position in the sequence where the domain starts.
-            end_position (): Position in the sequence where the domain ends.
+            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
+            start (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
+            end (): Optional end position if the annoation contains more than a single amino acid.
+            note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
+            name (): Name of the annotation. Defaults to None
+            cross_reference (): Database cross reference. Defaults to None
         """
         params = {
+            "start": start,
+            "end": end,
+            "note": note,
             "name": name,
-            "start_position": start_position,
-            "end_position": end_position,
+            "cross_reference": cross_reference,
         }
         if id is not None:
             params["id"] = id
-        self.domains.append(Domain(**params))
-        return self.domains[-1]
+        self.regions.append(Annotation(**params))
+        return self.regions[-1]
+
+    def add_to_sites(
+        self,
+        start: int,
+        end: int,
+        note: Optional[str] = None,
+        name: Optional[str] = None,
+        cross_reference: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Annotation' to attribute sites
+
+        Args:
+            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
+            start (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
+            end (): Optional end position if the annoation contains more than a single amino acid.
+            note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
+            name (): Name of the annotation. Defaults to None
+            cross_reference (): Database cross reference. Defaults to None
+        """
+        params = {
+            "start": start,
+            "end": end,
+            "note": note,
+            "name": name,
+            "cross_reference": cross_reference,
+        }
+        if id is not None:
+            params["id"] = id
+        self.sites.append(Annotation(**params))
+        return self.sites[-1]
 
     def add_to_equivalence(
         self, reference_position: int, sequence_position: int, id: Optional[str] = None
@@ -120,38 +163,6 @@ class ProteinSequence(sdRDM.DataModel):
             params["id"] = id
         self.equivalence.append(Equivalence(**params))
         return self.equivalence[-1]
-
-    def add_to_annotations(
-        self,
-        start_position: int,
-        end_position: int,
-        note: Optional[str] = None,
-        name: Optional[str] = None,
-        db_xref: Optional[str] = None,
-        id: Optional[str] = None,
-    ) -> None:
-        """
-        This method adds an object of type 'Annotation' to attribute annotations
-
-        Args:
-            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
-            start_position (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
-            end_position (): Optional end position if the annoation contains more than a single amino acid..
-            note (): Function that is found in the annotated amino acid or. Defaults to None
-            name (): Additional note for the annotation. Defaults to None
-            db_xref (): Database cross reference. Defaults to None
-        """
-        params = {
-            "start_position": start_position,
-            "end_position": end_position,
-            "note": note,
-            "name": name,
-            "db_xref": db_xref,
-        }
-        if id is not None:
-            params["id"] = id
-        self.annotations.append(Annotation(**params))
-        return self.annotations[-1]
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinSequence":

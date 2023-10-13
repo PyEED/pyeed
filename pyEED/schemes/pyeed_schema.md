@@ -1,32 +1,28 @@
 ```mermaid
 classDiagram
     ProteinSequence *-- Organism
-    ProteinSequence *-- Domain
     ProteinSequence *-- Equivalence
     ProteinSequence *-- Annotation
+    ProteinSequence *-- DNASequence
+    DNASequence *-- Organism
     
     class ProteinSequence {
         +string name*
-        +string amino_acid_sequence*
+        +string sequence*
+        +Organism organism*
+        +Annotation[0..*] regions
+        +Annotation[0..*] sites
+        +DNASequence cds
         +string nr_id
         +string uniprot_id
         +string pdb_id
-        +Organism organism*
-        +Domain[0..*] domains
         +string reference_sequence
         +Equivalence[0..*] equivalence
-        +Annotation[0..*] annotations
     }
     
     class Organism {
         +string name
-        +string ncbi_taxonomy_id*
-    }
-    
-    class Domain {
-        +string name*
-        +integer start_position*
-        +integer end_position*
+        +string taxonomy_id*
     }
     
     class Equivalence {
@@ -35,15 +31,16 @@ classDiagram
     }
     
     class Annotation {
-        +integer start_position*
-        +integer end_position*
+        +integer start*
+        +integer end*
         +string note
         +string name
-        +string db_xref
+        +string cross_reference
     }
     
     class DNASequence {
-        +string protein_sequence_id*
+        +string sequence*
+        +Organism organism*
     }
     
 ```
