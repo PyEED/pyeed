@@ -3,9 +3,7 @@
 
 </div>
 
-<p align="center">
-  <!-- [![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)>
-</p>
+[![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)>
 
 
 ## 🛣️ Roadmap
