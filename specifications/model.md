@@ -6,7 +6,7 @@ The PyEED data model provides a object data structure for protein sequences and 
 
 ### ProteinSequence
 
-Description of a protein sequence and its annotations.
+Description of a protein sequence and its annotations
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -21,16 +21,23 @@ Description of a protein sequence and its annotations.
   - Type: [Organism](#Organism)
   - Description: Corresponding organism
 - regions
-  - Type: [Annotation](#Annotation)
+  - Type: [Region](#Region)
   - Description: Domains of the protein
   - Multiple: True
 - sites
-  - Type: [Annotation](#Annotation)
+  - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
 - cds
   - Type: [DNASequence](#DNASequence)
   - Description: Corresponding DNA coding sequence
+- ec_number
+  - Type: string
+  - Regex: (\d+.)(\d+.)(\d+.)(\d+)
+  - Description: Enzyme Commission number
+- mol_weight
+  - Type: float
+  - Description: Calculated molecular weight of the protein
 - nr_id
   - Type: string
   - Description: Identifier for the NCBI NR database
@@ -80,7 +87,7 @@ Description of an organism.
 
 </details>
 
-### Annotation
+### Region
 
 Annotation of a protein sequence.
 
@@ -92,13 +99,34 @@ Annotation of a protein sequence.
   - Description: Start position of the annotation. A single start position without an end corresponds to a single amino acid
 - __end__
   - Type: integer
-  - Description: Optional end position if the annoation contains more than a single amino acid
+  - Description: Optional end position if the annotation contains more than a single amino acid
 - note
   - Type: string
   - Description: Information found in 'note' of an ncbi protein sequence entry
 - name
   - Type: string
   - Description: Name of the annotation
+- cross_reference
+  - Type: string
+  - Description: Database cross reference
+
+</details>
+
+### Site
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: string
+  - Description: Name of the site
+- type
+  - Type: string
+  - Description: Type of the site
+- positions
+  - Type: integer
+  - Description: Positions of the site
+  - Multiple: True
 - cross_reference
   - Type: string
   - Description: Database cross reference
@@ -114,7 +142,7 @@ Annotation of a protein sequence.
   - Type: string
   - Description: The DNA sequence
 - __organism__
-  - Description: Corresponding organism
   - Type: [Organism](#Organism)
+  - Description: Corresponding organism
 
 </details>
