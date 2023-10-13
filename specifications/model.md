@@ -1,17 +1,35 @@
-# PyEED Data Model
+# PyEED Data Model 𝌭 
 
-PyEED is a Python-encoded data model of an Enzyme Engineering Database. It supports the scalable and reproducible analysis of sequence and structure data of protein families, and makes data and processes findable, accessible, interoperable, and reusable according to the FAIR data principles.
+The PyEED data model provides a object data structure for protein sequences and their annotations.
 
 ## Objects
 
 ### ProteinSequence
 
+Description of a protein sequence and its annotations.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
 - __name__
   - Type: string
-  - Description: Systematic name of the protein.
-- __amino_acid_sequence__
+  - Description: Name of the protein
+- __sequence__
   - Type: string
-  - Description: The amino acid sequence of the protein sequence object.
+  - Description: Amino acid sequence
+- __organism__
+  - Type: [Organism](#Organism)
+  - Description: Corresponding organism
+- regions
+  - Type: [Annotation](#Annotation)
+  - Description: Domains of the protein
+  - Multiple: True
+- sites
+  - Type: [Annotation](#Annotation)
+  - Description: Annotations of different sites
+  - Multiple: True
+- cds
+  - Type: 
 - nr_id
   - Type: string
   - Description: Identifier for the NCBI NR database
@@ -21,13 +39,6 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
 - pdb_id
   - Type: string
   - Description: Identifier for the PDB database
-- __organism__
-  - Description: Corresponding organism
-  - Type: Organism
-- domains
-  - Type: [Domain](#Domain)
-  - Description: Domain specification
-  - Multiple: True
 - reference_sequence
   - Type: string
   - Description: Identifier of the sequence used as reference
@@ -35,33 +46,29 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
   - Type: [Equivalence](#Equivalence)
   - Description: Positions where the given sequence is equivalent to the reference
   - Multiple: True
-- annotations
-  - Type: [Annotation](#Annotation)
-  - Description: Position-wise annotation of the amino acid sequence
-  - Multiple: True
+
+</details>
 
 ### Organism
+
+Description of an organism.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
 
 - name
   - Type: string
   - Description: Name of the organism
-- __ncbi_taxonomy_id__
+- __taxonomy_id__
   - Type: string
   - Description: NCBI Taxonomy ID to identify the organism
 
-### Domain
-
-- __name__
-  - Type: string
-  - Description: Name of the annotated domain
-- __start_position__
-  - Type: integer
-  - Description: Position in the sequence where the domain starts
-- __end_position__
-  - Type: integer
-  - Description: Position in the sequence where the domain ends
+</details>
 
 ### Equivalence
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
 
 - __reference_position__
   - Type: integer
@@ -69,27 +76,44 @@ PyEED is a Python-encoded data model of an Enzyme Engineering Database. It suppo
 - __sequence_position__
   - Type: integer
   - Description: Position that is equivalent to the reference sequence position that is also given
-  
+
+</details>
+
 ### Annotation
 
-- __start_position__
+Annotation of a protein sequence.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __start__
   - Type: integer
   - Description: Start position of the annotation. A single start position without an end corresponds to a single amino acid
-- __end_position__
+- __end__
   - Type: integer
-  - Description: Optional end position if the annoation contains more than a single amino acid.
+  - Description: Optional end position if the annoation contains more than a single amino acid
 - note
   - Type: string
-  - Description: Function that is found in the annotated amino acid or 
+  - Description: Information found in 'note' of an ncbi protein sequence entry
 - name
   - Type: string
-  - Description: Additional note for the annotation
-- db_xref
+  - Description: Name of the annotation
+- cross_reference
   - Type: string
   - Description: Database cross reference
 
+</details>
+  
 ### DNASequence
 
-- __protein_sequence_id__
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __sequence__
   - Type: string
-  - Description: Reference to the corresponding protein sequence to which this DNA sequence translates 
+  - Description: The DNA sequence
+- __organism__
+  - Description: Corresponding organism
+  - Type: [Organism](#Organism)
+
+</details>
