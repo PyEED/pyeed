@@ -2,7 +2,8 @@
 classDiagram
     ProteinSequence *-- Organism
     ProteinSequence *-- Equivalence
-    ProteinSequence *-- Annotation
+    ProteinSequence *-- Region
+    ProteinSequence *-- Site
     ProteinSequence *-- DNASequence
     DNASequence *-- Organism
     
@@ -10,9 +11,11 @@ classDiagram
         +string name*
         +string sequence*
         +Organism organism*
-        +Annotation[0..*] regions
-        +Annotation[0..*] sites
+        +Region[0..*] regions
+        +Site[0..*] sites
         +DNASequence cds
+        +string ec_number
+        +float mol_weight
         +string nr_id
         +string uniprot_id
         +string pdb_id
@@ -30,11 +33,18 @@ classDiagram
         +integer sequence_position*
     }
     
-    class Annotation {
+    class Region {
         +integer start*
         +integer end*
         +string note
         +string name
+        +string cross_reference
+    }
+    
+    class Site {
+        +string name
+        +string type
+        +integer[0..*] positions
         +string cross_reference
     }
     

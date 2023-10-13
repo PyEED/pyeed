@@ -1,20 +1,22 @@
 import sdRDM
 
 from typing import List, Optional
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
-from .organism import Organism
+from Bio.Blast import NCBIWWW, NCBIXML
+from .site import Site
 from .equivalence import Equivalence
 from .dnasequence import DNASequence
-from .annotation import Annotation
+from .region import Region
+from .organism import Organism
 from ..io_handler.sequence import _seqio_to_protein_sequence
 
 
 @forge_signature
 class ProteinSequence(sdRDM.DataModel):
-    """Description of a protein sequence and its annotations."""
+    """Description of a protein sequence and its annotations"""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -37,13 +39,13 @@ class ProteinSequence(sdRDM.DataModel):
         description="Corresponding organism",
     )
 
-    regions: List[Annotation] = Field(
+    regions: List[Region] = Field(
         description="Domains of the protein",
         default_factory=ListPlus,
         multiple=True,
     )
 
-    sites: List[Annotation] = Field(
+    sites: List[Site] = Field(
         description="Annotations of different sites",
         default_factory=ListPlus,
         multiple=True,
@@ -52,6 +54,17 @@ class ProteinSequence(sdRDM.DataModel):
     cds: Optional[DNASequence] = Field(
         default=None,
         description="Corresponding DNA coding sequence",
+    )
+
+    ec_number: Optional[str] = Field(
+        default=None,
+        regex="(\\d+.)(\\d+.)(\\d+.)(\\d+)",
+        description="Enzyme Commission number",
+    )
+
+    mol_weight: Optional[float] = Field(
+        default=None,
+        description="Calculated molecular weight of the protein",
     )
 
     nr_id: Optional[str] = Field(
@@ -79,10 +92,6 @@ class ProteinSequence(sdRDM.DataModel):
         default_factory=ListPlus,
         multiple=True,
     )
-    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
-    __commit__: Optional[str] = PrivateAttr(
-        default="5592833c9e695a2fe5a0070d25ddb41fdeab9f05"
-    )
 
     def add_to_regions(
         self,
@@ -94,12 +103,12 @@ class ProteinSequence(sdRDM.DataModel):
         id: Optional[str] = None,
     ) -> None:
         """
-        This method adds an object of type 'Annotation' to attribute regions
+        This method adds an object of type 'Region' to attribute regions
 
         Args:
-            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
+            id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
             start (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
-            end (): Optional end position if the annoation contains more than a single amino acid.
+            end (): Optional end position if the annotation contains more than a single amino acid.
             note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
             name (): Name of the annotation. Defaults to None
             cross_reference (): Database cross reference. Defaults to None
@@ -113,39 +122,36 @@ class ProteinSequence(sdRDM.DataModel):
         }
         if id is not None:
             params["id"] = id
-        self.regions.append(Annotation(**params))
+        self.regions.append(Region(**params))
         return self.regions[-1]
 
     def add_to_sites(
         self,
-        start: int,
-        end: int,
-        note: Optional[str] = None,
         name: Optional[str] = None,
+        type: Optional[str] = None,
+        positions: List[int] = ListPlus(),
         cross_reference: Optional[str] = None,
         id: Optional[str] = None,
     ) -> None:
         """
-        This method adds an object of type 'Annotation' to attribute sites
+        This method adds an object of type 'Site' to attribute sites
 
         Args:
-            id (str): Unique identifier of the 'Annotation' object. Defaults to 'None'.
-            start (): Start position of the annotation. A single start position without an end corresponds to a single amino acid.
-            end (): Optional end position if the annoation contains more than a single amino acid.
-            note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
-            name (): Name of the annotation. Defaults to None
+            id (str): Unique identifier of the 'Site' object. Defaults to 'None'.
+            name (): Name of the site. Defaults to None
+            type (): Type of the site. Defaults to None
+            positions (): Positions of the site. Defaults to ListPlus()
             cross_reference (): Database cross reference. Defaults to None
         """
         params = {
-            "start": start,
-            "end": end,
-            "note": note,
             "name": name,
+            "type": type,
+            "positions": positions,
             "cross_reference": cross_reference,
         }
         if id is not None:
             params["id"] = id
-        self.sites.append(Annotation(**params))
+        self.sites.append(Site(**params))
         return self.sites[-1]
 
     def add_to_equivalence(
@@ -199,3 +205,46 @@ class ProteinSequence(sdRDM.DataModel):
 
         handle.close()
         return seq_record
+
+    def blast(self, n_hits: int) -> List["ProteinSequence"]:
+        """Makes a blast search with the given sequence.
+
+        Args:
+            n_hits (int): Number of hits to return.
+
+        Returns:
+            List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
+        """
+        return _pblast(self.sequence, n_hits)
+    
+    def _get_cds(self):
+
+        
+
+
+@staticmethod
+def _pblast(sequence: str, n_hits: int = None):
+    result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
+    blast_record = NCBIXML.read(result_handle)
+
+    accessions = _get_accessions(blast_record)
+
+    sequences = []
+    for acc in accessions:
+        sequences.append(ProteinSequence.from_ncbi(acc))
+
+    return sequences
+
+
+@staticmethod
+def _nblast(sequence: str, n_hits: int = None) -> List[ProteinSequence]:
+    result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
+    blast_record = NCBIXML.read(result_handle)
+
+
+@staticmethod
+def _get_accessions(blast_record: NCBIXML) -> List[str]:
+    accessions = []
+    for alignment in blast_record.alignments:
+        accessions.append(alignment.accession)
+    return accessions
