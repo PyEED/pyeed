@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 
 
@@ -44,4 +44,8 @@ class Annotation(sdRDM.DataModel):
     cross_reference: Optional[str] = Field(
         default=None,
         description="Database cross reference",
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
+    __commit__: Optional[str] = PrivateAttr(
+        default="5592833c9e695a2fe5a0070d25ddb41fdeab9f05"
     )

@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 
 
@@ -26,4 +26,8 @@ class Equivalence(sdRDM.DataModel):
             "Position that is equivalent to the reference sequence position that is"
             " also given"
         ),
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
+    __commit__: Optional[str] = PrivateAttr(
+        default="5592833c9e695a2fe5a0070d25ddb41fdeab9f05"
     )
