@@ -3,6 +3,7 @@ import sdRDM
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
+from .organism import Organism
 
 
 @forge_signature
@@ -15,10 +16,12 @@ class DNASequence(sdRDM.DataModel):
         xml="@id",
     )
 
-    protein_sequence_id: str = Field(
+    sequence: str = Field(
         ...,
-        description=(
-            "Reference to the corresponding protein sequence to which this DNA sequence"
-            " translates"
-        ),
+        description="The DNA sequence",
+    )
+
+    organism: Organism = Field(
+        ...,
+        description="Corresponding organism",
     )

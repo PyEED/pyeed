@@ -7,7 +7,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 
 @forge_signature
 class Organism(sdRDM.DataModel):
-    """"""
+    """Description of an organism."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -20,7 +20,7 @@ class Organism(sdRDM.DataModel):
         description="Name of the organism",
     )
 
-    ncbi_taxonomy_id: str = Field(
+    taxonomy_id: str = Field(
         ...,
         description="NCBI Taxonomy ID to identify the organism",
     )
