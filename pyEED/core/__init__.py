@@ -6,6 +6,7 @@ from .site import Site
 from .dnasequence import DNASequence
 
 __doc__ = ""
+
 __all__ = [
     "ProteinSequence",
     "Organism",
