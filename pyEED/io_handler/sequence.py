@@ -40,7 +40,6 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
     for feature in entry.features:
         # TODO: assert that only one protein is in the file
         if feature.type == "Protein":
-            print("yes")
             if "product" in feature.qualifiers:
                 protein_name = feature.qualifiers["product"][0]
 
@@ -51,7 +50,6 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
 
             if "EC_number" in feature.qualifiers:
                 ec_number = feature.qualifiers["EC_number"][0]
-                print(ec_number)
             else:
                 ec_number = None
         else:
