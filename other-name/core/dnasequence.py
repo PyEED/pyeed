@@ -5,29 +5,30 @@ from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 
 
+from .organism import Organism
+
+
 @forge_signature
-class Equivalence(sdRDM.DataModel):
+class DNASequence(sdRDM.DataModel):
     """"""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("equivalenceINDEX"),
+        default_factory=IDGenerator("dnasequenceINDEX"),
         xml="@id",
     )
 
-    reference_position: int = Field(
+    sequence: str = Field(
         ...,
-        description="Equivalent position in the reference sequence",
+        description="The DNA sequence",
     )
 
-    sequence_position: int = Field(
+    organism: Organism = Field(
         ...,
-        description=(
-            "Position that is equivalent to the reference sequence position that is"
-            " also given"
-        ),
+        description="Corresponding organism",
     )
 
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="de1ea68a5301068047a6413d4ca4d8473be3816b"
+        default="bc253c7b0c7f5a13a8c986328f4a6e67f2f36f3c"
+    )

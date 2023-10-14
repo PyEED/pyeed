@@ -27,7 +27,8 @@ class Equivalence(sdRDM.DataModel):
             " also given"
         ),
     )
+
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="73fe06fa32d40a3a1bd71455bc2052c013d24984"
+        default="dd65c92455ca29480957e8eb4d499c275bbc16e7"
     )

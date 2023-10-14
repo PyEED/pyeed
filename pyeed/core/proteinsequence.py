@@ -5,12 +5,12 @@ from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 
-
 from .dnasequence import DNASequence
 from .region import Region
 from .organism import Organism
 from .equivalence import Equivalence
 from .site import Site
+
 
 
 @forge_signature
@@ -126,11 +126,6 @@ class ProteinSequence(sdRDM.DataModel):
             "cross_reference": cross_reference,
         }
 
-        if id is not None:
-            params["id"] = id
-
-        self.regions.append(Region(**params))
-
         return self.regions[-1]
 
     def add_to_sites(
@@ -164,6 +159,7 @@ class ProteinSequence(sdRDM.DataModel):
 
         self.sites.append(Site(**params))
 
+
         return self.sites[-1]
 
     def add_to_equivalence(
@@ -187,5 +183,6 @@ class ProteinSequence(sdRDM.DataModel):
             params["id"] = id
 
         self.equivalence.append(Equivalence(**params))
+
 
         return self.equivalence[-1]

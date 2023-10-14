@@ -3,8 +3,6 @@ import sdRDM
 from typing import Optional
 from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
-
-
 from .organism import Organism
 
 
@@ -32,3 +30,4 @@ class DNASequence(sdRDM.DataModel):
     __commit__: Optional[str] = PrivateAttr(
         default="de1ea68a5301068047a6413d4ca4d8473be3816b"
     )
+
