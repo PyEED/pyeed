@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 from .organism import Organism
 
@@ -24,4 +24,8 @@ class DNASequence(sdRDM.DataModel):
     organism: Organism = Field(
         ...,
         description="Corresponding organism",
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
+    __commit__: Optional[str] = PrivateAttr(
+        default="73fe06fa32d40a3a1bd71455bc2052c013d24984"
     )
