@@ -38,5 +38,5 @@ class Site(sdRDM.DataModel):
     )
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="f44867fdfe39152f045044bf5dd35bc121f1989b"
+        default="1349271e2d84966c0e9c086b26c26f3c4b6369d7"
     )
