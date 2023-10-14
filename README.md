@@ -10,6 +10,7 @@
 
 ```bash
 pip install git+https://github.com/PyEED/pyeed.git
+```
 
 ## 🛣️ Roadmap
 
