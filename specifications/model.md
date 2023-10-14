@@ -1,85 +1,148 @@
 # PyEED Data Model
 
-PyEED is a Python-encoded data model of an Enzyme Engineering Database. It supports the scalable and reproducible analysis of sequence and structure data of protein families, and makes data and processes findable, accessible, interoperable, and reusable according to the FAIR data principles.
+The PyEED data model provides a object data structure for protein sequences and their annotations.
+
+## Objects
 
 ### ProteinSequence
 
-- __name*__
+Description of a protein sequence and its annotations
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __name__
   - Type: string
-  - Description: Systematic name of the protein.
-- __amino_acid_sequence*__
+  - Description: Name of the protein
+- __sequence__
   - Type: string
-  - Description: The amino acid sequence of the protein sequence object.
-- __nr_id__
+  - Description: Amino acid sequence
+- __organism__
+  - Type: [Organism](#Organism)
+  - Description: Corresponding organism
+- regions
+  - Type: [Region](#Region)
+  - Description: Domains of the protein
+  - Multiple: True
+- sites
+  - Type: [Site](#Site)
+  - Description: Annotations of different sites
+  - Multiple: True
+- cds
+  - Type: [DNASequence](#DNASequence)
+  - Description: Corresponding DNA coding sequence
+- ec_number
+  - Type: string
+  - Regex: (\d+.)(\d+.)(\d+.)(\d+)
+  - Description: Enzyme Commission number
+- mol_weight
+  - Type: float
+  - Description: Calculated molecular weight of the protein
+- nr_id
   - Type: string
   - Description: Identifier for the NCBI NR database
-- __uniprot_id__
+- uniprot_id
   - Type: string
   - Description: Identifier for the UniProt database
-- __pdb_id__
+- pdb_id
   - Type: string
   - Description: Identifier for the PDB database
-  - Multiple: True
-- __organism__
-  - Description: Corresponding organism
-  - Type: Organism
-- __domain__
-  - Type: [Domain](#Domain)
-  - Description: Domain specification
-  - Multiple: True
-- __reference_sequence__
+- reference_sequence
   - Type: string
   - Description: Identifier of the sequence used as reference
-- __equivalence__
+- equivalence
   - Type: [Equivalence](#Equivalence)
   - Description: Positions where the given sequence is equivalent to the reference
   - Multiple: True
-- __annotation__
-  - Type: [Annotation](#Annotation)
-  - Description: Position-wise annotation of the amino acid seqeunce
-  - Multiple: True
+
+</details>
 
 ### Organism
 
-- __ncbi_taxonomy_id*__
+Description of an organism.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: string
+  - Description: Name of the organism
+- __taxonomy_id__
   - Type: string
   - Description: NCBI Taxonomy ID to identify the organism
 
-### Domain
-
-- __name*__
-  - Type: string
-  - Description: Name of the annotated domain
-- __start_position*__
-  - Type: integer
-  - Description: Position in the sequence where the domain starts
-- __end_position*__
-  - Type: integer
-  - Description: Position in the sequence where the domain ends
+</details>
 
 ### Equivalence
 
-- __reference_position*__
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __reference_position__
   - Type: integer
   - Description: Equivalent position in the reference sequence
-- __sequence_position*__
+- __sequence_position__
   - Type: integer
   - Description: Position that is equivalent to the reference sequence position that is also given
-  
-### Annotation
 
-- __start_position*__
+</details>
+
+### Region
+
+Annotation of a protein sequence.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __start__
   - Type: integer
   - Description: Start position of the annotation. A single start position without an end corresponds to a single amino acid
-- __end_position__
+- __end__
   - Type: integer
-  - Description: Optional end position if the annoation contains more than a single amino acid.
-- __function*__
+  - Description: Optional end position if the annotation contains more than a single amino acid
+- note
   - Type: string
-  - Description: Function that is found in the annotated amino acid or sub-sequence
+  - Description: Information found in 'note' of an ncbi protein sequence entry
+- name
+  - Type: string
+  - Description: Name of the annotation
+- cross_reference
+  - Type: string
+  - Description: Database cross reference
 
+</details>
+
+### Site
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: string
+  - Description: Name of the site
+- type
+  - Type: string
+  - Description: Type of the site
+- positions
+  - Type: integer
+  - Description: Positions of the site
+  - Multiple: True
+- cross_reference
+  - Type: string
+  - Description: Database cross reference
+
+</details>
+  
 ### DNASequence
 
-- __protein_sequence_id*__
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __sequence__
   - Type: string
-  - Description: Reference to the corresponding protein sequence to which this DNA sequence translates 
+  - Description: The DNA sequence
+- __organism__
+  - Type: [Organism](#Organism)
+  - Description: Corresponding organism
+
+</details>

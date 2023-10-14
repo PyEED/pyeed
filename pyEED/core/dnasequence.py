@@ -1,32 +1,27 @@
 import sdRDM
 
-from typing import Optional, Union
-from pydantic import PrivateAttr
+from typing import Optional
 from pydantic import Field
-from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from .organism import Organism
 
 
 @forge_signature
 class DNASequence(sdRDM.DataModel):
-    id: str = Field(
+    """"""
+
+    id: Optional[str] = Field(
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("dnasequenceINDEX"),
         xml="@id",
     )
 
-    protein_sequence_id: str = Field(
+    sequence: str = Field(
         ...,
-        description=(
-            "Reference to the corresponding protein sequence to which this DNA sequence"
-            " translates"
-        ),
+        description="The DNA sequence",
     )
 
-    __repo__: Optional[str] = PrivateAttr(
-        default="git://github.com/PyEED/pyeed-data-model.git"
-    )
-
-    __commit__: Optional[str] = PrivateAttr(
-        default="9b23f1fd7a004c59bd50c5619397d5142f5754f0"
+    organism: Organism = Field(
+        ...,
+        description="Corresponding organism",
     )
