@@ -7,11 +7,11 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
 from tqdm import tqdm
-from .equivalence import Equivalence
-from .organism import Organism
+from .region import Region
 from .site import Site
 from .dnasequence import DNASequence
-from .region import Region
+from .organism import Organism
+from .equivalence import Equivalence
 from ..io_handler.sequence import _seqio_to_protein_sequence
 
 
@@ -95,7 +95,7 @@ class ProteinSequence(sdRDM.DataModel):
     )
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="de1ea68a5301068047a6413d4ca4d8473be3816b"
+        default="ebd06330df7dc0565be6a6c082743cf11e5cf272"
     )
 
     def add_to_regions(

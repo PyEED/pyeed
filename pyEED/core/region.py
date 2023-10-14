@@ -47,5 +47,5 @@ class Region(sdRDM.DataModel):
     )
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="de1ea68a5301068047a6413d4ca4d8473be3816b"
+        default="ebd06330df7dc0565be6a6c082743cf11e5cf272"
     )
