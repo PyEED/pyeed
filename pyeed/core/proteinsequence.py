@@ -4,13 +4,11 @@ from typing import List, Optional
 from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-
-
+from .dnasequence import DNASequence
 from .organism import Organism
 from .region import Region
-from .site import Site
-from .dnasequence import DNASequence
 from .equivalence import Equivalence
+from .site import Site
 
 
 @forge_signature
@@ -57,7 +55,7 @@ class ProteinSequence(sdRDM.DataModel):
 
     ec_number: Optional[str] = Field(
         default=None,
-        regex="(\d+.)(\d+.)(\d+.)(\d+)",
+        regex="(\\d+.)(\\d+.)(\\d+.)(\\d+)",
         description="Enzyme Commission number",
     )
 
@@ -91,10 +89,9 @@ class ProteinSequence(sdRDM.DataModel):
         default_factory=ListPlus,
         multiple=True,
     )
-
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
     __commit__: Optional[str] = PrivateAttr(
-        default="dd65c92455ca29480957e8eb4d499c275bbc16e7"
+        default="3622b8daa8d71ed70c4b167c1024997a6b63278d"
     )
 
     def add_to_regions(
@@ -117,7 +114,6 @@ class ProteinSequence(sdRDM.DataModel):
             name (): Name of the annotation. Defaults to None
             cross_reference (): Database cross reference. Defaults to None
         """
-
         params = {
             "start": start,
             "end": end,
@@ -125,12 +121,9 @@ class ProteinSequence(sdRDM.DataModel):
             "name": name,
             "cross_reference": cross_reference,
         }
-
         if id is not None:
             params["id"] = id
-
         self.regions.append(Region(**params))
-
         return self.regions[-1]
 
     def add_to_sites(
@@ -151,19 +144,15 @@ class ProteinSequence(sdRDM.DataModel):
             positions (): Positions of the site. Defaults to ListPlus()
             cross_reference (): Database cross reference. Defaults to None
         """
-
         params = {
             "name": name,
             "type": type,
             "positions": positions,
             "cross_reference": cross_reference,
         }
-
         if id is not None:
             params["id"] = id
-
         self.sites.append(Site(**params))
-
         return self.sites[-1]
 
     def add_to_equivalence(
@@ -177,15 +166,11 @@ class ProteinSequence(sdRDM.DataModel):
             reference_position (): Equivalent position in the reference sequence.
             sequence_position (): Position that is equivalent to the reference sequence position that is also given.
         """
-
         params = {
             "reference_position": reference_position,
             "sequence_position": sequence_position,
         }
-
         if id is not None:
             params["id"] = id
-
         self.equivalence.append(Equivalence(**params))
-
         return self.equivalence[-1]
