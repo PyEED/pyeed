@@ -10,7 +10,6 @@ python = ">=3.9,<3.13"
 pydantic = "1.10"
 biopython = "^1.81"
 numpy = "^1.26.0"
-ipykernel = "^6.25.2"
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", rev = "linking-refactor"}
 
 

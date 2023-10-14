@@ -6,11 +6,12 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
-from .site import Site
-from .equivalence import Equivalence
+from tqdm import tqdm
 from .dnasequence import DNASequence
-from .region import Region
+from .equivalence import Equivalence
 from .organism import Organism
+from .region import Region
+from .site import Site
 from ..io_handler.sequence import _seqio_to_protein_sequence
 
 
@@ -220,14 +221,14 @@ class ProteinSequence(sdRDM.DataModel):
     def _get_cds(self):
         pass
 
-    def _pblast(self, sequence: str, n_hits: int = None):
+    def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinSequence"]:
+        print(f"Running blast search for query {self.id}...")
         result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
         blast_record = NCBIXML.read(result_handle)
 
         accessions = self._get_accessions(blast_record)
-
         sequences = []
-        for acc in accessions:
+        for acc in tqdm(accessions, desc="Fetching protein sequences"):
             sequences.append(ProteinSequence.from_ncbi(acc))
 
         return sequences
