@@ -1,14 +1,21 @@
 import sdRDM
 
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
+<<<<<<< HEAD
 from tqdm import tqdm
 from .dnasequence import DNASequence
 from .equivalence import Equivalence
+=======
+from .region import Region
+from .equivalence import Equivalence
+from .site import Site
+from .dnasequence import DNASequence
+>>>>>>> b15126d2db795c3fc878cb3286254a19e6926072
 from .organism import Organism
 from .region import Region
 from .site import Site
@@ -92,6 +99,10 @@ class ProteinSequence(sdRDM.DataModel):
         description="Positions where the given sequence is equivalent to the reference",
         default_factory=ListPlus,
         multiple=True,
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed.git")
+    __commit__: Optional[str] = PrivateAttr(
+        default="73fe06fa32d40a3a1bd71455bc2052c013d24984"
     )
 
     def add_to_regions(
