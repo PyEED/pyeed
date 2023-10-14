@@ -215,36 +215,30 @@ class ProteinSequence(sdRDM.DataModel):
         Returns:
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
-        return _pblast(self.sequence, n_hits)
-    
+        return self._pblast(self.sequence, n_hits)
+
     def _get_cds(self):
+        pass
 
-        
+    def _pblast(self, sequence: str, n_hits: int = None):
+        result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
+        blast_record = NCBIXML.read(result_handle)
 
+        accessions = self._get_accessions(blast_record)
 
-@staticmethod
-def _pblast(sequence: str, n_hits: int = None):
-    result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
-    blast_record = NCBIXML.read(result_handle)
+        sequences = []
+        for acc in accessions:
+            sequences.append(ProteinSequence.from_ncbi(acc))
 
-    accessions = _get_accessions(blast_record)
+        return sequences
 
-    sequences = []
-    for acc in accessions:
-        sequences.append(ProteinSequence.from_ncbi(acc))
+    def _nblast(sequence: str, n_hits: int = None) -> List["ProteinSequence"]:
+        result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
+        blast_record = NCBIXML.read(result_handle)
 
-    return sequences
-
-
-@staticmethod
-def _nblast(sequence: str, n_hits: int = None) -> List[ProteinSequence]:
-    result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
-    blast_record = NCBIXML.read(result_handle)
-
-
-@staticmethod
-def _get_accessions(blast_record: NCBIXML) -> List[str]:
-    accessions = []
-    for alignment in blast_record.alignments:
-        accessions.append(alignment.accession)
-    return accessions
+    @staticmethod
+    def _get_accessions(blast_record: NCBIXML) -> List[str]:
+        accessions = []
+        for alignment in blast_record.alignments:
+            accessions.append(alignment.accession)
+        return accessions
