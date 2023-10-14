@@ -1,3 +1,3 @@
 
 __URL__ = "https://github.com/PyEED/pyeed.git"
-__COMMIT__ = "3622b8daa8d71ed70c4b167c1024997a6b63278d"
+__COMMIT__ = "f44867fdfe39152f045044bf5dd35bc121f1989b"
