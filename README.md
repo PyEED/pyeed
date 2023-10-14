@@ -21,4 +21,4 @@ pip install git+https://github.com/PyEED/pyeed.git
 - [ ] Storing `ProtenSequence` in a SQL database
 - [ ] Running alignment
 - [ ] Network analysis
-- [ ] Network visualization
+- [ ] Network visualisation
