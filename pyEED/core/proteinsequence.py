@@ -6,16 +6,9 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
-<<<<<<< HEAD
 from tqdm import tqdm
 from .dnasequence import DNASequence
 from .equivalence import Equivalence
-=======
-from .region import Region
-from .equivalence import Equivalence
-from .site import Site
-from .dnasequence import DNASequence
->>>>>>> b15126d2db795c3fc878cb3286254a19e6926072
 from .organism import Organism
 from .region import Region
 from .site import Site
