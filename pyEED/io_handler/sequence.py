@@ -1,7 +1,7 @@
 from Bio import SeqIO
 
-from pyeed.core.region import Region
-from pyeed.core.site import Site
+from pyEED.core.region import Region
+from pyEED.core.site import Site
 
 from ..core.organism import Organism
 
