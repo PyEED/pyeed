@@ -7,12 +7,12 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
 from tqdm import tqdm
-from .dnasequence import DNASequence
 from .equivalence import Equivalence
 from .organism import Organism
-from .region import Region
 from .site import Site
-from ..io_handler.sequence import _seqio_to_protein_sequence
+from .nucleotidesequence import NucleotideSequence
+from .region import Region
+from ..ncbi.seq_io import _seqio_to_protein_sequence, extract_nucleotide_seq
 
 
 @forge_signature
@@ -52,9 +52,9 @@ class ProteinSequence(sdRDM.DataModel):
         multiple=True,
     )
 
-    cds: Optional[DNASequence] = Field(
-        default=None,
-        description="Corresponding DNA coding sequence",
+    coding_sequence: Optional[NucleotideSequence] = Field(
+        default=NucleotideSequence(),
+        description="Information about the coding sequence for the protein sequence",
     )
 
     ec_number: Optional[str] = Field(
@@ -81,11 +81,6 @@ class ProteinSequence(sdRDM.DataModel):
     pdb_id: Optional[str] = Field(
         default=None,
         description="Identifier for the PDB database",
-    )
-
-    reference_sequence: Optional[str] = Field(
-        default=None,
-        description="Identifier of the sequence used as reference",
     )
 
     equivalence: List[Equivalence] = Field(
@@ -190,6 +185,7 @@ class ProteinSequence(sdRDM.DataModel):
         seq_record = cls._get_ncbi_entry(accession_id, "protein")
         return _seqio_to_protein_sequence(cls, seq_record)
 
+    @staticmethod
     def _get_ncbi_entry(
         accession_id: str, database: str, email: str = "exon@got-spliced.com"
     ) -> SeqIO.SeqRecord:
@@ -218,11 +214,15 @@ class ProteinSequence(sdRDM.DataModel):
         """
         return self._pblast(self.sequence, n_hits)
 
-    def _get_cds(self):
-        pass
+    def get_nucleotide_seq(self):
+        seq_record = self._get_ncbi_entry(
+            accession_id=self.coding_sequence.id, database="nucleotide"
+        )
+
+        extract_nucleotide_seq(seq_record, self.coding_sequence)
 
     def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinSequence"]:
-        print(f"Running blast search for query {self.id}...")
+        print(f"Running blast search for {self.name} from {self.organism.name}...")
         result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
         blast_record = NCBIXML.read(result_handle)
 
@@ -243,3 +243,7 @@ class ProteinSequence(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
+
+    @property
+    def nucleotide_seq(self):
+        return self.coding_sequence.sequence

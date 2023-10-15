@@ -28,9 +28,9 @@ Description of a protein sequence and its annotations
   - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
-- cds
-  - Type: [DNASequence](#DNASequence)
-  - Description: Corresponding DNA coding sequence
+- coding_sequence
+  - Type: [NucleotideSequence](#NucleotideSequence)
+  - Description: Information about the coding sequence for the protein sequence
 - ec_number
   - Type: string
   - Regex: (\d+.)(\d+.)(\d+.)(\d+)
@@ -47,9 +47,6 @@ Description of a protein sequence and its annotations
 - pdb_id
   - Type: string
   - Description: Identifier for the PDB database
-- reference_sequence
-  - Type: string
-  - Description: Identifier of the sequence used as reference
 - equivalence
   - Type: [Equivalence](#Equivalence)
   - Description: Positions where the given sequence is equivalent to the reference
@@ -89,7 +86,7 @@ Description of an organism.
 
 ### Region
 
-Annotation of a protein sequence.
+Annotation of a region within a sequence.
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -132,17 +129,27 @@ Annotation of a protein sequence.
   - Description: Database cross reference
 
 </details>
-  
-### DNASequence
+
+### NucleotideSequence
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- __sequence__
+- regions
+  - Type: [Region](#Region)
+  - Description: Defines regions within the nucleotide sequence that code for the protein sequence
+  - Multiple: True
+- molecule_type
   - Type: string
-  - Description: The DNA sequence
-- __organism__
-  - Type: [Organism](#Organism)
-  - Description: Corresponding organism
+  - Description: Type of the sequence
+- protein_id
+  - Type: string
+  - Description: Identifier of the corresponding protein sequence
+- gene_id
+  - Type: string
+  - Description: Identifier of the corresponding gene
+- sequence
+  - Type: string
+  - Description: The nucleotide sequence coding for the protein sequence
 
 </details>

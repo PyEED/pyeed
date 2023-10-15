@@ -4,8 +4,8 @@ classDiagram
     ProteinSequence *-- Equivalence
     ProteinSequence *-- Region
     ProteinSequence *-- Site
-    ProteinSequence *-- DNASequence
-    DNASequence *-- Organism
+    ProteinSequence *-- NucleotideSequence
+    NucleotideSequence *-- Region
     
     class ProteinSequence {
         +string name*
@@ -13,13 +13,12 @@ classDiagram
         +Organism organism*
         +Region[0..*] regions
         +Site[0..*] sites
-        +DNASequence cds
+        +NucleotideSequence coding_sequence
         +string ec_number
         +float mol_weight
         +string nr_id
         +string uniprot_id
         +string pdb_id
-        +string reference_sequence
         +Equivalence[0..*] equivalence
     }
     
@@ -48,9 +47,12 @@ classDiagram
         +string cross_reference
     }
     
-    class DNASequence {
-        +string sequence*
-        +Organism organism*
+    class NucleotideSequence {
+        +Region[0..*] regions
+        +string molecule_type
+        +string protein_id
+        +string gene_id
+        +string sequence
     }
     
 ```
