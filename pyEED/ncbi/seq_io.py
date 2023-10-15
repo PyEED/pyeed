@@ -33,6 +33,8 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
             pdb_id = entry.id
         else:
             pdb_id = None
+    else:
+        pdb_id = None
 
     sites = []
     protein_regions = []
@@ -103,6 +105,9 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
                 id=cds_id, regions=cds_regions, gene_id=gene_id
             )
 
+        if "CDS" not in [feature.type for feature in entry.features]:
+            coding_sequence = None
+
     return cls(
         id=entry.id,
         name=protein_name,
@@ -123,6 +128,7 @@ def get_cds_info(coded_by: dict) -> Tuple[str, List[Region]]:
     cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
     # Extract all regions from the 'coded_by' qualifier
+    coded_by = coded_by.replace(">", "")
     cds_regions = re.findall(cds_pattern, coded_by)
     cds_regions = [region.replace(" ", "") for region in cds_regions]
 

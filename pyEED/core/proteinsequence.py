@@ -215,6 +215,9 @@ class ProteinSequence(sdRDM.DataModel):
         return self._pblast(self.sequence, n_hits)
 
     def get_nucleotide_seq(self):
+        if not self.coding_sequence:
+            return
+
         seq_record = self._get_ncbi_entry(
             accession_id=self.coding_sequence.id, database="nucleotide"
         )
