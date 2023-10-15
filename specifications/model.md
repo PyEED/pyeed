@@ -6,7 +6,7 @@ The PyEED data model provides a object data structure for protein sequences and 
 
 ### ProteinSequence
 
-Description of a protein sequence and its annotations
+Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -56,7 +56,7 @@ Description of a protein sequence and its annotations
 
 ### Organism
 
-Description of an organism.
+Description of an organism 🦠.
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -70,23 +70,9 @@ Description of an organism.
 
 </details>
 
-### Equivalence
-
-<details>
-  <summary><i>Inspect attributes</i></summary>
-
-- __reference_position__
-  - Type: integer
-  - Description: Equivalent position in the reference sequence
-- __sequence_position__
-  - Type: integer
-  - Description: Position that is equivalent to the reference sequence position that is also given
-
-</details>
-
 ### Region
 
-Annotation of a region within a sequence.
+Annotation of a region within a sequence 🗺️.
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -111,6 +97,8 @@ Annotation of a region within a sequence.
 
 ### Site
 
+Annotation of a site within a sequence 📍.
+
 <details>
   <summary><i>Inspect attributes</i></summary>
 
@@ -130,7 +118,23 @@ Annotation of a region within a sequence.
 
 </details>
 
+### Equivalence
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- __reference_position__
+  - Type: integer
+  - Description: Equivalent position in the reference sequence
+- __sequence_position__
+  - Type: integer
+  - Description: Position that is equivalent to the reference sequence position that is also given
+
+</details>
+
 ### NucleotideSequence
+
+Description of a nucleotide sequence 🧬.
 
 <details>
   <summary><i>Inspect attributes</i></summary>
