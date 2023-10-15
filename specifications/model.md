@@ -1,7 +1,5 @@
 # PyEED Data Model
 
-The PyEED data model provides a object data structure for protein sequences and their annotations.
-
 ## Objects
 
 ### ProteinSequence
