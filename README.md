@@ -8,9 +8,15 @@
 
 ## Installation ⚙️
 
+Install pyEED by running
 ```bash
 pip install git+https://github.com/PyEED/pyeed.git
 ```
+or update pyEED to get the latest features.
+```bash
+pip install --force-reinstall --no-deps git+https://github.com/PyEED/pyeed.git
+```
+
 
 ## 🛣️ Roadmap
 
