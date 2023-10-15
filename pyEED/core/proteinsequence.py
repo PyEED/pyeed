@@ -12,7 +12,7 @@ from .organism import Organism
 from .site import Site
 from .nucleotidesequence import NucleotideSequence
 from .region import Region
-from ..io_handler.sequence import _seqio_to_protein_sequence, extract_nucleotide_seq
+from ..ncbi.seq_io import _seqio_to_protein_sequence, extract_nucleotide_seq
 
 
 @forge_signature
