@@ -3,7 +3,7 @@ from .organism import Organism
 from .equivalence import Equivalence
 from .region import Region
 from .site import Site
-from .dnasequence import DNASequence
+from .nucleotidesequence import NucleotideSequence
 
 __doc__ = ""
 __all__ = [
@@ -12,5 +12,5 @@ __all__ = [
     "Equivalence",
     "Region",
     "Site",
-    "DNASequence",
+    "NucleotideSequence",
 ]
