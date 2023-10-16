@@ -1097,8 +1097,8 @@ numpy = ">=1,<2"
 pandas = ">=1.2.5,<3"
 parsy = ">=2,<3"
 pins = {version = ">=0.8.2,<1", extras = ["gcs"]}
+psycopg2 = {version = ">=2.8.4,<3", optional = true, markers = "extra == \"all\" or extra == \"postgres\""}
 pyarrow = ">=2,<14"
-pymysql = {version = ">=1,<2", optional = true, markers = "extra == \"all\" or extra == \"mysql\""}
 python-dateutil = ">=2.8.2,<3"
 pytz = ">=2022.7"
 rich = ">=12.4.4,<14"
@@ -1816,6 +1816,26 @@ files = [
 ]
 
 [[package]]
+name = "psycopg2"
+version = "2.9.9"
+description = "psycopg2 - Python-PostgreSQL Database Adapter"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "psycopg2-2.9.9-cp310-cp310-win32.whl", hash = "sha256:38a8dcc6856f569068b47de286b472b7c473ac7977243593a288ebce0dc89516"},
+    {file = "psycopg2-2.9.9-cp310-cp310-win_amd64.whl", hash = "sha256:426f9f29bde126913a20a96ff8ce7d73fd8a216cfb323b1f04da402d452853c3"},
+    {file = "psycopg2-2.9.9-cp311-cp311-win32.whl", hash = "sha256:ade01303ccf7ae12c356a5e10911c9e1c51136003a9a1d92f7aa9d010fb98372"},
+    {file = "psycopg2-2.9.9-cp311-cp311-win_amd64.whl", hash = "sha256:121081ea2e76729acfb0673ff33755e8703d45e926e416cb59bae3a86c6a4981"},
+    {file = "psycopg2-2.9.9-cp37-cp37m-win32.whl", hash = "sha256:5e0d98cade4f0e0304d7d6f25bbfbc5bd186e07b38eac65379309c4ca3193efa"},
+    {file = "psycopg2-2.9.9-cp37-cp37m-win_amd64.whl", hash = "sha256:7e2dacf8b009a1c1e843b5213a87f7c544b2b042476ed7755be813eaf4e8347a"},
+    {file = "psycopg2-2.9.9-cp38-cp38-win32.whl", hash = "sha256:ff432630e510709564c01dafdbe996cb552e0b9f3f065eb89bdce5bd31fabf4c"},
+    {file = "psycopg2-2.9.9-cp38-cp38-win_amd64.whl", hash = "sha256:bac58c024c9922c23550af2a581998624d6e02350f4ae9c5f0bc642c633a2d5e"},
+    {file = "psycopg2-2.9.9-cp39-cp39-win32.whl", hash = "sha256:c92811b2d4c9b6ea0285942b2e7cac98a59e166d59c588fe5cfe1eda58e72d59"},
+    {file = "psycopg2-2.9.9-cp39-cp39-win_amd64.whl", hash = "sha256:de80739447af31525feddeb8effd640782cf5998e1a4e9192ebdf829717e3913"},
+    {file = "psycopg2-2.9.9.tar.gz", hash = "sha256:d1454bde93fb1e224166811694d600e746430c006fbb031ea06ecc2ea41bf156"},
+]
+
+[[package]]
 name = "pyarrow"
 version = "13.0.0"
 description = "Python library for Apache Arrow"
@@ -1981,21 +2001,6 @@ files = [
 
 [package.extras]
 plugins = ["importlib-metadata"]
-
-[[package]]
-name = "pymysql"
-version = "1.1.0"
-description = "Pure Python MySQL Driver"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "PyMySQL-1.1.0-py3-none-any.whl", hash = "sha256:8969ec6d763c856f7073c4c64662882675702efcb114b4bcbb955aea3a069fa7"},
-    {file = "PyMySQL-1.1.0.tar.gz", hash = "sha256:4f13a7df8bf36a51e81dd9f3605fede45a4878fe02f9236349fd82a3f0612f96"},
-]
-
-[package.extras]
-ed25519 = ["PyNaCl (>=1.4.0)"]
-rsa = ["cryptography"]
 
 [[package]]
 name = "python-dateutil"
@@ -2231,18 +2236,25 @@ resolved_reference = "2f409d067c3e56b1fea53bd77cd07c1d1dc215ba"
 
 [[package]]
 name = "sdrdm-database"
-version = "0.2.0"
+version = "0.3.0"
 description = "An sdRDM-based framework to utilize databases"
 optional = false
-python-versions = ">=3.9,<4.0"
-files = [
-    {file = "sdrdm_database-0.2.0-py3-none-any.whl", hash = "sha256:9b70494cb692a2d76b5d91418aac8f4852f3ec816fa449d7798f1740395ec669"},
-    {file = "sdrdm_database-0.2.0.tar.gz", hash = "sha256:36931bf0168b005e3ca494a6bd752bdb092aa77c78975d9e414dcd86ec2463b9"},
-]
+python-versions = "^3.9"
+files = []
+develop = false
 
 [package.dependencies]
-ibis-framework = {version = ">=7.0.0,<8.0.0", extras = ["mysql"]}
+ibis-framework = {version = "^7.0.0", extras = ["postgres"]}
 pydantic = "1.10"
+
+[package.extras]
+duckdb = []
+
+[package.source]
+type = "git"
+url = "https://github.com/JR-1991/sdrdm-database.git"
+reference = "data-insertion"
+resolved_reference = "e34de3940f4763043520e6e823ea349851737f1a"
 
 [[package]]
 name = "six"
@@ -2765,4 +2777,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "00299c7639c2522f08c3cb2aec23e269be5ac64ea056ba7a4733eaae45a0430e"
+content-hash = "f103b775ffa1a49bae112079518df1130adda634ce64e6d8999edbcc1c858a57"
