@@ -5,6 +5,10 @@ description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [
+    { include = "pyEED/core" },
+    { include = "pyEED/ncbi" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
