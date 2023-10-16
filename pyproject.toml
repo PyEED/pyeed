@@ -15,7 +15,6 @@ sdrdm-database = {extras = ["mysql"], version = "^0.3.0"}
 sqlalchemy = "^2.0.22"
 pymysql = "^1.1.0"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
