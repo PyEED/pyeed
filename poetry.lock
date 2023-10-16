@@ -285,13 +285,13 @@ test = ["hypothesis", "pytest", "pytest-benchmark[histogram]", "pytest-cov", "py
 
 [[package]]
 name = "bigtree"
-version = "0.13.1"
+version = "0.13.2"
 description = "Tree Implementation and Methods for Python, integrated with Python list, dictionary, and pandas DataFrame."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "bigtree-0.13.1-py3-none-any.whl", hash = "sha256:9a8cd31552f236d19f5b9c91fdcfe4dae3d605902fe1bd2128fba880b062264c"},
-    {file = "bigtree-0.13.1.tar.gz", hash = "sha256:bab7263c11534389620c0d309135268d9c7d60c99817a1eea24365e8349c7c98"},
+    {file = "bigtree-0.13.2-py3-none-any.whl", hash = "sha256:c55368a0f06c5d45ac72d4c50470fd475e654ba8d88931b42cce2eddf79cf89b"},
+    {file = "bigtree-0.13.2.tar.gz", hash = "sha256:261460bbde44c6e7a51b65f6b21ccbec06a873b4b618d4543d0b6573932cf3bd"},
 ]
 
 [package.extras]
@@ -2748,4 +2748,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b250467d2cecf3e0d812e4014fbe38d69601898261cd72a1ce192e5cf38aac28"
+content-hash = "4a5cfb41204c8c71dfe2bd632b81ff71946f97ce138f2e1e278b7c326d85e71f"
