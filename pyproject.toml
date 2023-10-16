@@ -13,7 +13,6 @@ tqdm = "^4.66.1"
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", rev = "linking-refactor"}
 sdrdm-database = {git = "https://github.com/JR-1991/sdrdm-database.git", rev = "data-insertion"}
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
