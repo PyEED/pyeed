@@ -9,7 +9,7 @@ from .region import Region
 
 @forge_signature
 class NucleotideSequence(sdRDM.DataModel):
-    """"""
+    """Description of a nucleotide sequence 🧬."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",

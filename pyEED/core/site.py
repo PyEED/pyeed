@@ -8,7 +8,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 
 @forge_signature
 class Site(sdRDM.DataModel):
-    """"""
+    """Annotation of a site within a sequence 📍."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",

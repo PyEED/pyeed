@@ -1,9 +1,9 @@
 ```mermaid
 classDiagram
     ProteinSequence *-- Organism
-    ProteinSequence *-- Equivalence
     ProteinSequence *-- Region
     ProteinSequence *-- Site
+    ProteinSequence *-- Equivalence
     ProteinSequence *-- NucleotideSequence
     NucleotideSequence *-- Region
     
@@ -27,11 +27,6 @@ classDiagram
         +string taxonomy_id*
     }
     
-    class Equivalence {
-        +integer reference_position*
-        +integer sequence_position*
-    }
-    
     class Region {
         +integer start*
         +integer end*
@@ -45,6 +40,11 @@ classDiagram
         +string type
         +integer[0..*] positions
         +string cross_reference
+    }
+    
+    class Equivalence {
+        +integer reference_position*
+        +integer sequence_position*
     }
     
     class NucleotideSequence {

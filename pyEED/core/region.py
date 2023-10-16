@@ -7,7 +7,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 
 @forge_signature
 class Region(sdRDM.DataModel):
-    """Annotation of a region within a sequence."""
+    """Annotation of a region within a sequence 🗺️."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
