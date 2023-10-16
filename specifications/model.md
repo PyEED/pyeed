@@ -31,7 +31,6 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Description: Information about the coding sequence for the protein sequence
 - ec_number
   - Type: string
-  - Regex: (\d+.)(\d+.)(\d+.)(\d+)
   - Description: Enzyme Commission number
 - mol_weight
   - Type: float

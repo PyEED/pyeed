@@ -7,7 +7,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 
 @forge_signature
 class Organism(sdRDM.DataModel):
-    """Description of an organism."""
+    """Description of an organism 🦠."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",

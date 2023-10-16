@@ -8,16 +8,16 @@ from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
 from tqdm import tqdm
 from .equivalence import Equivalence
-from .organism import Organism
-from .site import Site
 from .nucleotidesequence import NucleotideSequence
+from .site import Site
 from .region import Region
+from .organism import Organism
 from ..ncbi.seq_io import _seqio_to_protein_sequence, extract_nucleotide_seq
 
 
 @forge_signature
 class ProteinSequence(sdRDM.DataModel):
-    """Description of a protein sequence and its annotations"""
+    """Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -59,7 +59,6 @@ class ProteinSequence(sdRDM.DataModel):
 
     ec_number: Optional[str] = Field(
         default=None,
-        regex="(\\d+.)(\\d+.)(\\d+.)(\\d+)",
         description="Enzyme Commission number",
     )
 
