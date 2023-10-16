@@ -62,12 +62,17 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
             )
 
         if feature.type == "Region":
+            if "db_xref" in feature.qualifiers:
+                cross_reference = feature.qualifiers["db_xref"][0]
+            else:
+                cross_reference = None
+
             protein_regions.append(
                 Region(
                     name=feature.qualifiers["region_name"][0],
                     start=int(feature.location.start),
                     end=int(feature.location.end),
-                    cross_reference=feature.qualifiers["db_xref"][0],
+                    cross_reference=cross_reference,
                     note=feature.qualifiers["note"][0],
                 )
             )
@@ -80,11 +85,16 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
             else:
                 name = site_type
 
+            if "db_xref" in feature.qualifiers:
+                cross_reference = feature.qualifiers["db_xref"][0]
+            else:
+                cross_reference = None
+
             sites.append(
                 Site(
                     name=name,
                     positions=[loc for loc in feature.location],
-                    cross_reference=feature.qualifiers["db_xref"][0],
+                    cross_reference=cross_reference,
                     type=site_type,
                 )
             )
