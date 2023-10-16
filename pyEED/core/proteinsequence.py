@@ -1,3 +1,5 @@
+import time
+from requests import HTTPError
 import sdRDM
 
 from typing import List, Optional
@@ -230,8 +232,24 @@ class ProteinSequence(sdRDM.DataModel):
 
         accessions = self._get_accessions(blast_record)
         sequences = []
+        bad_requests = []
         for acc in tqdm(accessions, desc="Fetching protein sequences"):
-            sequences.append(ProteinSequence.from_ncbi(acc))
+            try:
+                sequences.append(ProteinSequence.from_ncbi(acc))
+                time.sleep(1)
+
+            except HTTPError:
+                bad_requests.append(acc)
+
+        if bad_requests:
+            print(f"\nEncountered {len(bad_request)} bad HTTP requests, retrying...")
+            for bad_request in tqdm(bad_requests, desc="Fetching protein sequences"):
+                try:
+                    sequences.append(ProteinSequence.from_ncbi(bad_request))
+                    time.sleep(2)
+
+                except HTTPError:
+                    print(f"Failed to fetch {bad_request}")
 
         return sequences
 

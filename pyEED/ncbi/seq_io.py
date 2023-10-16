@@ -118,6 +118,11 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
         if "CDS" not in [feature.type for feature in entry.features]:
             coding_sequence = None
 
+        if "Protein" not in [feature.type for feature in entry.features]:
+            protein_name = entry.description
+            ec_number = None
+            mol_weight = None
+
     return cls(
         id=entry.id,
         name=protein_name,
