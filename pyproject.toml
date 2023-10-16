@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pyEED"
+name = "pyeed"
 version = "0.1.0"
 description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
