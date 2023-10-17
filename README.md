@@ -6,8 +6,8 @@
 [![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)
 
 ## About 📖
-pyEED is a toolkit enabling object-oriented analysis of protein sequences. Instead of working with sequences in a file-oriented fashion, pyEED tools will provide a framework to work with sequences and their corresponding information in an object-oriented fashion. This will enable the user to easily access and manipulate sequence information and to perform analyses on the sequence data.  
-This library is currently and thus the API is subject to change. Check out the [Roadmap](#roadmap-%EF%B8%8F) for more information.
+pyEED is a toolkit enabling object-oriented analysis of protein sequences, instead of working with sequences in a file-oriented fashion. This will enable the user to easily access and manipulate sequence information and to perform analyses on the sequence data.  
+This library is currently under development and thus the API is subject to change. Check out the [Roadmap](#roadmap-%EF%B8%8F) for more information. If you have feature ideas, or notes issues with pyEED, submit an [issue](https://github.com/PyEED/pyeed/issues).
 
 
 ## Installation ⚙️
