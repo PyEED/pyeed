@@ -7,7 +7,7 @@
 
 ## About 📖
 pyEED is a toolkit enabling object-oriented analysis of protein sequences. Instead of working with sequences in a file-oriented fashion, pyEED tools will provide a framework to work with sequences and their corresponding information in an object-oriented fashion. This will enable the user to easily access and manipulate sequence information and to perform analyses on the sequence data.  
-This library is currently and thus the API is subject to change. Check out the [Roadmap](#-Roadmap) for more information.
+This library is currently and thus the API is subject to change. Check out the [Roadmap](#roadmap-) for more information.
 
 
 ## Installation ⚙️
@@ -44,7 +44,7 @@ print(blast_results[1].nucleotide_seq)
 ```
 
 A proper documentation is in the making 🐛
-## 🛣️ Roadmap
+## Roadmap 🛣️
 
 - [x] `ProteinSequence` data model: Object-oriented representation of a protein sequence database entry.
 - [x] `ProteinSequence` query: get protein sequence by accession id from NCBI database
