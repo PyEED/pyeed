@@ -1,4 +1,5 @@
 import time
+import secrets
 from requests import HTTPError
 import sdRDM
 
@@ -188,8 +189,12 @@ class ProteinSequence(sdRDM.DataModel):
 
     @staticmethod
     def _get_ncbi_entry(
-        accession_id: str, database: str, email: str = "exon@got-spliced.com"
+        accession_id: str, database: str, email: str = None
     ) -> SeqIO.SeqRecord:
+        # generate generic mail if none is given
+        if email is None:
+            email = f"{secrets.token_hex(8)}@gmail.com"
+
         Entrez.email = email
 
         databases = {"nucleotide", "protein"}
@@ -204,8 +209,8 @@ class ProteinSequence(sdRDM.DataModel):
         handle.close()
         return seq_record
 
-    def blast(self, n_hits: int) -> List["ProteinSequence"]:
-        """Makes a blast search with the given sequence.
+    def pblast(self, n_hits: int) -> List["ProteinSequence"]:
+        """Run protein blast for `ProteinSequence`.
 
         Args:
             n_hits (int): Number of hits to return.
@@ -226,7 +231,7 @@ class ProteinSequence(sdRDM.DataModel):
         extract_nucleotide_seq(seq_record, self.coding_sequence)
 
     def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinSequence"]:
-        print(f"Running blast search for {self.name} from {self.organism.name}...")
+        print(f"Running pblast search for {self.name} from {self.organism.name}...")
         result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
         blast_record = NCBIXML.read(result_handle)
 
