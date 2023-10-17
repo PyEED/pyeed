@@ -26,7 +26,7 @@ To create a new environment, run the following command from a terminal:
 conda create --name pyeed_env python=3.10
 ```
 
-In this case, the vrtual environment is named `pyeed_env` and uses Python 3.10.
+In this case, the virtual environment is named `pyeed_env` and uses Python 3.10.
 
 ### Activating the environment
 
