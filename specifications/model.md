@@ -44,10 +44,6 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
 - pdb_id
   - Type: string
   - Description: Identifier for the PDB database
-- equivalence
-  - Type: [Equivalence](#Equivalence)
-  - Description: Positions where the given sequence is equivalent to the reference
-  - Multiple: True
 
 </details>
 
@@ -115,19 +111,6 @@ Annotation of a site within a sequence 📍.
 
 </details>
 
-### Equivalence
-
-<details>
-  <summary><i>Inspect attributes</i></summary>
-
-- __reference_position__
-  - Type: integer
-  - Description: Equivalent position in the reference sequence
-- __sequence_position__
-  - Type: integer
-  - Description: Position that is equivalent to the reference sequence position that is also given
-
-</details>
 
 ### NucleotideSequence
 

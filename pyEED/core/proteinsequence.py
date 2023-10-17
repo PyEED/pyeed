@@ -1,20 +1,19 @@
-import time
-import secrets
-from requests import HTTPError
 import sdRDM
 
+import time
+import secrets
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from requests import HTTPError
 from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
 from tqdm import tqdm
-from .equivalence import Equivalence
-from .nucleotidesequence import NucleotideSequence
-from .site import Site
 from .region import Region
+from .site import Site
 from .organism import Organism
+from .nucleotidesequence import NucleotideSequence
 from ..ncbi.seq_io import _seqio_to_protein_sequence, extract_nucleotide_seq
 
 
@@ -85,12 +84,6 @@ class ProteinSequence(sdRDM.DataModel):
         description="Identifier for the PDB database",
     )
 
-    equivalence: List[Equivalence] = Field(
-        description="Positions where the given sequence is equivalent to the reference",
-        default_factory=ListPlus,
-        multiple=True,
-    )
-
     def add_to_regions(
         self,
         start: int,
@@ -151,26 +144,6 @@ class ProteinSequence(sdRDM.DataModel):
             params["id"] = id
         self.sites.append(Site(**params))
         return self.sites[-1]
-
-    def add_to_equivalence(
-        self, reference_position: int, sequence_position: int, id: Optional[str] = None
-    ) -> None:
-        """
-        This method adds an object of type 'Equivalence' to attribute equivalence
-
-        Args:
-            id (str): Unique identifier of the 'Equivalence' object. Defaults to 'None'.
-            reference_position (): Equivalent position in the reference sequence.
-            sequence_position (): Position that is equivalent to the reference sequence position that is also given.
-        """
-        params = {
-            "reference_position": reference_position,
-            "sequence_position": sequence_position,
-        }
-        if id is not None:
-            params["id"] = id
-        self.equivalence.append(Equivalence(**params))
-        return self.equivalence[-1]
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinSequence":
