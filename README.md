@@ -33,7 +33,7 @@ from pyEED.ncbi.utils import get_nucleotide_sequences
 tem1 = ProteinSequence.from_ncbi("QGC48744.1")
 
 # Start a blast search with the protein sequence of tem1 as query
-blast_results = tem1.blast(n_hits=10)
+blast_results = tem1.pblast(n_hits=10)
 
 # Get the corresponding nucleotide sequences of all blast results
 get_nucleotide_sequences(blast_results)
