@@ -4,7 +4,7 @@
 
 ### ProteinSequence
 
-Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
+Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. 
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -26,9 +26,6 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
-- coding_sequence
-  - Type: [NucleotideSequence](#NucleotideSequence)
-  - Description: Information about the coding sequence for the protein sequence
 - ec_number
   - Type: string
   - Description: Enzyme Commission number
