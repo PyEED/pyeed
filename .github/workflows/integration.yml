@@ -21,7 +21,6 @@ jobs:
           pip install -e .
       - name: Run example
         run: |
-            cd ./examples
             python .github/scripts/example.py
             echo "Done"
     services:
