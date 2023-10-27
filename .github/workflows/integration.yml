@@ -1,4 +1,4 @@
-name: Integration Tests (MySQL, Postgres)
+name: Integration Tests (MySQL)
 
 on: [push]
 
