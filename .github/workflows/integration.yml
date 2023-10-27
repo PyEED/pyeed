@@ -17,14 +17,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ibis-framework[mysql]
-          pip install ibis-framework[postgres]
           pip install jupyter nbconvert
           pip install -e .
       - name: Run example
         run: |
             cd ./examples
-            jupyter nbconvert --execute ./query_and_blast.ipynb
+            jupyter nbconvert --to python ./query_and_blast.ipynb
+            python ./query_and_blast.py
             echo "Done"
     services:
       mysql:
