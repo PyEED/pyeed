@@ -15,7 +15,7 @@ blast_results = aldolase.pblast(n_hits=10)
 get_nucleotide_sequences(blast_results)
 
 # Establish a connection to the database
-db = DBConnector(**toml.load(open("./env.toml")))
+db = DBConnector(**toml.load(open(".github/scripts/env.toml")))
 
 # Insert all blast results into the database
 db.insert(*blast_results, verbose=True)
