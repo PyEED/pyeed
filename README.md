@@ -50,7 +50,7 @@ A proper documentation is in the making 🐛
 - [x] `ProteinSequence` query: get protein sequence by accession id from NCBI database
 - [x] Blast search: get protein sequnces as a result from a blast search
 - [x] Retrieve corresponding coding sequence
-- [ ] Storing `ProtenSequence` in a SQL database
+- [x] Storing `ProtenSequence` in a SQL database
 - [ ] Running alignments
 - [ ] Create phylogenetic trees
 - [ ] Network analysis / visualization
