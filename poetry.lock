@@ -314,6 +314,10 @@ files = [
     {file = "biopython-1.81-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a51d9c1d1b4b634447535da74a644fae59bc234fbbf9001e2dc6b6fbabb98019"},
     {file = "biopython-1.81-cp311-cp311-win32.whl", hash = "sha256:2f9cfaf16d55ab80d514e7aebe5710dabe4e4ff47ede851031202e33b3249da3"},
     {file = "biopython-1.81-cp311-cp311-win_amd64.whl", hash = "sha256:e41b55edcfd448630e77bf4de66a7235324a8a149621499891da6bd1d5085b9a"},
+    {file = "biopython-1.81-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:175fcddc9f22a070aa6db54755d60c4b31090cc39f5f5f4b0a9a5d1ae3b45cd7"},
+    {file = "biopython-1.81-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9ec149487f3d1e0cf2b52b6071641c161ed545b0855ff51a71506152e14fc5bb"},
+    {file = "biopython-1.81-cp312-cp312-win32.whl", hash = "sha256:daeab15274bbcc0455cbd378636e14f53bc7c5b1f383e77021d7222e72cc3418"},
+    {file = "biopython-1.81-cp312-cp312-win_amd64.whl", hash = "sha256:22f5741aca91af0a76c0d5617e58e554fd3374bbd16e0c0ac1facf45b107313b"},
     {file = "biopython-1.81-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:3b36ba1bf6395c09a365c53530c9d71f3617763fa2c1d452b3d8948368c0f1de"},
     {file = "biopython-1.81-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7c5c07123ff5f44c9e6b5369df854a38afd3c0c50ef58498a0ae8f7eb799f3e8"},
     {file = "biopython-1.81-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:97cbdbed01b2512471f36c74b91658d1dfbdcbf39bc038f6ce5a41c3e60a8fc6"},
@@ -744,13 +748,13 @@ smmap = ">=3.0.1,<6"
 
 [[package]]
 name = "gitpython"
-version = "3.1.38"
+version = "3.1.40"
 description = "GitPython is a Python library used to interact with Git repositories"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "GitPython-3.1.38-py3-none-any.whl", hash = "sha256:9e98b672ffcb081c2c8d5aa630d4251544fb040fb158863054242f24a2a2ba30"},
-    {file = "GitPython-3.1.38.tar.gz", hash = "sha256:4d683e8957c8998b58ddb937e3e6cd167215a180e1ffd4da769ab81c620a89fe"},
+    {file = "GitPython-3.1.40-py3-none-any.whl", hash = "sha256:cf14627d5a8049ffbf49915732e5eddbe8134c3bdb9d476e6182b676fc573f8a"},
+    {file = "GitPython-3.1.40.tar.gz", hash = "sha256:22b126e9ffb671fdd0c129796343a02bf67bf2994b35449ffc9321aa755e18a4"},
 ]
 
 [package.dependencies]
@@ -1098,9 +1102,12 @@ pandas = ">=1.2.5,<3"
 parsy = ">=2,<3"
 pins = {version = ">=0.8.2,<1", extras = ["gcs"]}
 pyarrow = ">=2,<14"
+pymysql = {version = ">=1,<2", optional = true, markers = "extra == \"all\" or extra == \"mysql\""}
 python-dateutil = ">=2.8.2,<3"
 pytz = ">=2022.7"
 rich = ">=12.4.4,<14"
+sqlalchemy = {version = ">=1.4,<3", optional = true, markers = "extra == \"all\" or extra == \"clickhouse\" or extra == \"druid\" or extra == \"duckdb\" or extra == \"impala\" or extra == \"mssql\" or extra == \"mysql\" or extra == \"oracle\" or extra == \"postgres\" or extra == \"pyspark\" or extra == \"sqlite\" or extra == \"trino\""}
+sqlalchemy-views = {version = ">=0.3.1,<1", optional = true, markers = "extra == \"all\" or extra == \"duckdb\" or extra == \"mssql\" or extra == \"mysql\" or extra == \"oracle\" or extra == \"postgres\" or extra == \"snowflake\" or extra == \"sqlite\" or extra == \"trino\""}
 sqlglot = ">=18.7.0,<19"
 toolz = ">=0.11,<1"
 typing-extensions = ">=4.3.0,<5"
@@ -2228,18 +2235,23 @@ resolved_reference = "2f409d067c3e56b1fea53bd77cd07c1d1dc215ba"
 
 [[package]]
 name = "sdrdm-database"
-version = "0.3.0"
+version = "0.4.0"
 description = "An sdRDM-based framework to utilize databases"
 optional = false
 python-versions = ">=3.9,<4.0"
 files = [
-    {file = "sdrdm_database-0.3.0-py3-none-any.whl", hash = "sha256:dfa0ca2df694597156aae9b1886276655e5781e7e18bf8f6556ef62d1829261d"},
-    {file = "sdrdm_database-0.3.0.tar.gz", hash = "sha256:afa588a204063b68488fdf4b0ad5148debb599b4e17025a5a0375efef30919f4"},
+    {file = "sdrdm_database-0.4.0-py3-none-any.whl", hash = "sha256:25ac401b95079da5e65be5c249319fc1606e1306ae1b90a233ed7e81be2daea8"},
+    {file = "sdrdm_database-0.4.0.tar.gz", hash = "sha256:f65d92768a5cdd812f92733309d3e2cca775ce45c07faa6ea294e380a9b0e207"},
 ]
 
 [package.dependencies]
-ibis-framework = ">=7.0.0,<8.0.0"
+gitpython = ">=3.1.40,<4.0.0"
+ibis-framework = {version = ">=7.0.0,<8.0.0", extras = ["mysql"]}
+joblib = ">=1.3.2,<2.0.0"
 pydantic = "1.10"
+strawberry-graphql = ">=0.209.8,<0.210.0"
+typer = ">=0.9.0,<0.10.0"
+validators = ">=0.22.0,<0.23.0"
 
 [[package]]
 name = "six"
@@ -2350,6 +2362,20 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3-binary"]
 
 [[package]]
+name = "sqlalchemy-views"
+version = "0.3.2"
+description = "Adds CreateView and DropView constructs to SQLAlchemy"
+optional = false
+python-versions = "*"
+files = [
+    {file = "sqlalchemy-views-0.3.2.tar.gz", hash = "sha256:c396416939bc4459c71f15c0279b72c9eb1f92fe022afe7fa74ed3adeef76e3b"},
+    {file = "sqlalchemy_views-0.3.2-py3-none-any.whl", hash = "sha256:53a376efc8badbbd6d2d360f0d03fc70f1f5ee7748cf169506ea8a6e4f20326c"},
+]
+
+[package.dependencies]
+sqlalchemy = ">=1.0.0"
+
+[[package]]
 name = "sqlglot"
 version = "18.13.0"
 description = "An easily customizable SQL parser and transpiler"
@@ -2362,6 +2388,39 @@ files = [
 
 [package.extras]
 dev = ["autoflake", "black", "duckdb (>=0.6)", "isort", "mypy (>=0.990)", "pandas", "pdoc", "pre-commit", "pyspark", "python-dateutil", "types-python-dateutil"]
+
+[[package]]
+name = "strawberry-graphql"
+version = "0.209.8"
+description = "A library for creating GraphQL APIs"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "strawberry_graphql-0.209.8-py3-none-any.whl", hash = "sha256:115184c3bafbe8ea3fddf95862831970fd3a32dd3253568d4a2e5fdb23d75a81"},
+    {file = "strawberry_graphql-0.209.8.tar.gz", hash = "sha256:565392a8a8f70b3653638da8383d748bfcf3d68d50f8eac32c40e15d070e693a"},
+]
+
+[package.dependencies]
+graphql-core = ">=3.2.0,<3.3.0"
+python-dateutil = ">=2.7.0,<3.0.0"
+typing-extensions = ">=4.5.0"
+
+[package.extras]
+aiohttp = ["aiohttp (>=3.7.4.post0,<4.0.0)"]
+asgi = ["python-multipart (>=0.0.5,<0.0.7)", "starlette (>=0.18.0)"]
+chalice = ["chalice (>=1.22,<2.0)"]
+channels = ["asgiref (>=3.2,<4.0)", "channels (>=3.0.5)"]
+cli = ["libcst (>=0.4.7)", "pygments (>=2.3,<3.0)", "rich (>=12.0.0)", "typer (>=0.7.0)"]
+debug = ["libcst (>=0.4.7)", "rich (>=12.0.0)"]
+debug-server = ["libcst (>=0.4.7)", "pygments (>=2.3,<3.0)", "python-multipart (>=0.0.5,<0.0.7)", "rich (>=12.0.0)", "starlette (>=0.18.0)", "typer (>=0.7.0)", "uvicorn (>=0.11.6)"]
+django = ["Django (>=3.2)", "asgiref (>=3.2,<4.0)"]
+fastapi = ["fastapi (>=0.65.2)", "python-multipart (>=0.0.5,<0.0.7)"]
+flask = ["flask (>=1.1)"]
+opentelemetry = ["opentelemetry-api (<2)", "opentelemetry-sdk (<2)"]
+pydantic = ["pydantic (>1.6.1)"]
+pyinstrument = ["pyinstrument (>=4.0.0)"]
+sanic = ["sanic (>=20.12.2)"]
+starlite = ["starlite (>=1.48.0)"]
 
 [[package]]
 name = "termcolor"
@@ -2748,4 +2807,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "4a5cfb41204c8c71dfe2bd632b81ff71946f97ce138f2e1e278b7c326d85e71f"
+content-hash = "aa54a3c891d49e1744c219e34a26a87a78563e38c5ac776be88c1cbe9f91dd58"

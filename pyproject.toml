@@ -15,7 +15,7 @@ python = "^3.9"
 biopython = "^1.81"
 tqdm = "^4.66.1"
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", branch = "linking-refactor"}
-sdrdm-database = {extras = ["mysql"], version = "^0.3.0"}
+sdrdm-database = {extras = ["mysql"], version = "^0.4.0"}
 sqlalchemy = "^2.0.22"
 pymysql = "^1.1.0"
 
