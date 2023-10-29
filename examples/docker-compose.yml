@@ -12,5 +12,9 @@ services:
       - '3306:3306'
     expose:
       - '3306'
-    volumes:
+    volumes: # Uncomment to persist data
       - ${PWD}/data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 40s
+      retries: 10
