@@ -1,8 +1,8 @@
 # PyEED Data Model
 
-## Objects
+## Macro Molecules
 
-### ProteinSequence
+### ProteinInfo
 
 Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
 
@@ -19,7 +19,7 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Organism](#Organism)
   - Description: Corresponding organism
 - regions
-  - Type: [Region](#Region)
+  - Type: [ProteinRegion](#ProteinRegion)
   - Description: Domains of the protein
   - Multiple: True
 - sites
@@ -47,29 +47,50 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
 
 </details>
 
-### Organism
+### DNAInfo
 
-Description of an organism 🦠.
+Description of a nucleotide sequence 🧬
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
 - name
   - Type: string
-  - Description: Name of the organism
-- __taxonomy_id__
+  - Description: Name of the nucleotide sequence
+- sequence
   - Type: string
-  - Description: NCBI Taxonomy ID to identify the organism
+  - Description: The nucleotide sequence coding for the protein sequence
+- regions
+  - Type: [DNARegion](#DNARegion)
+  - Description: Defines regions within the nucleotide sequence that code for the protein sequence
+  - Multiple: True
+- organism
+  - Type: [Organism](#Organism)
+  - Description: Corresponding organism
+- molecule_type
+  - Type: string
+  - Description: Type of the sequence
+- protein_id
+  - Type: string
+  - Description: Identifier of the corresponding protein sequence
+- gene_id
+  - Type: string
+  - Description: Identifier of the corresponding gene
 
 </details>
 
-### Region
+## Annotations
 
-Annotation of a region within a sequence 🗺️.
+### AbstractRegion
+
+Annotation of a region within a sequence 🗺️
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
+- name
+  - Type: string
+  - Description: Name of the annotation
 - __start__
   - Type: integer
   - Description: Start position of the annotation. A single start position without an end corresponds to a single amino acid
@@ -79,18 +100,27 @@ Annotation of a region within a sequence 🗺️.
 - note
   - Type: string
   - Description: Information found in 'note' of an ncbi protein sequence entry
-- name
-  - Type: string
-  - Description: Name of the annotation
 - cross_reference
   - Type: string
   - Description: Database cross reference
 
 </details>
 
+### DNARegion[_AbstractRegion_]
+
+- type
+  - Type: [DNARegionType](#DNARegionType)
+  - Description: Type of the region within the nucleotide sequence
+
+### ProteinRegion[_AbstractRegion_]
+
+- type
+  - Type: [ProteinRegionType](#ProteinRegionType)
+  - Description: Type of the region within the protein sequence
+
 ### Site
 
-Annotation of a site within a sequence 📍.
+Annotation of a site within a sequence 📍
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -111,29 +141,71 @@ Annotation of a site within a sequence 📍.
 
 </details>
 
+### Organism
 
-### NucleotideSequence
-
-Description of a nucleotide sequence 🧬.
+Description of an organism 🦠
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- regions
-  - Type: [Region](#Region)
-  - Description: Defines regions within the nucleotide sequence that code for the protein sequence
-  - Multiple: True
-- molecule_type
+- name
   - Type: string
-  - Description: Type of the sequence
-- protein_id
+  - Description: Name of the organism
+- __taxonomy_id__
   - Type: string
-  - Description: Identifier of the corresponding protein sequence
-- gene_id
+  - Description: NCBI Taxonomy ID to identify the organism
+- rank
   - Type: string
-  - Description: Identifier of the corresponding gene
-- sequence
-  - Type: string
-  - Description: The nucleotide sequence coding for the protein sequence
+  - Description: Taxonomic rank of the organism
 
 </details>
+
+## Enumerations
+
+Differentiation between binding sites and binding site region. (Binding site, Binding region)
+Any site annotations for a DNA sequence?
+
+Annotation as solely a "domain"?
+
+### ProteinSiteType
+
+```python
+ACTIVE = "active"
+BINDING = "binding"
+METAL_BINDING = "metal"
+POST_TRANS_MODIFICATION = "post-translational modification"
+UNANNOTATED = "unannotated"
+```
+
+### DNARegionType
+
+```python
+CODING_SEQUENCE = "coding sequence"
+EXON = "exon"
+INTRON = "intron"
+PROMOTER = "promoter"
+ENHANCER = "enhancer"
+UNANNOTATED = "unannotated"
+```
+
+### ProteinRegionType
+
+```python
+DOMAIN = "domain"
+SIGNAL_PEPTIDE = "signal peptide"
+TRANSMEMBRANE = "transmembrane"
+UNANNOTATED = "unannotated"
+```
+
+### TaxonomicRank
+
+```python
+DOMAIN = "domain"
+KINGDOM = "kingdom"
+PHYLUM = "phylum"
+CLASS = "class"
+ORDER = "order"
+FAMILY = "family"
+GENUS = "genus"
+SPECIES = "species"
+```
