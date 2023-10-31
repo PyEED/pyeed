@@ -26,9 +26,6 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
-- coding_sequence
-  - Type: [NucleotideSequence](#NucleotideSequence)
-  - Description: Information about the coding sequence for the protein sequence
 - ec_number
   - Type: string
   - Description: Enzyme Commission number
@@ -154,9 +151,30 @@ Description of an organism 🦠
 - __taxonomy_id__
   - Type: string
   - Description: NCBI Taxonomy ID to identify the organism
-- rank
+- domain
   - Type: string
-  - Description: Taxonomic rank of the organism
+  - Description: Domain of the organism
+- kingdom
+  - Type: string
+  - Description: Kingdom of the organism
+- phylum
+  - Type: string
+  - Description: Phylum of the organism
+- class
+  - Type: string
+  - Description: Class of the organism
+- order
+  - Type: string
+  - Description: Order of the organism
+- family
+  - Type: string
+  - Description: Family of the organism
+- genus
+  - Type: string
+  - Description: Genus of the organism
+- species
+  - Type: string
+  - Description: Species of the organism
 
 </details>
 
