@@ -1,6 +1,6 @@
 # PyEED Data Model
 
-## Macro Molecules
+## Macromolecules
 
 ### ProteinInfo
 
@@ -9,6 +9,9 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
+- source_id
+  - Type: string
+  - Description: Identifier of the protein sequence in the source database
 - __name__
   - Type: string
   - Description: Name of the protein
@@ -26,21 +29,16 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
+- cds_references
+  - Type: [DNARegion](#DNARegion)
+  - Description: Defines the coding sequence of the protein
+  - Multiple: True
 - ec_number
   - Type: string
   - Description: Enzyme Commission number
 - mol_weight
   - Type: float
   - Description: Calculated molecular weight of the protein
-- nr_id
-  - Type: string
-  - Description: Identifier for the NCBI NR database
-- uniprot_id
-  - Type: string
-  - Description: Identifier for the UniProt database
-- pdb_id
-  - Type: string
-  - Description: Identifier for the PDB database
 
 </details>
 
@@ -54,25 +52,19 @@ Description of a nucleotide sequence 🧬
 - name
   - Type: string
   - Description: Name of the nucleotide sequence
-- sequence
+- __sequence__
   - Type: string
   - Description: The nucleotide sequence coding for the protein sequence
+- organism
+  - Type: [Organism](#Organism)
+  - Description: Corresponding organism
 - regions
   - Type: [DNARegion](#DNARegion)
   - Description: Defines regions within the nucleotide sequence that code for the protein sequence
   - Multiple: True
-- organism
-  - Type: [Organism](#Organism)
-  - Description: Corresponding organism
-- molecule_type
+- source_id
   - Type: string
-  - Description: Type of the sequence
-- protein_id
-  - Type: string
-  - Description: Identifier of the corresponding protein sequence
-- gene_id
-  - Type: string
-  - Description: Identifier of the corresponding gene
+  - Description: Identifier of the corresponding DNA sequence
 
 </details>
 
@@ -90,10 +82,10 @@ Annotation of a region within a sequence 🗺️
   - Description: Name of the annotation
 - __start__
   - Type: integer
-  - Description: Start position of the annotation. A single start position without an end corresponds to a single amino acid
+  - Description: Start position of the annotation
 - __end__
   - Type: integer
-  - Description: Optional end position if the annotation contains more than a single amino acid
+  - Description: End position of the annotation
 - note
   - Type: string
   - Description: Information found in 'note' of an ncbi protein sequence entry
@@ -126,7 +118,7 @@ Annotation of a site within a sequence 📍
   - Type: string
   - Description: Name of the site
 - type
-  - Type: string
+  - Type: ProteinSiteType
   - Description: Type of the site
 - positions
   - Type: integer
@@ -160,7 +152,7 @@ Description of an organism 🦠
 - phylum
   - Type: string
   - Description: Phylum of the organism
-- class
+- tax_class
   - Type: string
   - Description: Class of the organism
 - order
@@ -179,11 +171,6 @@ Description of an organism 🦠
 </details>
 
 ## Enumerations
-
-Differentiation between binding sites and binding site region. (Binding site, Binding region)
-Any site annotations for a DNA sequence?
-
-Annotation as solely a "domain"?
 
 ### ProteinSiteType
 
@@ -213,17 +200,4 @@ DOMAIN = "domain"
 SIGNAL_PEPTIDE = "signal peptide"
 TRANSMEMBRANE = "transmembrane"
 UNANNOTATED = "unannotated"
-```
-
-### TaxonomicRank
-
-```python
-DOMAIN = "domain"
-KINGDOM = "kingdom"
-PHYLUM = "phylum"
-CLASS = "class"
-ORDER = "order"
-FAMILY = "family"
-GENUS = "genus"
-SPECIES = "species"
 ```

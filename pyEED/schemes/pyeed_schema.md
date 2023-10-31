@@ -1,51 +1,98 @@
 ```mermaid
 classDiagram
-    ProteinSequence *-- Organism
-    ProteinSequence *-- Region
-    ProteinSequence *-- Site
-    ProteinSequence *-- NucleotideSequence
-    NucleotideSequence *-- Region
+    AbstractRegion <-- DNARegion
+    AbstractRegion <-- ProteinRegion
+    ProteinInfo *-- DNARegion
+    ProteinInfo *-- ProteinRegion
+    ProteinInfo *-- Site
+    ProteinInfo *-- Organism
+    DNAInfo *-- DNARegion
+    DNAInfo *-- Organism
+    DNARegion *-- DNARegionType
+    ProteinRegion *-- ProteinRegionType
+    Site *-- ProteinSiteType
     
-    class ProteinSequence {
+    class ProteinInfo {
+        +string source_id
         +string name*
         +string sequence*
         +Organism organism*
-        +Region[0..*] regions
+        +ProteinRegion[0..*] regions
         +Site[0..*] sites
-        +NucleotideSequence coding_sequence
+        +DNARegion[0..*] cds_references
         +string ec_number
         +float mol_weight
-        +string nr_id
-        +string uniprot_id
-        +string pdb_id
+    }
+    
+    class DNAInfo {
+        +string name
+        +string sequence*
+        +Organism organism
+        +DNARegion[0..*] regions
+        +string source_id
+    }
+    
+    class AbstractRegion {
+        +string name
+        +integer start*
+        +integer end*
+        +string note
+        +string cross_reference
+    }
+    
+    class DNARegion {
+        +DNARegionType type
+    }
+    
+    class ProteinRegion {
+        +ProteinRegionType type
+    }
+    
+    class Site {
+        +string name
+        +ProteinSiteType type
+        +integer[0..*] positions
+        +string cross_reference
     }
     
     class Organism {
         +string name
         +string taxonomy_id*
+        +string domain
+        +string kingdom
+        +string phylum
+        +string tax_class
+        +string order
+        +string family
+        +string genus
+        +string species
     }
     
-    class Region {
-        +integer start*
-        +integer end*
-        +string note
-        +string name
-        +string cross_reference
+    class ProteinSiteType {
+        << Enumeration >>
+        +ACTIVE
+        +BINDING
+        +METAL_BINDING
+        +POST_TRANS_MODIFICATION
+        +UNANNOTATED
     }
     
-    class Site {
-        +string name
-        +string type
-        +integer[0..*] positions
-        +string cross_reference
+    class DNARegionType {
+        << Enumeration >>
+        +CODING_SEQUENCE
+        +EXON
+        +INTRON
+        +PROMOTER
+        +ENHANCER
+        +UNANNOTATED
     }
     
-    class NucleotideSequence {
-        +Region[0..*] regions
-        +string molecule_type
-        +string protein_id
-        +string gene_id
-        +string sequence
+    class ProteinRegionType {
+        << Enumeration >>
+        +DOMAIN
+        +SIGNAL_PEPTIDE
+        +TRANSMEMBRANE
+        +UNANNOTATED
     }
     
 ```

@@ -1,8 +1,24 @@
-from .proteinsequence import ProteinSequence
-from .organism import Organism
-from .region import Region
+from .proteininfo import ProteinInfo
+from .dnainfo import DNAInfo
+from .abstractregion import AbstractRegion
+from .dnaregion import DNARegion
+from .proteinregion import ProteinRegion
 from .site import Site
-from .nucleotidesequence import NucleotideSequence
+from .organism import Organism
+from .proteinsitetype import ProteinSiteType
+from .dnaregiontype import DNARegionType
+from .proteinregiontype import ProteinRegionType
 
 __doc__ = ""
-__all__ = ["ProteinSequence", "Organism", "Region", "Site", "NucleotideSequence"]
+__all__ = [
+    "ProteinInfo",
+    "DNAInfo",
+    "AbstractRegion",
+    "DNARegion",
+    "ProteinRegion",
+    "Site",
+    "Organism",
+    "ProteinSiteType",
+    "DNARegionType",
+    "ProteinRegionType",
+]
