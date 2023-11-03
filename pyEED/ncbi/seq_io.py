@@ -103,17 +103,54 @@ def _seqio_to_dna_info(cls, entry: SeqIO):
 
 def get_organism(annotations, feature) -> Organism:
     taxonomy = annotations["taxonomy"]
+    print(feature.qualifiers["db_xref"][0])
+
+    try:
+        domain = taxonomy[0]
+    except IndexError:
+        domain = None
+
+    try:
+        kingdom = taxonomy[1]
+    except IndexError:
+        kingdom = None
+
+    try:
+        phylum = taxonomy[3]
+    except IndexError:
+        phylum = None
+
+    try:
+        tax_class = taxonomy[5]
+    except IndexError:
+        tax_class = None
+
+    try:
+        order = taxonomy[9]
+    except IndexError:
+        order = None
+
+    try:
+        family = taxonomy[13]
+    except IndexError:
+        family = None
+
+    try:
+        genus = taxonomy[14]
+    except IndexError:
+        genus = None
 
     return Organism(
         name=feature.qualifiers["organism"][0],
         taxonomy_id=feature.qualifiers["db_xref"][0],
-        domain=taxonomy[0],
-        kingdom=taxonomy[1],
-        phylum=taxonomy[3],
-        tax_class=taxonomy[5],
-        order=taxonomy[9],
-        family=taxonomy[13],
-        genus=taxonomy[14],
+        domain=domain,
+        kingdom=kingdom,
+        phylum=phylum,
+        tax_class=tax_class,
+        order=order,
+        family=family,
+        genus=genus,
+        species=feature.qualifiers["organism"][0].split(" ")[1],
     )
 
 
