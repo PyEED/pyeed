@@ -33,7 +33,7 @@ class Site(sdRDM.DataModel):
         multiple=True,
     )
 
-    cross_reference: Optional[str] = Field(
+    cross_ref: Optional[str] = Field(
         default=None,
         description="Database cross reference",
     )

@@ -29,10 +29,9 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Site](#Site)
   - Description: Annotations of different sites
   - Multiple: True
-- cds_references
+- coding_sequence_ref
   - Type: [DNARegion](#DNARegion)
   - Description: Defines the coding sequence of the protein
-  - Multiple: True
 - ec_number
   - Type: string
   - Description: Enzyme Commission number
@@ -80,15 +79,13 @@ Annotation of a region within a sequence 🗺️
 - name
   - Type: string
   - Description: Name of the annotation
-- __start__
-  - Type: integer
-  - Description: Start position of the annotation
-- __end__
-  - Type: integer
-  - Description: End position of the annotation
+- spans
+  - Type: [Span](#Span)
+  - Description: Spans of the region. E.g. multiple exons of a gene
+  - Multiple: True
 - note
   - Type: string
-  - Description: Information found in 'note' of an ncbi protein sequence entry
+  - Description: Information found in 'note' of an ncbi entry
 - cross_reference
   - Type: string
   - Description: Database cross reference
@@ -107,6 +104,20 @@ Annotation of a region within a sequence 🗺️
   - Type: [ProteinRegionType](#ProteinRegionType)
   - Description: Type of the region within the protein sequence
 
+### Span
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- start
+  - Type: integer
+  - Description: Start position of the span of a region
+- end
+  - Type: integer
+  - Description: End position of the span of a region
+
+</details>
+
 ### Site
 
 Annotation of a site within a sequence 📍
@@ -124,7 +135,7 @@ Annotation of a site within a sequence 📍
   - Type: integer
   - Description: Positions of the site
   - Multiple: True
-- cross_reference
+- cross_ref
   - Type: string
   - Description: Database cross reference
 
@@ -188,6 +199,7 @@ UNANNOTATED = "unannotated"
 CODING_SEQUENCE = "coding sequence"
 EXON = "exon"
 INTRON = "intron"
+GENE = "gene"
 PROMOTER = "promoter"
 ENHANCER = "enhancer"
 UNANNOTATED = "unannotated"

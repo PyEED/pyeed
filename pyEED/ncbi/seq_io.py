@@ -14,6 +14,8 @@ from pyEED.core.span import Span
 
 from ..core.organism import Organism
 
+GENEID_PATTERN = r"GeneID:\d+"
+
 
 def get_ncbi_entry(
     accession_id: str, database: str, email: str = None
@@ -51,7 +53,68 @@ def SeqIO_to_pyeed(entry: SeqIO):
 
 
 def _seqio_to_dna_info(cls, entry: SeqIO):
-    print(entry)
+    regions = []
+    for feature in entry.features:
+        if feature.type == "gene":
+            regions.append(
+                DNARegion(
+                    name=feature.qualifiers["gene"][0],
+                    spans=[
+                        Span(
+                            start=int(feature.location.start),
+                            end=int(feature.location.end),
+                        )
+                    ],
+                    cross_reference=re.findall(
+                        GENEID_PATTERN, "".join(feature.qualifiers["db_xref"])
+                    )[0],
+                    note=feature.qualifiers["note"][0],
+                    type=DNARegionType.GENE,
+                )
+            )
+
+        if feature.type == "CDS":
+            regions.append(
+                DNARegion(
+                    name=feature.qualifiers["product"][0],
+                    spans=[
+                        Span(
+                            start=int(feature.location.start),
+                            end=int(feature.location.end),
+                        )
+                    ],
+                    cross_reference=feature.qualifiers["protein_id"][0],
+                    note=feature.qualifiers["note"][0],
+                    type=DNARegionType.CODING_SEQUENCE,
+                )
+            )
+
+        if feature.type == "source":
+            organism = get_organism(entry.annotations, feature)
+
+    return cls(
+        source_id=entry.id,
+        name=entry.description,
+        sequence=str(entry.seq),
+        regions=regions,
+        organism=organism,
+    )
+
+
+def get_organism(annotations, feature) -> Organism:
+    taxonomy = annotations["taxonomy"]
+
+    return Organism(
+        name=feature.qualifiers["organism"][0],
+        taxonomy_id=feature.qualifiers["db_xref"][0],
+        domain=taxonomy[0],
+        kingdom=taxonomy[1],
+        phylum=taxonomy[3],
+        tax_class=taxonomy[5],
+        order=taxonomy[9],
+        family=taxonomy[13],
+        genus=taxonomy[14],
+    )
 
 
 def _seqio_to_nucleotide_info(cls, entry: SeqIO):
@@ -76,20 +139,7 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
                 ec_number = None
 
         if feature.type == "source":
-            organism = Organism(
-                name=feature.qualifiers["organism"][0],
-                taxonomy_id=feature.qualifiers["db_xref"][0],
-            )
-
-            taxonomy = entry.annotations["taxonomy"]
-
-            organism.domain = taxonomy[0]
-            organism.kingdom = taxonomy[1]
-            organism.phylum = taxonomy[3]
-            organism.tax_class = taxonomy[5]
-            organism.order = taxonomy[9]
-            organism.family = taxonomy[13]
-            organism.genus = taxonomy[14]
+            organism = get_organism(entry.annotations, feature)
 
         if feature.type == "Region":
             if "db_xref" in feature.qualifiers:
@@ -185,28 +235,3 @@ def get_cds_regions(coded_by: dict) -> List[DNARegion]:
         )
 
     return region
-
-
-def extract_nucleotide_seq(entry: SeqIO, nucleotide_sequence: "DNAInfo"):
-    """Handel nucleotide SeqIO entry and map it to `NucleotideSequence`"""
-
-    feature_regions = set()
-    for region in nucleotide_sequence.regions:
-        feature_regions.add(region.start)
-        feature_regions.add(region.end)
-
-    for feature in entry.features:
-        if feature.type == "CDS":
-            if isinstance(feature.location, CompoundLocation):
-                locations = set()
-                parts = feature.location.parts
-                for part in parts:
-                    # TODO: investigate reason for +1
-                    locations.add(int(part.start) + 1)
-                    locations.add(int(part.end))
-
-            if isinstance(feature.location, FeatureLocation):
-                locations = {int(feature.location.start) + 1, int(feature.location.end)}
-
-            if feature_regions == locations:
-                nucleotide_sequence.sequence = str(feature.location.extract(entry.seq))

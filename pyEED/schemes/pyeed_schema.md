@@ -8,6 +8,7 @@ classDiagram
     ProteinInfo *-- Organism
     DNAInfo *-- DNARegion
     DNAInfo *-- Organism
+    AbstractRegion *-- Span
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
@@ -19,7 +20,7 @@ classDiagram
         +Organism organism*
         +ProteinRegion[0..*] regions
         +Site[0..*] sites
-        +DNARegion[0..*] cds_references
+        +DNARegion coding_sequence_ref
         +string ec_number
         +float mol_weight
     }
@@ -34,8 +35,7 @@ classDiagram
     
     class AbstractRegion {
         +string name
-        +integer start*
-        +integer end*
+        +Span[0..*] spans
         +string note
         +string cross_reference
     }
@@ -48,11 +48,16 @@ classDiagram
         +ProteinRegionType type
     }
     
+    class Span {
+        +integer start
+        +integer end
+    }
+    
     class Site {
         +string name
         +ProteinSiteType type
         +integer[0..*] positions
-        +string cross_reference
+        +string cross_ref
     }
     
     class Organism {
@@ -82,6 +87,7 @@ classDiagram
         +CODING_SEQUENCE
         +EXON
         +INTRON
+        +GENE
         +PROMOTER
         +ENHANCER
         +UNANNOTATED

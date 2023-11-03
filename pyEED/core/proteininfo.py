@@ -1,23 +1,22 @@
 import sdRDM
 
 import time
-import secrets
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from requests import HTTPError
-from Bio import SeqIO, Entrez
 from Bio.Blast import NCBIWWW, NCBIXML
 from tqdm import tqdm
-from .dnaregion import DNARegion
+from pyEED.core.dnainfo import DNAInfo
 from .proteinregiontype import ProteinRegionType
-from .site import Site
-from .proteinsitetype import ProteinSiteType
-from .dnaregiontype import DNARegionType
 from .proteinregion import ProteinRegion
+from .site import Site
 from .organism import Organism
-from ..ncbi.seq_io import _seqio_to_protein_sequence
+from .proteinsitetype import ProteinSiteType
+from .dnaregion import DNARegion
+from .span import Span
+from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry
 
 
 @forge_signature
@@ -62,10 +61,9 @@ class ProteinInfo(sdRDM.DataModel):
         multiple=True,
     )
 
-    cds_references: List[DNARegion] = Field(
+    coding_sequence_ref: Optional[DNARegion] = Field(
+        default=DNARegion(),
         description="Defines the coding sequence of the protein",
-        default_factory=ListPlus,
-        multiple=True,
     )
 
     ec_number: Optional[str] = Field(
@@ -80,10 +78,9 @@ class ProteinInfo(sdRDM.DataModel):
 
     def add_to_regions(
         self,
-        start: int,
-        end: int,
         type: Optional[ProteinRegionType] = None,
         name: Optional[str] = None,
+        spans: List[Span] = ListPlus(),
         note: Optional[str] = None,
         cross_reference: Optional[str] = None,
         id: Optional[str] = None,
@@ -93,18 +90,16 @@ class ProteinInfo(sdRDM.DataModel):
 
         Args:
             id (str): Unique identifier of the 'ProteinRegion' object. Defaults to 'None'.
-            start (): Start position of the annotation.
-            end (): End position of the annotation.
             type (): Type of the region within the protein sequence. Defaults to None
             name (): Name of the annotation. Defaults to None
-            note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
+            spans (): Spans of the region. E.g. multiple exons of a gene. Defaults to ListPlus()
+            note (): Information found in 'note' of an ncbi entry. Defaults to None
             cross_reference (): Database cross reference. Defaults to None
         """
         params = {
-            "start": start,
-            "end": end,
             "type": type,
             "name": name,
+            "spans": spans,
             "note": note,
             "cross_reference": cross_reference,
         }
@@ -118,7 +113,7 @@ class ProteinInfo(sdRDM.DataModel):
         name: Optional[str] = None,
         type: Optional[ProteinSiteType] = None,
         positions: List[int] = ListPlus(),
-        cross_reference: Optional[str] = None,
+        cross_ref: Optional[str] = None,
         id: Optional[str] = None,
     ) -> None:
         """
@@ -129,53 +124,18 @@ class ProteinInfo(sdRDM.DataModel):
             name (): Name of the site. Defaults to None
             type (): Type of the site. Defaults to None
             positions (): Positions of the site. Defaults to ListPlus()
-            cross_reference (): Database cross reference. Defaults to None
+            cross_ref (): Database cross reference. Defaults to None
         """
         params = {
             "name": name,
             "type": type,
             "positions": positions,
-            "cross_reference": cross_reference,
+            "cross_ref": cross_ref,
         }
         if id is not None:
             params["id"] = id
         self.sites.append(Site(**params))
         return self.sites[-1]
-
-    def add_to_cds_references(
-        self,
-        start: int,
-        end: int,
-        type: Optional[DNARegionType] = None,
-        name: Optional[str] = None,
-        note: Optional[str] = None,
-        cross_reference: Optional[str] = None,
-        id: Optional[str] = None,
-    ) -> None:
-        """
-        This method adds an object of type 'DNARegion' to attribute cds_references
-
-        Args:
-            id (str): Unique identifier of the 'DNARegion' object. Defaults to 'None'.
-            start (): Start position of the annotation.
-            end (): End position of the annotation.
-            type (): Type of the region within the nucleotide sequence. Defaults to None
-            name (): Name of the annotation. Defaults to None
-            note (): Information found in 'note' of an ncbi protein sequence entry. Defaults to None
-            cross_reference (): Database cross reference. Defaults to None
-        """
-        params = {
-            "start": start,
-            "end": end,
-            "type": type,
-            "name": name,
-            "note": note,
-            "cross_reference": cross_reference,
-        }
-        if id is not None:
-            params["id"] = id
-        self.cds_references.append(DNARegion(**params))
-        return self.cds_references[-1]
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
@@ -189,30 +149,8 @@ class ProteinInfo(sdRDM.DataModel):
             ProteinSequence: 'ProteinSequence' object that corresponds to the given NCBI ID.
         """
 
-        seq_record = cls._get_ncbi_entry(accession_id, "protein")
-        return _seqio_to_protein_sequence(cls, seq_record)
-
-    @staticmethod
-    def _get_ncbi_entry(
-        accession_id: str, database: str, email: str = None
-    ) -> SeqIO.SeqRecord:
-        # generate generic mail if none is given
-        if email is None:
-            email = f"{secrets.token_hex(8)}@gmail.com"
-
-        Entrez.email = email
-
-        databases = {"nucleotide", "protein"}
-        if database not in databases:
-            raise ValueError(f"database must be one of {databases}")
-
-        handle = Entrez.efetch(
-            db=database, id=accession_id, rettype="gb", retmode="text"
-        )
-        seq_record = SeqIO.read(handle, "genbank")
-
-        handle.close()
-        return seq_record
+        seq_record = get_ncbi_entry(accession_id, "protein")
+        return _seqio_to_nucleotide_info(cls, seq_record)
 
     def pblast(self, n_hits: int) -> List["ProteinInfo"]:
         """Run protein blast for `ProteinSequence`.
@@ -225,15 +163,12 @@ class ProteinInfo(sdRDM.DataModel):
         """
         return self._pblast(self.sequence, n_hits)
 
-    # def get_nucleotide_seq(self):
-    #     if not self.coding_sequence:
-    #         return
+    def get_dna(self):
+        if not self.coding_sequence_ref:
+            return
 
-    #     seq_record = self._get_ncbi_entry(
-    #         accession_id=self.coding_sequence.id, database="nucleotide"
-    #     )
+        return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
 
-    #     extract_nucleotide_seq(seq_record, self.coding_sequence)
     def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         print(f"Running pblast search for {self.name} from {self.organism.name}...")
         result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
