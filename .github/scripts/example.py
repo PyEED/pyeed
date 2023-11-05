@@ -1,5 +1,5 @@
 import toml
-from pyEED.core.proteinsequence import ProteinInfo
+from pyEED.core.proteininfo import ProteinInfo
 from sdrdm_database import DBConnector
 
 # Get the protein sequence from NCBI
@@ -15,4 +15,4 @@ db = DBConnector(**toml.load(open(".github/scripts/env.toml")))
 
 # Insert all blast results into the database
 db.insert(*blast_results, verbose=True)
-db.connection.table("ProteinSequence")
+db.connection.table("ProteinInfo")
