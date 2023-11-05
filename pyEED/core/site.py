@@ -4,11 +4,12 @@ from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from .proteinsitetype import ProteinSiteType
 
 
 @forge_signature
 class Site(sdRDM.DataModel):
-    """Annotation of a site within a sequence 📍."""
+    """Annotation of a site within a sequence 📍"""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -21,7 +22,7 @@ class Site(sdRDM.DataModel):
         description="Name of the site",
     )
 
-    type: Optional[str] = Field(
+    type: Optional[ProteinSiteType] = Field(
         default=None,
         description="Type of the site",
     )
@@ -32,7 +33,7 @@ class Site(sdRDM.DataModel):
         multiple=True,
     )
 
-    cross_reference: Optional[str] = Field(
+    cross_ref: Optional[str] = Field(
         default=None,
         description="Database cross reference",
     )

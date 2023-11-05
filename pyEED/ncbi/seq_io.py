@@ -1,48 +1,213 @@
 import re
-from typing import List, Tuple
-from Bio import SeqIO
+import secrets
+from tqdm import tqdm
+from typing import List
+from Bio import SeqIO, Entrez
 from Bio.SeqFeature import FeatureLocation, CompoundLocation
-from pyEED.core.nucleotidesequence import NucleotideSequence
+from pyEED.core.dnaregion import DNARegion
+from pyEED.core.dnaregiontype import DNARegionType
+from pyEED.core.proteinregion import ProteinRegion
+from pyEED.core.proteinregiontype import ProteinRegionType
+from pyEED.core.proteinsitetype import ProteinSiteType
 
-from pyEED.core.region import Region
 from pyEED.core.site import Site
+from pyEED.core.span import Span
 
 from ..core.organism import Organism
 
+GENEID_PATTERN = r"GeneID:\d+"
 
-def SeqIO_to_pyeed(entry: SeqIO):
-    """Handel SeqIO entry and return pyeed object."""
 
-    if entry.annotations["molecule_type"] == "protein":
-        return _seqio_to_protein_sequence(entry)
+def get_ncbi_entry(
+    accession_id: str, database: str, email: str = None, api_key: str = None
+) -> SeqIO.SeqRecord:
+    # generate generic mail if none is given
+    if email is None:
+        email = f"{secrets.token_hex(8)}@gmail.com"
 
-    elif entry.annotations["molecule_type"] == "DNA":
-        raise NotImplementedError("DNA is not implemented yet.")
+    databases = {"nucleotide", "protein"}
+    if database not in databases:
+        raise ValueError(f"database must be one of {databases}")
 
+    Entrez.email = email
+    Entrez.api_key = api_key
+
+    handle = Entrez.efetch(
+        db=database, id=accession_id, rettype="gb", retmode="text", api_key=api_key
+    )
+    seq_record = SeqIO.read(handle, "genbank")
+
+    handle.close()
+    return seq_record
+
+
+def get_ncbi_entrys(
+    accession_ids: List[str], database: str, email: str = None, api_key: str = None
+) -> SeqIO.SeqRecord:
+    # generate generic mail if none is given
+    if email is None:
+        email = f"{secrets.token_hex(8)}@gmail.com"
+
+    # Concat accession_ids to string
+    if isinstance(accession_ids, list):
+        accession_id = ",".join(accession_ids)
     else:
-        raise ValueError(
-            f"{entry.id} of type {entry.annotations['molecule_type']} is not 'protein' or 'DNA'."
-        )
+        raise ValueError("Accession_ids must be a list")
+
+    databases = {"nucleotide", "protein"}
+    if database not in databases:
+        raise ValueError(f"database must be one of {databases}")
+
+    # Make request
+    Entrez.email = email
+    Entrez.api_key = api_key
+
+    handle = Entrez.efetch(
+        db=database, id=accession_id, rettype="gb", retmode="text", api_key=api_key
+    )
+
+    seq_records = []
+    for record in tqdm(
+        SeqIO.parse(handle, "genbank"), desc="Fetching protein sequences"
+    ):
+        seq_records.append(record)
+
+    handle.close()
+
+    return seq_records
 
 
-def _seqio_to_protein_sequence(cls, entry: SeqIO):
+# def SeqIO_to_pyeed(entry: SeqIO):
+#     """Handel SeqIO entry and return pyeed object."""
+
+#     if entry.annotations["molecule_type"] == "protein":
+#         return _seqio_to_nucleotide_info(entry)
+
+#     elif entry.annotations["molecule_type"] == "DNA":
+#         raise NotImplementedError("DNA is not implemented yet.")
+
+#     else:
+#         raise ValueError(
+#             f"{entry.id} of type {entry.annotations['molecule_type']} is not 'protein' or 'DNA'."
+#         )
+
+
+def _seqio_to_dna_info(cls, entry: SeqIO):
+    regions = []
+    for feature in entry.features:
+        if feature.type == "gene":
+            regions.append(
+                DNARegion(
+                    name=feature.qualifiers["gene"][0],
+                    spans=[
+                        Span(
+                            start=int(feature.location.start),
+                            end=int(feature.location.end),
+                        )
+                    ],
+                    cross_reference=re.findall(
+                        GENEID_PATTERN, "".join(feature.qualifiers["db_xref"])
+                    )[0],
+                    note=feature.qualifiers["note"][0],
+                    type=DNARegionType.GENE,
+                )
+            )
+
+        if feature.type == "CDS":
+            regions.append(
+                DNARegion(
+                    name=feature.qualifiers["product"][0],
+                    spans=[
+                        Span(
+                            start=int(feature.location.start),
+                            end=int(feature.location.end),
+                        )
+                    ],
+                    cross_reference=feature.qualifiers["protein_id"][0],
+                    note=feature.qualifiers["note"][0],
+                    type=DNARegionType.CODING_SEQUENCE,
+                )
+            )
+
+        if feature.type == "source":
+            organism = get_organism(entry.annotations, feature)
+
+    return cls(
+        source_id=entry.id,
+        name=entry.description,
+        sequence=str(entry.seq),
+        regions=regions,
+        organism=organism,
+    )
+
+
+def get_organism(annotations, feature) -> Organism:
+    taxonomy = annotations["taxonomy"]
+
+    try:
+        domain = taxonomy[0]
+    except IndexError:
+        domain = None
+
+    try:
+        kingdom = taxonomy[1]
+    except IndexError:
+        kingdom = None
+
+    try:
+        phylum = taxonomy[3]
+    except IndexError:
+        phylum = None
+
+    try:
+        tax_class = taxonomy[5]
+    except IndexError:
+        tax_class = None
+
+    try:
+        order = taxonomy[9]
+    except IndexError:
+        order = None
+
+    try:
+        family = taxonomy[13]
+    except IndexError:
+        family = None
+
+    try:
+        genus = taxonomy[14]
+    except IndexError:
+        genus = None
+
+    return Organism(
+        name=feature.qualifiers["organism"][0],
+        taxonomy_id=feature.qualifiers["db_xref"][0],
+        domain=domain,
+        kingdom=kingdom,
+        phylum=phylum,
+        tax_class=tax_class,
+        order=order,
+        family=family,
+        genus=genus,
+        species=feature.qualifiers["organism"][0].split(" ")[1],
+    )
+
+
+def _seqio_to_nucleotide_info(cls, entry: SeqIO):
     """Handel SeqIO entry and return `ProteinSequence`"""
 
-    if "db_source" in entry.annotations:
-        if "pdb" in entry.annotations["db_source"]:
-            pdb_id = entry.id
-        else:
-            pdb_id = None
-    else:
-        pdb_id = None
-
     sites = []
-    protein_regions = []
+    regions = []
     for feature in entry.features:
         # TODO: assert that only one protein is in the file
         if feature.type == "Protein":
             if "product" in feature.qualifiers:
                 protein_name = feature.qualifiers["product"][0]
+            elif "name" in feature.qualifiers:
+                protein_name = feature.qualifiers["name"][0]
+            else:
+                print(f"No name info found in {entry.id}")
+                protein_name = None
 
             if "calculated_mol_wt" in feature.qualifiers:
                 mol_weight = feature.qualifiers["calculated_mol_wt"][0]
@@ -55,11 +220,7 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
                 ec_number = None
 
         if feature.type == "source":
-            organism = Organism(
-                name=feature.qualifiers["organism"][0],
-                taxonomy_id=feature.qualifiers["db_xref"][0].split(":")[1],
-                id=feature.qualifiers["db_xref"][0],
-            )
+            organism = get_organism(entry.annotations, feature)
 
         if feature.type == "Region":
             if "db_xref" in feature.qualifiers:
@@ -67,18 +228,22 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
             else:
                 cross_reference = None
 
-            protein_regions.append(
-                Region(
+            regions.append(
+                ProteinRegion(
                     name=feature.qualifiers["region_name"][0],
-                    start=int(feature.location.start),
-                    end=int(feature.location.end),
+                    spans=[
+                        Span(
+                            start=int(feature.location.start),
+                            end=int(feature.location.end),
+                        )
+                    ],
                     cross_reference=cross_reference,
                     note=feature.qualifiers["note"][0],
                 )
             )
 
         if feature.type == "Site":
-            site_type = feature.qualifiers["site_type"][0]
+            site_type = feature.qualifiers["site_type"][0].lower()
 
             if "note" in feature.qualifiers:
                 name = feature.qualifiers["note"][0]
@@ -94,29 +259,16 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
                 Site(
                     name=name,
                     positions=[loc for loc in feature.location],
-                    cross_reference=cross_reference,
-                    type=site_type,
+                    cross_ref=cross_reference,
+                    type=ProteinSiteType.match_string(site_type),
                 )
             )
 
         if feature.type == "CDS":
-            cds_id, cds_regions = get_cds_info(feature.qualifiers["coded_by"][0])
-
-            # TODO: find better way to discriminate between 'gene' and 'locus_tag'
-            if "gene" in feature.qualifiers:
-                gene_id = feature.qualifiers["gene"][0]
-            else:
-                try:
-                    gene_id = feature.qualifiers["locus_tag"][0]
-                except KeyError:
-                    gene_id = None
-
-            coding_sequence = NucleotideSequence(
-                id=cds_id, regions=cds_regions, gene_id=gene_id
-            )
+            cds_regions = get_cds_regions(feature.qualifiers["coded_by"][0])
 
         if "CDS" not in [feature.type for feature in entry.features]:
-            coding_sequence = None
+            cds_regions = []
 
         if "Protein" not in [feature.type for feature in entry.features]:
             protein_name = entry.description
@@ -124,20 +276,19 @@ def _seqio_to_protein_sequence(cls, entry: SeqIO):
             mol_weight = None
 
     return cls(
-        id=entry.id,
+        source_id=entry.id,
         name=protein_name,
         sequence=str(entry.seq),
         ec_number=ec_number,
         mol_weight=mol_weight,
         organism=organism,
         sites=sites,
-        regions=protein_regions,
-        pdb_id=pdb_id,
-        coding_sequence=coding_sequence,
+        regions=regions,
+        coding_sequence_ref=cds_regions,
     )
 
 
-def get_cds_info(coded_by: dict) -> Tuple[str, List[Region]]:
+def get_cds_regions(coded_by: dict) -> List[DNARegion]:
     """Extract information about the coding sequence from the 'coded_by' qualifier."""
 
     cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
@@ -153,38 +304,15 @@ def get_cds_info(coded_by: dict) -> Tuple[str, List[Region]]:
         print("nucleotide sequence references are not identical.")
 
     # Extract the start and end position of each region
-    regions = []
     cds_ranges = [region.split(":")[1] for region in cds_regions]
     for region in cds_ranges:
         start, end = region.split("..")
-        regions.append(Region(id=reference_ids[0], start=int(start), end=int(end)))
+        span = Span(start=int(start), end=int(end))
 
-    return reference_ids[0], regions
+        region = DNARegion(
+            id=reference_ids[0],
+            spans=[span],
+            type=DNARegionType.CODING_SEQUENCE,
+        )
 
-
-def extract_nucleotide_seq(entry: SeqIO, nucleotide_sequence: NucleotideSequence):
-    """Handel nucleotide SeqIO entry and map it to `NucleotideSequence`"""
-
-    feature_regions = set()
-    for region in nucleotide_sequence.regions:
-        feature_regions.add(region.start)
-        feature_regions.add(region.end)
-
-    for feature in entry.features:
-        if feature.type == "source":
-            nucleotide_sequence.molecule_type = feature.qualifiers["mol_type"][0]
-
-        if feature.type == "CDS":
-            if isinstance(feature.location, CompoundLocation):
-                locations = set()
-                parts = feature.location.parts
-                for part in parts:
-                    # TODO: investigate reason for +1
-                    locations.add(int(part.start) + 1)
-                    locations.add(int(part.end))
-
-            if isinstance(feature.location, FeatureLocation):
-                locations = {int(feature.location.start) + 1, int(feature.location.end)}
-
-            if feature_regions == locations:
-                nucleotide_sequence.sequence = str(feature.location.extract(entry.seq))
+    return region
