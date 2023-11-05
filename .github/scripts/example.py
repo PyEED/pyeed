@@ -1,18 +1,12 @@
 import toml
-
-from pyEED.core.proteinsequence import ProteinSequence
-from pyEED.ncbi.utils import get_nucleotide_sequences
-
+from pyEED.core.proteinsequence import ProteinInfo
 from sdrdm_database import DBConnector
 
-aldolase = ProteinSequence.from_ncbi("NP_001287541.1")
+# Get the protein sequence from NCBI
+aldolase = ProteinInfo.from_ncbi("NP_001287541.1")
 
-# Get the corresponding nucleotide sequence
-aldolase.get_nucleotide_seq()
+# Start a blast search with the protein sequence of tem1 as query
 blast_results = aldolase.pblast(n_hits=10)
-
-# Get the nucleotide sequences of the blast results
-get_nucleotide_sequences(blast_results)
 
 # Establish a connection to the database
 db = DBConnector(**toml.load(open(".github/scripts/env.toml")))
