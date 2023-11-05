@@ -14,5 +14,5 @@ class ProteinSiteType(Enum):
             if type.value == s:
                 return type.value
 
-        print(f"unmatched site type: {s}")
+        # print(f"unmatched site type: {s}")
         return cls.UNANNOTATED.value

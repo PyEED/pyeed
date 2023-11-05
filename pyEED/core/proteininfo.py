@@ -1,22 +1,19 @@
 import sdRDM
 
-import time
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from requests import HTTPError
 from Bio.Blast import NCBIWWW, NCBIXML
-from tqdm import tqdm
 from pyEED.core.dnainfo import DNAInfo
-from .proteinregiontype import ProteinRegionType
 from .proteinregion import ProteinRegion
-from .site import Site
 from .organism import Organism
-from .proteinsitetype import ProteinSiteType
+from .site import Site
 from .dnaregion import DNARegion
+from .proteinregiontype import ProteinRegionType
+from .proteinsitetype import ProteinSiteType
 from .span import Span
-from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry
+from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
 @forge_signature
@@ -34,8 +31,8 @@ class ProteinInfo(sdRDM.DataModel):
         description="Identifier of the protein sequence in the source database",
     )
 
-    name: str = Field(
-        ...,
+    name: Optional[str] = Field(
+        default=None,
         description="Name of the protein",
     )
 
@@ -152,7 +149,11 @@ class ProteinInfo(sdRDM.DataModel):
         seq_record = get_ncbi_entry(accession_id, "protein")
         return _seqio_to_nucleotide_info(cls, seq_record)
 
-    def pblast(self, n_hits: int) -> List["ProteinInfo"]:
+    @classmethod
+    def _from_seq_record(cls, seq_record) -> "ProteinInfo":
+        return _seqio_to_nucleotide_info(cls, seq_record)
+
+    def pblast(self, n_hits: int, api_key: str = None) -> List["ProteinInfo"]:
         """Run protein blast for `ProteinSequence`.
 
         Args:
@@ -161,41 +162,31 @@ class ProteinInfo(sdRDM.DataModel):
         Returns:
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
-        return self._pblast(self.sequence, n_hits)
+
+        print(f"Running pblast search for {self.name} from {self.organism.name}...")
+        result_handle = NCBIWWW.qblast(
+            "blastp", "nr", self.sequence, hitlist_size=n_hits
+        )
+        blast_record = NCBIXML.read(result_handle)
+
+        accessions = self._get_accessions(blast_record)
+        seq_records = get_ncbi_entrys(accessions, "protein", api_key=api_key)
+
+        protein_infos = []
+        for record in seq_records:
+            protein_infos.append(self._from_seq_record(record))
+
+        protein_infos = [
+            self._from_seq_record(seq_record) for seq_record in seq_records
+        ]
+
+        return protein_infos
 
     def get_dna(self):
         if not self.coding_sequence_ref:
             return
 
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
-
-    def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
-        print(f"Running pblast search for {self.name} from {self.organism.name}...")
-        result_handle = NCBIWWW.qblast("blastp", "nr", sequence, hitlist_size=n_hits)
-        blast_record = NCBIXML.read(result_handle)
-
-        accessions = self._get_accessions(blast_record)
-        sequences = []
-        bad_requests = []
-        for acc in tqdm(accessions, desc="Fetching protein sequences"):
-            try:
-                sequences.append(ProteinInfo.from_ncbi(acc))
-                time.sleep(1)
-
-            except HTTPError:
-                bad_requests.append(acc)
-
-        if bad_requests:
-            print(f"\nEncountered {len(bad_request)} bad HTTP requests, retrying...")
-            for bad_request in tqdm(bad_requests, desc="Fetching protein sequences"):
-                try:
-                    sequences.append(ProteinInfo.from_ncbi(bad_request))
-                    time.sleep(2)
-
-                except HTTPError:
-                    print(f"Failed to fetch {bad_request}")
-
-        return sequences
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
@@ -207,7 +198,3 @@ class ProteinInfo(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
-
-    @property
-    def nucleotide_seq(self):
-        return self.coding_sequence.sequence

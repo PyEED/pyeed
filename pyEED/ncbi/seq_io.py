@@ -1,5 +1,6 @@
 import re
 import secrets
+from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
 from Bio.SeqFeature import FeatureLocation, CompoundLocation
@@ -18,38 +19,77 @@ GENEID_PATTERN = r"GeneID:\d+"
 
 
 def get_ncbi_entry(
-    accession_id: str, database: str, email: str = None
+    accession_id: str, database: str, email: str = None, api_key: str = None
 ) -> SeqIO.SeqRecord:
     # generate generic mail if none is given
     if email is None:
         email = f"{secrets.token_hex(8)}@gmail.com"
 
-    Entrez.email = email
-
     databases = {"nucleotide", "protein"}
     if database not in databases:
         raise ValueError(f"database must be one of {databases}")
 
-    handle = Entrez.efetch(db=database, id=accession_id, rettype="gb", retmode="text")
+    Entrez.email = email
+    Entrez.api_key = api_key
+
+    handle = Entrez.efetch(
+        db=database, id=accession_id, rettype="gb", retmode="text", api_key=api_key
+    )
     seq_record = SeqIO.read(handle, "genbank")
 
     handle.close()
     return seq_record
 
 
-def SeqIO_to_pyeed(entry: SeqIO):
-    """Handel SeqIO entry and return pyeed object."""
+def get_ncbi_entrys(
+    accession_ids: List[str], database: str, email: str = None, api_key: str = None
+) -> SeqIO.SeqRecord:
+    # generate generic mail if none is given
+    if email is None:
+        email = f"{secrets.token_hex(8)}@gmail.com"
 
-    if entry.annotations["molecule_type"] == "protein":
-        return _seqio_to_nucleotide_info(entry)
-
-    elif entry.annotations["molecule_type"] == "DNA":
-        raise NotImplementedError("DNA is not implemented yet.")
-
+    # Concat accession_ids to string
+    if isinstance(accession_ids, list):
+        accession_id = ",".join(accession_ids)
     else:
-        raise ValueError(
-            f"{entry.id} of type {entry.annotations['molecule_type']} is not 'protein' or 'DNA'."
-        )
+        raise ValueError("Accession_ids must be a list")
+
+    databases = {"nucleotide", "protein"}
+    if database not in databases:
+        raise ValueError(f"database must be one of {databases}")
+
+    # Make request
+    Entrez.email = email
+    Entrez.api_key = api_key
+
+    handle = Entrez.efetch(
+        db=database, id=accession_id, rettype="gb", retmode="text", api_key=api_key
+    )
+
+    seq_records = []
+    for record in tqdm(
+        SeqIO.parse(handle, "genbank"), desc="Fetching protein sequences"
+    ):
+        seq_records.append(record)
+
+    handle.close()
+
+    return seq_records
+
+
+# def SeqIO_to_pyeed(entry: SeqIO):
+#     """Handel SeqIO entry and return pyeed object."""
+
+#     if entry.annotations["molecule_type"] == "protein":
+#         return _seqio_to_nucleotide_info(entry)
+
+#     elif entry.annotations["molecule_type"] == "DNA":
+#         raise NotImplementedError("DNA is not implemented yet.")
+
+#     else:
+#         raise ValueError(
+#             f"{entry.id} of type {entry.annotations['molecule_type']} is not 'protein' or 'DNA'."
+#         )
 
 
 def _seqio_to_dna_info(cls, entry: SeqIO):
@@ -103,7 +143,6 @@ def _seqio_to_dna_info(cls, entry: SeqIO):
 
 def get_organism(annotations, feature) -> Organism:
     taxonomy = annotations["taxonomy"]
-    print(feature.qualifiers["db_xref"][0])
 
     try:
         domain = taxonomy[0]
@@ -164,6 +203,11 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
         if feature.type == "Protein":
             if "product" in feature.qualifiers:
                 protein_name = feature.qualifiers["product"][0]
+            elif "name" in feature.qualifiers:
+                protein_name = feature.qualifiers["name"][0]
+            else:
+                print(f"No name info found in {entry.id}")
+                protein_name = None
 
             if "calculated_mol_wt" in feature.qualifiers:
                 mol_weight = feature.qualifiers["calculated_mol_wt"][0]

@@ -12,7 +12,7 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
 - source_id
   - Type: string
   - Description: Identifier of the protein sequence in the source database
-- __name__
+- name
   - Type: string
   - Description: Name of the protein
 - __sequence__

@@ -15,7 +15,7 @@ classDiagram
     
     class ProteinInfo {
         +string source_id
-        +string name*
+        +string name
         +string sequence*
         +Organism organism*
         +ProteinRegion[0..*] regions
