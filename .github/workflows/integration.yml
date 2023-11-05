@@ -22,7 +22,7 @@ jobs:
       - name: Setup Database
         run: |
           sdrdm-db \
-                --root-obj ProteinSequence \
+                --root-obj ProteinInfo \
                 --model-path https://github.com/PyEED/pyeed.git \
                 --env-file .github/scripts/env.toml
       - name: Run example
