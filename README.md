@@ -23,24 +23,26 @@ pip install --upgrade git+https://github.com/PyEED/pyeed.git
 
 ## Quick start 🚀
 
-In the following example, information of the [beta-lactamase](https://www.ncbi.nlm.nih.gov/protein/QGC48744.1) (*Escherichia coli*) is retrieved from the corresponding GenBank entry. Thereafter, a protein blast search ist started and the found sequence information is fetched and stored as `ProteinSequence` objects. Finally, the corresponding coding sequence is retrieved for all sequences.
+In the following example, information of the [aldolase](https://www.ncbi.nlm.nih.gov/protein/NP_001287541.1/) (*Drosophila melanogaster*) is retrieved from the corresponding GenBank entry. Thereafter, a protein blast search ist started and the found sequence information is fetched and stored as `ProteinSequence` objects.
 
 ```python
-from pyEED.core.proteinsequence import ProteinSequence
-from pyEED.ncbi.utils import get_nucleotide_sequences
+from pyEED.core import ProteinInfo
 
 # Get a protein entry from NCBI by accession id
-tem1 = ProteinSequence.from_ncbi("QGC48744.1")
+aldolase = ProteinInfo.from_ncbi("NP_001287541.1")
+print(aldolase)
 
 # Start a blast search with the protein sequence of tem1 as query
-blast_results = tem1.pblast(n_hits=10)
+blast_results = aldolase.pblast(n_hits=10)
 
-# Get the corresponding nucleotide sequences of all blast results
-get_nucleotide_sequences(blast_results)
+# Get the corresponding nucleotide entry
+aldolase_cds = aldolase.get_dna()
 
 # print the protein and coding sequence of the 2nd blast result
 print(blast_results[1].sequence)
-print(blast_results[1].nucleotide_seq)
+
+# print the nucleotide sequence of tem1
+print(aldolase_cds)
 ```
 
 A proper documentation is in the making 🐛

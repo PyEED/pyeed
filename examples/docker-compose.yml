@@ -1,20 +1,23 @@
-version: '3.3'
+version: '3.8'
 services:
-  mysql:
-    image: mysql:5.7
+  db:
+    container_name: pg_container
+    image: postgres
     restart: always
     environment:
-      MYSQL_DATABASE: 'db'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'user'
-      MYSQL_ROOT_PASSWORD: 'root'
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: ExampleDB
+    # volumes:
+    #   - ${PWD}/data:/var/lib/postgresql/data
     ports:
-      - '3306:3306'
-    expose:
-      - '3306'
-    volumes: # Uncomment to persist data
-      - ${PWD}/data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-      timeout: 40s
-      retries: 10
+      - "5432:5432"
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"

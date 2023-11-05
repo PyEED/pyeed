@@ -77,3 +77,6 @@ class NucleotideSequence(sdRDM.DataModel):
             params["id"] = id
         self.regions.append(Region(**params))
         return self.regions[-1]
+
+    @classmethod
+    def from_ncbi(cls, )
