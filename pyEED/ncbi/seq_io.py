@@ -179,6 +179,11 @@ def get_organism(annotations, feature) -> Organism:
     except IndexError:
         genus = None
 
+    try:
+        species = feature.qualifiers["organism"][0].split(" ")[1]
+    except IndexError:
+        species = None
+
     return Organism(
         name=feature.qualifiers["organism"][0],
         taxonomy_id=feature.qualifiers["db_xref"][0],
@@ -189,103 +194,106 @@ def get_organism(annotations, feature) -> Organism:
         order=order,
         family=family,
         genus=genus,
-        species=feature.qualifiers["organism"][0].split(" ")[1],
+        species=species,
     )
 
 
 def _seqio_to_nucleotide_info(cls, entry: SeqIO):
     """Handel SeqIO entry and return `ProteinSequence`"""
 
-    sites = []
-    regions = []
-    for feature in entry.features:
-        # TODO: assert that only one protein is in the file
-        if feature.type == "Protein":
-            if "product" in feature.qualifiers:
-                protein_name = feature.qualifiers["product"][0]
-            elif "name" in feature.qualifiers:
-                protein_name = feature.qualifiers["name"][0]
-            else:
-                print(f"No name info found in {entry.id}")
-                protein_name = None
+    try:
+        sites = []
+        regions = []
+        for feature in entry.features:
+            # TODO: assert that only one protein is in the file
+            if feature.type == "Protein":
+                if "product" in feature.qualifiers:
+                    protein_name = feature.qualifiers["product"][0]
+                elif "name" in feature.qualifiers:
+                    protein_name = feature.qualifiers["name"][0]
+                else:
+                    print(f"No name info found in {entry.id}")
+                    protein_name = None
 
-            if "calculated_mol_wt" in feature.qualifiers:
-                mol_weight = feature.qualifiers["calculated_mol_wt"][0]
-            else:
+                if "calculated_mol_wt" in feature.qualifiers:
+                    mol_weight = feature.qualifiers["calculated_mol_wt"][0]
+                else:
+                    mol_weight = None
+
+                if "EC_number" in feature.qualifiers:
+                    ec_number = feature.qualifiers["EC_number"][0]
+                else:
+                    ec_number = None
+
+            if feature.type == "source":
+                organism = get_organism(entry.annotations, feature)
+
+            if feature.type == "Region":
+                if "db_xref" in feature.qualifiers:
+                    cross_reference = feature.qualifiers["db_xref"][0]
+                else:
+                    cross_reference = None
+
+                regions.append(
+                    ProteinRegion(
+                        name=feature.qualifiers["region_name"][0],
+                        spans=[
+                            Span(
+                                start=int(feature.location.start),
+                                end=int(feature.location.end),
+                            )
+                        ],
+                        cross_reference=cross_reference,
+                        note=feature.qualifiers["note"][0],
+                    )
+                )
+
+            if feature.type == "Site":
+                site_type = feature.qualifiers["site_type"][0].lower()
+
+                if "note" in feature.qualifiers:
+                    name = feature.qualifiers["note"][0]
+                else:
+                    name = site_type
+
+                if "db_xref" in feature.qualifiers:
+                    cross_reference = feature.qualifiers["db_xref"][0]
+                else:
+                    cross_reference = None
+
+                sites.append(
+                    Site(
+                        name=name,
+                        positions=[loc for loc in feature.location],
+                        cross_ref=cross_reference,
+                        type=ProteinSiteType.match_string(site_type),
+                    )
+                )
+
+            if feature.type == "CDS":
+                cds_regions = get_cds_regions(feature.qualifiers["coded_by"][0])
+
+            if "CDS" not in [feature.type for feature in entry.features]:
+                cds_regions = []
+
+            if "Protein" not in [feature.type for feature in entry.features]:
+                protein_name = entry.description
+                ec_number = None
                 mol_weight = None
 
-            if "EC_number" in feature.qualifiers:
-                ec_number = feature.qualifiers["EC_number"][0]
-            else:
-                ec_number = None
-
-        if feature.type == "source":
-            organism = get_organism(entry.annotations, feature)
-
-        if feature.type == "Region":
-            if "db_xref" in feature.qualifiers:
-                cross_reference = feature.qualifiers["db_xref"][0]
-            else:
-                cross_reference = None
-
-            regions.append(
-                ProteinRegion(
-                    name=feature.qualifiers["region_name"][0],
-                    spans=[
-                        Span(
-                            start=int(feature.location.start),
-                            end=int(feature.location.end),
-                        )
-                    ],
-                    cross_reference=cross_reference,
-                    note=feature.qualifiers["note"][0],
-                )
-            )
-
-        if feature.type == "Site":
-            site_type = feature.qualifiers["site_type"][0].lower()
-
-            if "note" in feature.qualifiers:
-                name = feature.qualifiers["note"][0]
-            else:
-                name = site_type
-
-            if "db_xref" in feature.qualifiers:
-                cross_reference = feature.qualifiers["db_xref"][0]
-            else:
-                cross_reference = None
-
-            sites.append(
-                Site(
-                    name=name,
-                    positions=[loc for loc in feature.location],
-                    cross_ref=cross_reference,
-                    type=ProteinSiteType.match_string(site_type),
-                )
-            )
-
-        if feature.type == "CDS":
-            cds_regions = get_cds_regions(feature.qualifiers["coded_by"][0])
-
-        if "CDS" not in [feature.type for feature in entry.features]:
-            cds_regions = []
-
-        if "Protein" not in [feature.type for feature in entry.features]:
-            protein_name = entry.description
-            ec_number = None
-            mol_weight = None
-
-    return cls(
-        source_id=entry.id,
-        name=protein_name,
-        sequence=str(entry.seq),
-        ec_number=ec_number,
-        mol_weight=mol_weight,
-        organism=organism,
-        sites=sites,
-        regions=regions,
-        coding_sequence_ref=cds_regions,
-    )
+        return cls(
+            source_id=entry.id,
+            name=protein_name,
+            sequence=str(entry.seq),
+            ec_number=ec_number,
+            mol_weight=mol_weight,
+            organism=organism,
+            sites=sites,
+            regions=regions,
+            coding_sequence_ref=cds_regions,
+        )
+    except UnboundLocalError:
+        print(f"❌ Sequence {entry.id} was not added, since mapping failed.")
 
 
 def get_cds_regions(coded_by: dict) -> List[DNARegion]:
@@ -295,6 +303,7 @@ def get_cds_regions(coded_by: dict) -> List[DNARegion]:
 
     # Extract all regions from the 'coded_by' qualifier
     coded_by = coded_by.replace(">", "")
+    coded_by = coded_by.replace("<", "")
     cds_regions = re.findall(cds_pattern, coded_by)
     cds_regions = [region.replace(" ", "") for region in cds_regions]
 
