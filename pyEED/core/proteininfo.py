@@ -162,7 +162,7 @@ class ProteinInfo(sdRDM.DataModel):
         **kwargs,
     ) -> List["ProteinInfo"]:
         """Run protein blast for a `ProteinInfo`.
-        Additional keyword arguments can be pass `Bio.Blast.NCBIWWW.qblast`.
+        Additional keyword arguments can be pass according to the blast [specifications](https://biopython.org/docs/1.75/api/Bio.Blast.NCBIWWW.html).
 
         Args:
             n_hits (int): Number of hits to return.
@@ -178,7 +178,7 @@ class ProteinInfo(sdRDM.DataModel):
         animation = cycle(list("🏃🏻‍♀️🏃🏼‍♀️🏃🏽‍♀"))
 
         print(f"🏃🏼‍♀️ Running PBLAST")
-        print(f"├── name: {self.name}")
+        print(f"├── protein name: {self.name}")
         print(f"├── organism: {self.organism.name}")
         print(f"├── e-value: {e_value}")
         print(f"└── max hits: {n_hits}")
