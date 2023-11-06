@@ -169,6 +169,7 @@ class ProteinInfo(sdRDM.DataModel):
             e_value (float, optional): E-value threshold. Defaults to 10.0.
             api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
 
+
         Returns:
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
