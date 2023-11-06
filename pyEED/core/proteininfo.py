@@ -1,5 +1,6 @@
 import sdRDM
 
+from itertools import cycle
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
@@ -153,21 +154,45 @@ class ProteinInfo(sdRDM.DataModel):
     def _from_seq_record(cls, seq_record) -> "ProteinInfo":
         return _seqio_to_nucleotide_info(cls, seq_record)
 
-    def pblast(self, n_hits: int, api_key: str = None) -> List["ProteinInfo"]:
-        """Run protein blast for `ProteinSequence`.
+    def pblast(
+        self,
+        n_hits: int,
+        e_value: float = 10.0,
+        api_key: str = None,
+        **kwargs,
+    ) -> List["ProteinInfo"]:
+        """Run protein blast for a `ProteinInfo`.
+        Additional keyword arguments can be pass `Bio.Blast.NCBIWWW.qblast`.
 
         Args:
             n_hits (int): Number of hits to return.
+            e_value (float, optional): E-value threshold. Defaults to 10.0.
+            api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
+
 
         Returns:
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
 
-        print(f"Running pblast search for {self.name} from {self.organism.name}...")
+        completed = False
+        animation = cycle(list("🏃🏻‍♀️🏃🏼‍♀️🏃🏽‍♀"))
+
+        print(f"🏃🏼‍♀️ Running PBLAST")
+        print(f"├── name: {self.name}")
+        print(f"├── organism: {self.organism.name}")
+        print(f"├── e-value: {e_value}")
+        print(f"└── max hits: {n_hits}")
+
         result_handle = NCBIWWW.qblast(
-            "blastp", "nr", self.sequence, hitlist_size=n_hits
+            "blastp",
+            "nr",
+            self.sequence,
+            hitlist_size=n_hits,
+            expect=e_value,
+            **kwargs,
         )
         blast_record = NCBIXML.read(result_handle)
+        completed = True
 
         accessions = self._get_accessions(blast_record)
         seq_records = get_ncbi_entrys(accessions, "protein", api_key=api_key)
@@ -175,10 +200,6 @@ class ProteinInfo(sdRDM.DataModel):
         protein_infos = []
         for record in seq_records:
             protein_infos.append(self._from_seq_record(record))
-
-        protein_infos = [
-            self._from_seq_record(seq_record) for seq_record in seq_records
-        ]
 
         return protein_infos
 
