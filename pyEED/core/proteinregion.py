@@ -2,8 +2,8 @@
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .proteinregiontype import ProteinRegionType
 from .abstractregion import AbstractRegion
+from .proteinregiontype import ProteinRegionType
 
 
 @forge_signature

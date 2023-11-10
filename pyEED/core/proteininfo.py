@@ -1,19 +1,18 @@
 import sdRDM
 
-from itertools import cycle
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .proteinregion import ProteinRegion
-from .organism import Organism
 from .site import Site
-from .dnaregion import DNARegion
-from .proteinregiontype import ProteinRegionType
 from .proteinsitetype import ProteinSiteType
+from .organism import Organism
+from .proteinregion import ProteinRegion
+from .dnaregion import DNARegion
 from .span import Span
+from .proteinregiontype import ProteinRegionType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
@@ -174,14 +173,12 @@ class ProteinInfo(sdRDM.DataModel):
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
 
-        completed = False
-        animation = cycle(list("🏃🏻‍♀️🏃🏼‍♀️🏃🏽‍♀"))
-
         print(f"🏃🏼‍♀️ Running PBLAST")
-        print(f"├── protein name: {self.name}")
+        print(f"╭── protein name: {self.name}")
+        print(f"├── accession: {self.source_id}")
         print(f"├── organism: {self.organism.name}")
         print(f"├── e-value: {e_value}")
-        print(f"└── max hits: {n_hits}")
+        print(f"╰── max hits: {n_hits}")
 
         result_handle = NCBIWWW.qblast(
             "blastp",
@@ -192,7 +189,6 @@ class ProteinInfo(sdRDM.DataModel):
             **kwargs,
         )
         blast_record = NCBIXML.read(result_handle)
-        completed = True
 
         accessions = self._get_accessions(blast_record)
         seq_records = get_ncbi_entrys(accessions, "protein", api_key=api_key)
@@ -201,6 +197,7 @@ class ProteinInfo(sdRDM.DataModel):
         for record in seq_records:
             protein_infos.append(self._from_seq_record(record))
 
+        print("🎉 Done\n")
         return protein_infos
 
     def get_dna(self):
