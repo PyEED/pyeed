@@ -6,6 +6,7 @@ from .proteinregion import ProteinRegion
 from .span import Span
 from .site import Site
 from .organism import Organism
+from .pairwisealignment import PairwiseAlignment
 from .proteinsitetype import ProteinSiteType
 from .dnaregiontype import DNARegionType
 from .proteinregiontype import ProteinRegionType
@@ -20,6 +21,7 @@ __all__ = [
     "Span",
     "Site",
     "Organism",
+    "PairwiseAlignment",
     "ProteinSiteType",
     "DNARegionType",
     "ProteinRegionType",

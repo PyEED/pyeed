@@ -1,5 +1,6 @@
 import re
 import secrets
+import time
 from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
@@ -52,7 +53,7 @@ def get_ncbi_entrys(
     if isinstance(accession_ids, list):
         accession_id = ",".join(accession_ids)
     else:
-        raise ValueError("Accession_ids must be a list")
+        raise ValueError("'accession_ids' must be a list")
 
     databases = {"nucleotide", "protein"}
     if database not in databases:
@@ -68,28 +69,15 @@ def get_ncbi_entrys(
 
     seq_records = []
     for record in tqdm(
-        SeqIO.parse(handle, "genbank"), desc="Fetching protein sequences"
+        SeqIO.parse(handle, "genbank"),
+        desc="⬇️ Fetching protein sequences",
+        total=len(accession_ids),
     ):
         seq_records.append(record)
 
     handle.close()
 
     return seq_records
-
-
-# def SeqIO_to_pyeed(entry: SeqIO):
-#     """Handel SeqIO entry and return pyeed object."""
-
-#     if entry.annotations["molecule_type"] == "protein":
-#         return _seqio_to_nucleotide_info(entry)
-
-#     elif entry.annotations["molecule_type"] == "DNA":
-#         raise NotImplementedError("DNA is not implemented yet.")
-
-#     else:
-#         raise ValueError(
-#             f"{entry.id} of type {entry.annotations['molecule_type']} is not 'protein' or 'DNA'."
-#         )
 
 
 def _seqio_to_dna_info(cls, entry: SeqIO):
