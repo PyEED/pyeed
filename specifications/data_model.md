@@ -181,6 +181,40 @@ Description of an organism 🦠
 
 </details>
 
+## Alignments
+
+### PairwiseAlignment
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- reference_seq
+  - Type: [ProteinInfo](#ProteinInfo)
+  - Description: Protein sequence used as reference
+  - Alias: reference
+- query_seq
+  - Type: [ProteinInfo](#ProteinInfo)
+  - Description: Protein sequence used as query
+  - Alias: query
+- score
+  - Type: float
+  - Description: Alignment score
+- identity
+  - Type: float
+  - Description: Ration of identical residues in the alignment
+- similarity
+  - Type: float
+  - Description: Ration of similar residues in the alignment
+- gaps
+  - Type: int
+  - Description: Number of gaps in the alignment
+- mismatches
+  - Type: int
+  - Description: Number of mismatches in the alignment
+
+
+</details>
+
 ## Enumerations
 
 ### ProteinSiteType

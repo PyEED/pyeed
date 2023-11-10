@@ -1,17 +1,41 @@
 from tqdm import tqdm
+from time import time
 from typing import List
 
+from pyEED.core.proteininfo import ProteinInfo
+from pyEED.ncbi.seq_io import get_ncbi_entrys
 
-def get_nucleotide_sequences(protein_sequences: List["ProteinSequence"]):
-    """Fetches the nucleotide sequences of the coding sequences of the given protein sequences.
 
-    Args:
-        protein_sequences (List[ProteinSequence]): List of protein sequences.
+def load_accessions(
+    accession_ids: List[str],
+    database: str = "protein",
+    email: str = None,
+    api_key: str = None,
+) -> List[ProteinInfo]:
+    if not isinstance(accession_ids, list):
+        try:
+            import toml
 
-    Returns:
-        None
-    """
-    for protein_sequence in tqdm(
-        protein_sequences, desc="Fetching nucleotide sequences"
-    ):
-        protein_sequence.get_nucleotide_seq()
+            # Load the TOML file
+            with open(accession_ids, "r") as toml_file:
+                seed_data = toml.load(toml_file)
+
+            # Access the list
+            for value in seed_data.values():
+                if isinstance(value, list):
+                    accession_ids = value
+        except:
+            raise ValueError("Accessions must be a list or a TOML file")
+
+    seq_entries = get_ncbi_entrys(
+        accession_ids=accession_ids,
+        database="protein",
+        email=email,
+        api_key=api_key,
+    )
+
+    protein_infos = []
+    for record in seq_entries:
+        protein_infos.append(ProteinInfo._from_seq_record(record))
+
+    return protein_infos
