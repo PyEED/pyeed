@@ -155,7 +155,8 @@ class ProteinInfo(sdRDM.DataModel):
 
     def pblast(
         self,
-        n_hits: int,
+        database: str = "nr",
+        n_hits: int = 100,
         e_value: float = 10.0,
         api_key: str = None,
         **kwargs,
@@ -164,26 +165,39 @@ class ProteinInfo(sdRDM.DataModel):
         Additional keyword arguments can be pass according to the blast [specifications](https://biopython.org/docs/1.75/api/Bio.Blast.NCBIWWW.html).
 
         Args:
-            n_hits (int): Number of hits to return.
+            database (str, optional): Database to search. Defaults to "nr".
+            n_hits (int, optional): Number of hits to return. Defaults to 100.
             e_value (float, optional): E-value threshold. Defaults to 10.0.
             api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
-
 
         Returns:
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
+
+        databases = {
+            "nr": "Non-redundant",
+            "refseq_protein": "NCBI Protein Reference Sequences",
+            "swissprot": "Non-redundant UniProtKB / SwissProt sequences",
+            "pdbaa": "PDB protein database",
+        }
+
+        if database not in databases:
+            raise ValueError(
+                f"Database '{database}' is not supported. Choose one of {list(databases.keys())}"
+            )
 
         print(f"🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")
         print(f"├── accession: {self.source_id}")
         print(f"├── organism: {self.organism.name}")
         print(f"├── e-value: {e_value}")
+        print(f"├── database: {databases[database]}")
         print(f"╰── max hits: {n_hits}")
 
         result_handle = NCBIWWW.qblast(
-            "blastp",
-            "nr",
-            self.sequence,
+            program="blastp",
+            database=database,
+            sequence=self.sequence,
             hitlist_size=n_hits,
             expect=e_value,
             **kwargs,
