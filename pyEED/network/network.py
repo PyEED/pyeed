@@ -9,6 +9,7 @@ from pyEED.core.pairwisealignment import PairwiseAlignment
 def pairwise_network(
     alignments: List[PairwiseAlignment],
     weight: str = "identity",
+    cutoff: float = None,
     label: str = "accession_id",
     color: str = "name",
 ) -> None:
@@ -43,14 +44,14 @@ def pairwise_network(
             f"'label' to parameterize network must be an alignment property ({labels})"
         )
 
-    graph = construct_network(alignments)
+    graph = construct_network(alignments, cutoff=cutoff)
 
     graph = position_nodes_and_edges(graph, weight=weight)
 
     visualize_network(graph, label=label, color=color)
 
 
-def construct_network(alignments: List[PairwiseAlignment]) -> nx.Graph:
+def construct_network(alignments: List[PairwiseAlignment], cutoff: float) -> nx.Graph:
     """Maps properties of alignments to a network graph."""
     graph = nx.Graph()
 
@@ -68,15 +69,31 @@ def construct_network(alignments: List[PairwiseAlignment]) -> nx.Graph:
         )
 
     # Add edges and assign edge attributes
-    for alignment in alignments:
-        graph.add_edge(
-            alignment.reference_seq.source_id,
-            alignment.query_seq.source_id,
-            identity=alignment.identity,
-            gaps=1 / (alignment.gaps + 1),
-            mismatches=1 / (alignment.mismatches + 1),
-            score=alignment.score,
-        )
+    if cutoff != None: 
+
+        for alignment in alignments:
+
+            if alignment.identity >= cutoff:
+                
+                graph.add_edge(
+                    alignment.reference_seq.source_id,
+                    alignment.query_seq.source_id,
+                    identity=alignment.identity,
+                    gaps=1 / (alignment.gaps + 1),
+                    mismatches=1 / (alignment.mismatches + 1),
+                    score=alignment.score,
+                )
+    else:
+        for alignment in alignments:
+
+            graph.add_edge(
+                alignment.reference_seq.source_id,
+                alignment.query_seq.source_id,
+                identity=alignment.identity,
+                gaps=1 / (alignment.gaps + 1),
+                mismatches=1 / (alignment.mismatches + 1),
+                score=alignment.score,
+            )
 
     return graph
 
