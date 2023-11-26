@@ -1,11 +1,13 @@
+from ctypes import alignment
 from typing import List
 from itertools import combinations
 from Bio.Align import PairwiseAligner
-from numpy import mat
 from tqdm import tqdm
 
 from pyEED.core import ProteinInfo
 from pyEED.core import PairwiseAlignment
+
+from joblib import Parallel, delayed, cpu_count
 
 
 def multi_pairwise_alignment(
@@ -16,24 +18,26 @@ def multi_pairwise_alignment(
     gap_open: int = -1,
     gap_extend: int = 0,
     substitution_matrix: str = "None",
+    n_jobs: int = None,
 ):
     pairs = list(combinations(protien_infos, 2))
 
-    alignments = []
-    for pair in tqdm(pairs, desc=f"⁑ Aligning unique sequence pairs"):
-        reference, query = pair
-        alignments.append(
-            pairwise_alignment(
-                reference,
-                query,
-                mode=mode,
-                gap_open=gap_open,
-                gap_extend=gap_extend,
-                match=match,
-                mismatch=mismatch,
-                substitution_matrix=substitution_matrix,
-            )
+    if n_jobs is None:
+        n_jobs = cpu_count()
+
+    alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
+        delayed(pairwise_alignment)(
+            reference,
+            query,
+            mode,
+            match,
+            mismatch,
+            gap_open,
+            gap_extend,
+            substitution_matrix,
         )
+        for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+    )
 
     return alignments
 
