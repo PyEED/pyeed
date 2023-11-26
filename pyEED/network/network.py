@@ -21,6 +21,8 @@ def pairwise_network(
         alignments (List[PairwiseAlignment]): List of pairwise alignments.
         weight (str, optional): Attribute of `PairwiseAlignment` to weight the edges.
         Defaults to "identity".
+        cutoff (float, optional): Sequences with a weight higher than the cutoff are connected
+        in the network. Defaults to None.
         label (str, optional): Node labe in the graph. Defaults to "accession_id".
         color (str, optional): Attribute of `ProteinInfo` co colorize nodes. Defaults to "name".
 
@@ -69,12 +71,9 @@ def construct_network(alignments: List[PairwiseAlignment], cutoff: float) -> nx.
         )
 
     # Add edges and assign edge attributes
-    if cutoff != None: 
-
+    if cutoff != None:
         for alignment in alignments:
-
             if alignment.identity >= cutoff:
-                
                 graph.add_edge(
                     alignment.reference_seq.source_id,
                     alignment.query_seq.source_id,
@@ -85,7 +84,6 @@ def construct_network(alignments: List[PairwiseAlignment], cutoff: float) -> nx.
                 )
     else:
         for alignment in alignments:
-
             graph.add_edge(
                 alignment.reference_seq.source_id,
                 alignment.query_seq.source_id,
