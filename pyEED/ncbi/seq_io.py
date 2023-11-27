@@ -1,10 +1,12 @@
 import re
 import secrets
-import time
+from datetime import datetime
+from matplotlib.pylab import f
 from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
 from Bio.SeqFeature import FeatureLocation, CompoundLocation
+from pyEED.core.citation import Citation
 from pyEED.core.dnaregion import DNARegion
 from pyEED.core.dnaregiontype import DNARegionType
 from pyEED.core.proteinregion import ProteinRegion
@@ -190,6 +192,16 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
     """Handel SeqIO entry and return `ProteinSequence`"""
 
     try:
+        # Citation
+        citation = Citation()
+        for ref in entry.annotations["references"]:
+            year = re.search(r"\d{2}-[A-Z]{3}-\d{4}", ref.journal)
+            citation.pubmed_id = ref.pubmed_id
+            citation.medline_id = ref.medline_id
+            if year:
+                date_str = year.group()
+                citation.year = datetime.strptime(date_str, "%d-%b-%Y").year
+
         sites = []
         regions = []
         for feature in entry.features:
@@ -279,6 +291,7 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
             sites=sites,
             regions=regions,
             coding_sequence_ref=cds_regions,
+            citation=citation,
         )
     except UnboundLocalError:
         print(f"❌ Sequence {entry.id} was not added, since mapping failed.")
