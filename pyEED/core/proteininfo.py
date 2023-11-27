@@ -6,15 +6,15 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .proteinsitetype import ProteinSiteType
-from .organism import Organism
-from .citation import Citation
-from .proteinregiontype import ProteinRegionType
 from .substrate import Substrate
+from .proteinregiontype import ProteinRegionType
+from .organism import Organism
 from .dnaregion import DNARegion
-from .proteinregion import ProteinRegion
 from .site import Site
 from .span import Span
+from .proteinregion import ProteinRegion
+from .citation import Citation
+from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
@@ -61,8 +61,8 @@ class ProteinInfo(sdRDM.DataModel):
     )
 
     coding_sequence_ref: Optional[DNARegion] = Field(
-        default=DNARegion(),
         description="Defines the coding sequence of the protein",
+        default_factory=DNARegion,
     )
 
     ec_number: Optional[str] = Field(
@@ -82,8 +82,8 @@ class ProteinInfo(sdRDM.DataModel):
     )
 
     citation: Optional[Citation] = Field(
-        default=Citation(),
         description="Publication on the protein",
+        default_factory=Citation,
     )
 
     def add_to_regions(
