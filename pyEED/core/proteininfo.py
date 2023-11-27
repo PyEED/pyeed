@@ -6,13 +6,15 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .site import Site
-from .proteinsitetype import ProteinSiteType
-from .organism import Organism
-from .proteinregion import ProteinRegion
 from .dnaregion import DNARegion
+from .proteinsitetype import ProteinSiteType
+from .proteinregion import ProteinRegion
 from .span import Span
+from .citation import Citation
+from .substrate import Substrate
+from .organism import Organism
 from .proteinregiontype import ProteinRegionType
+from .site import Site
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
@@ -59,8 +61,8 @@ class ProteinInfo(sdRDM.DataModel):
     )
 
     coding_sequence_ref: Optional[DNARegion] = Field(
-        default=DNARegion(),
         description="Defines the coding sequence of the protein",
+        default_factory=DNARegion,
     )
 
     ec_number: Optional[str] = Field(
@@ -71,6 +73,17 @@ class ProteinInfo(sdRDM.DataModel):
     mol_weight: Optional[float] = Field(
         default=None,
         description="Calculated molecular weight of the protein",
+    )
+
+    substrates: List[Substrate] = Field(
+        description="Promiscuous substrates of the protein",
+        default_factory=ListPlus,
+        multiple=True,
+    )
+
+    citation: Optional[Citation] = Field(
+        description="Publication on the protein",
+        default_factory=Citation,
     )
 
     def add_to_regions(
@@ -133,6 +146,30 @@ class ProteinInfo(sdRDM.DataModel):
             params["id"] = id
         self.sites.append(Site(**params))
         return self.sites[-1]
+
+    def add_to_substrates(
+        self,
+        name: Optional[str] = None,
+        inchi: Optional[str] = None,
+        smiles: Optional[str] = None,
+        chebi_id: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Substrate' to attribute substrates
+
+        Args:
+            id (str): Unique identifier of the 'Substrate' object. Defaults to 'None'.
+            name (): Name of the substrate. Defaults to None
+            inchi (): InChI code of the substrate. Defaults to None
+            smiles (): SMILES code of the substrate. Defaults to None
+            chebi_id (): ChEBI ID of the substrate. Defaults to None
+        """
+        params = {"name": name, "inchi": inchi, "smiles": smiles, "chebi_id": chebi_id}
+        if id is not None:
+            params["id"] = id
+        self.substrates.append(Substrate(**params))
+        return self.substrates[-1]
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":

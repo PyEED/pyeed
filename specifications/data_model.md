@@ -38,8 +38,16 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
 - mol_weight
   - Type: float
   - Description: Calculated molecular weight of the protein
+- substrates
+  - Type: [Substrate](#Substrate)
+  - Description: Promiscuous substrates of the protein
+  - Multiple: True
+- citation
+  - Type: [Citation](#Citation)
+  - Description: Publication on the protein
 
 </details>
+
 
 ### DNAInfo
 
@@ -89,6 +97,68 @@ Annotation of a region within a sequence 🗺️
 - cross_reference
   - Type: string
   - Description: Database cross reference
+
+</details>
+
+### Citation
+
+Information on publication of the entry 📖
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- doi
+  - Type: str
+  - Description: DOI of the publication
+- pubmed_id
+  - Type: str
+  - Description: PubMed ID of the publication
+- medline_id
+  - Type: str
+  - Description: Medline ID of the publication
+- year
+  - Type: int
+  - Description: Year of publication
+- authors
+  - Type: Author
+  - Description: Authors of the publication
+  - Multiple: True
+
+</details>
+
+### Author
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- given_name
+  - Type: str
+  - Description: Given name of the author
+- family_name
+  - Type: str
+  - Description: Family name of the author
+
+</details>
+
+### Substrate
+
+Promiscuous substrate of an enzyme 🧪
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: str
+  - Description: Name of the substrate
+- inchi
+  - Type: str
+  - Description: InChI code of the substrate
+- smiles
+  - Type: str
+  - Description: SMILES code of the substrate
+- chebi_id
+  - Type: str
+  - Description: ChEBI ID of the substrate
 
 </details>
 
