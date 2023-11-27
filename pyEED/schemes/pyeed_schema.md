@@ -2,6 +2,8 @@
 classDiagram
     AbstractRegion <-- DNARegion
     AbstractRegion <-- ProteinRegion
+    ProteinInfo *-- Citation
+    ProteinInfo *-- Substrate
     ProteinInfo *-- DNARegion
     ProteinInfo *-- ProteinRegion
     ProteinInfo *-- Site
@@ -9,6 +11,7 @@ classDiagram
     DNAInfo *-- DNARegion
     DNAInfo *-- Organism
     AbstractRegion *-- Span
+    Citation *-- Author
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
@@ -24,6 +27,8 @@ classDiagram
         +DNARegion coding_sequence_ref
         +string ec_number
         +float mol_weight
+        +Substrate[0..*] substrates
+        +Citation citation
     }
     
     class DNAInfo {
@@ -39,6 +44,26 @@ classDiagram
         +Span[0..*] spans
         +string note
         +string cross_reference
+    }
+    
+    class Citation {
+        +str doi
+        +str pubmed_id
+        +str medline_id
+        +int year
+        +Author[0..*] authors
+    }
+    
+    class Author {
+        +str given_name
+        +str family_name
+    }
+    
+    class Substrate {
+        +str name
+        +str inchi
+        +str smiles
+        +str chebi_id
     }
     
     class DNARegion {
