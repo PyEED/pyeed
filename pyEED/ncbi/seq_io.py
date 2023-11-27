@@ -1,11 +1,9 @@
 import re
 import secrets
 from datetime import datetime
-from matplotlib.pylab import f
 from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
-from Bio.SeqFeature import FeatureLocation, CompoundLocation
 from pyEED.core.citation import Citation
 from pyEED.core.dnaregion import DNARegion
 from pyEED.core.dnaregiontype import DNARegionType
