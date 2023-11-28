@@ -2529,7 +2529,7 @@ test = ["pytest"]
 type = "git"
 url = "https://github.com/JR-1991/software-driven-rdm.git"
 reference = "pydantic-v2-migration"
-resolved_reference = "541c5a284c292d13bb62ed0cc4e13a1542b57233"
+resolved_reference = "febb3ca5272e3f7c016811ed5a8f379f579abb03"
 
 [[package]]
 name = "sdrdm-database"

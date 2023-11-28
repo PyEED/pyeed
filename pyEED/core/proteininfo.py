@@ -6,15 +6,15 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .organism import Organism
-from .proteinregiontype import ProteinRegionType
 from .citation import Citation
-from .site import Site
-from .span import Span
-from .proteinsitetype import ProteinSiteType
 from .substrate import Substrate
-from .proteinregion import ProteinRegion
 from .dnaregion import DNARegion
+from .proteinsitetype import ProteinSiteType
+from .span import Span
+from .site import Site
+from .proteinregiontype import ProteinRegionType
+from .organism import Organism
+from .proteinregion import ProteinRegion
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
