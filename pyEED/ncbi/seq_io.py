@@ -262,7 +262,7 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
                 cds_regions = get_cds_regions(feature.qualifiers["coded_by"][0])
 
             if "CDS" not in [feature.type for feature in entry.features]:
-                cds_regions = []
+                cds_regions = None
 
             if "Protein" not in [feature.type for feature in entry.features]:
                 protein_name = entry.description
