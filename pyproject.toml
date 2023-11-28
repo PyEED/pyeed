@@ -14,7 +14,7 @@ packages = [
 python = ">=3.9,<3.13"
 biopython = "^1.81"
 tqdm = "^4.66.1"
-sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", branch = "linking-refactor"}
+sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", branch = "pydantic-v2-migration"}
 sqlalchemy = "^2.0.22"
 pymysql = "^1.1.0"
 sdrdm-database = {version = "^0.4.1", extras = ["postgres"]}
