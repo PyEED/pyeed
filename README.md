@@ -45,7 +45,12 @@ print(blast_results[1].sequence)
 print(aldolase_cds)
 ```
 
-A proper documentation is in the making 🐛
+## Documentation 📘
+
+Check out the [documentation](https://pyeed.github.io/pyeed/) for in-depth information on how to setup PyEED, 
+use the build-in tools, and store sequence data in databases.  
+Documentation is in the making 🐛
+
 ## Roadmap 🛣️
 
 - [x] `ProteinSequence` data model: Object-oriented representation of a protein sequence database entry.
@@ -53,6 +58,8 @@ A proper documentation is in the making 🐛
 - [x] Blast search: get protein sequnces as a result from a blast search
 - [x] Retrieve corresponding coding sequence
 - [x] Storing `ProtenSequence` in a SQL database
-- [ ] Running alignments
+- [x] Running pairwise alignments
+- [x] Network analysis / visualization
 - [ ] Create phylogenetic trees
-- [ ] Network analysis / visualization
+- [ ] Multi-sequence alignments
+- [ ] Representative clustering
