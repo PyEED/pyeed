@@ -1,5 +1,5 @@
 <div align="center">
-<h1 align="center">pyEED
+<h1 align="center">PyEED
 
 </div>
 
