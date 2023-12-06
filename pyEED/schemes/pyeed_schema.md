@@ -15,7 +15,8 @@ classDiagram
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
-    PairwiseAlignment *-- ProteinInfo
+    Alignment *-- ProteinInfo
+    Alignment *-- StandardNumbering
     
     class ProteinInfo {
         +string source_id
@@ -99,14 +100,22 @@ classDiagram
         +string species
     }
     
-    class PairwiseAlignment {
+    class Alignment {
         +ProteinInfo reference_seq
-        +ProteinInfo query_seq
+        +ProteinInfo[0..*] query_seqs
+        +string method
+        +string consensus
         +float score
+        +StandardNumbering[0..*] standard_numberings
         +float identity
         +float similarity
         +int gaps
         +int mismatches
+    }
+    
+    class StandardNumbering {
+        +string sequence_id
+        +string[0..*] numbering
     }
     
     class ProteinSiteType {
