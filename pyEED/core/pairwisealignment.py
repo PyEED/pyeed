@@ -1,9 +1,21 @@
 import sdRDM
 
-from typing import Optional
-from pydantic import Field
+from typing import Optional, Union, List
+from pydantic import PrivateAttr, Field, validator
+from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from .proteinsitetype import ProteinSiteType
+from .dnaregiontype import DNARegionType
+from .proteinregiontype import ProteinRegionType
+from .proteinregion import ProteinRegion
+from .dnaregion import DNARegion
+from .site import Site
+from .organism import Organism
+from .substrate import Substrate
+from .span import Span
+from .author import Author
 from .proteininfo import ProteinInfo
+from .citation import Citation
 
 
 @forge_signature
