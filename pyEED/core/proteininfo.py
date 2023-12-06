@@ -1,20 +1,22 @@
 import sdRDM
 
-from typing import List, Optional
-from pydantic import Field
+from typing import Optional, Union, List
+from pydantic import PrivateAttr, Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .substrate import Substrate
-from .proteinregion import ProteinRegion
-from .dnaregion import DNARegion
-from .citation import Citation
-from .organism import Organism
 from .proteinsitetype import ProteinSiteType
+from .dnaregiontype import DNARegionType
 from .proteinregiontype import ProteinRegionType
+from .dnaregion import DNARegion
 from .site import Site
+from .organism import Organism
+from .substrate import Substrate
 from .span import Span
+from .author import Author
+from .proteinregion import ProteinRegion
+from .citation import Citation
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
