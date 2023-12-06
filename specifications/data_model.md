@@ -253,7 +253,7 @@ Description of an organism 🦠
 
 ## Alignments
 
-### PairwiseAlignment
+### Alignment
 
 <details>
   <summary><i>Inspect attributes</i></summary>
@@ -262,13 +262,23 @@ Description of an organism 🦠
   - Type: [ProteinInfo](#ProteinInfo)
   - Description: Protein sequence used as reference
   - Alias: reference
-- query_seq
+- query_seqs
   - Type: [ProteinInfo](#ProteinInfo)
   - Description: Protein sequence used as query
-  - Alias: query
+  - Multiple: True
+- method
+  - Type: string
+  - Description: Method used for the alignment
+- consensus
+  - Type: string
+  - Description: Consensus sequence of the alignment
 - score
   - Type: float
   - Description: Alignment score
+- standard_numberings
+  - Type: [StandardNumbering](#StandardNumbering)
+  - Description: Standard numbering of the aligned sequences
+  - Multiple: True
 - identity
   - Type: float
   - Description: Ration of identical residues in the alignment
@@ -281,6 +291,22 @@ Description of an organism 🦠
 - mismatches
   - Type: int
   - Description: Number of mismatches in the alignment
+
+
+</details>
+
+### StandardNumbering
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- sequence_id
+  - Type: string
+  - Description:  Identifier of the aligned sequence
+- numbering
+  - Type: string
+  - Description: Standard numbering of the aligned sequence
+  - Multiple: True
 
 
 </details>

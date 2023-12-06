@@ -5,7 +5,7 @@ from Bio.Align import PairwiseAligner
 from tqdm import tqdm
 
 from pyEED.core import ProteinInfo
-from pyEED.core import PairwiseAlignment
+from pyEED.core import Alignment
 
 from joblib import Parallel, delayed, cpu_count
 
@@ -51,7 +51,26 @@ def pairwise_alignment(
     gap_open: int = -1,
     gap_extend: int = 0,
     substitution_matrix: str = "None",
-):
+) -> Alignment:
+    """Creates a pairwise alignment between two sequences.
+
+    Args:
+        reference_info (ProteinInfo): Sequence 1 to be aligned.
+        query_info (ProteinInfo): Sequence 2 to be aligned.
+        mode (str, optional): If the alignment should be global or local. Defaults to "global".
+        match (int, optional): Score of a match. Defaults to 1.
+        mismatch (int, optional): Score of a mismatch. Defaults to -1.
+        gap_open (int, optional): Gap open cost. Defaults to -1.
+        gap_extend (int, optional): Gap extend cost. Defaults to 0.
+        substitution_matrix (str, optional): Substitution matrix name. Defaults to "None".
+
+    Raises:
+        ValueError: If the mode is not global or local.
+        FileNotFoundError: If the substitution matrix is not valid.
+
+    Returns:
+        PairwiseAlignment: Pairwise alignment object with the alignment scores.
+    """
     modes = ["global", "local"]
 
     if mode not in modes:
@@ -78,17 +97,19 @@ def pairwise_alignment(
             )
 
     alignment_result = aligner.align(reference_info.sequence, query_info.sequence)[0]
+    # print(type(alignment_result))
+    # print(dir(alignment_result))
+    # print(alignment_result)
+    print(alignment_result.format())
     gaps = alignment_result.counts().gaps
     mismatches = alignment_result.counts().mismatches
     identities = alignment_result.counts().identities
 
     identity = identities / len(reference_info.sequence)
-    gaps_ratio = gaps / len(reference_info.sequence)
-    mismatches_ratio = mismatches / len(reference_info.sequence)
 
-    alignment = PairwiseAlignment(
+    alignment = Alignment(
         reference_seq=reference_info,
-        query_seq=query_info,
+        query_seqs=[query_info],
         score=alignment_result.score,
         identity=identity,
         gaps=gaps,

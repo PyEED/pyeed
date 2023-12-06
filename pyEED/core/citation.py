@@ -1,7 +1,7 @@
 import sdRDM
 
-from typing import List, Optional
-from pydantic import Field
+from typing import Optional, Union, List
+from pydantic import PrivateAttr, Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from .author import Author
