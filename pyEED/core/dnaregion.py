@@ -7,6 +7,7 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 from .span import Span
 from .dnaregiontype import DNARegionType
 from .abstractregion import AbstractRegion
+from .span import Span
 
 
 @forge_signature
