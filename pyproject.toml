@@ -9,6 +9,7 @@ packages = [
     { include = "pyEED/core" },
     { include = "pyEED/ncbi" },
     { include = "pyEED/networks" },
+    { include = "pyEED/alignment" },
 ]
 
 [tool.poetry.dependencies]
