@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [
     { include = "pyEED/core" },
     { include = "pyEED/ncbi" },
-    { include = "pyEED/networks" },
+    { include = "pyEED/network" },
     { include = "pyEED/alignment" },
 ]
 
