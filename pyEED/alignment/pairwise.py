@@ -69,7 +69,7 @@ def pairwise_alignment(
         FileNotFoundError: If the substitution matrix is not valid.
 
     Returns:
-        PairwiseAlignment: Pairwise alignment object with the alignment scores.
+        Alignment: Pairwise alignment object with the alignment scores.
     """
     modes = ["global", "local"]
 

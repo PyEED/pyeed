@@ -3,23 +3,23 @@ import networkx as nx
 import plotly.graph_objects as go
 
 from pyEED.core.proteininfo import ProteinInfo
-from pyEED.core.pairwisealignment import PairwiseAlignment
+from pyEED.core.alignment import Alignment
 
 
 def pairwise_network(
-    alignments: List[PairwiseAlignment],
+    alignments: List[Alignment],
     weight: str = "identity",
     cutoff: float = None,
     label: str = "accession_id",
     color: str = "name",
 ) -> None:
-    """Takes a list of `PairwiseAlignment`, constructs a network graph,
+    """Takes a list of `Alignment`, constructs a network graph,
     whereas the edges of the graph are weighted with an attribute of the
-    `PairwiseAlignment` object. Visualizes the network graph.
+    `Alignment` object. Visualizes the network graph.
 
     Args:
-        alignments (List[PairwiseAlignment]): List of pairwise alignments.
-        weight (str, optional): Attribute of `PairwiseAlignment` to weight the edges.
+        alignments (List[Alignment]): List of pairwise alignments.
+        weight (str, optional): Attribute of `Alignment` to weight the edges.
         Defaults to "identity".
         cutoff (float, optional): Sequences with a weight higher than the cutoff are connected
         in the network. Defaults to None.
@@ -53,7 +53,7 @@ def pairwise_network(
     visualize_network(graph, label=label, color=color)
 
 
-def construct_network(alignments: List[PairwiseAlignment], cutoff: float) -> nx.Graph:
+def construct_network(alignments: List[Alignment], cutoff: float) -> nx.Graph:
     """Maps properties of alignments to a network graph."""
     graph = nx.Graph()
 
@@ -187,7 +187,7 @@ def position_nodes_and_edges(graph: nx.Graph, weight: str) -> nx.Graph:
     return graph
 
 
-def _get_unique_sequences(alignments: List[PairwiseAlignment]) -> List[ProteinInfo]:
+def _get_unique_sequences(alignments: List[Alignment]) -> List[ProteinInfo]:
     """Gets unique sequences from a list of alignments."""
 
     sequence_infos = []
