@@ -138,7 +138,6 @@ def pairwise_alignment(
             counter_point = counter_point + 1
             counter_gap = 1
         
-    
     print(reference_seq_numbering)
     print(query_seq_numbering)
 
