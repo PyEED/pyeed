@@ -1,4 +1,6 @@
 import sdRDM
+import fasta
+import os
 
 from typing import Optional, Union, List
 from pydantic import PrivateAttr, Field, validator
@@ -255,3 +257,12 @@ class ProteinInfo(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
+    
+    def _create_fasta(id, sequence) -> fasta:
+        file = open("sequences.fasta","a")
+        file.write(">" + id)
+        file.write("\n" + sequence)
+    
+    
+
+
