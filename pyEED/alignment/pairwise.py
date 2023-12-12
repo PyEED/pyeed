@@ -97,15 +97,51 @@ def pairwise_alignment(
             )
 
     alignment_result = aligner.align(reference_info.sequence, query_info.sequence)[0]
-    # print(type(alignment_result))
-    # print(dir(alignment_result))
-    # print(alignment_result)
-    print(alignment_result.format())
+   
+    print(alignment_result)
+    
     gaps = alignment_result.counts().gaps
     mismatches = alignment_result.counts().mismatches
     identities = alignment_result.counts().identities
 
     identity = identities / len(reference_info.sequence)
+
+    #create standard numbering 
+    reference_seq_numbering = list(range(1, len(reference_info.sequence)+1))
+    query_seq_numbering = []
+    counter_gap = 1
+    counter_point = 1
+    counter = 0
+    pointer = reference_seq_numbering[0]
+
+    for i in range(0,len(alignment_result[1][:])):
+        if(alignment_result[0][i] == "-"):
+            query_seq_numbering.append(str(reference_seq_numbering[counter]-1) + "-" + str(counter_gap))
+            counter_gap = counter_gap + 1
+            counter_point = 1
+
+        elif(alignment_result[0][i] == alignment_result[1][i]):
+            query_seq_numbering.append(str(reference_seq_numbering[counter]))
+            pointer = reference_seq_numbering[counter]
+            counter = counter + 1
+            counter_gap = 1
+            counter_point = 1
+            
+        elif(alignment_result[1][i] == "-"):
+            query_seq_numbering.append("")
+            counter_gap = 1
+            counter = counter + 1
+            counter_point = 1
+
+        else:
+            query_seq_numbering.append(str(pointer) + "." + str(counter_point))
+            counter_point = counter_point + 1
+            counter_gap = 1
+        
+    
+    print(reference_seq_numbering)
+    print(query_seq_numbering)
+
 
     alignment = Alignment(
         reference_seq=reference_info,
