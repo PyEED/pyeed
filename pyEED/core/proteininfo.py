@@ -19,6 +19,7 @@ from .dnaregiontype import DNARegionType
 from .substrate import Substrate
 from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
+from Bio import SeqIO
 
 
 @forge_signature
@@ -256,8 +257,7 @@ class ProteinInfo(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
+    
+    
 
-    def _create_fasta(id, sequence):
-        file = open("sequences.fasta", "a")
-        file.write(">" + id)
-        file.write("\n" + sequence)
+
