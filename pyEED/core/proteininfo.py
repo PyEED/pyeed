@@ -1,5 +1,4 @@
 import sdRDM
-import fasta
 import os
 
 from typing import Optional, Union, List
@@ -24,7 +23,7 @@ from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_en
 
 @forge_signature
 class ProteinInfo(sdRDM.DataModel):
-    """Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
+    """Description of a protein sequence. Additionally, the `ProteinInfo` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinInfo` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -178,13 +177,13 @@ class ProteinInfo(sdRDM.DataModel):
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
         """
-        This method creates a 'ProteinSequence' object from a given NCBI ID.
+        This method creates a 'ProteinInfo' object from a given NCBI ID.
 
         Args:
             accession_id (str): NCBI accession ID of the protein sequence.
 
         Returns:
-            ProteinSequence: 'ProteinSequence' object that corresponds to the given NCBI ID.
+            ProteinInfo: 'ProteinInfo' object that corresponds to the given NCBI ID.
         """
 
         seq_record = get_ncbi_entry(accession_id, "protein")
@@ -211,7 +210,7 @@ class ProteinInfo(sdRDM.DataModel):
 
 
         Returns:
-            List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
+            List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
         """
 
         print(f"🏃🏼‍♀️ Running PBLAST")
@@ -257,12 +256,8 @@ class ProteinInfo(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
-    
-    def _create_fasta(id, sequence) -> fasta:
-        file = open("sequences.fasta","a")
+
+    def _create_fasta(id, sequence):
+        file = open("sequences.fasta", "a")
         file.write(">" + id)
         file.write("\n" + sequence)
-    
-    
-
-
