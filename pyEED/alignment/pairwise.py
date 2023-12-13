@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from pyEED.core import ProteinInfo
 from pyEED.core import Alignment
+from pyEED.core import StandardNumbering
 
 from joblib import Parallel, delayed, cpu_count
 
@@ -106,7 +107,27 @@ def pairwise_alignment(
 
     identity = identities / len(reference_info.sequence)
 
-    #create standard numbering 
+    standard_number = standard_numbering(
+        reference_info=reference_info,
+        alignment_result=alignment_result)
+    
+    alignment = Alignment(
+        reference_seq=reference_info,
+        query_seqs=[query_info],
+        score=alignment_result.score,
+        standard_numberings=standard_number,
+        identity=identity,
+        gaps=gaps,
+        mismatches=mismatches,
+    )
+
+    return alignment
+
+def standard_numbering(
+        reference_info: ProteinInfo,
+        alignment_result                #return type? 
+        ) -> StandardNumbering:
+    
     reference_seq_numbering = list(range(1, len(reference_info.sequence)+1))
     query_seq_numbering = []
     counter_gap = 1
@@ -138,17 +159,9 @@ def pairwise_alignment(
             counter_point = counter_point + 1
             counter_gap = 1
         
-    print(reference_seq_numbering)
-    print(query_seq_numbering)
-
-
-    alignment = Alignment(
-        reference_seq=reference_info,
-        query_seqs=[query_info],
-        score=alignment_result.score,
-        identity=identity,
-        gaps=gaps,
-        mismatches=mismatches,
-    )
-
-    return alignment
+  
+    standard_number = StandardNumbering(
+        sequence_id=reference_info.id,
+        numbering=query_seq_numbering)
+    
+    return standard_number
