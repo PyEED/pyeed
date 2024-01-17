@@ -1,22 +1,13 @@
 import sdRDM
 
-from typing import Optional, Union, List
-from pydantic import PrivateAttr, Field, validator
+from typing import List, Optional
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .span import Span
-from .citation import Citation
-from .author import Author
-from .proteinregion import ProteinRegion
-from .proteinregiontype import ProteinRegionType
 from .organism import Organism
-from .site import Site
+from .citation import Citation
 from .standardnumbering import StandardNumbering
-from .dnaregion import DNARegion
-from .dnaregiontype import DNARegionType
-from .substrate import Substrate
-from .proteinsitetype import ProteinSiteType
-from .proteininfo import ProteinInfo
+from .abstractsequence import AbstractSequence
 
 
 @forge_signature
@@ -29,13 +20,13 @@ class Alignment(sdRDM.DataModel):
         xml="@id",
     )
 
-    reference_seq: Optional[ProteinInfo] = Field(
+    reference_seq: Optional[AbstractSequence] = Field(
         default=None,
         description="Protein sequence used as reference",
         alias="reference",
     )
 
-    query_seqs: List[ProteinInfo] = Field(
+    query_seqs: List[AbstractSequence] = Field(
         description="Protein sequence used as query",
         default_factory=ListPlus,
         multiple=True,
@@ -85,56 +76,38 @@ class Alignment(sdRDM.DataModel):
     def add_to_query_seqs(
         self,
         sequence: str,
-        organism: Organism,
         source_id: Optional[str] = None,
         name: Optional[str] = None,
-        regions: List[ProteinRegion] = ListPlus(),
-        sites: List[Site] = ListPlus(),
-        coding_sequence_ref: Optional[DNARegion] = None,
-        ec_number: Optional[str] = None,
-        mol_weight: Optional[float] = None,
-        substrates: List[Substrate] = ListPlus(),
+        organism: Optional[Organism] = None,
         citation: Optional[Citation] = None,
         id: Optional[str] = None,
     ) -> None:
         """
-        This method adds an object of type 'ProteinInfo' to attribute query_seqs
+        This method adds an object of type 'AbstractSequence' to attribute query_seqs
 
         Args:
-            id (str): Unique identifier of the 'ProteinInfo' object. Defaults to 'None'.
-            sequence (): Amino acid sequence.
-            organism (): Corresponding organism.
-            source_id (): Identifier of the protein sequence in the source database. Defaults to None
-            name (): Name of the protein. Defaults to None
-            regions (): Domains of the protein. Defaults to ListPlus()
-            sites (): Annotations of different sites. Defaults to ListPlus()
-            coding_sequence_ref (): Defines the coding sequence of the protein. Defaults to None
-            ec_number (): Enzyme Commission number. Defaults to None
-            mol_weight (): Calculated molecular weight of the protein. Defaults to None
-            substrates (): Promiscuous substrates of the protein. Defaults to ListPlus()
-            citation (): Publication on the protein. Defaults to None
+            id (str): Unique identifier of the 'AbstractSequence' object. Defaults to 'None'.
+            sequence (): Sequence of the molecule.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            name (): Name of the sequence. Defaults to None
+            organism (): Corresponding organism. Defaults to None
+            citation (): Publication of the sequence. Defaults to None
         """
         params = {
             "sequence": sequence,
-            "organism": organism,
             "source_id": source_id,
             "name": name,
-            "regions": regions,
-            "sites": sites,
-            "coding_sequence_ref": coding_sequence_ref,
-            "ec_number": ec_number,
-            "mol_weight": mol_weight,
-            "substrates": substrates,
+            "organism": organism,
             "citation": citation,
         }
         if id is not None:
             params["id"] = id
-        self.query_seqs.append(ProteinInfo(**params))
+        self.query_seqs.append(AbstractSequence(**params))
         return self.query_seqs[-1]
 
     def add_to_standard_numberings(
         self,
-        sequence_id: Optional[str] = None,
+        sequence_id: Optional[AbstractSequence] = None,
         numbering: List[str] = ListPlus(),
         id: Optional[str] = None,
     ) -> None:

@@ -2,25 +2,36 @@
 
 ## Macromolecules
 
-### ProteinInfo
-
-Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
+### AbstractSequence
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
 - source_id
   - Type: string
-  - Description: Identifier of the protein sequence in the source database
+  - Description: Identifier of the sequence in the source database
 - name
   - Type: string
-  - Description: Name of the protein
+  - Description: Name of the sequence
 - __sequence__
   - Type: string
-  - Description: Amino acid sequence
-- __organism__
+  - Description: Sequence of the molecule
+- organism
   - Type: [Organism](#Organism)
   - Description: Corresponding organism
+- citation
+  - Type: [Citation](#Citation)
+  - Description: Publication of the sequence
+
+</details>
+
+### ProteinInfo[_AbstractSequence_]
+
+Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
 - regions
   - Type: [ProteinRegion](#ProteinRegion)
   - Description: Domains of the protein
@@ -42,9 +53,6 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Substrate](#Substrate)
   - Description: Promiscuous substrates of the protein
   - Multiple: True
-- citation
-  - Type: [Citation](#Citation)
-  - Description: Publication on the protein
 
 </details>
 
@@ -56,49 +64,14 @@ Description of a nucleotide sequence 🧬
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- name
-  - Type: string
-  - Description: Name of the nucleotide sequence
-- __sequence__
-  - Type: string
-  - Description: The nucleotide sequence coding for the protein sequence
-- organism
-  - Type: [Organism](#Organism)
-  - Description: Corresponding organism
 - regions
   - Type: [DNARegion](#DNARegion)
   - Description: Defines regions within the nucleotide sequence that code for the protein sequence
   - Multiple: True
-- source_id
-  - Type: string
-  - Description: Identifier of the corresponding DNA sequence
 
 </details>
 
 ## Annotations
-
-### AbstractRegion
-
-Annotation of a region within a sequence 🗺️
-
-<details>
-  <summary><i>Inspect attributes</i></summary>
-
-- name
-  - Type: string
-  - Description: Name of the annotation
-- spans
-  - Type: [Span](#Span)
-  - Description: Spans of the region. E.g. multiple exons of a gene
-  - Multiple: True
-- note
-  - Type: string
-  - Description: Information found in 'note' of an ncbi entry
-- cross_reference
-  - Type: string
-  - Description: Database cross reference
-
-</details>
 
 ### Citation
 
@@ -159,6 +132,29 @@ Promiscuous substrate of an enzyme 🧪
 - chebi_id
   - Type: str
   - Description: ChEBI ID of the substrate
+
+</details>
+
+### AbstractRegion
+
+Annotation of a region within a sequence 🗺️
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: string
+  - Description: Name of the annotation
+- spans
+  - Type: [Span](#Span)
+  - Description: Spans of the region. E.g. multiple exons of a gene
+  - Multiple: True
+- note
+  - Type: string
+  - Description: Information found in 'note' of an ncbi entry
+- cross_reference
+  - Type: string
+  - Description: Database cross reference
 
 </details>
 
@@ -259,11 +255,11 @@ Description of an organism 🦠
   <summary><i>Inspect attributes</i></summary>
 
 - reference_seq
-  - Type: [ProteinInfo](#ProteinInfo)
+  - Type: [AbstractSequence](#AbstractSequence)
   - Description: Protein sequence used as reference
   - Alias: reference
 - query_seqs
-  - Type: [ProteinInfo](#ProteinInfo)
+  - Type: [AbstractSequence](#AbstractSequence)
   - Description: Protein sequence used as query
   - Multiple: True
 - method
@@ -301,7 +297,7 @@ Description of an organism 🦠
   <summary><i>Inspect attributes</i></summary>
 
 - sequence_id
-  - Type: string
+  - Type: @AbstractSequence.source_id
   - Description:  Identifier of the aligned sequence
 - numbering
   - Type: string

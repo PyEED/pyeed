@@ -1,50 +1,43 @@
 ```mermaid
 classDiagram
+    AbstractSequence <-- ProteinInfo
     AbstractRegion <-- DNARegion
     AbstractRegion <-- ProteinRegion
-    ProteinInfo *-- Citation
+    AbstractSequence *-- Citation
+    AbstractSequence *-- Organism
     ProteinInfo *-- Substrate
     ProteinInfo *-- DNARegion
     ProteinInfo *-- ProteinRegion
     ProteinInfo *-- Site
-    ProteinInfo *-- Organism
     DNAInfo *-- DNARegion
-    DNAInfo *-- Organism
-    AbstractRegion *-- Span
     Citation *-- Author
+    AbstractRegion *-- Span
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
-    Alignment *-- ProteinInfo
+    Alignment *-- AbstractSequence
     Alignment *-- StandardNumbering
+    StandardNumbering *-- AbstractSequence
     
-    class ProteinInfo {
+    class AbstractSequence {
         +string source_id
         +string name
         +string sequence*
-        +Organism organism*
+        +Organism organism
+        +Citation citation
+    }
+    
+    class ProteinInfo {
         +ProteinRegion[0..*] regions
         +Site[0..*] sites
         +DNARegion coding_sequence_ref
         +string ec_number
         +float mol_weight
         +Substrate[0..*] substrates
-        +Citation citation
     }
     
     class DNAInfo {
-        +string name
-        +string sequence*
-        +Organism organism
         +DNARegion[0..*] regions
-        +string source_id
-    }
-    
-    class AbstractRegion {
-        +string name
-        +Span[0..*] spans
-        +string note
-        +string cross_reference
     }
     
     class Citation {
@@ -65,6 +58,13 @@ classDiagram
         +str inchi
         +str smiles
         +str chebi_id
+    }
+    
+    class AbstractRegion {
+        +string name
+        +Span[0..*] spans
+        +string note
+        +string cross_reference
     }
     
     class DNARegion {
@@ -101,8 +101,8 @@ classDiagram
     }
     
     class Alignment {
-        +ProteinInfo reference_seq
-        +ProteinInfo[0..*] query_seqs
+        +AbstractSequence reference_seq
+        +AbstractSequence[0..*] query_seqs
         +string method
         +string consensus
         +float score
@@ -114,7 +114,7 @@ classDiagram
     }
     
     class StandardNumbering {
-        +string sequence_id
+        +AbstractSequence sequence_id
         +string[0..*] numbering
     }
     
