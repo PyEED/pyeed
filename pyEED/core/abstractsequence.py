@@ -3,10 +3,8 @@ import sdRDM
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
-
-
-from .organism import Organism
 from .citation import Citation
+from .organism import Organism
 
 
 @forge_signature

@@ -297,7 +297,7 @@ Description of an organism 🦠
   <summary><i>Inspect attributes</i></summary>
 
 - sequence_id
-  - Type: @AbstractSequence.source_id
+  - Type: string
   - Description:  Identifier of the aligned sequence
 - numbering
   - Type: string

@@ -17,7 +17,6 @@ classDiagram
     Site *-- ProteinSiteType
     Alignment *-- AbstractSequence
     Alignment *-- StandardNumbering
-    StandardNumbering *-- AbstractSequence
     
     class AbstractSequence {
         +string source_id
@@ -114,7 +113,7 @@ classDiagram
     }
     
     class StandardNumbering {
-        +AbstractSequence sequence_id
+        +string sequence_id
         +string[0..*] numbering
     }
     

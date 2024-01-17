@@ -4,10 +4,10 @@ from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .organism import Organism
 from .citation import Citation
-from .standardnumbering import StandardNumbering
 from .abstractsequence import AbstractSequence
+from .standardnumbering import StandardNumbering
+from .organism import Organism
 
 
 @forge_signature
@@ -107,7 +107,7 @@ class Alignment(sdRDM.DataModel):
 
     def add_to_standard_numberings(
         self,
-        sequence_id: Optional[AbstractSequence] = None,
+        sequence_id: Optional[str] = None,
         numbering: List[str] = ListPlus(),
         id: Optional[str] = None,
     ) -> None:
