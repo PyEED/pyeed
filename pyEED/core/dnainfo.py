@@ -4,9 +4,9 @@ from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .dnaregiontype import DNARegionType
 from .dnaregion import DNARegion
 from .span import Span
+from .dnaregiontype import DNARegionType
 from ..ncbi.seq_io import get_ncbi_entry, _seqio_to_dna_info
 
 
