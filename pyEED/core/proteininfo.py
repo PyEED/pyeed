@@ -1,55 +1,29 @@
-import sdRDM
-import os
 
-from typing import Optional, Union, List
-from pydantic import PrivateAttr, Field, validator
+from typing import List, Optional
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .span import Span
-from .citation import Citation
-from .author import Author
-from .proteinregion import ProteinRegion
 from .proteinregiontype import ProteinRegionType
-from .organism import Organism
-from .site import Site
+from .proteinregion import ProteinRegion
 from .dnaregion import DNARegion
-from .dnaregiontype import DNARegionType
-from .substrate import Substrate
 from .proteinsitetype import ProteinSiteType
+from .site import Site
+from .span import Span
+from .abstractsequence import AbstractSequence
+from .substrate import Substrate
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
-from Bio import SeqIO
 
 
 @forge_signature
-class ProteinInfo(sdRDM.DataModel):
-    """Description of a protein sequence. Additionally, the `ProteinInfo` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinInfo` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
+class ProteinInfo(AbstractSequence):
+    """Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("proteininfoINDEX"),
         xml="@id",
-    )
-
-    source_id: Optional[str] = Field(
-        default=None,
-        description="Identifier of the protein sequence in the source database",
-    )
-
-    name: Optional[str] = Field(
-        default=None,
-        description="Name of the protein",
-    )
-
-    sequence: str = Field(
-        ...,
-        description="Amino acid sequence",
-    )
-
-    organism: Organism = Field(
-        ...,
-        description="Corresponding organism",
     )
 
     regions: List[ProteinRegion] = Field(
@@ -83,11 +57,6 @@ class ProteinInfo(sdRDM.DataModel):
         description="Promiscuous substrates of the protein",
         default_factory=ListPlus,
         multiple=True,
-    )
-
-    citation: Optional[Citation] = Field(
-        description="Publication on the protein",
-        default_factory=Citation,
     )
 
     def add_to_regions(
@@ -257,7 +226,3 @@ class ProteinInfo(sdRDM.DataModel):
         for alignment in blast_record.alignments:
             accessions.append(alignment.accession)
         return accessions
-    
-    
-
-
