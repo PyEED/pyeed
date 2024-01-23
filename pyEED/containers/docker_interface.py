@@ -3,13 +3,12 @@ import shutil
 from typing import Any, List
 import tempfile
 from abc import ABC, abstractmethod
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 
 import docker
 from docker.models.containers import Container
 from docker.models.images import Image
 from docker.client import DockerClient
-
 
 from pyEED.containers.containers import ToolContainer
 from pyEED.core.abstractsequence import AbstractSequence
@@ -30,17 +29,36 @@ class AbstractContainer(BaseModel, ABC):
         _tempdir_path (str): Path to the temporary directory.
 
     Methods:
-        get_image(): Gets the image from Docker Hub.
-        run_container(command: str, data: Any): Runs a container and executes a command.
-        setup_input_data(data: Any) -> str: Creates the input data for the container.
-        extract_output_data(): Extracts the output data from the container.
-        setup_command() -> str: Creates the command to be executed in the container.
-        delete_temp_dir(): Deletes the temporary directory.
+        get_image() -> Image:
+            Gets the image from Docker Hub. If the image is not found, it will be pulled.
+
+        run_container(command: str, data: Any) -> Container:
+            Runs a container from a given image and executes a command.
+            Data is mounted to the container.
+
+        setup_input_data(data: Any) -> str:
+            Creates the input data for the container.
+
+        extract_output_data():
+            Extracts the output data from the container.
+
+        setup_command() -> str:
+            Creates the command to be executed in the container.
+
+        _delete_temp_dir():
+            Deletes the temporary directory.
     """
 
     _container_info: ToolContainer
-    _client: DockerClient = docker.from_env()
-    _tempdir_path: str = tempfile.mkdtemp()
+
+    _client: DockerClient = PrivateAttr()
+    _tempdir_path: str = PrivateAttr()
+
+    def __init__(self, **kwargs):
+        BaseModel.__init__(self, **kwargs)
+        super().__init__(**kwargs)
+        self._tempdir_path = tempfile.mkdtemp()
+        self._client = docker.from_env()
 
     def get_image(self) -> Image:
         """Gets the image from Docker Hub. If the image is not found, it will be pulled."""
@@ -52,22 +70,19 @@ class AbstractContainer(BaseModel, ABC):
     def run_container(self, command: str, data: Any) -> Container:
         """Runs a container from a given image and executes a command.
         Data is mounted to the container."""
-        image = self.get_image()
-        self.setup_input_data(data=data)
+        try:
+            image = self.get_image()
+            self.setup_input_data(data=data)
 
-        container = self._client.containers.run(
-            image=image,
-            command=command,
-            name=self._container_info.name,
-            auto_remove=True,
-            volumes={self._tempdir_path: {"bind": "/data/", "mode": "rw"}},
-        )
-
-        return container
-
-    def delete_temp_dir(self):
-        """Deletes the temporary directory."""
-        shutil.rmtree(self._tempdir_path)
+            self._client.containers.run(
+                image=image,
+                command=command,
+                name=self._container_info.name,
+                auto_remove=True,
+                volumes={self._tempdir_path: {"bind": "/data/", "mode": "rw"}},
+            )
+        except Exception as e:
+            print(f"Error running container: {e}")
 
     @abstractmethod
     def setup_input_data(self, data: Any) -> str:
@@ -84,8 +99,33 @@ class AbstractContainer(BaseModel, ABC):
         """Creates the command which is executed in the container."""
         pass
 
+    def _delete_temp_dir(self):
+        """Deletes the temporary directory."""
+        shutil.rmtree(self._tempdir_path)
+
 
 class ClustalOmega(AbstractContainer):
+    """
+    ClustalOmega is a class that represents a container for running the ClustalOmega tool.
+
+    Attributes:
+        _container_info (ToolContainer): The information about the ClustalOmega container.
+
+    Methods:
+        setup_input_data(data: List[AbstractSequence]) -> str:
+            Sets up the input data for the ClustalOmega container.
+
+        setup_command() -> str:
+            Sets up the command to run the ClustalOmega container.
+
+        extract_output_data() -> _type_:
+            Extracts the output data from the ClustalOmega container.
+
+        align(sequences: List[AbstractSequence]) -> _type_:
+            Aligns multiple sequences using the ClustalOmega container and returns the alignment result.
+    """
+
+    # TODO: Add type hints
     _container_info: ToolContainer = ToolContainer.CLUSTALO
 
     def setup_input_data(self, data: List[AbstractSequence]) -> str:
@@ -104,7 +144,7 @@ class ClustalOmega(AbstractContainer):
         with open(os.path.join(self._tempdir_path, "output.fasta"), "r") as file:
             alignment = Bio.AlignIO.read(file, "fasta")
 
-        self.delete_temp_dir()
+        self._delete_temp_dir()
         return alignment
 
     def align(self, sequences: List[AbstractSequence]):
@@ -116,6 +156,7 @@ class ClustalOmega(AbstractContainer):
         Returns:
             _type_: _description_
         """
+
         self.run_container(
             command=self.setup_command(),
             data=sequences,
