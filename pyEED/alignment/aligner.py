@@ -8,7 +8,6 @@ from pyEED.containers.docker_interface import AbstractContainer
 from pyEED.core import AbstractSequence
 from pyEED.core import StandardNumbering
 from pyEED.core import Alignment
-from pyEED.containers.containers import DockerHubContainer
 
 
 class AbstractPairwiseAligner(BaseModel, ABC):

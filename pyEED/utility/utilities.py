@@ -1,12 +1,8 @@
 from typing import List
-import tempfile
 
 from pyEED.core.abstractsequence import AbstractSequence
 
 
 def create_multifaster(sequences: List[AbstractSequence]) -> str:
-    multifasta = ""
-    for seq in sequences:
-        multifasta += f">{seq.source_id}\n{seq.sequence}\n"
-
-    return multifasta
+    """Creates a multifasta string from a list of sequences."""
+    return "\n".join([f">{seq.source_id}\n{seq.sequence}" for seq in sequences])
