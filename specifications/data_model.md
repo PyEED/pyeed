@@ -25,6 +25,7 @@
 
 </details>
 
+
 ### ProteinInfo[_AbstractSequence_]
 
 Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
@@ -53,6 +54,37 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Substrate](#Substrate)
   - Description: Promiscuous substrates of the protein
   - Multiple: True
+
+</details>
+
+### Structure
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- pdb_id
+  - Type: string
+  - Description: PDB ID of the structure
+- alphafold_id
+  - Type: string
+  - Description: AlphaFold ID of the structure
+- method
+  - Type: string
+  - Description: Method used for structure determination
+- resolution
+  - Type: float
+  - Description: Resolution of the structure in angstrom
+- chains
+  - Type: [Chain](#Chain)
+  - Description: Chains of the structure
+  - Multiple: True
+- ligands
+  - Type: [Ligand](#Ligand)
+  - Description: Ligands of the structure
+  - Multiple: True
+- mutations
+  - Type: int
+  - Description: Mutations of the structure
 
 </details>
 
