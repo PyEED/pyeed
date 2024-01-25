@@ -12,7 +12,7 @@ from joblib import Parallel, delayed, cpu_count
 
 
 def multi_pairwise_alignment(
-    protien_infos: List[ProteinInfo],
+    protein_infos: List[ProteinInfo],
     mode: str = "global",
     match: int = 1,
     mismatch: int = -1,
@@ -21,7 +21,7 @@ def multi_pairwise_alignment(
     substitution_matrix: str = "None",
     n_jobs: int = None,
 ):
-    pairs = list(combinations(protien_infos, 2))
+    pairs = list(combinations(protein_infos, 2))
 
     if n_jobs is None:
         n_jobs = cpu_count()
@@ -99,7 +99,7 @@ def pairwise_alignment(
 
     alignment_result = aligner.align(reference_info.sequence, query_info.sequence)[0]
    
-    print(alignment_result)
+    #print(alignment_result)
     
     gaps = alignment_result.counts().gaps
     mismatches = alignment_result.counts().mismatches
@@ -115,7 +115,7 @@ def pairwise_alignment(
         reference_seq=reference_info,
         query_seqs=[query_info],
         score=alignment_result.score,
-        standard_numberings=standard_number,
+        standard_numberings=[standard_number],
         identity=identity,
         gaps=gaps,
         mismatches=mismatches,
@@ -125,43 +125,103 @@ def pairwise_alignment(
 
 def standard_numbering(
         reference_info: ProteinInfo,
-        alignment_result                #return type? 
+        alignment_result: PairwiseAligner
         ) -> StandardNumbering:
     
     reference_seq_numbering = list(range(1, len(reference_info.sequence)+1))
     query_seq_numbering = []
     counter_gap = 1
-    counter_point = 1
     counter = 0
-    pointer = reference_seq_numbering[0]
 
     for i in range(0,len(alignment_result[1][:])):
         if(alignment_result[0][i] == "-"):
-            query_seq_numbering.append(str(reference_seq_numbering[counter]-1) + "-" + str(counter_gap))
+            query_seq_numbering.append(str(reference_seq_numbering[counter]-1) + "." + str(counter_gap))
             counter_gap = counter_gap + 1
-            counter_point = 1
-
-        elif(alignment_result[0][i] == alignment_result[1][i]):
-            query_seq_numbering.append(str(reference_seq_numbering[counter]))
-            pointer = reference_seq_numbering[counter]
-            counter = counter + 1
-            counter_gap = 1
-            counter_point = 1
             
         elif(alignment_result[1][i] == "-"):
-            query_seq_numbering.append("")
             counter_gap = 1
             counter = counter + 1
-            counter_point = 1
-
-        else:
-            query_seq_numbering.append(str(pointer) + "." + str(counter_point))
-            counter_point = counter_point + 1
-            counter_gap = 1
         
+        else:
+            query_seq_numbering.append(str(reference_seq_numbering[counter]))
+            counter = counter + 1
+            counter_gap = 1
   
     standard_number = StandardNumbering(
-        sequence_id=reference_info.id,
-        numbering=query_seq_numbering)
+    sequence_id=reference_info.id,
+    numbering=query_seq_numbering)
     
     return standard_number
+
+
+def str_to_int(
+        numbering: List
+        ) -> List:
+    
+    reference_seq = []
+
+    for number in numbering:
+
+        find_point = number.find(".")
+
+        if find_point != -1:
+            reference_seq.append([int(number[0:find_point]), int(number[find_point+1:])])
+        else:
+            reference_seq.append([int(number),0])
+    return reference_seq
+
+
+def vizualize_standard_numbering(
+        alignment: Alignment
+    ):
+    
+    for j in range(len(alignment.query_seqs)):
+    
+        counter_ref = 0
+        counter_query = 0
+
+        identity = []
+        print_target = []
+        print_query = []
+
+        reference_seq = list(range(1,len(alignment.reference_seq.sequence)+1))
+        query_seq = str_to_int(alignment.standard_numberings[j].numbering)
+
+        count_points = sum(1 for _, num in query_seq if num != 0)
+
+        length = len(alignment.reference_seq.sequence) + count_points
+
+        for i in range(length):
+
+            if query_seq[counter_query][1] != 0:
+                print_target.append('-')
+                print_query.append(alignment.query_seqs[j].sequence[counter_query])
+                counter_query += 1
+            
+            elif counter_ref != 0 and query_seq[counter_query][0] != reference_seq[counter_ref]:
+                print_query.append('-')
+                print_target.append(alignment.reference_seq.sequence[counter_ref])
+                counter_ref += 1
+
+            else: 
+                print_query.append(alignment.query_seqs[j].sequence[counter_query])  
+                print_target.append(alignment.reference_seq.sequence[counter_ref])
+                counter_query += 1
+                counter_ref += 1
+
+        for i in range(0,length):  
+            if print_target[i] == print_query[i]:
+                identity.append('|')
+            
+            else:
+                identity.append(' ')
+    
+
+    print(''.join(print_target))
+    print(''.join(identity))
+    print(''.join(print_query))                
+
+
+                    
+        
+
