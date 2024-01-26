@@ -4,10 +4,12 @@ from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .citation import Citation
-from .abstractsequence import AbstractSequence
+
+from pyEED.core.abstractsequence import AbstractSequence
+from .sequence import Sequence
 from .standardnumbering import StandardNumbering
-from .organism import Organism
+
+from pyEED.containers.abstract_container import AbstractContainer
 
 
 @forge_signature
@@ -20,21 +22,9 @@ class Alignment(sdRDM.DataModel):
         xml="@id",
     )
 
-    reference_seq: Optional[AbstractSequence] = Field(
-        default=None,
-        description="Protein sequence used as reference",
-        alias="reference",
-    )
-
-    query_seqs: List[AbstractSequence] = Field(
-        description="Protein sequence used as query",
-        default_factory=ListPlus,
-        multiple=True,
-    )
-
     method: Optional[str] = Field(
         default=None,
-        description="Method used for the alignment",
+        description="Applied alignment method",
     )
 
     consensus: Optional[str] = Field(
@@ -42,9 +32,16 @@ class Alignment(sdRDM.DataModel):
         description="Consensus sequence of the alignment",
     )
 
-    score: Optional[float] = Field(
-        default=None,
-        description="Alignment score",
+    input_sequences: List[Sequence] = Field(
+        description="Sequences of the alignment",
+        default_factory=ListPlus,
+        multiple=True,
+    )
+
+    aligned_sequences: List[Sequence] = Field(
+        description="Aligned sequences of the alignment",
+        default_factory=ListPlus,
+        multiple=True,
     )
 
     standard_numberings: List[StandardNumbering] = Field(
@@ -53,61 +50,50 @@ class Alignment(sdRDM.DataModel):
         multiple=True,
     )
 
-    identity: Optional[float] = Field(
-        default=None,
-        description="Ration of identical residues in the alignment",
-    )
-
-    similarity: Optional[float] = Field(
-        default=None,
-        description="Ration of similar residues in the alignment",
-    )
-
-    gaps: Optional[int] = Field(
-        default=None,
-        description="Number of gaps in the alignment",
-    )
-
-    mismatches: Optional[int] = Field(
-        default=None,
-        description="Number of mismatches in the alignment",
-    )
-
-    def add_to_query_seqs(
+    def add_to_input_sequences(
         self,
-        sequence: str,
         source_id: Optional[str] = None,
-        name: Optional[str] = None,
-        organism: Optional[Organism] = None,
-        citation: Optional[Citation] = None,
+        sequence: Optional[str] = None,
         id: Optional[str] = None,
     ) -> None:
         """
-        This method adds an object of type 'AbstractSequence' to attribute query_seqs
+        This method adds an object of type 'Sequence' to attribute input_sequences
 
         Args:
-            id (str): Unique identifier of the 'AbstractSequence' object. Defaults to 'None'.
-            sequence (): Sequence of the molecule.
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
             source_id (): Identifier of the sequence in the source database. Defaults to None
-            name (): Name of the sequence. Defaults to None
-            organism (): Corresponding organism. Defaults to None
-            citation (): Publication of the sequence. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
         """
-        params = {
-            "sequence": sequence,
-            "source_id": source_id,
-            "name": name,
-            "organism": organism,
-            "citation": citation,
-        }
+        params = {"source_id": source_id, "sequence": sequence}
         if id is not None:
             params["id"] = id
-        self.query_seqs.append(AbstractSequence(**params))
-        return self.query_seqs[-1]
+        self.input_sequences.append(Sequence(**params))
+        return self.input_sequences[-1]
+
+    def add_to_aligned_sequences(
+        self,
+        source_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Sequence' to attribute aligned_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
+        """
+        params = {"source_id": source_id, "sequence": sequence}
+        if id is not None:
+            params["id"] = id
+        self.aligned_sequences.append(Sequence(**params))
+        return self.aligned_sequences[-1]
 
     def add_to_standard_numberings(
         self,
-        sequence_id: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        numbered_id: Optional[str] = None,
         numbering: List[str] = ListPlus(),
         id: Optional[str] = None,
     ) -> None:
@@ -116,11 +102,50 @@ class Alignment(sdRDM.DataModel):
 
         Args:
             id (str): Unique identifier of the 'StandardNumbering' object. Defaults to 'None'.
-            sequence_id (): Identifier of the aligned sequence. Defaults to None
+            reference_id (): Standard numbering of the reference sequence. Defaults to None
+            numbered_id (): Standard numbering of the query sequence. Defaults to None
             numbering (): Standard numbering of the aligned sequence. Defaults to ListPlus()
         """
-        params = {"sequence_id": sequence_id, "numbering": numbering}
+        params = {
+            "reference_id": reference_id,
+            "numbered_id": numbered_id,
+            "numbering": numbering,
+        }
         if id is not None:
             params["id"] = id
         self.standard_numberings.append(StandardNumbering(**params))
         return self.standard_numberings[-1]
+
+    def align(self, aligner: AbstractContainer, **kwargs):
+        alignment = aligner().align(sequences=self.input_sequences)
+        self.method = aligner._container_info.name
+
+        self.aligned_sequences = [
+            Sequence(source_id=seq.id, sequence=str(seq.seq)) for seq in alignment
+        ]
+
+        # TODO: This is a workaround for the BioPython bug that causes the dumb_consensus() method to raise a warning
+        # Need to find new way to calculate consensus
+        import warnings
+        from Bio.Align import AlignInfo
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.consensus = str(AlignInfo.SummaryInfo(alignment).dumb_consensus())
+
+    def create_standard_numbering(self, reference_sequence: Sequence):
+        raise NotImplementedError
+
+    @classmethod
+    def from_sequences(cls, sequences: List[AbstractSequence]):
+        alignment = cls()
+        alignment.input_sequences = [
+            Sequence(source_id=seq.source_id, sequence=str(seq.sequence))
+            for seq in sequences
+        ]
+        return alignment
+
+    def __repr__(self):
+        if len(self.aligned_sequences) != 0:
+            alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
+            return f"{self.consensus}\n\n{alignment})"

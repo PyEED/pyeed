@@ -16,9 +16,14 @@ class StandardNumbering(sdRDM.DataModel):
         xml="@id",
     )
 
-    sequence_id: Optional[str] = Field(
+    reference_id: Optional[str] = Field(
         default=None,
-        description="Identifier of the aligned sequence",
+        description="Standard numbering of the reference sequence",
+    )
+
+    numbered_id: Optional[str] = Field(
+        default=None,
+        description="Standard numbering of the query sequence",
     )
 
     numbering: List[str] = Field(

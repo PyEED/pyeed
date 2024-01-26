@@ -5,13 +5,14 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .dnaregion import DNARegion
-from .substrate import Substrate
-from .abstractsequence import AbstractSequence
 from .proteinregion import ProteinRegion
-from .proteinregiontype import ProteinRegionType
+from .abstractsequence import AbstractSequence
 from .site import Site
+from .citation import Citation
 from .span import Span
+from .proteinregiontype import ProteinRegionType
+from .substrate import Substrate
+from .dnaregion import DNARegion
 from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
@@ -24,6 +25,11 @@ class ProteinInfo(AbstractSequence):
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("proteininfoINDEX"),
         xml="@id",
+    )
+
+    family_name: Optional[str] = Field(
+        default=None,
+        description="Family name of the protein",
     )
 
     regions: List[ProteinRegion] = Field(
@@ -126,6 +132,7 @@ class ProteinInfo(AbstractSequence):
         inchi: Optional[str] = None,
         smiles: Optional[str] = None,
         chebi_id: Optional[str] = None,
+        citation: Optional[Citation] = None,
         id: Optional[str] = None,
     ) -> None:
         """
@@ -137,8 +144,15 @@ class ProteinInfo(AbstractSequence):
             inchi (): InChI code of the substrate. Defaults to None
             smiles (): SMILES code of the substrate. Defaults to None
             chebi_id (): ChEBI ID of the substrate. Defaults to None
+            citation (): Citations of the substrate. Defaults to None
         """
-        params = {"name": name, "inchi": inchi, "smiles": smiles, "chebi_id": chebi_id}
+        params = {
+            "name": name,
+            "inchi": inchi,
+            "smiles": smiles,
+            "chebi_id": chebi_id,
+            "citation": citation,
+        }
         if id is not None:
             params["id"] = id
         self.substrates.append(Substrate(**params))
