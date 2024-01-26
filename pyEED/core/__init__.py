@@ -1,5 +1,6 @@
 from .abstractsequence import AbstractSequence
 from .proteininfo import ProteinInfo
+from .structure import Structure
 from .dnainfo import DNAInfo
 from .citation import Citation
 from .author import Author
@@ -11,6 +12,8 @@ from .span import Span
 from .site import Site
 from .organism import Organism
 from .alignment import Alignment
+from .pairwisealignment import PairwiseAlignment
+from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 from .proteinsitetype import ProteinSiteType
 from .dnaregiontype import DNARegionType
@@ -20,6 +23,7 @@ __doc__ = ""
 __all__ = [
     "AbstractSequence",
     "ProteinInfo",
+    "Structure",
     "DNAInfo",
     "Citation",
     "Author",
@@ -31,6 +35,8 @@ __all__ = [
     "Site",
     "Organism",
     "Alignment",
+    "PairwiseAlignment",
+    "Sequence",
     "StandardNumbering",
     "ProteinSiteType",
     "DNARegionType",

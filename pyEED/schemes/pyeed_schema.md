@@ -3,6 +3,7 @@ classDiagram
     AbstractSequence <-- ProteinInfo
     AbstractRegion <-- DNARegion
     AbstractRegion <-- ProteinRegion
+    Alignment <-- PairwiseAlignment
     AbstractSequence *-- Citation
     AbstractSequence *-- Organism
     ProteinInfo *-- Substrate
@@ -11,11 +12,12 @@ classDiagram
     ProteinInfo *-- Site
     DNAInfo *-- DNARegion
     Citation *-- Author
+    Substrate *-- Citation
     AbstractRegion *-- Span
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
-    Alignment *-- AbstractSequence
+    Alignment *-- Sequence
     Alignment *-- StandardNumbering
     
     class AbstractSequence {
@@ -27,12 +29,23 @@ classDiagram
     }
     
     class ProteinInfo {
+        +string family_name
         +ProteinRegion[0..*] regions
         +Site[0..*] sites
         +DNARegion coding_sequence_ref
         +string ec_number
         +float mol_weight
         +Substrate[0..*] substrates
+    }
+    
+    class Structure {
+        +string pdb_id
+        +string alphafold_id
+        +string method
+        +float resolution
+        +string[0..*] chains
+        +string[0..*] ligands
+        +int mutations
     }
     
     class DNAInfo {
@@ -57,6 +70,7 @@ classDiagram
         +str inchi
         +str smiles
         +str chebi_id
+        +Citation citation
     }
     
     class AbstractRegion {
@@ -100,20 +114,29 @@ classDiagram
     }
     
     class Alignment {
-        +AbstractSequence reference_seq
-        +AbstractSequence[0..*] query_seqs
         +string method
         +string consensus
-        +float score
+        +Sequence[0..*] input_sequences
+        +Sequence[0..*] aligned_sequences
         +StandardNumbering[0..*] standard_numberings
+    }
+    
+    class PairwiseAlignment {
+        +float score
         +float identity
         +float similarity
         +int gaps
         +int mismatches
     }
     
+    class Sequence {
+        +string source_id
+        +string sequence
+    }
+    
     class StandardNumbering {
-        +string sequence_id
+        +str reference_id
+        +str numbered_id
         +string[0..*] numbering
     }
     

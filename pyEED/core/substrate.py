@@ -3,6 +3,7 @@ import sdRDM
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
+from .citation import Citation
 
 
 @forge_signature
@@ -33,4 +34,9 @@ class Substrate(sdRDM.DataModel):
     chebi_id: Optional[str] = Field(
         default=None,
         description="ChEBI ID of the substrate",
+    )
+
+    citation: Optional[Citation] = Field(
+        description="Citations of the substrate",
+        default_factory=Citation,
     )
