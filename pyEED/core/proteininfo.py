@@ -1,23 +1,23 @@
-import sdRDM
-
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyEED.core.dnainfo import DNAInfo
-from .site import Site
-from .proteinsitetype import ProteinSiteType
-from .organism import Organism
 from .proteinregion import ProteinRegion
-from .dnaregion import DNARegion
+from .abstractsequence import AbstractSequence
+from .site import Site
+from .citation import Citation
 from .span import Span
 from .proteinregiontype import ProteinRegionType
+from .substrate import Substrate
+from .dnaregion import DNARegion
+from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
 
 @forge_signature
-class ProteinInfo(sdRDM.DataModel):
+class ProteinInfo(AbstractSequence):
     """Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
 
     id: Optional[str] = Field(
@@ -26,24 +26,9 @@ class ProteinInfo(sdRDM.DataModel):
         xml="@id",
     )
 
-    source_id: Optional[str] = Field(
+    family_name: Optional[str] = Field(
         default=None,
-        description="Identifier of the protein sequence in the source database",
-    )
-
-    name: Optional[str] = Field(
-        default=None,
-        description="Name of the protein",
-    )
-
-    sequence: str = Field(
-        ...,
-        description="Amino acid sequence",
-    )
-
-    organism: Organism = Field(
-        ...,
-        description="Corresponding organism",
+        description="Family name of the protein",
     )
 
     regions: List[ProteinRegion] = Field(
@@ -59,8 +44,8 @@ class ProteinInfo(sdRDM.DataModel):
     )
 
     coding_sequence_ref: Optional[DNARegion] = Field(
-        default=DNARegion(),
         description="Defines the coding sequence of the protein",
+        default_factory=DNARegion,
     )
 
     ec_number: Optional[str] = Field(
@@ -71,6 +56,12 @@ class ProteinInfo(sdRDM.DataModel):
     mol_weight: Optional[float] = Field(
         default=None,
         description="Calculated molecular weight of the protein",
+    )
+
+    substrates: List[Substrate] = Field(
+        description="Promiscuous substrates of the protein",
+        default_factory=ListPlus,
+        multiple=True,
     )
 
     def add_to_regions(
@@ -134,16 +125,48 @@ class ProteinInfo(sdRDM.DataModel):
         self.sites.append(Site(**params))
         return self.sites[-1]
 
+    def add_to_substrates(
+        self,
+        name: Optional[str] = None,
+        inchi: Optional[str] = None,
+        smiles: Optional[str] = None,
+        chebi_id: Optional[str] = None,
+        citation: Optional[Citation] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Substrate' to attribute substrates
+
+        Args:
+            id (str): Unique identifier of the 'Substrate' object. Defaults to 'None'.
+            name (): Name of the substrate. Defaults to None
+            inchi (): InChI code of the substrate. Defaults to None
+            smiles (): SMILES code of the substrate. Defaults to None
+            chebi_id (): ChEBI ID of the substrate. Defaults to None
+            citation (): Citations of the substrate. Defaults to None
+        """
+        params = {
+            "name": name,
+            "inchi": inchi,
+            "smiles": smiles,
+            "chebi_id": chebi_id,
+            "citation": citation,
+        }
+        if id is not None:
+            params["id"] = id
+        self.substrates.append(Substrate(**params))
+        return self.substrates[-1]
+
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
         """
-        This method creates a 'ProteinSequence' object from a given NCBI ID.
+        This method creates a 'ProteinInfo' object from a given NCBI ID.
 
         Args:
             accession_id (str): NCBI accession ID of the protein sequence.
 
         Returns:
-            ProteinSequence: 'ProteinSequence' object that corresponds to the given NCBI ID.
+            ProteinInfo: 'ProteinInfo' object that corresponds to the given NCBI ID.
         """
 
         seq_record = get_ncbi_entry(accession_id, "protein")
@@ -155,8 +178,7 @@ class ProteinInfo(sdRDM.DataModel):
 
     def pblast(
         self,
-        database: str = "nr",
-        n_hits: int = 100,
+        n_hits: int,
         e_value: float = 10.0,
         api_key: str = None,
         **kwargs,
@@ -165,39 +187,26 @@ class ProteinInfo(sdRDM.DataModel):
         Additional keyword arguments can be pass according to the blast [specifications](https://biopython.org/docs/1.75/api/Bio.Blast.NCBIWWW.html).
 
         Args:
-            database (str, optional): Database to search. Defaults to "nr".
-            n_hits (int, optional): Number of hits to return. Defaults to 100.
+            n_hits (int): Number of hits to return.
             e_value (float, optional): E-value threshold. Defaults to 10.0.
             api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
 
+
         Returns:
-            List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
+            List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
         """
-
-        databases = {
-            "nr": "Non-redundant",
-            "refseq_protein": "NCBI Protein Reference Sequences",
-            "swissprot": "Non-redundant UniProtKB / SwissProt sequences",
-            "pdbaa": "PDB protein database",
-        }
-
-        if database not in databases:
-            raise ValueError(
-                f"Database '{database}' is not supported. Choose one of {list(databases.keys())}"
-            )
 
         print(f"🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")
         print(f"├── accession: {self.source_id}")
         print(f"├── organism: {self.organism.name}")
         print(f"├── e-value: {e_value}")
-        print(f"├── database: {databases[database]}")
         print(f"╰── max hits: {n_hits}")
 
         result_handle = NCBIWWW.qblast(
-            program="blastp",
-            database=database,
-            sequence=self.sequence,
+            "blastp",
+            "nr",
+            self.sequence,
             hitlist_size=n_hits,
             expect=e_value,
             **kwargs,
@@ -219,6 +228,9 @@ class ProteinInfo(sdRDM.DataModel):
             return
 
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
+
+    def __str__(self):
+        return f">{self.source_id}\n{self.sequence}"
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)

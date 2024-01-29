@@ -4,10 +4,9 @@ from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .organism import Organism
+from .span import Span
 from .dnaregiontype import DNARegionType
 from .dnaregion import DNARegion
-from .span import Span
 from ..ncbi.seq_io import get_ncbi_entry, _seqio_to_dna_info
 
 
@@ -21,21 +20,6 @@ class DNAInfo(sdRDM.DataModel):
         xml="@id",
     )
 
-    name: Optional[str] = Field(
-        default=None,
-        description="Name of the nucleotide sequence",
-    )
-
-    sequence: str = Field(
-        ...,
-        description="The nucleotide sequence coding for the protein sequence",
-    )
-
-    organism: Optional[Organism] = Field(
-        default=None,
-        description="Corresponding organism",
-    )
-
     regions: List[DNARegion] = Field(
         description=(
             "Defines regions within the nucleotide sequence that code for the protein"
@@ -43,11 +27,6 @@ class DNAInfo(sdRDM.DataModel):
         ),
         default_factory=ListPlus,
         multiple=True,
-    )
-
-    source_id: Optional[str] = Field(
-        default=None,
-        description="Identifier of the corresponding DNA sequence",
     )
 
     def add_to_regions(

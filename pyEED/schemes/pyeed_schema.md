@@ -1,37 +1,76 @@
 ```mermaid
 classDiagram
+    AbstractSequence <-- ProteinInfo
     AbstractRegion <-- DNARegion
     AbstractRegion <-- ProteinRegion
+    Alignment <-- PairwiseAlignment
+    AbstractSequence *-- Citation
+    AbstractSequence *-- Organism
+    ProteinInfo *-- Substrate
     ProteinInfo *-- DNARegion
     ProteinInfo *-- ProteinRegion
     ProteinInfo *-- Site
-    ProteinInfo *-- Organism
     DNAInfo *-- DNARegion
-    DNAInfo *-- Organism
+    Citation *-- Author
+    Substrate *-- Citation
     AbstractRegion *-- Span
     DNARegion *-- DNARegionType
     ProteinRegion *-- ProteinRegionType
     Site *-- ProteinSiteType
-    PairwiseAlignment *-- ProteinInfo
+    Alignment *-- Sequence
+    Alignment *-- StandardNumbering
     
-    class ProteinInfo {
+    class AbstractSequence {
         +string source_id
         +string name
         +string sequence*
-        +Organism organism*
+        +Organism organism
+        +Citation citation
+    }
+    
+    class ProteinInfo {
+        +string family_name
         +ProteinRegion[0..*] regions
         +Site[0..*] sites
         +DNARegion coding_sequence_ref
         +string ec_number
         +float mol_weight
+        +Substrate[0..*] substrates
+    }
+    
+    class Structure {
+        +string pdb_id
+        +string alphafold_id
+        +string method
+        +float resolution
+        +string[0..*] chains
+        +string[0..*] ligands
+        +int mutations
     }
     
     class DNAInfo {
-        +string name
-        +string sequence*
-        +Organism organism
         +DNARegion[0..*] regions
-        +string source_id
+    }
+    
+    class Citation {
+        +str doi
+        +str pubmed_id
+        +str medline_id
+        +int year
+        +Author[0..*] authors
+    }
+    
+    class Author {
+        +str given_name
+        +str family_name
+    }
+    
+    class Substrate {
+        +str name
+        +str inchi
+        +str smiles
+        +str chebi_id
+        +Citation citation
     }
     
     class AbstractRegion {
@@ -74,14 +113,31 @@ classDiagram
         +string species
     }
     
+    class Alignment {
+        +string method
+        +string consensus
+        +Sequence[0..*] input_sequences
+        +Sequence[0..*] aligned_sequences
+        +StandardNumbering[0..*] standard_numberings
+    }
+    
     class PairwiseAlignment {
-        +ProteinInfo reference_seq
-        +ProteinInfo query_seq
         +float score
         +float identity
         +float similarity
         +int gaps
         +int mismatches
+    }
+    
+    class Sequence {
+        +string source_id
+        +string sequence
+    }
+    
+    class StandardNumbering {
+        +str reference_id
+        +str numbered_id
+        +string[0..*] numbering
     }
     
     class ProteinSiteType {
