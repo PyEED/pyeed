@@ -1,4 +1,3 @@
-
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
@@ -229,6 +228,9 @@ class ProteinInfo(AbstractSequence):
             return
 
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
+
+    def __str__(self):
+        return f">{self.source_id}\n{self.sequence}"
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
