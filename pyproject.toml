@@ -8,6 +8,8 @@ readme = "README.md"
 packages = [
     { include = "pyEED/core" },
     { include = "pyEED/ncbi" },
+    { include = "pyEED/network" },
+    { include = "pyEED/alignment" },
 ]
 
 [tool.poetry.dependencies]
@@ -23,6 +25,7 @@ networkx = "^3.2.1"
 plotly = "^5.18.0"
 nbformat = "^5.9.2"
 scipy = "^1.11.3"
+docker = "^7.0.0"
 
 [build-system]
 requires = ["poetry-core"]

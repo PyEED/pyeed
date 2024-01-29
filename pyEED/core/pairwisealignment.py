@@ -1,31 +1,20 @@
-import sdRDM
 
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .proteininfo import ProteinInfo
+
+
+from .alignment import Alignment
 
 
 @forge_signature
-class PairwiseAlignment(sdRDM.DataModel):
+class PairwiseAlignment(Alignment):
     """"""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("pairwisealignmentINDEX"),
         xml="@id",
-    )
-
-    reference_seq: Optional[ProteinInfo] = Field(
-        default=None,
-        description="Protein sequence used as reference",
-        alias="reference",
-    )
-
-    query_seq: Optional[ProteinInfo] = Field(
-        default=None,
-        description="Protein sequence used as query",
-        alias="query",
     )
 
     score: Optional[float] = Field(
