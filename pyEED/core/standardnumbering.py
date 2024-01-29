@@ -1,7 +1,7 @@
 import sdRDM
 
-from typing import Optional, Union, List
-from pydantic import PrivateAttr, Field, validator
+from typing import List, Optional
+from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 
@@ -16,9 +16,14 @@ class StandardNumbering(sdRDM.DataModel):
         xml="@id",
     )
 
-    sequence_id: Optional[str] = Field(
+    reference_id: Optional[str] = Field(
         default=None,
-        description="Identifier of the aligned sequence",
+        description="Standard numbering of the reference sequence",
+    )
+
+    numbered_id: Optional[str] = Field(
+        default=None,
+        description="Standard numbering of the query sequence",
     )
 
     numbering: List[str] = Field(
