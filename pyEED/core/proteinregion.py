@@ -1,12 +1,9 @@
-import sdRDM
 
-from typing import Optional, Union, List
-from pydantic import PrivateAttr, Field, validator
-from sdRDM.base.listplus import ListPlus
+from typing import Optional
+from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
-from .span import Span
-from .proteinregiontype import ProteinRegionType
 from .abstractregion import AbstractRegion
+from .proteinregiontype import ProteinRegionType
 
 
 @forge_signature

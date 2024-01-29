@@ -2,25 +2,40 @@
 
 ## Macromolecules
 
-### ProteinInfo
-
-Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
+### AbstractSequence
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
 - source_id
   - Type: string
-  - Description: Identifier of the protein sequence in the source database
+  - Description: Identifier of the sequence in the source database
 - name
   - Type: string
-  - Description: Name of the protein
+  - Description: Name of the sequence
 - __sequence__
   - Type: string
-  - Description: Amino acid sequence
-- __organism__
+  - Description: Sequence of the molecule
+- organism
   - Type: [Organism](#Organism)
   - Description: Corresponding organism
+- citation
+  - Type: [Citation](#Citation)
+  - Description: Publication of the sequence
+
+</details>
+
+
+### ProteinInfo[_AbstractSequence_]
+
+Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence.
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- family_name
+  - Type: string
+  - Description: Family name of the protein
 - regions
   - Type: [ProteinRegion](#ProteinRegion)
   - Description: Domains of the protein
@@ -42,9 +57,37 @@ Description of a protein sequence. Additionally, the `ProteinSequence` contains 
   - Type: [Substrate](#Substrate)
   - Description: Promiscuous substrates of the protein
   - Multiple: True
-- citation
-  - Type: [Citation](#Citation)
-  - Description: Publication on the protein
+
+</details>
+
+### Structure
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- pdb_id
+  - Type: string
+  - Description: PDB ID of the structure
+- alphafold_id
+  - Type: string
+  - Description: AlphaFold ID of the structure
+- method
+  - Type: string
+  - Description: Method used for structure determination
+- resolution
+  - Type: float
+  - Description: Resolution of the structure in angstrom
+- chains
+  - Type: string
+  - Description: Chains of the structure
+  - Multiple: True
+- ligands
+  - Type: string
+  - Description: Ligands of the structure
+  - Multiple: True
+- mutations
+  - Type: int
+  - Description: Mutations of the structure
 
 </details>
 
@@ -56,49 +99,14 @@ Description of a nucleotide sequence 🧬
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- name
-  - Type: string
-  - Description: Name of the nucleotide sequence
-- __sequence__
-  - Type: string
-  - Description: The nucleotide sequence coding for the protein sequence
-- organism
-  - Type: [Organism](#Organism)
-  - Description: Corresponding organism
 - regions
   - Type: [DNARegion](#DNARegion)
   - Description: Defines regions within the nucleotide sequence that code for the protein sequence
   - Multiple: True
-- source_id
-  - Type: string
-  - Description: Identifier of the corresponding DNA sequence
 
 </details>
 
 ## Annotations
-
-### AbstractRegion
-
-Annotation of a region within a sequence 🗺️
-
-<details>
-  <summary><i>Inspect attributes</i></summary>
-
-- name
-  - Type: string
-  - Description: Name of the annotation
-- spans
-  - Type: [Span](#Span)
-  - Description: Spans of the region. E.g. multiple exons of a gene
-  - Multiple: True
-- note
-  - Type: string
-  - Description: Information found in 'note' of an ncbi entry
-- cross_reference
-  - Type: string
-  - Description: Database cross reference
-
-</details>
 
 ### Citation
 
@@ -159,6 +167,32 @@ Promiscuous substrate of an enzyme 🧪
 - chebi_id
   - Type: str
   - Description: ChEBI ID of the substrate
+- citation
+  - Type: Citation
+  - Description: Citations of the substrate
+
+</details>
+
+### AbstractRegion
+
+Annotation of a region within a sequence 🗺️
+
+<details>
+  <summary><i>Inspect attributes</i></summary>
+
+- name
+  - Type: string
+  - Description: Name of the annotation
+- spans
+  - Type: [Span](#Span)
+  - Description: Spans of the region. E.g. multiple exons of a gene
+  - Multiple: True
+- note
+  - Type: string
+  - Description: Information found in 'note' of an ncbi entry
+- cross_reference
+  - Type: string
+  - Description: Database cross reference
 
 </details>
 
@@ -258,27 +292,32 @@ Description of an organism 🦠
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- reference_seq
-  - Type: [ProteinInfo](#ProteinInfo)
-  - Description: Protein sequence used as reference
-  - Alias: reference
-- query_seqs
-  - Type: [ProteinInfo](#ProteinInfo)
-  - Description: Protein sequence used as query
-  - Multiple: True
 - method
   - Type: string
-  - Description: Method used for the alignment
+  - Description: Applied alignment method
 - consensus
   - Type: string
   - Description: Consensus sequence of the alignment
+- input_sequences
+  - Type: Sequence
+  - Description: Sequences of the alignment
+  - Multiple: True
+- aligned_sequences
+  - Type: Sequence
+  - Description: Aligned sequences of the alignment
+  - Multiple: True
+- standard_numberings
+  - Type: StandardNumbering
+  - Description: Standard numbering of the aligned sequences
+  - Multiple: True
+
+</details>
+
+### PairwiseAlignment[_Alignment_]
+
 - score
   - Type: float
   - Description: Alignment score
-- standard_numberings
-  - Type: [StandardNumbering](#StandardNumbering)
-  - Description: Standard numbering of the aligned sequences
-  - Multiple: True
 - identity
   - Type: float
   - Description: Ration of identical residues in the alignment
@@ -293,16 +332,26 @@ Description of an organism 🦠
   - Description: Number of mismatches in the alignment
 
 
-</details>
+### Sequence
+
+- source_id
+  - Type: string
+  - Description: Identifier of the sequence in the source database
+- sequence
+  - Type: string
+  - Description: Sequence of the alignment. Gaps are represented by '-'
 
 ### StandardNumbering
 
 <details>
   <summary><i>Inspect attributes</i></summary>
 
-- sequence_id
-  - Type: string
-  - Description:  Identifier of the aligned sequence
+- reference_id
+  - Type: str
+  - Description: Standard numbering of the reference sequence
+- numbered_id
+  - Type: str
+  - Description: Standard numbering of the query sequence
 - numbering
   - Type: string
   - Description: Standard numbering of the aligned sequence
