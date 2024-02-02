@@ -1,18 +1,22 @@
+import os
 import docker
 import shutil
 from enum import Enum
 from typing import Any
 import tempfile
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr
 
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
 
+from pyEED.ncbi import seq_io
+
 
 class ToolImage(Enum):
     CLUSTALO = "biocontainers/clustal-omega:v1.2.1_cv5"
+    BLAST = "haeussma/blast:latest"
 
 
 class AbstractContainer(BaseModel, ABC):
@@ -104,3 +108,108 @@ class AbstractContainer(BaseModel, ABC):
     def setup_command(self) -> str:
         """Creates the command which is executed in the container."""
         pass
+
+
+class Blastp(AbstractContainer):
+    """
+    Class for running BLASTP.
+
+    Attributes:
+        _container_info (ToolContainer): Information about the container.
+        _client (DockerClient): Docker client instance.
+        _tempdir_path (str): Path to the temporary directory.
+
+    Methods:
+        create_file(data: Any) -> str:
+            Creates the input data for the container.
+
+        extract_output_data():
+            Extracts the output data from the container.
+
+        setup_command() -> str:
+            Creates the command to be executed in the container.
+    """
+
+    identity: float = Field(default=0.0, description="Minimum identity to safe hits.")
+    evalue: float = Field(default=10, description="Expectation value (E) to safe hits.")
+    n_hits: int = Field(default=500, description="Maximum number of hits to return.")
+    subs_matrix: str = Field(default="BLOSUM62")
+    word_size: int = Field(
+        default=3, ge=2, le=7, description="Word size of the initial match."
+    )
+    gapopen: int = Field(default=11, description="Cost to open a gap.")
+    gapextend: int = Field(default=1, description="Cost to extend a gap.")
+    threshold: int = Field(
+        default=11, description="Minimum score to add a word to the BLAST lookup table."
+    )
+
+    _container_info = ToolImage.BLAST
+    _db_path: str = PrivateAttr()
+    _n_cores: int = PrivateAttr(default=os.cpu_count())
+    _ncbi_key: str = PrivateAttr(default=None)
+
+    def __init__(self, _db_path: str, ncbi_key: str = None, **kwargs):
+        super().__init__(**kwargs)
+        self._db_path = _db_path
+        if not self._ncbi_key:
+            try:
+                self._ncbi_key = os.environ["NCBI_API_KEY"]
+            except KeyError:
+                self._ncbi_key = ncbi_key
+
+    def run_container(self, command: str, data: Any) -> Container:
+        try:
+            image = self.get_image()
+            self.create_file(data=data)
+
+            print(f"🏃 Running {self._container_info.name}")
+            self._client.containers.run(
+                image=image,
+                command=command,
+                name=self._container_info.name,
+                auto_remove=True,
+                volumes={
+                    self._tempdir_path: {"bind": "/data/", "mode": "rw"},
+                    self._db_path: {"bind": "/db/", "mode": "rw"},
+                },
+            )
+            return self.extract_output_data()
+        except Exception as e:
+            print(f"Error running container: {e}")
+
+    def create_file(self, data: str) -> str:
+        """Creates the input data for the container."""
+        with open(f"{self._tempdir_path}/input.fasta", "w") as f:
+            f.write(data)
+        return f"{self._tempdir_path}/blastp.fasta"
+
+    def extract_output_data(self):
+        from Bio import SearchIO
+
+        """Extracts the output data from the container."""
+
+        search_io = SearchIO.read(f"{self._tempdir_path}/blastp.out", "blast-tab")
+
+        return [
+            result.id
+            for result in search_io
+            if result._items[0].ident_pct >= self.identity * 100
+        ]
+
+    def setup_command(self) -> str:
+        """Creates the command which is executed in the container."""
+        return (
+            f"blastp "
+            f"-query /data/input.fasta "
+            f"-db /db/clustered_db "
+            f"-out /data/blastp.out "
+            f"-outfmt 6 "
+            f"-gapopen {self.gapopen} "
+            f"-gapextend {self.gapextend} "
+            f"-threshold {self.threshold} "
+            f"-num_threads {self._n_cores} "
+            f"-matrix {self.subs_matrix} "
+            f"-word_size {self.word_size} "
+            f"-evalue {self.evalue} "
+            f"-max_target_seqs {self.n_hits}"
+        )
