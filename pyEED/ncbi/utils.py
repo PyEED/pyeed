@@ -27,6 +27,8 @@ def load_accessions(
         except:
             raise ValueError("Accessions must be a list or a TOML file")
 
+    print(api_key)
+
     seq_entries = get_ncbi_entrys(
         accession_ids=accession_ids,
         database="protein",

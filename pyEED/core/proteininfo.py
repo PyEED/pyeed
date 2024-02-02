@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
@@ -14,6 +15,8 @@ from .substrate import Substrate
 from .dnaregion import DNARegion
 from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
+
+from pyEED.containers.abstract_container import Blastp
 
 
 @forge_signature
@@ -176,7 +179,20 @@ class ProteinInfo(AbstractSequence):
     def _from_seq_record(cls, seq_record) -> "ProteinInfo":
         return _seqio_to_nucleotide_info(cls, seq_record)
 
-    def pblast(
+    @classmethod
+    def from_accessions(
+        cls, accession_ids: List[str], email: str = None, api_key: str = None
+    ) -> List["ProteinInfo"]:
+        seq_entries = get_ncbi_entrys(
+            accession_ids=accession_ids,
+            database="protein",
+            email=email,
+            api_key=api_key,
+        )
+
+        return [cls._from_seq_record(record) for record in seq_entries]
+
+    def ncbi_blastp(
         self,
         n_hits: int,
         e_value: float = 10.0,
@@ -223,13 +239,45 @@ class ProteinInfo(AbstractSequence):
         print("🎉 Done\n")
         return protein_infos
 
+    def blastp(
+        self,
+        db_path: str,
+        identity: float = 0,
+        evalue: float = 10,
+        n_hits: int = 500,
+        subst_matrix: str = "BLOSUM62",
+        word_size: int = 3,
+        gapopen: int = 11,
+        gapextend: int = 1,
+        threshold: int = 11,
+        n_cores: int = os.cpu_count(),
+        ncbi_key: str = None,
+    ):
+        blaster = Blastp(
+            _db_path=db_path,
+            identity=identity,
+            evalue=evalue,
+            n_hits=n_hits,
+            subst_matrix=subst_matrix,
+            word_size=word_size,
+            gapopen=gapopen,
+            gapextend=gapextend,
+            threshold=threshold,
+            n_cores=n_cores,
+            ncbi_key=ncbi_key,
+        )
+
+        command = blaster.setup_command()
+        accession_ids = blaster.run_container(command=command, data=self.to_fasta())
+        return ProteinInfo.from_accessions(accession_ids)
+
     def get_dna(self):
         if not self.coding_sequence_ref:
             return
 
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
 
-    def __str__(self):
+    def to_fasta(self):
         return f">{self.source_id}\n{self.sequence}"
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
