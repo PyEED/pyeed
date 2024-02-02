@@ -145,7 +145,7 @@ class Alignment(sdRDM.DataModel):
         ]
         return alignment
 
-    def __repr__(self):
-        if len(self.aligned_sequences) != 0:
-            alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
-            return f"{self.consensus}\n\n{alignment})"
+    # def __repr__(self):
+    #     if len(self.aligned_sequences) != 0:
+    #         alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
+    #         return f"{self.consensus}\n\n{alignment})"
