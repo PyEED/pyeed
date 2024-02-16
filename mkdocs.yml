@@ -1,0 +1,68 @@
+site_name: PyEED Documentation
+repo_url: https://github.com/PyEED/pyeed/
+repo_name: PyEED/pyeed
+site_url: https://pyeed.github.io/pyeed/
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - The Sequence objects: examples/basics.md
+    - Using BLAST: examples/blast.md
+    - Aligning Sequences: examples/alignments.md
+    - Creating Sequence Networks: examples/networks.md
+  - Installation:
+    - PIP: installation/pip.md
+    - Docker: installation/docker.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.links
+    - content.code.select
+    - content.code.copy
+    - content.code.annotation
+  palette: 
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - tables
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - md_in_html
+  - pymdownx.tabbed:
+      alternate_style: true
