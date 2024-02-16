@@ -4,6 +4,7 @@
 </div>
 
 [![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)
+[![Documentation](https://github.com/PyEED/pyeed/actions/workflows/make_docs.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/make_docs.yaml)
 
 ## About 📖
 pyEED is a toolkit enabling object-oriented analysis of protein sequences, instead of working with sequences in a file-oriented fashion. This will enable the user to easily access and manipulate sequence information and to perform analyses on the sequence data.  
