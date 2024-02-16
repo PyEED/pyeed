@@ -16,6 +16,7 @@ nav:
 
 theme:
   name: material
+  logo: figs/pyeed.png
   features:
     - navigation.tabs
     - navigation.sections
