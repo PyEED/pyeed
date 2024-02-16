@@ -14,13 +14,3 @@ The object structure of PyEED is based on a [data model](https://github.com/PyEE
 { .annotate }
 
 1.   PyEED uses the [sdRDM framework](https://github.com/JR-1991/software-driven-rdm) to define the architecture of its data as a Markdown document. The hierarchical structure defined in the Markdown document is used to generate Python classes, mirroring the structure of the data model. PyEED can thus be used to read and write data from SQL databases and apply its tools to the data.
-
-
-### Relational data base
-
-Besides defining the data structure, the data model also defines tables and their relations in a relational database. This allows the native transfer of data that is currently worked with in e.g. a JupyterNotebook and a relational database. Thus, the database structures are inferred from the data model in the same way as the Python classes.
-
-<details>
-  <summary>Why do we use a database?</summary>
-  The objects we are creating in our JupyterNotebook are only stored for the runtime of the program. After we stop our JupyterNotebook the data would be lost. A database is a persistent data storage and lets us structure our data in such a way, that we need less space on our memory. Therefore we create tables based on the datamodel and use relations in relational database systems to represent those. We are modeling normal references as 1:n and data structures such as sets or lists with n:m by using linking tables.
-</details>
