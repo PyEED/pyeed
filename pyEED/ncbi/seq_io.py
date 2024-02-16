@@ -186,6 +186,9 @@ def get_organism(annotations, feature) -> Organism:
     )
 
 
+# TODO: from Jan Range to Everyone:    1:18  PM .get("note", "") to avoid key error
+
+
 def _seqio_to_nucleotide_info(cls, entry: SeqIO):
     """Handel SeqIO entry and return `ProteinSequence`"""
 
