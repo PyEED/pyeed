@@ -8,7 +8,7 @@ from Bio.Align import PairwiseAligner
 from joblib import Parallel, delayed, cpu_count
 from tqdm import tqdm
 
-from pyEED.core.abstractsequence import AbstractSequence
+from pyeed.core.abstractsequence import AbstractSequence
 
 
 from .alignment import Alignment

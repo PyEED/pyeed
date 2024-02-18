@@ -3,9 +3,9 @@ from itertools import combinations
 from Bio.Align import PairwiseAligner
 from tqdm import tqdm
 
-from pyEED.core import ProteinInfo
-from pyEED.core import Alignment
-from pyEED.core import StandardNumbering
+from pyeed.core import ProteinInfo
+from pyeed.core import Alignment
+from pyeed.core import StandardNumbering
 
 from joblib import Parallel, delayed, cpu_count
 

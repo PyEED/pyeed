@@ -4,15 +4,15 @@ from datetime import datetime
 from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
-from pyEED.core.citation import Citation
-from pyEED.core.dnaregion import DNARegion
-from pyEED.core.dnaregiontype import DNARegionType
-from pyEED.core.proteinregion import ProteinRegion
-from pyEED.core.proteinregiontype import ProteinRegionType
-from pyEED.core.proteinsitetype import ProteinSiteType
+from pyeed.core.citation import Citation
+from pyeed.core.dnaregion import DNARegion
+from pyeed.core.dnaregiontype import DNARegionType
+from pyeed.core.proteinregion import ProteinRegion
+from pyeed.core.proteinregiontype import ProteinRegionType
+from pyeed.core.proteinsitetype import ProteinSiteType
 
-from pyEED.core.site import Site
-from pyEED.core.span import Span
+from pyeed.core.site import Site
+from pyeed.core.span import Span
 
 from ..core.organism import Organism
 

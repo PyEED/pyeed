@@ -2,8 +2,8 @@ import os
 from typing import List
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
-from pyEED.containers import AbstractContainer, ToolImage
-from pyEED.core import Sequence
+from pyeed.containers import AbstractContainer, ToolImage
+from pyeed.core import Sequence
 
 
 class ClustalOmega(AbstractContainer):

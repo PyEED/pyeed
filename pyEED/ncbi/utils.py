@@ -2,8 +2,8 @@ from tqdm import tqdm
 from time import time
 from typing import List
 
-from pyEED.core.proteininfo import ProteinInfo
-from pyEED.ncbi.seq_io import get_ncbi_entrys
+from pyeed.core.proteininfo import ProteinInfo
+from pyeed.ncbi.seq_io import get_ncbi_entrys
 
 
 def load_accessions(
