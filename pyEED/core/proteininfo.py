@@ -4,7 +4,7 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
-from pyEED.core.dnainfo import DNAInfo
+from .dnainfo import DNAInfo
 from .proteinregion import ProteinRegion
 from .abstractsequence import AbstractSequence
 from .site import Site
@@ -16,7 +16,7 @@ from .dnaregion import DNARegion
 from .proteinsitetype import ProteinSiteType
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
 
-from pyEED.containers.abstract_container import Blastp
+from pyeed.containers.abstract_container import Blastp
 
 
 @forge_signature
@@ -277,16 +277,10 @@ class ProteinInfo(AbstractSequence):
 
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
 
-    def to_fasta(self):
-        return f">{self.source_id}\n{self.sequence}"
-
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
         blast_record = NCBIXML.read(result_handle)
 
     @staticmethod
     def _get_accessions(blast_record: NCBIXML) -> List[str]:
-        accessions = []
-        for alignment in blast_record.alignments:
-            accessions.append(alignment.accession)
-        return accessions
+        return [alignment.accession for alignment in blast_record.alignments]

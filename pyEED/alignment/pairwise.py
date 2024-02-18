@@ -4,8 +4,8 @@ from Bio.Align import PairwiseAligner
 from numpy import mat
 from tqdm import tqdm
 
-from pyEED.core import ProteinInfo
-from pyEED.core import PairwiseAlignment
+from pyeed.core import ProteinInfo
+from pyeed.core import PairwiseAlignment
 
 
 def multi_pairwise_alignment(

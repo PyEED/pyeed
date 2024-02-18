@@ -11,7 +11,7 @@ from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
 
-from pyEED.ncbi import seq_io
+from pyeed.ncbi import seq_io
 
 
 class ToolImage(Enum):

@@ -1,7 +1,7 @@
 from typing import List
 
-from pyEED.core.abstractsequence import AbstractSequence
-from pyEED.core.sequence import Sequence
+from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.core.sequence import Sequence
 
 
 def create_multifaster(sequences: List[Sequence]) -> str:

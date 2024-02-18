@@ -2,8 +2,8 @@ from typing import List
 import networkx as nx
 import plotly.graph_objects as go
 
-from pyEED.core.proteininfo import ProteinInfo
-from pyEED.core.alignment import Alignment
+from pyeed.core.proteininfo import ProteinInfo
+from pyeed.core.alignment import Alignment
 
 
 def pairwise_network(

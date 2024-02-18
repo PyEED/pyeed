@@ -5,11 +5,11 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 
-from pyEED.core.abstractsequence import AbstractSequence
+from .abstractsequence import AbstractSequence
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 
-from pyEED.containers.abstract_container import AbstractContainer
+from pyeed.containers.abstract_container import AbstractContainer
 
 
 @forge_signature

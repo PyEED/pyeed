@@ -53,7 +53,7 @@ Alternatively, the sequence can be initiated from a sequence string, triggering 
     # Not yet implemented
     ```
 
-## ⬇️ Save a sequence data
+## ⬇️ Save a sequence
 
 ### To file
 
@@ -87,5 +87,5 @@ The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML`file format. Th
 Alternatively, sequence data can be stored in a `PostgreSQL` database. Therefore, the `to_db()` method can be used.
 
 ```py
-# Not yet implemented
+# Feature is currently implemented
 ```
