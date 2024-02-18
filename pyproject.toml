@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "pyEED"
-version = "0.1.0"
+name = "pyeed"
+version = "0.1.1"
 description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
