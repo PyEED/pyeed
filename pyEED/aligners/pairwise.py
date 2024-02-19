@@ -1,166 +1,182 @@
-from typing import List
+from pydantic import BaseModel, Field, validator
+import sdRDM
+from typing import Any, List, Optional
 from itertools import combinations
-from Bio.Align import PairwiseAligner
+from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from tqdm import tqdm
+from pyeed.core.abstractsequence import AbstractSequence
 
+<<<<<<< HEAD
 from pyeed.core import ProteinInfo
+=======
+from pyeed.core.pairwisealignment import PairwiseAlignment
+from pyeed.core.sequence import Sequence
+>>>>>>> alignments
 from pyeed.core import Alignment
 from pyeed.core import StandardNumbering
 
 from joblib import Parallel, delayed, cpu_count
 
 
-def multi_pairwise_alignment(
-    protien_infos: List[ProteinInfo],
-    mode: str = "global",
-    match: int = 1,
-    mismatch: int = -1,
-    gap_open: int = -1,
-    gap_extend: int = 0,
-    substitution_matrix: str = "None",
-    n_jobs: int = None,
-):
-    pairs = list(combinations(protien_infos, 2))
+class PairwiseAligner(BaseModel):
 
-    if n_jobs is None:
-        n_jobs = cpu_count()
-
-    alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
-        delayed(pairwise_alignment)(
-            reference,
-            query,
-            mode,
-            match,
-            mismatch,
-            gap_open,
-            gap_extend,
-            substitution_matrix,
-        )
-        for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+    sequences: List[Sequence] = Field(
+        description="Sequences to be aligned",
+        max_items=2,
+        min_items=2,
+    )
+    mode: str = Field(
+        description="Alignment mode",
+        default="global",
+    )
+    match: int = Field(
+        description="Score of a match",
+        default=1,
+    )
+    mismatch: int = Field(
+        description="Score of a mismatch",
+        default=-1,
+    )
+    gap_open: int = Field(
+        description="Gap open cost",
+        default=-1,
+    )
+    gap_extend: int = Field(
+        description="Gap extend cost",
+        default=0,
+    )
+    substitution_matrix: str = Field(
+        description="Substitution matrix name",
+        default="None",
     )
 
-    return alignments
-
-
-def pairwise_alignment(
-    reference_info: ProteinInfo,
-    query_info: ProteinInfo,
-    mode: str = "global",
-    match: int = 1,
-    mismatch: int = -1,
-    gap_open: int = -1,
-    gap_extend: int = 0,
-    substitution_matrix: str = "None",
-) -> Alignment:
-    """Creates a pairwise alignment between two sequences.
-
-    Args:
-        reference_info (ProteinInfo): Sequence 1 to be aligned.
-        query_info (ProteinInfo): Sequence 2 to be aligned.
-        mode (str, optional): If the alignment should be global or local. Defaults to "global".
-        match (int, optional): Score of a match. Defaults to 1.
-        mismatch (int, optional): Score of a mismatch. Defaults to -1.
-        gap_open (int, optional): Gap open cost. Defaults to -1.
-        gap_extend (int, optional): Gap extend cost. Defaults to 0.
-        substitution_matrix (str, optional): Substitution matrix name. Defaults to "None".
-
-    Raises:
-        ValueError: If the mode is not global or local.
-        FileNotFoundError: If the substitution matrix is not valid.
-
-    Returns:
-        Alignment: Pairwise alignment object with the alignment scores.
-    """
-    modes = ["global", "local"]
-
-    if mode not in modes:
-        raise ValueError(f"Invalid alignment mode: {mode}. Valid modes are: {modes}")
-
-    aligner = PairwiseAligner()
-    aligner.mode = mode
-    aligner.match_score = match
-    aligner.mismatch_score = mismatch
-    aligner.open_gap_score = gap_open
-    aligner.extend_gap_score = gap_extend
-
-    if substitution_matrix != "None":
-        matrices = ["BLOSUM62", "BLOSUM45", "BLOSUM80", "PAM250", "PAM30", "PAM70"]
-        try:
-            from Bio.Align import substitution_matrices
-
-            aligner.substitution_matrix = substitution_matrices.load(
-                substitution_matrix
+    @validator("sequences", pre=True)
+    def sequences_validator(cls, sequences):
+        if all(isinstance(seq, AbstractSequence) for seq in sequences):
+            return [
+                Sequence(source_id=seq.source_id, sequence=seq.sequence)
+                for seq in sequences
+            ]
+        elif all(isinstance(seq, Sequence) for seq in sequences):
+            return sequences
+        else:
+            raise ValueError(
+                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
             )
-        except FileNotFoundError:
-            raise FileNotFoundError(
+
+    @validator("mode")
+    def mode_validator(cls, mode):
+        modes = ["global", "local"]
+
+        if mode not in modes:
+            raise ValueError(
+                f"Invalid alignment mode: {mode}. Valid modes are: {modes}"
+            )
+
+        return mode
+
+    @validator("substitution_matrix")
+    def substitution_matrix_validator(cls, substitution_matrix):
+        matrices = ["BLOSUM62", "BLOSUM45", "BLOSUM80", "PAM250", "PAM30", "PAM70"]
+
+        if substitution_matrix not in matrices:
+            raise ValueError(
                 f"Invalid substitution matrix: {substitution_matrix}. Available matrices are: {matrices}"
             )
 
-    alignment_result = aligner.align(reference_info.sequence, query_info.sequence)[0]
+        return substitution_matrix
 
-    print(alignment_result)
+    def align(self):
+        """
+        Aligns two sequences using the specified alignment parameters of the `PairwiseAligner` class.
 
-    gaps = alignment_result.counts().gaps
-    mismatches = alignment_result.counts().mismatches
-    identities = alignment_result.counts().identities
+        Returns:
+            PairwiseAlignment: The aligned sequences along with alignment statistics.
 
-    identity = identities / len(reference_info.sequence)
+        Raises:
+            ValueError: If the sequences are not of type AbstractSequence or Sequence.
+            ValueError: If the alignment mode is invalid.
+            ValueError: If the substitution matrix name is invalid.
+        """
 
-    standard_number = standard_numbering(
-        reference_info=reference_info, alignment_result=alignment_result
-    )
+        aligner = BioPairwiseAligner()
+        aligner.mode = self.mode
+        aligner.match_score = self.match
+        aligner.mismatch_score = self.mismatch
+        aligner.open_gap_score = self.gap_open
+        aligner.extend_gap_score = self.gap_extend
 
-    alignment = Alignment(
-        reference_seq=reference_info,
-        query_seqs=[query_info],
-        score=alignment_result.score,
-        standard_numberings=standard_number,
-        identity=identity,
-        gaps=gaps,
-        mismatches=mismatches,
-    )
+        if self.substitution_matrix != "None":
+            aligner.substitution_matrix = self._load_substitution_matrix()
 
-    return alignment
+        shorter_seq, longer_seq = sorted(self.sequences, key=lambda x: len(x.sequence))
+
+        alignment_result = aligner.align(shorter_seq.sequence, longer_seq.sequence)[0]
+
+        aligned_sequences = [
+            Sequence(source_id=shorter_seq.source_id, sequence=alignment_result[0]),
+            Sequence(source_id=longer_seq.source_id, sequence=alignment_result[1]),
+        ]
+
+        gaps = alignment_result.counts().gaps
+        mismatches = alignment_result.counts().mismatches
+        identities = alignment_result.counts().identities
+        identity = identities / len(shorter_seq.sequence)
+
+        standard_numbering = StandardNumbering(
+            reference_id=shorter_seq.source_id,
+            numbered_id=longer_seq.source_id,
+            numbering=Alignment._get_numbering_string(
+                shorter_seq.sequence, longer_seq.sequence
+            ),
+        )
+
+        alignment = PairwiseAlignment(
+            input_sequences=[shorter_seq, longer_seq],
+            method=self.mode,
+            aligned_sequences=aligned_sequences,
+            standard_numberings=[standard_numbering],
+            score=alignment_result.score,
+            identity=identity,
+            gaps=gaps,
+            mismatches=mismatches,
+        )
+
+        return alignment
+
+    def _load_substitution_matrix(self) -> Any:
+        from Bio.Align import substitution_matrices
+
+        return substitution_matrices.load(self.substitution_matrix)
 
 
-def standard_numbering(
-    reference_info: ProteinInfo, alignment_result  # return type?
-) -> StandardNumbering:
-    reference_seq_numbering = list(range(1, len(reference_info.sequence) + 1))
-    query_seq_numbering = []
-    counter_gap = 1
-    counter_point = 1
-    counter = 0
-    pointer = reference_seq_numbering[0]
+# def multi_pairwise_alignment(
+#     protien_infos: List[ProteinInfo],
+#     mode: str = "global",
+#     match: int = 1,
+#     mismatch: int = -1,
+#     gap_open: int = -1,
+#     gap_extend: int = 0,
+#     substitution_matrix: str = "None",
+#     n_jobs: int = None,
+# ):
+#     pairs = list(combinations(protien_infos, 2))
 
-    for i in range(0, len(alignment_result[1][:])):
-        if alignment_result[0][i] == "-":
-            query_seq_numbering.append(
-                str(reference_seq_numbering[counter] - 1) + "-" + str(counter_gap)
-            )
-            counter_gap = counter_gap + 1
-            counter_point = 1
+#     if n_jobs is None:
+#         n_jobs = cpu_count()
 
-        elif alignment_result[0][i] == alignment_result[1][i]:
-            query_seq_numbering.append(str(reference_seq_numbering[counter]))
-            pointer = reference_seq_numbering[counter]
-            counter = counter + 1
-            counter_gap = 1
-            counter_point = 1
+#     alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
+#         delayed(pairwise_alignment)(
+#             reference,
+#             query,
+#             mode,
+#             match,
+#             mismatch,
+#             gap_open,
+#             gap_extend,
+#             substitution_matrix,
+#         )
+#         for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+#     )
 
-        elif alignment_result[1][i] == "-":
-            query_seq_numbering.append("")
-            counter_gap = 1
-            counter = counter + 1
-            counter_point = 1
-
-        else:
-            query_seq_numbering.append(str(pointer) + "." + str(counter_point))
-            counter_point = counter_point + 1
-            counter_gap = 1
-
-    standard_number = StandardNumbering(
-        sequence_id=reference_info.id, numbering=query_seq_numbering
-    )
-
-    return standard_number
+#     return alignments

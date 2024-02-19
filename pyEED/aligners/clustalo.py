@@ -8,10 +8,9 @@ from pyeed.core import Sequence
 
 class ClustalOmega(AbstractContainer):
     """
-    ClustalOmega is a class that represents a container for running the ClustalOmega tool.
+    ClustalOmega is a class that manages a container for running the ClustalOmega tool.
 
     Attributes:
-        msa (Optional[MultiSequenceAlignment]): The alignment result.
         _container_info (ToolContainer): The information about the ClustalOmega container.
 
     Methods:
