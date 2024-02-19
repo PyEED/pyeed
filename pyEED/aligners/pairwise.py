@@ -5,10 +5,9 @@ from itertools import combinations
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from tqdm import tqdm
 from pyeed.core.abstractsequence import AbstractSequence
+
 from pyeed.core.pairwisealignment import PairwiseAlignment
 from pyeed.core.sequence import Sequence
-
-from pyeed.core import ProteinInfo
 from pyeed.core import Alignment
 from pyeed.core import StandardNumbering
 
@@ -54,6 +53,12 @@ class PairwiseAligner(BaseModel):
                 Sequence(source_id=seq.source_id, sequence=seq.sequence)
                 for seq in sequences
             ]
+        elif all(isinstance(seq, Sequence) for seq in sequences):
+            return sequences
+        else:
+            raise ValueError(
+                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
+            )
 
     @validator("mode")
     def mode_validator(cls, mode):
@@ -78,6 +83,18 @@ class PairwiseAligner(BaseModel):
         return substitution_matrix
 
     def align(self):
+        """
+        Aligns two sequences using the specified alignment parameters of the `PairwiseAligner` class.
+
+        Returns:
+            PairwiseAlignment: The aligned sequences along with alignment statistics.
+
+        Raises:
+            ValueError: If the sequences are not of type AbstractSequence or Sequence.
+            ValueError: If the alignment mode is invalid.
+            ValueError: If the substitution matrix name is invalid.
+        """
+
         aligner = BioPairwiseAligner()
         aligner.mode = self.mode
         aligner.match_score = self.match
@@ -102,13 +119,19 @@ class PairwiseAligner(BaseModel):
         identities = alignment_result.counts().identities
         identity = identities / len(shorter_seq.sequence)
 
-        # standard_number = standard_numbering(
-        #     reference_info=reference_info, alignment_result=alignment_result
-        # )
+        standard_numbering = StandardNumbering(
+            reference_id=shorter_seq.source_id,
+            numbered_id=longer_seq.source_id,
+            numbering=Alignment._get_numbering_string(
+                shorter_seq.sequence, longer_seq.sequence
+            ),
+        )
 
         alignment = PairwiseAlignment(
             input_sequences=[shorter_seq, longer_seq],
+            method=self.mode,
             aligned_sequences=aligned_sequences,
+            standard_numberings=[standard_numbering],
             score=alignment_result.score,
             identity=identity,
             gaps=gaps,
@@ -123,33 +146,33 @@ class PairwiseAligner(BaseModel):
         return substitution_matrices.load(self.substitution_matrix)
 
 
-def multi_pairwise_alignment(
-    protien_infos: List[ProteinInfo],
-    mode: str = "global",
-    match: int = 1,
-    mismatch: int = -1,
-    gap_open: int = -1,
-    gap_extend: int = 0,
-    substitution_matrix: str = "None",
-    n_jobs: int = None,
-):
-    pairs = list(combinations(protien_infos, 2))
+# def multi_pairwise_alignment(
+#     protien_infos: List[ProteinInfo],
+#     mode: str = "global",
+#     match: int = 1,
+#     mismatch: int = -1,
+#     gap_open: int = -1,
+#     gap_extend: int = 0,
+#     substitution_matrix: str = "None",
+#     n_jobs: int = None,
+# ):
+#     pairs = list(combinations(protien_infos, 2))
 
-    if n_jobs is None:
-        n_jobs = cpu_count()
+#     if n_jobs is None:
+#         n_jobs = cpu_count()
 
-    alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
-        delayed(pairwise_alignment)(
-            reference,
-            query,
-            mode,
-            match,
-            mismatch,
-            gap_open,
-            gap_extend,
-            substitution_matrix,
-        )
-        for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
-    )
+#     alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
+#         delayed(pairwise_alignment)(
+#             reference,
+#             query,
+#             mode,
+#             match,
+#             mismatch,
+#             gap_open,
+#             gap_extend,
+#             substitution_matrix,
+#         )
+#         for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+#     )
 
-    return alignments
+#     return alignments
