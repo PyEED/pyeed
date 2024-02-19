@@ -3,7 +3,7 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
-from pyEED.core.dnainfo import DNAInfo
+from .dnainfo import DNAInfo
 from .proteinregion import ProteinRegion
 from .abstractsequence import AbstractSequence
 from .site import Site
