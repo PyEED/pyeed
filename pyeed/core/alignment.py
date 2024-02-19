@@ -1,10 +1,12 @@
 import re
 import sdRDM
 
-from typing import List, Optional
-from pydantic import Field
+from typing import List, Optional, Union
+from pydantic import Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+
+from pyeed.aligners.pairwise import PairwiseAligner
 
 from .abstractsequence import AbstractSequence
 from .sequence import Sequence
@@ -50,6 +52,20 @@ class Alignment(sdRDM.DataModel):
         default_factory=ListPlus,
         multiple=True,
     )
+
+    @validator("input_sequences", pre=True)
+    def sequences_validator(cls, sequences):
+        if all(isinstance(seq, AbstractSequence) for seq in sequences):
+            return [
+                Sequence(source_id=seq.source_id, sequence=seq.sequence)
+                for seq in sequences
+            ]
+        elif all(isinstance(seq, Sequence) for seq in sequences):
+            return sequences
+        else:
+            raise ValueError(
+                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
+            )
 
     def add_to_input_sequences(
         self,
@@ -117,10 +133,25 @@ class Alignment(sdRDM.DataModel):
         self.standard_numberings.append(StandardNumbering(**params))
         return self.standard_numberings[-1]
 
-    def align(self, aligner: AbstractContainer, **kwargs):
-        alignment = aligner().align(sequences=self.input_sequences)
-        self.method = aligner._container_info.name
+    def align(self, aligner: Union[AbstractContainer, PairwiseAligner], **kwargs):
 
+        if issubclass(aligner, AbstractContainer):
+            self._container_align(aligner, **kwargs)
+
+        elif issubclass(aligner, PairwiseAligner):
+            self._python_align(aligner, **kwargs)
+
+        else:
+            raise ValueError(
+                "aligner must be an instance of AbstractContainer or PairwiseAligner"
+            )
+
+    def _container_align(self, aligner: AbstractContainer, **kwargs):
+        sequences = [seq.fasta_string() for seq in self.input_sequences]
+
+        alignment = aligner().align(sequences=sequences)
+
+        self.method = aligner._container_info.name
         self.aligned_sequences = [
             Sequence(source_id=seq.id, sequence=str(seq.seq)) for seq in alignment
         ]
@@ -134,13 +165,41 @@ class Alignment(sdRDM.DataModel):
             warnings.simplefilter("ignore")
             self.consensus = str(AlignInfo.SummaryInfo(alignment).dumb_consensus())
 
+        self.apply_standard_numbering()
+
+    def _python_align(self, aligner: PairwiseAligner, **kwargs):
+        if len(self.input_sequences) == 2:
+            alignment_reuslt = aligner(
+                sequences=[
+                    self.input_sequences[0].sequence,
+                    self.input_sequences[1].sequence,
+                ],
+                **kwargs,
+            ).align()
+
+        # self.aligned_sequences = [
+        #     Sequence(source_id=seq.id, sequence=str(seq.seq))
+        #     for seq in alignment_reuslt
+        # ]
+
+        # TODO: Alignment has no ID attriburte
+        # TODO: Map to data model
+        return alignment_reuslt
+
     @classmethod
-    def from_sequences(cls, sequences: List[AbstractSequence]):
-        alignment = cls()
-        alignment.input_sequences = [
-            Sequence(source_id=seq.source_id, sequence=str(seq.sequence))
-            for seq in sequences
-        ]
+    def from_sequences(
+        cls,
+        sequences: List[AbstractSequence],
+        aligner: Union[AbstractContainer, PairwiseAligner] = None,
+        **kwargs,
+    ):
+        alignment = cls(
+            input_sequences=sequences,
+        )
+
+        if aligner is not None:
+            alignment.align(aligner, **kwargs)
+
         return alignment
 
     @staticmethod

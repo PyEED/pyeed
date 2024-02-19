@@ -172,6 +172,11 @@ class ProteinInfo(AbstractSequence):
             ProteinInfo: 'ProteinInfo' object that corresponds to the given NCBI ID.
         """
 
+        if isinstance(accession_id, list) and all(
+            isinstance(x, str) for x in accession_id
+        ):
+            return cls.from_accessions(accession_id)
+
         seq_record = get_ncbi_entry(accession_id, "protein")
         return _seqio_to_nucleotide_info(cls, seq_record)
 

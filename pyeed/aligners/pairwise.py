@@ -1,30 +1,23 @@
+from numpy import short
 from pydantic import BaseModel, Field, validator
 import sdRDM
 from typing import Any, List, Optional
 from itertools import combinations
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from tqdm import tqdm
-from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.aligners import AbstractAligner
 
-from pyeed.core.pairwisealignment import PairwiseAlignment
-from pyeed.core.sequence import Sequence
-from pyeed.core import Alignment
-from pyeed.core import StandardNumbering
 
 from joblib import Parallel, delayed, cpu_count
 
 
-class PairwiseAligner(BaseModel):
+class PairwiseAligner(AbstractAligner):
 
-    sequences: List[Sequence] = Field(
-        description="Sequences to be aligned",
-        max_items=2,
-        min_items=2,
-    )
     mode: str = Field(
         description="Alignment mode",
         default="global",
     )
+
     match: int = Field(
         description="Score of a match",
         default=1,
@@ -45,20 +38,6 @@ class PairwiseAligner(BaseModel):
         description="Substitution matrix name",
         default="None",
     )
-
-    @validator("sequences", pre=True)
-    def sequences_validator(cls, sequences):
-        if all(isinstance(seq, AbstractSequence) for seq in sequences):
-            return [
-                Sequence(source_id=seq.source_id, sequence=seq.sequence)
-                for seq in sequences
-            ]
-        elif all(isinstance(seq, Sequence) for seq in sequences):
-            return sequences
-        else:
-            raise ValueError(
-                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
-            )
 
     @validator("mode")
     def mode_validator(cls, mode):
@@ -105,40 +84,40 @@ class PairwiseAligner(BaseModel):
         if self.substitution_matrix != "None":
             aligner.substitution_matrix = self._load_substitution_matrix()
 
-        shorter_seq, longer_seq = sorted(self.sequences, key=lambda x: len(x.sequence))
+        shorter_seq, longer_seq = sorted(self.sequences, key=lambda x: len(x))
 
-        alignment_result = aligner.align(shorter_seq.sequence, longer_seq.sequence)[0]
+        alignment_result = aligner.align(shorter_seq, longer_seq)[0]
 
-        aligned_sequences = [
-            Sequence(source_id=shorter_seq.source_id, sequence=alignment_result[0]),
-            Sequence(source_id=longer_seq.source_id, sequence=alignment_result[1]),
-        ]
+        # aligned_sequences = [
+        #     Sequence(source_id=shorter_seq.source_id, sequence=alignment_result[0]),
+        #     Sequence(source_id=longer_seq.source_id, sequence=alignment_result[1]),
+        # ]
 
-        gaps = alignment_result.counts().gaps
-        mismatches = alignment_result.counts().mismatches
-        identities = alignment_result.counts().identities
-        identity = identities / len(shorter_seq.sequence)
+        # gaps = alignment_result.counts().gaps
+        # mismatches = alignment_result.counts().mismatches
+        # identities = alignment_result.counts().identities
+        # identity = identities / len(shorter_seq.sequence)
 
-        standard_numbering = StandardNumbering(
-            reference_id=shorter_seq.source_id,
-            numbered_id=longer_seq.source_id,
-            numbering=Alignment._get_numbering_string(
-                shorter_seq.sequence, longer_seq.sequence
-            ),
-        )
+        # standard_numbering = StandardNumbering(
+        #     reference_id=shorter_seq.source_id,
+        #     numbered_id=longer_seq.source_id,
+        #     numbering=Alignment._get_numbering_string(
+        #         shorter_seq.sequence, longer_seq.sequence
+        #     ),
+        # )
 
-        alignment = PairwiseAlignment(
-            input_sequences=[shorter_seq, longer_seq],
-            method=self.mode,
-            aligned_sequences=aligned_sequences,
-            standard_numberings=[standard_numbering],
-            score=alignment_result.score,
-            identity=identity,
-            gaps=gaps,
-            mismatches=mismatches,
-        )
+        # alignment = PairwiseAlignment(
+        #     input_sequences=[shorter_seq, longer_seq],
+        #     method=self.mode,
+        #     aligned_sequences=aligned_sequences,
+        #     standard_numberings=[standard_numbering],
+        #     score=alignment_result.score,
+        #     identity=identity,
+        #     gaps=gaps,
+        #     mismatches=mismatches,
+        # )
 
-        return alignment
+        return alignment_result
 
     def _load_substitution_matrix(self) -> Any:
         from Bio.Align import substitution_matrices

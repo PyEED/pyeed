@@ -1,7 +1,7 @@
 # Basics
 
 ## 🧬 Create a sequence
-PyEED treats Protein sequences the same as DNA sequences. Central object of PyEED is the `ProteinInfo` and `DNAInfo` object, which both are an `AbstractSequence`.  
+PyEED treats Protein sequences the same as DNA sequences. The central object of PyEED is the `ProteinInfo` and `DNAInfo` object, which both are an `AbstractSequence`.  
 A sequence object can be created by passing a sequence string to the constructor.  
 
 === "Protein"

@@ -45,6 +45,5 @@ class AbstractSequence(sdRDM.DataModel):
     def _fasta_string(self):
         return f">{self.source_id}\n{self.sequence}"
 
-    def to_fasta(self, file_path: str):
-        with open(file_path, "w") as f:
-            f.write(self._fasta_string())
+    def to_fasta(self):
+        return self._fasta_string()

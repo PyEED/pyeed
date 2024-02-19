@@ -292,16 +292,16 @@ Description of an organism 🦠
 <details>
   <summary><i>Inspect attributes</i></summary>
 
+- input_sequences
+  - Type: Sequence
+  - Description: Sequences of the alignment
+  - Multiple: True
 - method
   - Type: string
   - Description: Applied alignment method
 - consensus
   - Type: string
   - Description: Consensus sequence of the alignment
-- input_sequences
-  - Type: Sequence
-  - Description: Sequences of the alignment
-  - Multiple: True
 - aligned_sequences
   - Type: Sequence
   - Description: Aligned sequences of the alignment
