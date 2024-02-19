@@ -134,9 +134,6 @@ class Alignment(sdRDM.DataModel):
             warnings.simplefilter("ignore")
             self.consensus = str(AlignInfo.SummaryInfo(alignment).dumb_consensus())
 
-    def create_standard_numbering(self, reference_sequence: Sequence):
-        raise NotImplementedError
-
     @classmethod
     def from_sequences(cls, sequences: List[AbstractSequence]):
         alignment = cls()
@@ -147,7 +144,7 @@ class Alignment(sdRDM.DataModel):
         return alignment
 
     @staticmethod
-    def assign_pairwise_numbering(reference: str, query: str) -> List[str]:
+    def _get_numbering_string(reference: str, query: str) -> List[str]:
         """
         Assigns pairwise numbering to the reference and query sequences.
 
@@ -205,7 +202,7 @@ class Alignment(sdRDM.DataModel):
 
         standard_numberings = []
         for aligned_sequence in aligned_sequences:
-            numbering = self.assign_pairwise_numbering(
+            numbering = self._get_numbering_string(
                 reference=reference.sequence, query=aligned_sequence.sequence
             )
 
@@ -218,8 +215,3 @@ class Alignment(sdRDM.DataModel):
             )
 
         self.standard_numberings = standard_numberings
-
-    def __repr__(self):
-        if len(self.aligned_sequences) != 0:
-            alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
-            return f"{self.consensus}\n\n{alignment})"

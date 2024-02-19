@@ -1,8 +1,6 @@
-
 from typing import Optional
 from pydantic import Field
 from sdRDM.base.utils import forge_signature, IDGenerator
-
 
 from .alignment import Alignment
 
