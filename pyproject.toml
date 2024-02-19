@@ -10,7 +10,8 @@ packages = [
     { include = "pyeed/ncbi" },
     { include = "pyeed/network" },
     { include = "pyeed/aligners" },
-    { include = "pyeed/containers" }
+    { include = "pyeed/containers" },
+    { include = "pyeed/utility" }
 ]
 
 [tool.poetry.dependencies]
@@ -30,6 +31,7 @@ docker = "^7.0.0"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
+pytest = "^8.0.1"
 
 [build-system]
 requires = ["poetry-core"]
