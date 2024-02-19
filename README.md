@@ -3,7 +3,7 @@
 
 </div>
 
-[![Generate API](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/generate_api.yaml)
+[![Tests](https://github.com/PyEED/pyeed/actions/workflows/tests.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/tests.yaml)
 [![Documentation](https://github.com/PyEED/pyeed/actions/workflows/make_docs.yaml/badge.svg)](https://github.com/PyEED/pyeed/actions/workflows/make_docs.yaml)
 
 ## About 📖
@@ -13,13 +13,9 @@ This library is currently under development and thus the API is subject to chang
 
 ## Installation ⚙️
 
-Install pyEED by running
+Install `pyeed` by running
 ```bash
 pip install git+https://github.com/PyEED/pyeed.git
-```
-... or update pyEED to get the latest features.
-```bash
-pip install --upgrade git+https://github.com/PyEED/pyeed.git
 ```
 
 ## Quick start 🚀
@@ -27,7 +23,7 @@ pip install --upgrade git+https://github.com/PyEED/pyeed.git
 In the following example, information of the [aldolase](https://www.ncbi.nlm.nih.gov/protein/NP_001287541.1/) (*Drosophila melanogaster*) is retrieved from the corresponding GenBank entry. Thereafter, a protein blast search ist started and the found sequence information is fetched and stored as `ProteinSequence` objects.
 
 ```python
-from pyEED.core import ProteinInfo
+from pyeed.core import ProteinInfo
 
 # Get a protein entry from NCBI by accession id
 aldolase = ProteinInfo.from_ncbi("NP_001287541.1")
@@ -48,9 +44,8 @@ print(aldolase_cds)
 
 ## Documentation 📘
 
-Check out the [documentation](https://pyeed.github.io/pyeed/) for in-depth information on how to setup PyEED, 
+Check out the [documentation](https://pyeed.github.io/pyeed/) for in-depth information on how to setup `pyeed`, 
 use the build-in tools, and store sequence data in databases.  
-Documentation is in the making 🐛
 
 ## Roadmap 🛣️
 
@@ -62,5 +57,5 @@ Documentation is in the making 🐛
 - [x] Running pairwise alignments
 - [x] Network analysis / visualization
 - [ ] Create phylogenetic trees
-- [ ] Multi-sequence alignments
+- [x] Multi-sequence alignments
 - [ ] Representative clustering
