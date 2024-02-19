@@ -15,7 +15,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.9,<3.12"
 biopython = "^1.81"
 tqdm = "^4.66.1"
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", branch = "linking-refactor"}
