@@ -1,15 +1,16 @@
 [tool.poetry]
-name = "pyEED"
-version = "0.1.0"
+name = "pyeed"
+version = "0.1.1"
 description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    { include = "pyEED/core" },
-    { include = "pyEED/ncbi" },
-    { include = "pyEED/network" },
-    { include = "pyEED/alignment" },
+    { include = "pyeed/core" },
+    { include = "pyeed/ncbi" },
+    { include = "pyeed/network" },
+    { include = "pyeed/aligners" },
+    { include = "pyeed/containers" }
 ]
 
 [tool.poetry.dependencies]
