@@ -6,11 +6,7 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 
-<<<<<<< HEAD
 from .abstractsequence import AbstractSequence
-=======
-from pyeed.core.abstractsequence import AbstractSequence
->>>>>>> alignments
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 
@@ -147,12 +143,6 @@ class Alignment(sdRDM.DataModel):
         ]
         return alignment
 
-<<<<<<< HEAD
-    # def __repr__(self):
-    #     if len(self.aligned_sequences) != 0:
-    #         alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
-    #         return f"{self.consensus}\n\n{alignment})"
-=======
     @staticmethod
     def _get_numbering_string(reference: str, query: str) -> List[str]:
         """
@@ -225,4 +215,3 @@ class Alignment(sdRDM.DataModel):
             )
 
         self.standard_numberings = standard_numberings
->>>>>>> alignments

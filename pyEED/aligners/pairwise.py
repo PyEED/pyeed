@@ -6,12 +6,8 @@ from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from tqdm import tqdm
 from pyeed.core.abstractsequence import AbstractSequence
 
-<<<<<<< HEAD
-from pyeed.core import ProteinInfo
-=======
 from pyeed.core.pairwisealignment import PairwiseAlignment
 from pyeed.core.sequence import Sequence
->>>>>>> alignments
 from pyeed.core import Alignment
 from pyeed.core import StandardNumbering
 
