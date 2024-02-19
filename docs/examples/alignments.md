@@ -1,23 +1,96 @@
-# Aligning sequences
+# Aligning Sequences
 
-## Pairwise sequence alignment
+## 🪢 The `Alignment` object
 
-PyEED allows to perform pairwise sequence alignments. Therefore, an `PairwiseAligner` is created to perform the alignment.
+The `Alignment` is the central object of working with sequence alignments. 
+Both alignment objects contain the following attributes:  
+
+- `input_sequences`, containing the sequences of the alignment
+- `method`, denoting the applied alignment method
+- `consensus`, containing the consensus sequence of the alignment
+- `aligned_sequences`, containing the aligned sequences as a result of the alignment
+- `standard_numberings`, containing the standard numbering of the aligned sequences to a reference sequence
+
+Besides the `Alignment` object, PyEED also provides a `PairwiseAlignment` object, containing the alignment score, identity, similarity, gaps, and mismatches of a pairwise alignment.
+
+
+Before running the alignment, an `Alignment` needs to be created. This can be done by passing a list of `ProteinInfo` or `DNAInfo` objects to the constructor. The alignment can then be run by calling the `align()` method, passing the alignment method as an argument. The method returns the alignment object, containing the aligned sequences.
 
 ``` py
-from pyEED.core import ProteinInfo
-from pyEED.alignment import PairwiseAligner
+from pyeed.core import ProteinInfo, Alignment
 
-# Create two ProteinInfo objects
+# Get two ProteinInfo objects
+tem1 = ProteinInfo.from_ncbi("QGC48744.1")
+tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+
+# Create an Alignment
+alignment = Alignment(input_sequences=[tem1, tem109])
 ```
 
+Alternatively, the `from_sequneces()` class method can be used to create an alignment from a list of `ProteinInfo` or `DNAInfo` objects.
+
+``` py
+from pyeed.core import ProteinInfo, Alignment
+
+# Get two ProteinInfo objects
+tem1 = ProteinInfo.from_ncbi("QGC48744.1")
+tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+list_of_sequences = [tem1, tem109]
+
+# Create an Alignment
+alignment = Alignment.from_sequences(list_of_sequences)
+```
+
+### 🔗 Pairwise Alignments
+
+=== "Local Alignment"
+
+    ``` py
+    from pyeed.core import ProteinInfo, Alignment
+    from pyeed.aligners import PairwiseAligner
+
+    # Get two ProteinInfo objects
+    tem1 = ProteinInfo.from_ncbi("QGC48744.1")
+    tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+
+    # Create and run alignment
+    alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner)
+    ```
+
+=== "Global Alignment"
+    ``` py
+    from pyeed.core import ProteinInfo, PairwiseAlignment
+    from pyeed.aligners import NeedlemanWunsch
+    ```
 
 
+#### Multi-Pairwise Alignment
 
-## Multiple sequence alignments
 
-Most sequence alignment tools are implemented as command line tools, which need to be set up. PyEED provides a wrapper for common alignment tools, circumventing the need to setup tools manually. In this process, PyEED builds the alignment tools as a DOCKER container, ensuring the tools run on each system.
+### ⛓️ Multiple Sequence Alignments
 
-### Clustal Omega
+Most sequence alignment tools are implemented as command line tools, which need to be set up. PyEED implements common alignments tools such as `ClustalOmega` wrapped as Docker containers. As a result, no manual installation of tools is required, since the tools are automatically installed when needed.
 
-To run align sequences with Clustal Omega, a `CLustalOmega` object is ...
+=== "ClustalOmega"
+
+    ``` py
+    from pyeed.core import ProteinInfo, Alignment
+    from pyeed.aligners import ClustalOmega
+
+    # Get sequences
+    ncbi_accessions = ["QGC48744.1", "AAT46413.1", "AAT46414.1", "AAT46415.1"]
+    sequences = ProteinInfo.from_ncbi(ncbi_accessions)
+
+    # Create and run alignment
+    alignment = Alignment.from_sequences(sequences, aligner=ClustalOmega)
+    ```
+
+=== "MUSCLE"
+
+    ``` py
+    # Not yet implemented
+    ```
+
+## 💯 Standard Numbering
+
+Standard numbering is a way to express the alignment of a sequence to a reference sequence in the form of numbers. The Standard Numbering is created based on aligned sequences in which an aligned positions are the the same position within the alignment. If a position is not aligned, and a gap is introduced and denoted with `-`.  

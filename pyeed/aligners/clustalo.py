@@ -3,7 +3,6 @@ from typing import List
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
 from pyeed.containers import AbstractContainer, ToolImage
-from pyeed.core import Sequence
 
 
 class ClustalOmega(AbstractContainer):
@@ -29,18 +28,18 @@ class ClustalOmega(AbstractContainer):
 
     _container_info: ToolImage = ToolImage.CLUSTALO
 
-    def create_file(self, data: List[Sequence]):
+    def create_file(self, data: List[str]):
         """
         Sets up the input data for the ClustalOmega container.
 
         Args:
-            data (List[AbstractSequence]): List of sequences to be aligned.
+            data (List[str]): List of FASTA formatted sequences to be aligned.
         """
-        fasta = "\n".join([seq.fasta_string() for seq in data])
+        data = "\n".join(data)
         path = os.path.join(self._tempdir_path, "input.fasta")
 
         with open(path, "w") as file:
-            file.write(fasta)
+            file.write(data)
 
     def setup_command(self):
         """
@@ -64,12 +63,12 @@ class ClustalOmega(AbstractContainer):
 
         return alignment
 
-    def align(self, sequences: List[Sequence]):
+    def align(self, sequences: List[str]):
         """
         Aligns multiple sequences and returns the alignment result.
 
         Args:
-            sequences (List[Sequence]): List of sequences to be aligned.
+            sequences (List[str]): List of FASTA formatted sequences to be aligned.
 
         Returns:
             MultiSequenceAlignment: The alignment result.

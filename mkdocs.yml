@@ -4,15 +4,19 @@ repo_name: PyEED/pyeed
 site_url: https://pyeed.github.io/pyeed/
 
 nav:
-  - Home: index.md
-  - Getting Started:
+  - 🏠 Home: index.md
+  - ⚡️ Quick Start:
     - The Sequence objects: examples/basics.md
-    - Using BLAST: examples/blast.md
+    - Finding Sequences: examples/blast.md
     - Aligning Sequences: examples/alignments.md
+    - Clustering Sequences: examples/clustering.md
     - Creating Sequence Networks: examples/networks.md
-  - Installation:
+  - 🔎 Use cases:
+    - Get an Overview over a Protein Family: usecases/usecase1.md
+  - ⬇️ Installation:
     - PIP: installation/pip.md
     - Docker: installation/docker.md
+
 
 theme:
   name: material
