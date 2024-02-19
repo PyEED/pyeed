@@ -2,16 +2,15 @@ import os
 from typing import List
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
-from pyEED.containers import AbstractContainer, ToolImage
-from pyEED.core import Sequence
+from pyeed.containers import AbstractContainer, ToolImage
+from pyeed.core import Sequence
 
 
 class ClustalOmega(AbstractContainer):
     """
-    ClustalOmega is a class that represents a container for running the ClustalOmega tool.
+    ClustalOmega is a class that manages a container for running the ClustalOmega tool.
 
     Attributes:
-        msa (Optional[MultiSequenceAlignment]): The alignment result.
         _container_info (ToolContainer): The information about the ClustalOmega container.
 
     Methods:
