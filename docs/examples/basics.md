@@ -37,8 +37,6 @@ Besides adding sequence information manually, PyEED also allows to search for se
     dna = DNAInfo.from_db("NC_000913.3")
     ```
 
-
-
 Alternatively, the sequence can be initiated from a sequence string, triggering a BLAST search in the NCBI database. If the sequence is found, the sequence object is filled with the corresponding information.
 
 === "Protein"
