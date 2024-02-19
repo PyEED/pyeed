@@ -1,3 +1,4 @@
+import re
 import sdRDM
 
 from typing import List, Optional
@@ -5,7 +6,11 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 
+<<<<<<< HEAD
 from .abstractsequence import AbstractSequence
+=======
+from pyeed.core.abstractsequence import AbstractSequence
+>>>>>>> alignments
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 
@@ -133,9 +138,6 @@ class Alignment(sdRDM.DataModel):
             warnings.simplefilter("ignore")
             self.consensus = str(AlignInfo.SummaryInfo(alignment).dumb_consensus())
 
-    def create_standard_numbering(self, reference_sequence: Sequence):
-        raise NotImplementedError
-
     @classmethod
     def from_sequences(cls, sequences: List[AbstractSequence]):
         alignment = cls()
@@ -145,7 +147,82 @@ class Alignment(sdRDM.DataModel):
         ]
         return alignment
 
+<<<<<<< HEAD
     # def __repr__(self):
     #     if len(self.aligned_sequences) != 0:
     #         alignment = "\n".join(seq.sequence for seq in self.aligned_sequences)
     #         return f"{self.consensus}\n\n{alignment})"
+=======
+    @staticmethod
+    def _get_numbering_string(reference: str, query: str) -> List[str]:
+        """
+        Assigns pairwise numbering to the reference and query sequences.
+
+        Args:
+            reference (str): The reference sequence.
+            query (str): The query sequence.
+
+        Returns:
+            List[str]: A list of pairwise numbering.
+
+        """
+
+        numbering = []
+        reference_counter = 0
+        query_counter = 1
+
+        for ref_pos, que_pos in zip(reference, query):
+            if ref_pos == "-":
+                numbering.append(f"{reference_counter}.{query_counter}")
+                query_counter += 1
+            else:
+                reference_counter += 1
+                if que_pos != "-":
+                    numbering.append(f"{reference_counter}.{query_counter}")
+                    query_counter += 1
+                else:
+                    numbering.append(str(reference_counter))
+
+        return numbering
+
+    def apply_standard_numbering(
+        self,
+        reference: Sequence = None,
+    ):
+        """
+        Apply standard numbering to the aligned sequences.
+
+        Args:
+            reference (Sequence, optional): The reference sequence to use for numbering.
+            If not provided, the first aligned sequence will be used as the reference.
+            Defaults to None.
+
+        Raises:
+            ValueError: If the sequences are not aligned.
+
+        """
+        if not self.aligned_sequences:
+            raise ValueError(
+                "Sequences must be aligned first. Run the align() method first."
+            )
+
+        if reference == None:
+            reference = self.aligned_sequences[0]
+            aligned_sequences = self.aligned_sequences[1:]
+
+        standard_numberings = []
+        for aligned_sequence in aligned_sequences:
+            numbering = self._get_numbering_string(
+                reference=reference.sequence, query=aligned_sequence.sequence
+            )
+
+            standard_numberings.append(
+                StandardNumbering(
+                    reference_id=reference.source_id,
+                    numbered_id=aligned_sequence.source_id,
+                    numbering=numbering,
+                )
+            )
+
+        self.standard_numberings = standard_numberings
+>>>>>>> alignments

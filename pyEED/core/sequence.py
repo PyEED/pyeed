@@ -36,6 +36,3 @@ class Sequence(sdRDM.DataModel):
 
     def __str__(self) -> str:
         return self.fasta_string()
-
-    def __repr__(self) -> str:
-        return self.fasta_string()

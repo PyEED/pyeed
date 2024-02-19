@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from typing import Optional, List
 from numpy import short
 from pydantic import Field
@@ -11,6 +12,12 @@ from tqdm import tqdm
 from pyeed.core.abstractsequence import AbstractSequence
 
 
+=======
+from typing import Optional
+from pydantic import Field
+from sdRDM.base.utils import forge_signature, IDGenerator
+
+>>>>>>> alignments
 from .alignment import Alignment
 
 
