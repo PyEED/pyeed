@@ -1,71 +1,117 @@
+
 import os
-from typing import List, Optional
-from pydantic import Field
+from typing import Dict, List, Optional
+from pydantic import PrivateAttr, model_validator
+from uuid import uuid4
+from pydantic_xml import attr, element, wrapped
+from lxml.etree import _Element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature, IDGenerator
+from sdRDM.base.utils import forge_signature
+from sdRDM.tools.utils import elem2dict
 from Bio.Blast import NCBIWWW, NCBIXML
-from .dnainfo import DNAInfo
+from pyeed.containers.abstract_container import Blastp
 from .proteinregion import ProteinRegion
+from .dnaregion import DNARegion
+from .substrate import Substrate
+from .citation import Citation
+from .proteinsitetype import ProteinSiteType
+from .proteinregiontype import ProteinRegionType
 from .abstractsequence import AbstractSequence
 from .site import Site
-from .citation import Citation
 from .span import Span
-from .proteinregiontype import ProteinRegionType
-from .substrate import Substrate
-from .dnaregion import DNARegion
-from .proteinsitetype import ProteinSiteType
+from .dnainfo import DNAInfo
 from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
-
-from pyeed.containers.abstract_container import Blastp
 
 
 @forge_signature
-class ProteinInfo(AbstractSequence):
+class ProteinInfo(
+    AbstractSequence,
+    nsmap={
+        "": "https://github.com/PyEED/pyeed@3b002efa6bf51e951767d8a7749ebad563897cb8#ProteinInfo"
+    },
+):
     """Description of a protein sequence. Additionally, the `ProteinSequence` contains annotations for sites and regions of the protein sequence alongside information on the organism. Furthermore, the `ProteinSequence` contains information on the coding sequence of the protein sequence, which allows later retrieval of the corresponding nucleotide sequence."""
 
-    id: Optional[str] = Field(
+    id: Optional[str] = attr(
+        name="id",
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("proteininfoINDEX"),
+        default_factory=lambda: str(uuid4()),
         xml="@id",
     )
 
-    family_name: Optional[str] = Field(
-        default=None,
+    family_name: Optional[str] = element(
         description="Family name of the protein",
+        default=None,
+        tag="family_name",
+        json_schema_extra=dict(),
     )
 
-    regions: List[ProteinRegion] = Field(
-        description="Domains of the protein",
-        default_factory=ListPlus,
-        multiple=True,
+    regions: List[ProteinRegion] = wrapped(
+        "regions",
+        element(
+            description="Domains of the protein",
+            default_factory=ListPlus,
+            tag="ProteinRegion",
+            json_schema_extra=dict(multiple=True),
+        ),
     )
 
-    sites: List[Site] = Field(
-        description="Annotations of different sites",
-        default_factory=ListPlus,
-        multiple=True,
+    sites: List[Site] = wrapped(
+        "sites",
+        element(
+            description="Annotations of different sites",
+            default_factory=ListPlus,
+            tag="Site",
+            json_schema_extra=dict(multiple=True),
+        ),
     )
 
-    coding_sequence_ref: Optional[DNARegion] = Field(
+    coding_sequence_ref: Optional[DNARegion] = element(
         description="Defines the coding sequence of the protein",
         default_factory=DNARegion,
+        tag="coding_sequence_ref",
+        json_schema_extra=dict(),
     )
 
-    ec_number: Optional[str] = Field(
-        default=None,
+    ec_number: Optional[str] = element(
         description="Enzyme Commission number",
-    )
-
-    mol_weight: Optional[float] = Field(
         default=None,
-        description="Calculated molecular weight of the protein",
+        tag="ec_number",
+        json_schema_extra=dict(),
     )
 
-    substrates: List[Substrate] = Field(
-        description="Promiscuous substrates of the protein",
-        default_factory=ListPlus,
-        multiple=True,
+    mol_weight: Optional[float] = element(
+        description="Calculated molecular weight of the protein",
+        default=None,
+        tag="mol_weight",
+        json_schema_extra=dict(),
     )
+
+    substrates: List[Substrate] = wrapped(
+        "substrates",
+        element(
+            description="Promiscuous substrates of the protein",
+            default_factory=ListPlus,
+            tag="Substrate",
+            json_schema_extra=dict(multiple=True),
+        ),
+    )
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="3b002efa6bf51e951767d8a7749ebad563897cb8"
+    )
+    _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _parse_raw_xml_data(self):
+        for attr, value in self:
+            if isinstance(value, (ListPlus, list)) and all(
+                (isinstance(i, _Element) for i in value)
+            ):
+                self._raw_xml_data[attr] = [elem2dict(i) for i in value]
+            elif isinstance(value, _Element):
+                self._raw_xml_data[attr] = elem2dict(value)
+        return self
 
     def add_to_regions(
         self,
@@ -75,7 +121,7 @@ class ProteinInfo(AbstractSequence):
         note: Optional[str] = None,
         cross_reference: Optional[str] = None,
         id: Optional[str] = None,
-    ) -> None:
+    ) -> ProteinRegion:
         """
         This method adds an object of type 'ProteinRegion' to attribute regions
 
@@ -106,7 +152,7 @@ class ProteinInfo(AbstractSequence):
         positions: List[int] = ListPlus(),
         cross_ref: Optional[str] = None,
         id: Optional[str] = None,
-    ) -> None:
+    ) -> Site:
         """
         This method adds an object of type 'Site' to attribute sites
 
@@ -136,7 +182,7 @@ class ProteinInfo(AbstractSequence):
         chebi_id: Optional[str] = None,
         citation: Optional[Citation] = None,
         id: Optional[str] = None,
-    ) -> None:
+    ) -> Substrate:
         """
         This method adds an object of type 'Substrate' to attribute substrates
 
