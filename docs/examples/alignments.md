@@ -54,20 +54,13 @@ alignment = Alignment.from_sequences(list_of_sequences)
     tem109 = ProteinInfo.from_ncbi("AAT46413.1")
 
     # Create and run alignment
-    alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner, mode="local")
+    alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner)
     ```
 
 === "Global Alignment"
     ``` py
     from pyeed.core import ProteinInfo, PairwiseAlignment
-    from pyeed.aligners import PairwiseAligner
-
-    # Get two ProteinInfo objects
-    tem1 = ProteinInfo.from_ncbi("QGC48744.1")
-    tem109 = ProteinInfo.from_ncbi("AAT46413.1")
-
-    # Create and run alignment
-    alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner, mode="global")
+    from pyeed.aligners import NeedlemanWunsch
     ```
 
 
