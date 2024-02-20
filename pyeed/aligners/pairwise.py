@@ -1,4 +1,3 @@
-from numpy import short
 from pydantic import BaseModel, Field, validator
 import sdRDM
 from typing import Any, List, Optional
@@ -88,35 +87,6 @@ class PairwiseAligner(AbstractAligner):
 
         alignment_result = aligner.align(shorter_seq, longer_seq)[0]
 
-        # aligned_sequences = [
-        #     Sequence(source_id=shorter_seq.source_id, sequence=alignment_result[0]),
-        #     Sequence(source_id=longer_seq.source_id, sequence=alignment_result[1]),
-        # ]
-
-        # gaps = alignment_result.counts().gaps
-        # mismatches = alignment_result.counts().mismatches
-        # identities = alignment_result.counts().identities
-        # identity = identities / len(shorter_seq.sequence)
-
-        # standard_numbering = StandardNumbering(
-        #     reference_id=shorter_seq.source_id,
-        #     numbered_id=longer_seq.source_id,
-        #     numbering=Alignment._get_numbering_string(
-        #         shorter_seq.sequence, longer_seq.sequence
-        #     ),
-        # )
-
-        # alignment = PairwiseAlignment(
-        #     input_sequences=[shorter_seq, longer_seq],
-        #     method=self.mode,
-        #     aligned_sequences=aligned_sequences,
-        #     standard_numberings=[standard_numbering],
-        #     score=alignment_result.score,
-        #     identity=identity,
-        #     gaps=gaps,
-        #     mismatches=mismatches,
-        # )
-
         return alignment_result
 
     def _load_substitution_matrix(self) -> Any:
@@ -124,34 +94,26 @@ class PairwiseAligner(AbstractAligner):
 
         return substitution_matrices.load(self.substitution_matrix)
 
+    # def align_multi_pairwise(self):
+    #     n_jobs = cpu_count()
 
-# def multi_pairwise_alignment(
-#     protien_infos: List[ProteinInfo],
-#     mode: str = "global",
-#     match: int = 1,
-#     mismatch: int = -1,
-#     gap_open: int = -1,
-#     gap_extend: int = 0,
-#     substitution_matrix: str = "None",
-#     n_jobs: int = None,
-# ):
-#     pairs = list(combinations(protien_infos, 2))
+    #     pairs = list(combinations(protien_infos, 2))
 
-#     if n_jobs is None:
-#         n_jobs = cpu_count()
+    #     if n_jobs is None:
+    #         n_jobs = cpu_count()
 
-#     alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
-#         delayed(pairwise_alignment)(
-#             reference,
-#             query,
-#             mode,
-#             match,
-#             mismatch,
-#             gap_open,
-#             gap_extend,
-#             substitution_matrix,
-#         )
-#         for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
-#     )
+    #     alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
+    #         delayed(pairwise_alignment)(
+    #             reference,
+    #             query,
+    #             mode,
+    #             match,
+    #             mismatch,
+    #             gap_open,
+    #             gap_extend,
+    #             substitution_matrix,
+    #         )
+    #         for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+    #     )
 
-#     return alignments
+    #     return alignments

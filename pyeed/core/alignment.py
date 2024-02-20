@@ -1,10 +1,11 @@
-import re
 import sdRDM
-
+from tqdm import tqdm
+from itertools import combinations
 from typing import List, Optional, Union
 from pydantic import Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from Bio.Align import Alignment as BioAlignment
 
 from pyeed.aligners.pairwise import PairwiseAligner
 
@@ -136,10 +137,10 @@ class Alignment(sdRDM.DataModel):
     def align(self, aligner: Union[AbstractContainer, PairwiseAligner], **kwargs):
 
         if issubclass(aligner, AbstractContainer):
-            self._container_align(aligner, **kwargs)
+            return self._container_align(aligner, **kwargs)
 
         elif issubclass(aligner, PairwiseAligner):
-            self._python_align(aligner, **kwargs)
+            return self._python_align(aligner, **kwargs)
 
         else:
             raise ValueError(
@@ -167,24 +168,89 @@ class Alignment(sdRDM.DataModel):
 
         self.apply_standard_numbering()
 
+        return self
+
     def _python_align(self, aligner: PairwiseAligner, **kwargs):
+
         if len(self.input_sequences) == 2:
-            alignment_reuslt = aligner(
+
+            shorter_seq, longer_seq = sorted(
+                self.input_sequences, key=lambda x: len(x.sequence)
+            )
+            pairwise_aligner = aligner(
                 sequences=[
-                    self.input_sequences[0].sequence,
-                    self.input_sequences[1].sequence,
+                    shorter_seq.sequence,
+                    longer_seq.sequence,
                 ],
                 **kwargs,
-            ).align()
+            )
+            alignment_result = pairwise_aligner.align()
+            self.method = pairwise_aligner.mode
 
-        # self.aligned_sequences = [
-        #     Sequence(source_id=seq.id, sequence=str(seq.seq))
-        #     for seq in alignment_reuslt
-        # ]
+        # elif len(self.input_sequences) > 2:
+        #     # run multi pairwise alignment
+        #     pairs = list(combinations(protien_infos, 2))
 
-        # TODO: Alignment has no ID attriburte
-        # TODO: Map to data model
-        return alignment_reuslt
+        #     if n_jobs is None:
+        #         n_jobs = cpu_count()
+
+        #     alignments = Parallel(n_jobs=n_jobs, prefer="processes")(
+        #         delayed(pairwise_alignment)(
+        #             reference,
+        #             query,
+        #             mode,
+        #             match,
+        #             mismatch,
+        #             gap_open,
+        #             gap_extend,
+        #             substitution_matrix,
+        #         )
+        #         for reference, query in tqdm(pairs, desc="⛓️ Aligning sequences")
+        #     )
+
+        #     return alignments
+
+        else:
+            raise ValueError(
+                f"Alignment Error. Recieved {len(self.input_sequences)} sequences. Expected 2."
+            )
+
+        return self._map_pairwise_alignment_results(alignment_result)
+
+    def _map_pairwise_alignment_results(self, alignment_result: BioAlignment):
+        from pyeed.core.pairwisealignment import PairwiseAlignment
+
+        shorter_seq, longer_seq = sorted(
+            self.input_sequences, key=lambda x: len(x.sequence)
+        )
+
+        self.aligned_sequences = [
+            Sequence(
+                source_id=shorter_seq.source_id,
+                sequence=alignment_result[0],
+            ),
+            Sequence(
+                source_id=longer_seq.source_id,
+                sequence=alignment_result[1],
+            ),
+        ]
+
+        identities = alignment_result.counts().identities
+        identity = identities / len(shorter_seq.sequence)
+
+        pairwise_alignment = PairwiseAlignment(
+            input_sequences=self.input_sequences,
+            method=self.method,
+            aligned_sequences=self.aligned_sequences,
+            score=alignment_result.score,
+            gaps=alignment_result.counts().gaps,
+            identity=identity,
+            mismatches=alignment_result.counts().mismatches,
+        )
+
+        pairwise_alignment.apply_standard_numbering()
+
+        return pairwise_alignment
 
     @classmethod
     def from_sequences(
@@ -198,7 +264,7 @@ class Alignment(sdRDM.DataModel):
         )
 
         if aligner is not None:
-            alignment.align(aligner, **kwargs)
+            return alignment.align(aligner, **kwargs)
 
         return alignment
 
