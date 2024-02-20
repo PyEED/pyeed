@@ -1,57 +1,161 @@
-import re
 import sdRDM
 
-from typing import List, Optional, Union
-from pydantic import Field, validator
+from typing import Optional, Union, List, Dict
+from pydantic import PrivateAttr, model_validator, validator
+from uuid import uuid4
+from pydantic_xml import attr, element, wrapped
+from lxml.etree import _Element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature, IDGenerator
-
+from sdRDM.base.utils import forge_signature
+from sdRDM.tools.utils import elem2dict
 from pyeed.aligners.pairwise import PairwiseAligner
-
-from .abstractsequence import AbstractSequence
-from .sequence import Sequence
-from .standardnumbering import StandardNumbering
-
 from pyeed.containers.abstract_container import AbstractContainer
+from .standardnumbering import StandardNumbering
+from .sequence import Sequence
+from .abstractsequence import AbstractSequence
 
 
 @forge_signature
-class Alignment(sdRDM.DataModel):
+class Alignment(
+    sdRDM.DataModel,
+    nsmap={
+        "": "https://github.com/PyEED/pyeed@3b002efa6bf51e951767d8a7749ebad563897cb8#Alignment"
+    },
+):
     """"""
 
-    id: Optional[str] = Field(
+    id: Optional[str] = attr(
+        name="id",
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("alignmentINDEX"),
+        default_factory=lambda: str(uuid4()),
         xml="@id",
     )
 
-    method: Optional[str] = Field(
-        default=None,
+    input_sequences: List[Sequence] = wrapped(
+        "input_sequences",
+        element(
+            description="Sequences of the alignment",
+            default_factory=ListPlus,
+            tag="Sequence",
+            json_schema_extra=dict(multiple=True),
+        ),
+    )
+
+    method: Optional[str] = element(
         description="Applied alignment method",
-    )
-
-    consensus: Optional[str] = Field(
         default=None,
+        tag="method",
+        json_schema_extra=dict(),
+    )
+
+    consensus: Optional[str] = element(
         description="Consensus sequence of the alignment",
+        default=None,
+        tag="consensus",
+        json_schema_extra=dict(),
     )
 
-    input_sequences: List[Sequence] = Field(
-        description="Sequences of the alignment",
-        default_factory=ListPlus,
-        multiple=True,
+    aligned_sequences: List[Sequence] = wrapped(
+        "aligned_sequences",
+        element(
+            description="Aligned sequences of the alignment",
+            default_factory=ListPlus,
+            tag="Sequence",
+            json_schema_extra=dict(multiple=True),
+        ),
     )
 
-    aligned_sequences: List[Sequence] = Field(
-        description="Aligned sequences of the alignment",
-        default_factory=ListPlus,
-        multiple=True,
+    standard_numberings: List[StandardNumbering] = wrapped(
+        "standard_numberings",
+        element(
+            description="Standard numbering of the aligned sequences",
+            default_factory=ListPlus,
+            tag="StandardNumbering",
+            json_schema_extra=dict(multiple=True),
+        ),
     )
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="3b002efa6bf51e951767d8a7749ebad563897cb8"
+    )
+    _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
-    standard_numberings: List[StandardNumbering] = Field(
-        description="Standard numbering of the aligned sequences",
-        default_factory=ListPlus,
-        multiple=True,
-    )
+    @model_validator(mode="after")
+    def _parse_raw_xml_data(self):
+        for attr, value in self:
+            if isinstance(value, (ListPlus, list)) and all(
+                (isinstance(i, _Element) for i in value)
+            ):
+                self._raw_xml_data[attr] = [elem2dict(i) for i in value]
+            elif isinstance(value, _Element):
+                self._raw_xml_data[attr] = elem2dict(value)
+        return self
+
+    def add_to_input_sequences(
+        self,
+        source_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> Sequence:
+        """
+        This method adds an object of type 'Sequence' to attribute input_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
+        """
+        params = {"source_id": source_id, "sequence": sequence}
+        if id is not None:
+            params["id"] = id
+        self.input_sequences.append(Sequence(**params))
+        return self.input_sequences[-1]
+
+    def add_to_aligned_sequences(
+        self,
+        source_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> Sequence:
+        """
+        This method adds an object of type 'Sequence' to attribute aligned_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
+        """
+        params = {"source_id": source_id, "sequence": sequence}
+        if id is not None:
+            params["id"] = id
+        self.aligned_sequences.append(Sequence(**params))
+        return self.aligned_sequences[-1]
+
+    def add_to_standard_numberings(
+        self,
+        reference_id: Optional[str] = None,
+        numbered_id: Optional[str] = None,
+        numbering: List[str] = ListPlus(),
+        id: Optional[str] = None,
+    ) -> StandardNumbering:
+        """
+        This method adds an object of type 'StandardNumbering' to attribute standard_numberings
+
+        Args:
+            id (str): Unique identifier of the 'StandardNumbering' object. Defaults to 'None'.
+            reference_id (): Standard numbering of the reference sequence. Defaults to None
+            numbered_id (): Standard numbering of the query sequence. Defaults to None
+            numbering (): Standard numbering of the aligned sequence. Defaults to ListPlus()
+        """
+        params = {
+            "reference_id": reference_id,
+            "numbered_id": numbered_id,
+            "numbering": numbering,
+        }
+        if id is not None:
+            params["id"] = id
+        self.standard_numberings.append(StandardNumbering(**params))
+        return self.standard_numberings[-1]
 
     @validator("input_sequences", pre=True)
     def sequences_validator(cls, sequences):
@@ -64,7 +168,8 @@ class Alignment(sdRDM.DataModel):
             return sequences
         else:
             raise ValueError(
-                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
+                "Invalid sequence type. Sequences must be of type AbstractSequence or"
+                " Sequence"
             )
 
     def add_to_input_sequences(
