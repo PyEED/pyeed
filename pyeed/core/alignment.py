@@ -9,8 +9,6 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Align import Alignment as BioAlignment
 from joblib import Parallel, delayed, cpu_count
 
-from pyeed.core.pairwisealignment import PairwiseAlignment
-
 if TYPE_CHECKING:
     from pyeed.core.dnainfo import DNAInfo
     from pyeed.core.proteininfo import ProteinInfo
@@ -308,7 +306,7 @@ class Alignment(sdRDM.DataModel):
 
     def _map_pairwise_alignment_results(
         self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str
-    ) -> PairwiseAlignment:
+    ) -> "PairwiseAlignment":
         """Maps the results of a pairwise alignment to a PairwiseAlignment object.
 
         Args:

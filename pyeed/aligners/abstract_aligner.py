@@ -1,6 +1,6 @@
 from typing import List
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 
 class AbstractAligner(BaseModel, ABC):

@@ -13,9 +13,6 @@ from docker.models.images import Image
 from docker.errors import DockerException
 
 
-from pyeed.ncbi import seq_io
-
-
 class ToolImage(Enum):
     CLUSTALO = "biocontainers/clustal-omega:v1.2.1_cv5"
     BLAST = "haeussma/blast:latest"
