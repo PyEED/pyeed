@@ -1,204 +1,236 @@
-from typing import List
+from typing import List, Optional
 import networkx as nx
 import plotly.graph_objects as go
+from pydantic import BaseModel, Field
+from pyeed import network
+from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.core.pairwisealignment import PairwiseAlignment
 
 from pyeed.core.proteininfo import ProteinInfo
 from pyeed.core.alignment import Alignment
 
 
-def pairwise_network(
-    alignments: List[Alignment],
-    weight: str = "identity",
-    cutoff: float = None,
-    label: str = "accession_id",
-    color: str = "name",
-) -> None:
-    """Takes a list of `Alignment`, constructs a network graph,
-    whereas the edges of the graph are weighted with an attribute of the
-    `Alignment` object. Visualizes the network graph.
+class SequenceNetwork(BaseModel):
 
-    Args:
-        alignments (List[Alignment]): List of pairwise alignments.
-        weight (str, optional): Attribute of `Alignment` to weight the edges.
-        Defaults to "identity".
-        cutoff (float, optional): Sequences with a weight higher than the cutoff are connected
-        in the network. Defaults to None.
-        label (str, optional): Node labe in the graph. Defaults to "accession_id".
-        color (str, optional): Attribute of `ProteinInfo` co colorize nodes. Defaults to "name".
+    sequences: List[AbstractSequence] = Field(
+        ...,
+        description="List of sequences to be compared",
+    )
 
-    Raises:
-        ValueError: If 'weights' is not one of "identity", "score", "gaps", or "mismatches".
-        ValueError: If 'label' is not one of "name", "organism", "ec_number",
-        "mol_weight", or "accession_id".
-    """
+    pairwise_alignments: List[PairwiseAlignment] = Field(
+        ...,
+        description="List of pairwise alignments",
+    )
 
-    # Validate weights
-    weights = ["identity", "score", "gaps", "mismatches"]
-    if weight not in weights:
-        raise ValueError(
-            f"'weight' to parameterize network must be an alignment property ({weights})"
-        )
+    weight: str = Field(
+        ...,
+        description="Attribute of Alignment to weight the edges",
+    )
 
-    # Validate labels
-    labels = ["name", "organism", "ec_number", "mol_weight", "accession_id"]
-    if label not in labels:
-        raise ValueError(
-            f"'label' to parameterize network must be an alignment property ({labels})"
-        )
+    color: str = Field(
+        ...,
+        description="Attribute of ProteinInfo to colorize nodes",
+    )
 
-    graph = construct_network(alignments, cutoff=cutoff)
+    threshold: Optional[float] = Field(
+        default=None,
+        description="Sequences with a weight higher than the threshold are connected in the network",
+    )
 
-    graph = position_nodes_and_edges(graph, weight=weight)
+    label: str = Field(
+        ...,
+        description="Node label in the graph",
+    )
 
-    visualize_network(graph, label=label, color=color)
+    def graph(self) -> nx.Graph:
+        """Maps properties of alignments to a network graph."""
+        graph = nx.Graph()
 
+        # Add nodes and assign node attributes
+        for sequence in self.sequences:
+            graph.add_node(
+                sequence.source_id,
+                name=sequence.name,
+                organism=sequence.organism,
+            )
 
-def construct_network(alignments: List[Alignment], cutoff: float) -> nx.Graph:
-    """Maps properties of alignments to a network graph."""
-    graph = nx.Graph()
-
-    sequences = _get_unique_sequences(alignments)
-
-    # Add nodes and assign node attributes
-    for sequence in sequences:
-        graph.add_node(
-            node_for_adding=sequence.source_id,
-            name=sequence.name,
-            accession_id=sequence.source_id,
-            organism=sequence.organism.name,
-            ec_number=sequence.ec_number,
-            mol_weight=sequence.mol_weight,
-        )
-
-    # Add edges and assign edge attributes
-    if cutoff != None:
-        for alignment in alignments:
-            if alignment.identity >= cutoff:
+        # Add edges and assign edge attributes
+        if self.threshold != None:
+            for alignment in self.pairwise_alignments:
+                print(alignment.id)
+                if alignment.identity >= self.threshold:
+                    graph.add_edge(
+                        alignment.input_sequences[0].source_id,
+                        alignment.input_sequences[1].source_id,
+                        identity=alignment.identity,
+                        gaps=1 / (alignment.gaps + 1),
+                        mismatches=1 / (alignment.mismatches + 1),
+                        score=alignment.score,
+                    )
+        else:
+            for alignment in self.pairwise_alignments:
+                print()
                 graph.add_edge(
-                    alignment.reference_seq.source_id,
-                    alignment.query_seq.source_id,
+                    alignment.input_sequences[0].source_id,
+                    alignment.input_sequences[1].source_id,
                     identity=alignment.identity,
                     gaps=1 / (alignment.gaps + 1),
                     mismatches=1 / (alignment.mismatches + 1),
                     score=alignment.score,
                 )
-    else:
-        for alignment in alignments:
-            graph.add_edge(
-                alignment.reference_seq.source_id,
-                alignment.query_seq.source_id,
-                identity=alignment.identity,
-                gaps=1 / (alignment.gaps + 1),
-                mismatches=1 / (alignment.mismatches + 1),
-                score=alignment.score,
-            )
 
-    return graph
+        return graph
 
+    # def pairwise_network(
+    #     alignments: List[Alignment],
+    #     weight: str = "identity",
+    #     cutoff: float = None,
+    #     label: str = "accession_id",
+    #     color: str = "name",
+    # ) -> None:
+    #     """Takes a list of `Alignment`, constructs a network graph,
+    #     whereas the edges of the graph are weighted with an attribute of the
+    #     `Alignment` object. Visualizes the network graph.
 
-def visualize_network(graph: nx.Graph, label: str, color: str):
-    """Visualizes a network graph."""
-    # TODO: Refactor coloration of nodes
-    # TODO: Add ability to colorize edges
+    #     Args:
+    #         alignments (List[Alignment]): List of pairwise alignments.
+    #         weight (str, optional): Attribute of `Alignment` to weight the edges.
+    #         Defaults to "identity".
+    #         cutoff (float, optional): Sequences with a weight higher than the cutoff are connected
+    #         in the network. Defaults to None.
+    #         label (str, optional): Node labe in the graph. Defaults to "accession_id".
+    #         color (str, optional): Attribute of `ProteinInfo` co colorize nodes. Defaults to "name".
 
-    colors = ["blue", "red", "green", "orange", "purple", "pink", "brown", "yellow"]
-    traces = []
-    # Add edges
-    for edge in graph.edges:
-        traces.append(
-            go.Scatter(
-                x=graph.edges[edge]["x_pos"],
-                y=graph.edges[edge]["y_pos"],
-                mode="lines",
-                line=dict(
-                    width=1,
-                    # colorscale="YlGnBu",
-                    # colorbar=dict(title='Heatmap Colorscale')
-                    color="rgba(128, 128, 128, 0.1)",
-                ),
-                hoverinfo="text",
-                text=graph.edges[edge]["gaps"],
-            )
-        )
+    #     Raises:
+    #         ValueError: If 'weights' is not one of "identity", "score", "gaps", or "mismatches".
+    #         ValueError: If 'label' is not one of "name", "organism", "ec_number",
+    #         "mol_weight", or "accession_id".
+    #     """
 
-    # Add nodes
-    color_dict = {}
-    for _, data in graph.nodes(data=True):
-        if data[color] not in color_dict:
-            color_dict[data[color]] = colors[len(color_dict)]
+    #     # Validate weights
+    #     weights = ["identity", "score", "gaps", "mismatches"]
+    #     if weight not in weights:
+    #         raise ValueError(
+    #             f"'weight' to parameterize network must be an alignment property ({weights})"
+    #         )
 
-        traces.append(
-            go.Scatter(
-                x=[data["x_pos"]],
-                y=[data["y_pos"]],
-                mode="markers",
-                hoverinfo="text",
-                marker=dict(
-                    # showscale=True,
-                    # colorscale="Viridis",
-                    size=10,
-                    # colorbar=dict(thickness=15, title=""),
-                    color=color_dict[data[color]],
-                ),
-                text=data[label],
-            )
-        )
+    #     # Validate labels
+    #     labels = ["name", "organism", "ec_number", "mol_weight", "accession_id"]
+    #     if label not in labels:
+    #         raise ValueError(
+    #             f"'label' to parameterize network must be an alignment property ({labels})"
+    #         )
 
-    # Plot figure
-    fig = go.Figure(
-        data=traces,
-        layout=go.Layout(
-            plot_bgcolor="white",
-            showlegend=False,
-            hovermode="closest",
-            margin=dict(b=0, l=0, r=0, t=0),
-        ),
-    )
-    fig.update_xaxes(visible=False)
-    fig.update_yaxes(visible=False)
-    print(color_dict)
+    #     graph = construct_network(alignments, cutoff=cutoff)
 
-    fig.show()
+    #     graph = position_nodes_and_edges(graph, weight=weight)
+
+    #     visualize_network(graph, label=label, color=color)
 
 
-def position_nodes_and_edges(graph: nx.Graph, weight: str) -> nx.Graph:
-    """Calculates node positions based on weight metric and
-    adds position information of nodes and edges to the respective
-    entry in the graph."""
+# def visualize_network(graph: nx.Graph, label: str, color: str):
+#     """Visualizes a network graph."""
+#     # TODO: Refactor coloration of nodes
+#     # TODO: Add ability to colorize edges
 
-    positions = nx.spring_layout(graph, weight=weight)
+#     colors = ["blue", "red", "green", "orange", "purple", "pink", "brown", "yellow"]
+#     traces = []
+#     # Add edges
+#     for edge in graph.edges:
+#         traces.append(
+#             go.Scatter(
+#                 x=graph.edges[edge]["x_pos"],
+#                 y=graph.edges[edge]["y_pos"],
+#                 mode="lines",
+#                 line=dict(
+#                     width=1,
+#                     # colorscale="YlGnBu",
+#                     # colorbar=dict(title='Heatmap Colorscale')
+#                     color="rgba(128, 128, 128, 0.1)",
+#                 ),
+#                 hoverinfo="text",
+#                 text=graph.edges[edge]["gaps"],
+#             )
+#         )
 
-    # Add node position as coordinates
-    for node in graph.nodes():
-        graph.nodes[node]["x_pos"] = positions[node][0]
-        graph.nodes[node]["y_pos"] = positions[node][1]
+#     # Add nodes
+#     color_dict = {}
+#     for _, data in graph.nodes(data=True):
+#         if data[color] not in color_dict:
+#             color_dict[data[color]] = colors[len(color_dict)]
 
-    # Add edge positions as coordinates
-    for edge in graph.edges():
-        graph.edges[edge]["x_pos"] = [
-            graph.nodes[edge[0]]["x_pos"],
-            graph.nodes[edge[1]]["x_pos"],
-        ]
-        graph.edges[edge]["y_pos"] = [
-            graph.nodes[edge[0]]["y_pos"],
-            graph.nodes[edge[1]]["y_pos"],
-        ]
+#         traces.append(
+#             go.Scatter(
+#                 x=[data["x_pos"]],
+#                 y=[data["y_pos"]],
+#                 mode="markers",
+#                 hoverinfo="text",
+#                 marker=dict(
+#                     # showscale=True,
+#                     # colorscale="Viridis",
+#                     size=10,
+#                     # colorbar=dict(thickness=15, title=""),
+#                     color=color_dict[data[color]],
+#                 ),
+#                 text=data[label],
+#             )
+#         )
 
-    return graph
+#     # Plot figure
+#     fig = go.Figure(
+#         data=traces,
+#         layout=go.Layout(
+#             plot_bgcolor="white",
+#             showlegend=False,
+#             hovermode="closest",
+#             margin=dict(b=0, l=0, r=0, t=0),
+#         ),
+#     )
+#     fig.update_xaxes(visible=False)
+#     fig.update_yaxes(visible=False)
+#     print(color_dict)
+
+#     fig.show()
 
 
-def _get_unique_sequences(alignments: List[Alignment]) -> List[ProteinInfo]:
-    """Gets unique sequences from a list of alignments."""
+# def position_nodes_and_edges(graph: nx.Graph, weight: str) -> nx.Graph:
+#     """Calculates node positions based on weight metric and
+#     adds position information of nodes and edges to the respective
+#     entry in the graph."""
 
-    sequence_infos = []
-    added_ids = set()
-    for alignment in alignments:
-        if alignment.reference_seq.source_id not in added_ids:
-            sequence_infos.append(alignment.reference_seq)
-            added_ids.add(alignment.reference_seq.source_id)
+#     positions = nx.spring_layout(graph, weight=weight)
 
-        if alignment.query_seq.source_id not in added_ids:
-            sequence_infos.append(alignment.query_seq)
-            added_ids.add(alignment.query_seq.source_id)
+#     # Add node position as coordinates
+#     for node in graph.nodes():
+#         graph.nodes[node]["x_pos"] = positions[node][0]
+#         graph.nodes[node]["y_pos"] = positions[node][1]
 
-    return sequence_infos
+#     # Add edge positions as coordinates
+#     for edge in graph.edges():
+#         graph.edges[edge]["x_pos"] = [
+#             graph.nodes[edge[0]]["x_pos"],
+#             graph.nodes[edge[1]]["x_pos"],
+#         ]
+#         graph.edges[edge]["y_pos"] = [
+#             graph.nodes[edge[0]]["y_pos"],
+#             graph.nodes[edge[1]]["y_pos"],
+#         ]
+
+#     return graph
+
+
+# def _get_unique_sequences(alignments: List[Alignment]) -> List[ProteinInfo]:
+#     """Gets unique sequences from a list of alignments."""
+
+#     sequence_infos = []
+#     added_ids = set()
+#     for alignment in alignments:
+#         if alignment.reference_seq.source_id not in added_ids:
+#             sequence_infos.append(alignment.reference_seq)
+#             added_ids.add(alignment.reference_seq.source_id)
+
+#         if alignment.query_seq.source_id not in added_ids:
+#             sequence_infos.append(alignment.query_seq)
+#             added_ids.add(alignment.query_seq.source_id)
+
+#     return sequence_infos
