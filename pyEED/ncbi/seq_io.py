@@ -221,6 +221,14 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
                     cross_reference = feature.qualifiers["db_xref"][0]
                 else:
                     cross_reference = None
+                    
+                if "note" in feature.qualifiers:
+                    if feature.qualifiers["note"]:
+                        note = feature.qualifiers["note"][0]
+                    else:
+                        note = ""
+                else:
+                    note = ""
 
                 regions.append(
                     ProteinRegion(
@@ -232,7 +240,7 @@ def _seqio_to_nucleotide_info(cls, entry: SeqIO):
                             )
                         ],
                         cross_reference=cross_reference,
-                        note=feature.qualifiers["note"][0],
+                        note=note,
                     )
                 )
 
