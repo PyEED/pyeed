@@ -14,8 +14,6 @@ from .proteinregiontype import ProteinRegionType
 from .substrate import Substrate
 from .dnaregion import DNARegion
 from .proteinsitetype import ProteinSiteType
-from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry, get_ncbi_entrys
-
 from pyeed.containers.abstract_container import Blastp
 
 
@@ -162,6 +160,8 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
+        from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry
+
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
 
@@ -182,12 +182,16 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def _from_seq_record(cls, seq_record) -> "ProteinInfo":
+        from ..ncbi.seq_io import _seqio_to_nucleotide_info
+
         return _seqio_to_nucleotide_info(cls, seq_record)
 
     @classmethod
     def from_accessions(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
+        from ..ncbi.seq_io import get_ncbi_entrys
+
         seq_entries = get_ncbi_entrys(
             accession_ids=accession_ids,
             database="protein",
@@ -216,6 +220,7 @@ class ProteinInfo(AbstractSequence):
         Returns:
             List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
         """
+        from ..ncbi.seq_io import get_ncbi_entrys
 
         print(f"🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")

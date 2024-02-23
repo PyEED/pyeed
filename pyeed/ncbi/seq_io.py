@@ -1,14 +1,11 @@
 import re
 import secrets
-from datetime import datetime
 from tqdm import tqdm
 from typing import List
 from Bio import SeqIO, Entrez
-from pyeed.core.citation import Citation
 from pyeed.core.dnaregion import DNARegion
 from pyeed.core.dnaregiontype import DNARegionType
 from pyeed.core.proteinregion import ProteinRegion
-from pyeed.core.proteinregiontype import ProteinRegionType
 from pyeed.core.proteinsitetype import ProteinSiteType
 
 from pyeed.core.site import Site

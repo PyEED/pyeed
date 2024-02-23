@@ -7,7 +7,6 @@ from sdRDM.base.utils import forge_signature, IDGenerator
 from .span import Span
 from .dnaregiontype import DNARegionType
 from .dnaregion import DNARegion
-from ..ncbi.seq_io import get_ncbi_entry, _seqio_to_dna_info
 
 
 @forge_signature
@@ -63,6 +62,8 @@ class DNAInfo(sdRDM.DataModel):
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "DNAInfo":
+        from pyeed.ncbi.seq_io import get_ncbi_entry, _seqio_to_dna_info
+
         seq_record = get_ncbi_entry(accession_id=accession_id, database="nucleotide")
         return _seqio_to_dna_info(cls, seq_record)
 

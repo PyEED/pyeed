@@ -2,26 +2,36 @@ site_name: PyEED Documentation
 repo_url: https://github.com/PyEED/pyeed/
 repo_name: PyEED/pyeed
 site_url: https://pyeed.github.io/pyeed/
+site_author: Max Häußler
+
 
 nav:
   - 🏠 Home: index.md
   - ⚡️ Quick Start:
-    - The Sequence objects: examples/basics.md
-    - Finding Sequences: examples/blast.md
-    - Aligning Sequences: examples/alignments.md
-    - Clustering Sequences: examples/clustering.md
-    - Creating Sequence Networks: examples/networks.md
+    - quick_start/index.md
+    - The Sequence objects: quick_start/basics.md
+    - Finding Sequences: quick_start/blast.md
+    - Aligning Sequences: quick_start/alignments.md
+    - Clustering Sequences: quick_start/clustering.md
+    - Creating Sequence Networks: quick_start/networks.md
   - 🔎 Use cases:
     - Get an Overview over a Protein Family: usecases/usecase1.md
   - ⬇️ Installation:
-    - PIP: installation/pip.md
-    - Docker: installation/docker.md
+    - Install PyEED: installation/install_pyeed.md
+    - Setup Local BLAST database: installation/setup_local_blast.md
 
 
 theme:
   name: material
   logo: figs/pyeed.png
   features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.instant.preview
+    - navigation.indexes
+    - navigation.footer
+
+    - content.action.view
     - navigation.tabs
     - navigation.sections
     - toc.integrate

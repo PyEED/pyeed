@@ -1,23 +1,60 @@
-import re
+from numpy import short
 import sdRDM
-
-from typing import List, Optional, Union
+from tqdm import tqdm
+from itertools import combinations
+from typing import List, Optional, Union, Tuple, TYPE_CHECKING
 from pydantic import Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from Bio.Align import Alignment as BioAlignment
+from joblib import Parallel, delayed, cpu_count
 
-from pyeed.aligners.pairwise import PairwiseAligner
+if TYPE_CHECKING:
+    from pyeed.core.dnainfo import DNAInfo
+    from pyeed.core.proteininfo import ProteinInfo
+    from .abstractsequence import AbstractSequence
+    from pyeed.containers.abstract_container import AbstractContainer
+    from pyeed.aligners.pairwise import PairwiseAligner
 
-from .abstractsequence import AbstractSequence
-from .sequence import Sequence
+
 from .standardnumbering import StandardNumbering
-
-from pyeed.containers.abstract_container import AbstractContainer
+from .sequence import Sequence
+from .abstractsequence import AbstractSequence
 
 
 @forge_signature
 class Alignment(sdRDM.DataModel):
-    """"""
+    """
+    Description of the Alignment class.
+
+    Attributes:
+        id (Optional[str]): Unique identifier of the given object.
+        method (Optional[str]): Applied alignment method.
+        consensus (Optional[str]): Consensus sequence of the alignment.
+        input_sequences (List[Sequence]): Sequences of the alignment.
+        aligned_sequences (List[Sequence]): Aligned sequences of the alignment.
+        standard_numberings (List[StandardNumbering]): Standard numbering of the aligned sequences.
+
+    Methods:
+        add_to_input_sequences(source_id: Optional[str] = None, sequence: Optional[str] = None, id: Optional[str] = None) -> None:
+            Adds an object of type 'Sequence' to attribute input_sequences.
+
+        add_to_aligned_sequences(source_id: Optional[str] = None, sequence: Optional[str] = None, id: Optional[str] = None) -> None:
+            Adds an object of type 'Sequence' to attribute aligned_sequences.
+
+        add_to_standard_numberings(reference_id: Optional[str] = None, numbered_id: Optional[str] = None, numbering: List[str] = ListPlus(), id: Optional[str] = None) -> None:
+            Adds an object of type 'StandardNumbering' to attribute standard_numberings.
+
+        align(aligner: Union["AbstractContainer", "PairwiseAligner"], **kwargs):
+            Aligns the input sequences using the specified aligner.
+
+        apply_standard_numbering(reference: Sequence = None):
+            Applies standard numbering to the aligned sequences.
+
+        from_sequences(sequences: List[Union["ProteinInfo", "DNAInfo"]], aligner: Union["AbstractContainer", "PairwiseAligner"] = None, **kwargs):
+            Creates an Alignment object from a list of sequences and optionally aligns them.
+
+    """
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
@@ -133,20 +170,46 @@ class Alignment(sdRDM.DataModel):
         self.standard_numberings.append(StandardNumbering(**params))
         return self.standard_numberings[-1]
 
-    def align(self, aligner: Union[AbstractContainer, PairwiseAligner], **kwargs):
+    def align(self, aligner: Union["AbstractContainer", "PairwiseAligner"], **kwargs):
+        """
+        Aligns the input sequences using the specified aligner.
+
+        Args:
+            aligner (Union[AbstractContainer, PairwiseAligner]): The aligner object to use for alignment.
+            **kwargs: Additional keyword arguments to pass to the aligner.
+
+        Returns:
+            Alignment or List[PairwiseAlignment]: The aligned sequences. If a Multi sequence aligner is used, an Alignment object will be returned.
+            If a PairwiseAligner is used, a list of PairwiseAlignment object will be returned. If more than two sequences are provided,
+            a list of PairwiseAlignment objects will be returned.
+
+        Raises:
+            ValueError: If the aligner is not an instance of AbstractContainer or PairwiseAligner.
+        """
+
+        from pyeed.containers.abstract_container import AbstractContainer
+        from pyeed.aligners.pairwise import PairwiseAligner
 
         if issubclass(aligner, AbstractContainer):
-            self._container_align(aligner, **kwargs)
+            return self._container_align(aligner, **kwargs)
 
         elif issubclass(aligner, PairwiseAligner):
-            self._python_align(aligner, **kwargs)
+            return self._python_align(aligner, **kwargs)
 
         else:
             raise ValueError(
                 "aligner must be an instance of AbstractContainer or PairwiseAligner"
             )
 
-    def _container_align(self, aligner: AbstractContainer, **kwargs):
+    def _container_align(self, aligner: "AbstractContainer", **kwargs):
+        """Runs alignment using a containerized aligner.
+
+        Args:
+            aligner (AbstractContainer): Containerized aligner to be called.
+
+        Returns:
+            Any: Alignment result
+        """
         sequences = [seq.fasta_string() for seq in self.input_sequences]
 
         alignment = aligner().align(sequences=sequences)
@@ -167,38 +230,145 @@ class Alignment(sdRDM.DataModel):
 
         self.apply_standard_numbering()
 
-    def _python_align(self, aligner: PairwiseAligner, **kwargs):
+        return self
+
+    def _map_to_pairwisealignment(self):
+
+        from pyeed.core.pairwisealignment import PairwiseAlignment
+
+        return PairwiseAlignment(
+            input_sequences=self.input_sequences,
+            method=self.method,
+            aligned_sequences=self.aligned_sequences,
+            standard_numberings=self.standard_numberings,
+        )
+
+    def _python_align(self, aligner: "PairwiseAligner", **kwargs):
+        """Runs alignment using a python-based aligner.
+
+        Args:
+            aligner (PairwiseAligner): Python-based aligner to be called.
+
+        Raises:
+            ValueError: If the number of sequences is less than 2.
+
+        Returns:
+            _type_: Alignment result
+        """
+
+        # Pairwise alignment
         if len(self.input_sequences) == 2:
-            alignment_reuslt = aligner(
+
+            pairwise_aligner = aligner(
                 sequences=[
                     self.input_sequences[0].sequence,
                     self.input_sequences[1].sequence,
                 ],
                 **kwargs,
-            ).align()
+            )
+            alignment_result = pairwise_aligner.align()
+            self.method = pairwise_aligner.mode
 
-        # self.aligned_sequences = [
-        #     Sequence(source_id=seq.id, sequence=str(seq.seq))
-        #     for seq in alignment_reuslt
-        # ]
+            return self._map_pairwise_alignment_results(
+                alignment_result,
+                pair=(
+                    self.input_sequences[0],
+                    self.input_sequences[1],
+                ),
+                mode=pairwise_aligner.mode,
+            )
 
-        # TODO: Alignment has no ID attriburte
-        # TODO: Map to data model
-        return alignment_reuslt
+        # Multi pairwise alignment
+        elif len(self.input_sequences) > 2:
+            pairs = list(combinations(self.input_sequences, 2))
+
+            aligners = [
+                aligner(sequences=[s.sequence for s in pair], **kwargs)
+                for pair in pairs
+            ]
+
+            alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
+                delayed(a.align)()
+                for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
+            )
+
+            return [
+                self._map_pairwise_alignment_results(
+                    alignment, pair, mode=aligners[0].mode
+                )
+                for alignment, pair in zip(alignments, pairs)
+            ]
+
+        else:
+            raise ValueError(
+                f"Alignment Error. Recieved {len(self.input_sequences)} sequences. Expected 2."
+            )
+
+    def _map_pairwise_alignment_results(
+        self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str
+    ) -> "PairwiseAlignment":
+        """Maps the results of a pairwise alignment to a PairwiseAlignment object.
+
+        Args:
+            alignment_result (BioAlignment): The result of the pairwise alignment.
+            pair (Tuple[Sequence, Sequence]): The pair of sequences that were aligned.
+            mode (str): The alignment mode used.
+
+        Returns:
+            PairwiseAlignment: PairwiseAlignment object
+        """
+        from pyeed.core.pairwisealignment import PairwiseAlignment
+
+        self.aligned_sequences = [
+            Sequence(source_id=pair[0].source_id, sequence=alignment_result[0]),
+            Sequence(source_id=pair[1].source_id, sequence=alignment_result[1]),
+        ]
+
+        shorter_seq = min(self.input_sequences, key=lambda x: len(x.sequence))
+
+        identities = alignment_result.counts().identities
+        identity = identities / len(shorter_seq.sequence)
+
+        pairwise_alignment = PairwiseAlignment(
+            input_sequences=list(pair),
+            method=mode,
+            aligned_sequences=self.aligned_sequences,
+            score=alignment_result.score,
+            gaps=alignment_result.counts().gaps,
+            identity=identity,
+            mismatches=alignment_result.counts().mismatches,
+        )
+
+        return pairwise_alignment
 
     @classmethod
     def from_sequences(
         cls,
-        sequences: List[AbstractSequence],
-        aligner: Union[AbstractContainer, PairwiseAligner] = None,
+        sequences: List[Union["ProteinInfo", "DNAInfo"]],
+        aligner: Union["AbstractContainer", "PairwiseAligner"] = None,
         **kwargs,
     ):
+        """
+        Creates an instance of the Alignment class from a list of sequences.
+        If an aligner is provided, it also aligns the sequences.
+
+        Args:
+            sequences (List[Union["ProteinInfo", "DNAInfo"]]): A list of sequences to be aligned.
+            aligner (Union["AbstractContainer", "PairwiseAligner"], optional): The aligner object to use for alignment.
+                If not provided, the sequences will not be aligned.
+            **kwargs: Additional keyword arguments to pass to the aligner.
+
+        Returns:
+            Alignment: An instance of the Alignment class with the provided sequences.
+            If an aligner was provided, the sequences will be aligned.
+        """
+
         alignment = cls(
             input_sequences=sequences,
         )
 
         if aligner is not None:
-            alignment.align(aligner, **kwargs)
+            return alignment.align(aligner, **kwargs)
 
         return alignment
 
@@ -213,7 +383,6 @@ class Alignment(sdRDM.DataModel):
 
         Returns:
             List[str]: A list of pairwise numbering.
-
         """
 
         numbering = []

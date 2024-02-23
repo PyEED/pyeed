@@ -1,1 +1,1 @@
-from .network import pairwise_network
+from .network import SequenceNetwork

@@ -48,7 +48,8 @@ class ClustalOmega(AbstractContainer):
         Returns:
             str: The command to run the ClustalOmega container.
         """
-        return "clustalo -i /data/input.fasta -o /data/output.clu --outfmt=clu"
+        threads = os.cpu_count()
+        return f"clustalo -i /data/input.fasta -o /data/output.clu --outfmt=clu --threads={threads}"
 
     def extract_output_data(self) -> MultipleSeqAlignment:
         """
