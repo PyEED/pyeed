@@ -10,8 +10,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
-
-from pyeed.ncbi import seq_io
+from docker.errors import DockerException
 
 
 class ToolImage(Enum):
@@ -62,7 +61,15 @@ class AbstractContainer(BaseModel, ABC):
         BaseModel.__init__(self, **kwargs)
         super().__init__(**kwargs)
         self._tempdir_path = tempfile.mkdtemp()
-        self._client = docker.from_env()
+        self._client = self._initialize_docker_client()
+
+    def _initialize_docker_client(self) -> DockerClient:
+        try:
+            client = docker.from_env()
+            client.ping()
+            return client
+        except DockerException as e:
+            print(f"Docker is not running. Start the Docker application. {e}")
 
     def get_image(self) -> Image:
         """Gets the image from Docker Hub. If the image is not found, it will be pulled."""
