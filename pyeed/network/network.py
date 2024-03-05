@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from pyeed.core.abstractsequence import AbstractSequence
 from pyeed.core.pairwisealignment import PairwiseAlignment
+from pyeed.core.proteininfo import ProteinInfo
 
 
 class SequenceNetwork(BaseModel):
@@ -63,6 +64,15 @@ class SequenceNetwork(BaseModel):
         description="Dimension of the network graph",
     )
 
+    targets: Optional[List[str]] = Field(
+        default=[],
+        description="List of selected sequences",
+    )
+
+    def add_target(self, target: AbstractSequence):
+        if target.source_id not in self.targets:
+            self.targets.append(target.source_id)
+
     @property
     def graph(self) -> nx.Graph:
         """
@@ -84,13 +94,40 @@ class SequenceNetwork(BaseModel):
         graph = nx.Graph()
 
         # Add nodes and assign node attributes
-        for sequence in self.sequences:
-            graph.add_node(
-                sequence.source_id,
-                name=sequence.name,
-                organism=sequence.organism,
-                taxonomy_id=sequence.organism.taxonomy_id,
-            )
+        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
+            for sequence in self.sequences:
+                graph.add_node(
+                    sequence.source_id,
+                    name=sequence.name,
+                    familiy_name=sequence.family_name,
+                    domain=sequence.organism.domain,
+                    kingdome=sequence.organism.kingdom,
+                    phylum=sequence.organism.phylum,
+                    tax_class=sequence.organism.tax_class,
+                    order=sequence.organism.order,
+                    family=sequence.organism.family,
+                    genus=sequence.organism.genus,
+                    species=sequence.organism.species,
+                    ec_number=sequence.ec_number,
+                    mol_weight=sequence.mol_weight,
+                    taxonomy_id=sequence.organism.taxonomy_id,
+                )
+
+        else:
+            for sequence in self.sequences:
+                graph.add_node(
+                    sequence.source_id,
+                    name=sequence.name,
+                    domain=sequence.organism.domain,
+                    kingdome=sequence.organism.kingdom,
+                    phylum=sequence.organism.phylum,
+                    tax_class=sequence.organism.tax_class,
+                    order=sequence.organism.order,
+                    family=sequence.organism.family,
+                    genus=sequence.organism.genus,
+                    species=sequence.organism.species,
+                    taxonomy_id=sequence.organism.taxonomy_id,
+                )
 
         # Add edges and assign edge attributes
         if self.threshold != None:
@@ -115,6 +152,12 @@ class SequenceNetwork(BaseModel):
                     score=alignment.score,
                 )
 
+        # Calculate betweenness centrality
+        betweenness = nx.betweenness_centrality(graph)
+        for node, betw_value in betweenness.items():
+            graph.nodes[node]["betweenness"] = betw_value
+
+        # Calculate node positions based on dimensions
         if self.dimensions == 2:
             return self._2d_position_nodes_and_edges(graph)
         elif self.dimensions == 3:
@@ -140,15 +183,6 @@ class SequenceNetwork(BaseModel):
 
         Raises:
             ValueError: If the 'dimensions' attribute is greater than 3.
-
-        Notes:
-            - The visualization is done using the Plotly library.
-            - If the 'dimensions' attribute is 2, the network graph is visualized in 2D.
-            - If the 'dimensions' attribute is 3, the network graph is visualized in 3D.
-            - The visualization includes nodes representing sequences and edges representing alignments between sequences.
-            - The color of the nodes is determined by the 'color' attribute of the SequenceNetwork class.
-            - The hover information for each node includes the sequence name, organism, kingdom, phylum, and source ID.
-            - The visualization is displayed using the Plotly library.
         """
 
         if self.dimensions == 2:
@@ -222,22 +256,28 @@ class SequenceNetwork(BaseModel):
         """Visualizes a 3D network graph."""
 
         traces = []
-        # Add edges
-        # for edge in self.graph.edges:
-        #     traces.append(
-        #         go.Scatter3d(
-        #             x=self.graph.edges[edge]["x_pos"],
-        #             y=self.graph.edges[edge]["y_pos"],
-        #             z=self.graph.edges[edge]["z_pos"],
-        #             mode="lines",
-        #             line=dict(
-        #                 width=1,
-        #                 color="rgba(128, 128, 128, 0.1)",
-        #             ),
-        #             hoverinfo="text",
-        #             text=self.graph.edges[edge]["gaps"],
-        #         )
-        #     )
+
+        betweenness = 1
+        bridge_nodes = [
+            node_id
+            for node_id, betw in self.graph.nodes(data="betweenness")
+            if betw > betweenness
+        ]
+        for edge in self.graph.edges:
+            if edge[0] in bridge_nodes or edge[1] in bridge_nodes:
+                traces.append(
+                    go.Scatter3d(
+                        x=self.graph.edges[edge]["x_pos"],
+                        y=self.graph.edges[edge]["y_pos"],
+                        z=self.graph.edges[edge]["z_pos"],
+                        mode="lines",
+                        hoverinfo="none",
+                        line=dict(
+                            width=1,
+                            color="rgba(128, 128, 128, 0.8)",
+                        ),
+                    )
+                )
 
         color_conditions = set([node[self.color] for node in self.graph.nodes.values()])
         color_dict = dict(
@@ -246,15 +286,15 @@ class SequenceNetwork(BaseModel):
 
         # Add nodes
         for key, node in self.graph.nodes.items():
-            info = [
-                (
-                    node["name"],
-                    node["organism"].name,
-                    node["organism"].kingdom,
-                    node["organism"].phylum,
-                    key,
-                )
-            ]
+            size = 6
+            color = color_dict[node[self.color]]
+            symbol = "circle"
+            if key in self.targets:
+                size = 10
+                color = "red"
+                symbol = "cross"
+
+            info = [tuple(n for n in node.values())]
 
             traces.append(
                 go.Scatter3d(
@@ -263,11 +303,12 @@ class SequenceNetwork(BaseModel):
                     z=[node["z_pos"]],
                     mode="markers",
                     marker=dict(
-                        size=7,
-                        color=color_dict[node[self.color]],
+                        size=size,
+                        color=color,
+                        symbol=symbol,
                     ),
                     text=node["name"],
-                    hovertemplate="<b>%{customdata[0]}</b><br>Organism: %{customdata[1]}<br>Kingdom: %{customdata[2]}<br>Phylum: %{customdata[3]}</b><br>Source ID: %{customdata[4]}<extra></extra>",
+                    hovertemplate="<b>%{customdata[0]}</b><br>Family Name: %{customdata[1]}<br>Domain: %{customdata[2]}<br>Kingdom: %{customdata[3]}</b><br>Phylum: %{customdata[4]}<br>Class: %{customdata[5]}<br>Order: %{customdata[6]}<br>Family: %{customdata[7]}<br>Genus: %{customdata[8]}<br>Species: %{customdata[9]}<br>EC Number: %{customdata[10]}<br>Mol Weight: %{customdata[11]}<br>Taxonomy ID: %{customdata[12]}<extra></extra>",
                     customdata=list((info)),
                 )
             )
@@ -291,6 +332,25 @@ class SequenceNetwork(BaseModel):
     def visualize_2d_network(self):
         """Visualizes a 2D network graph."""
         traces = []
+        betweenness = 1
+        bridge_nodes = [
+            node_id
+            for node_id, betw in self.graph.nodes(data="betweenness")
+            if betw > betweenness
+        ]
+        for edge in self.graph.edges:
+            if edge[0] in bridge_nodes or edge[1] in bridge_nodes:
+                traces.append(
+                    go.Scatter(
+                        x=self.graph.edges[edge]["x_pos"],
+                        y=self.graph.edges[edge]["y_pos"],
+                        mode="lines",
+                        line=dict(
+                            width=1,
+                            color="rgba(128, 128, 128, 0.1)",
+                        ),
+                    )
+                )
 
         # Add nodes
         color_conditions = set([node[self.color] for node in self.graph.nodes.values()])
@@ -299,27 +359,27 @@ class SequenceNetwork(BaseModel):
         )
 
         for key, node in self.graph.nodes.items():
-            info = [
-                (
-                    node["name"],
-                    node["organism"].name,
-                    node["organism"].kingdom,
-                    node["organism"].phylum,
-                    key,
-                )
-            ]
+            size = 6
+            color = color_dict[node[self.color]]
+            symbol = "circle"
+            if key in self.targets:
+                size = 10
+                color = "red"
+                symbol = "cross"
 
+            info = [tuple(n for n in node.values())]
             traces.append(
                 go.Scatter(
                     x=[node["x_pos"]],
                     y=[node["y_pos"]],
                     mode="markers",
                     marker=dict(
-                        size=10,
-                        color=color_dict[node[self.color]],
+                        size=size,
+                        color=color,
+                        symbol=symbol,
                     ),
                     text=node["name"],
-                    hovertemplate="<b>%{customdata[0]}</b><br>Organism: %{customdata[1]}<br>Kingdom: %{customdata[2]}<br>Phylum: %{customdata[3]}</b><br>Source ID: %{customdata[4]}<extra></extra>",
+                    hovertemplate="<b>%{customdata[0]}</b><br>Family Name: %{customdata[1]}<br>Domain: %{customdata[2]}<br>Kingdom: %{customdata[3]}</b><br>Phylum: %{customdata[4]}<br>Class: %{customdata[5]}<br>Order: %{customdata[6]}<br>Family: %{customdata[7]}<br>Genus: %{customdata[8]}<br>Species: %{customdata[9]}<br>EC Number: %{customdata[10]}<br>Mol Weight: %{customdata[11]}<br>Taxonomy ID: %{customdata[12]}<extra></extra>",
                     customdata=list((info)),
                 )
             )
@@ -337,7 +397,7 @@ class SequenceNetwork(BaseModel):
         fig.update_xaxes(visible=False)
         fig.update_yaxes(visible=False)
 
-        fig.show()
+        fig.show(scale=10)
 
     @staticmethod
     def _sample_colorscale(size: int) -> List[str]:
