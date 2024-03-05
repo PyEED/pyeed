@@ -70,13 +70,26 @@ alignment = Alignment.from_sequences(list_of_sequences)
     alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner, mode="global")
     ```
 
+=== "Multi-Pairwise Alignment"
+    If more than two sequences are subjected to a `PairwiseAligner`, all unique sequence pairs are aligned. 
+    Instead of an `Alignment` object, a `List[PairwiseAlignment]` object is returned, containing all individual pairwise alignments.
 
-#### Multi-Pairwise Alignment
+    ``` py
+    from pyeed.core import ProteinInfo, Alignment
+    from pyeed.aligners import PairwiseAligner
 
+    # Get sequences
+    ncbi_accessions = ["QGC48744.1", "AAT46413.1", "AAT46414.1", "AAT46415.1"]
+    sequences = ProteinInfo.from_ncbi(ncbi_accessions)
+
+    # Create and run alignment
+    alignment = Alignment.from_sequences(sequences, aligner=PairwiseAligner, mode="global)
+
+    ```
 
 ### ⛓️ Multiple Sequence Alignments
 
-Most sequence alignment tools are implemented as command line tools, which need to be set up. PyEED implements common alignments tools such as `ClustalOmega` wrapped as Docker containers. As a result, no manual installation of tools is required, since the tools are automatically installed when needed.
+Most sequence alignment tools are implemented as command line tools, which need to be set up. PyEED implements common alignment tools such as `ClustalOmega` wrapped as Docker containers. As a result, no manual installation of tools is required, since the tools are automatically installed when needed.
 
 === "ClustalOmega"
 
@@ -100,4 +113,5 @@ Most sequence alignment tools are implemented as command line tools, which need 
 
 ## 💯 Standard Numbering
 
-Standard numbering is a way to express the alignment of a sequence to a reference sequence in the form of numbers. The Standard Numbering is created based on aligned sequences in which an aligned positions are the the same position within the alignment. If a position is not aligned, and a gap is introduced and denoted with `-`.  
+Standard numbering is a way to express the alignment of a sequence to a reference sequence in the form of numbers.
+The Standard Numbering is created based on aligned sequences in which aligned positions are at the same position within the alignment. If a position is not aligned, and a gap is introduced and denoted with `-`.  

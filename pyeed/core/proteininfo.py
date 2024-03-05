@@ -279,6 +279,7 @@ class ProteinInfo(AbstractSequence):
 
         command = blaster.setup_command()
         accession_ids = blaster.run_container(command=command, data=self.to_fasta())
+        accession_ids.insert(0, self.source_id)
         return ProteinInfo.from_accessions(accession_ids)
 
     def get_dna(self):
