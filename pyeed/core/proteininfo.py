@@ -4,6 +4,7 @@ from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
+
 from .dnainfo import DNAInfo
 from .proteinregion import ProteinRegion
 from .abstractsequence import AbstractSequence
@@ -160,7 +161,8 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
-        from ..ncbi.seq_io import _seqio_to_nucleotide_info, get_ncbi_entry
+        from ..parsers.abstractparser import NCBIParser
+        from ..ncbi.seq_io import get_ncbi_entry
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
@@ -178,19 +180,14 @@ class ProteinInfo(AbstractSequence):
             return cls.from_accessions(accession_id)
 
         seq_record = get_ncbi_entry(accession_id, "protein")
-        return _seqio_to_nucleotide_info(cls, seq_record)
-
-    @classmethod
-    def _from_seq_record(cls, seq_record) -> "ProteinInfo":
-        from ..ncbi.seq_io import _seqio_to_nucleotide_info
-
-        return _seqio_to_nucleotide_info(cls, seq_record)
+        return NCBIParser(seq_record).map(cls)
 
     @classmethod
     def from_accessions(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
         from ..ncbi.seq_io import get_ncbi_entrys
+        from ..parsers.abstractparser import NCBIParser
 
         seq_entries = get_ncbi_entrys(
             accession_ids=accession_ids,
@@ -199,7 +196,7 @@ class ProteinInfo(AbstractSequence):
             api_key=api_key,
         )
 
-        return [cls._from_seq_record(record) for record in seq_entries]
+        return [NCBIParser(seq_entry).map(cls) for seq_entry in seq_entries]
 
     def ncbi_blastp(
         self,
@@ -222,7 +219,7 @@ class ProteinInfo(AbstractSequence):
         """
         from ..ncbi.seq_io import get_ncbi_entrys
 
-        print(f"🏃🏼‍♀️ Running PBLAST")
+        print("🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")
         print(f"├── accession: {self.source_id}")
         print(f"├── organism: {self.organism.name}")
@@ -291,6 +288,7 @@ class ProteinInfo(AbstractSequence):
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
         blast_record = NCBIXML.read(result_handle)
+        raise NotImplementedError("This method is not implemented yet.")
 
     @staticmethod
     def _get_accessions(blast_record: NCBIXML) -> List[str]:

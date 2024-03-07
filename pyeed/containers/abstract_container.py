@@ -1,6 +1,11 @@
 import os
+import logging
+import logging.config
 import docker
 import shutil
+import random
+import string
+from pathlib import Path
 from enum import Enum
 from typing import Any
 import tempfile
@@ -11,6 +16,10 @@ from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
 from docker.errors import DockerException
+
+path_config = Path(__file__).parent.parent.parent / "logging.conf"
+logging.config.fileConfig(path_config)
+logger = logging.getLogger("pyeed")
 
 
 class ToolImage(Enum):
@@ -62,21 +71,28 @@ class AbstractContainer(BaseModel, ABC):
         super().__init__(**kwargs)
         self._tempdir_path = tempfile.mkdtemp()
         self._client = self._initialize_docker_client()
+        logger.debug(
+            f"Successfully initialized container of type: {self._container_info}, _tempdir_path: {self._tempdir_path}"
+        )
 
     def _initialize_docker_client(self) -> DockerClient:
+
+        logger.debug("Initializing Docker client")
         try:
             client = docker.from_env()
             client.ping()
             return client
         except DockerException as e:
-            print(f"Docker is not running. Start the Docker application. {e}")
+            logger.error(f"Docker is not running. Start the Docker application. {e}")
 
     def get_image(self) -> Image:
         """Gets the image from Docker Hub. If the image is not found, it will be pulled."""
         try:
+            logger.debug(f"Getting image {self._container_info.value}")
             return self._client.images.get(self._container_info.value)
         except docker.errors.ImageNotFound:
-            print(f"⬇️ Pulling {self._container_info.name}")
+            logger.info(f"⬇️ Pulling {self._container_info.name}")
+
             return self._client.images.pull(self._container_info.value)
 
     def run_container(self, command: str, data: Any) -> Container:
@@ -86,16 +102,18 @@ class AbstractContainer(BaseModel, ABC):
             image = self.get_image()
             self.create_file(data=data)
 
-            print(f"🏃 Running {self._container_info.name}")
+            logger.info(f"🏃 Running {self._container_info.name}")
             self._client.containers.run(
                 image=image,
                 command=command,
-                name=self._container_info.name,
+                name=self._container_info.name
+                + "_"
+                + "".join(random.choices(string.ascii_lowercase, k=5)),
                 auto_remove=True,
                 volumes={self._tempdir_path: {"bind": "/data/", "mode": "rw"}},
             )
         except Exception as e:
-            print(f"Error running container: {e}")
+            logger.error(f"Error running {self._container_info} container: {e}")
 
     def _delete_temp_dir(self):
         """Deletes the temporary directory."""
@@ -173,7 +191,8 @@ class Blastp(AbstractContainer):
             self._client.containers.run(
                 image=image,
                 command=command,
-                name=self._container_info.name,
+                name=self._container_info.name
+                + "".join(random.choices(string.ascii_lowercase, k=5)),
                 auto_remove=True,
                 volumes={
                     self._tempdir_path: {"bind": "/data/", "mode": "rw"},
@@ -186,8 +205,10 @@ class Blastp(AbstractContainer):
 
     def create_file(self, data: str) -> str:
         """Creates the input data for the container."""
+
         with open(f"{self._tempdir_path}/input.fasta", "w") as f:
             f.write(data)
+            logger.debug(f"Created input file: {self._tempdir_path}/blastp.fasta")
         return f"{self._tempdir_path}/blastp.fasta"
 
     def extract_output_data(self):
@@ -196,6 +217,9 @@ class Blastp(AbstractContainer):
         """Extracts the output data from the container."""
 
         search_io = SearchIO.read(f"{self._tempdir_path}/blastp.out", "blast-tab")
+        logger.debug("Extracted output data")
+
+        # TODO add debug info on how many sequences were discarded due to identity and evalue thresholds
 
         return [
             result.id
@@ -205,6 +229,7 @@ class Blastp(AbstractContainer):
 
     def setup_command(self) -> str:
         """Creates the command which is executed in the container."""
+        logger.debug(f"Setting up command for {self._container_info}")
         return (
             f"blastp "
             f"-query /data/input.fasta "
