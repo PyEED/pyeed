@@ -1,9 +1,12 @@
 import os
 from typing import List, Optional
+import warnings
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
+
+from pyeed.core.organism import Organism
 
 from .dnainfo import DNAInfo
 from .proteinregion import ProteinRegion
@@ -160,43 +163,63 @@ class ProteinInfo(AbstractSequence):
         return self.substrates[-1]
 
     @classmethod
-    def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
-        from ..parsers.abstractparser import NCBIParser
-        from ..ncbi.seq_io import get_ncbi_entry
+    def get_id(cls, protein_id: str) -> "ProteinInfo":
+        from ..fetchers.abstractfetcher import NCBIProteinParser, NCBITaxonomyParser
+        from ..ncbi.seq_io import get_ncbi_entry, get_ncbi_taxonomy
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
 
         Args:
-            accession_id (str): NCBI accession ID of the protein sequence.
+            protein_id (str): ID of the protein in NCBI or UniProt database.
 
         Returns:
-            ProteinInfo: 'ProteinInfo' object that corresponds to the given NCBI ID.
+            ProteinInfo: 'ProteinInfo' with information of the corresponding protein_id.
         """
 
-        if isinstance(accession_id, list) and all(
-            isinstance(x, str) for x in accession_id
-        ):
-            return cls.from_accessions(accession_id)
+        if isinstance(protein_id, list) and all(isinstance(x, str) for x in protein_id):
+            warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
+            return cls.get_ids(protein_id)
 
-        seq_record = get_ncbi_entry(accession_id, "protein")
-        return NCBIParser(seq_record).map(cls)
+        seq_record = get_ncbi_entry(
+            accession_id=protein_id, database="protein", retmode="text"
+        )
+        protein = NCBIProteinParser(seq_record).map(cls)
+
+        if protein.organism:
+            tax_record = get_ncbi_taxonomy(protein.organism.taxonomy_id)
+            protein.organism = NCBITaxonomyParser(tax_record[0]).map(Organism)
+
+        return protein
 
     @classmethod
-    def from_accessions(
+    def get_ids(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
-        from ..ncbi.seq_io import get_ncbi_entrys
-        from ..parsers.abstractparser import NCBIParser
+        from ..ncbi.seq_io import get_ncbi_entrys, get_ncbi_taxonomy
+        from ..fetchers.abstractfetcher import NCBIProteinParser, NCBITaxonomyParser
 
         seq_entries = get_ncbi_entrys(
             accession_ids=accession_ids,
             database="protein",
+            retmode="text",
             email=email,
             api_key=api_key,
         )
 
-        return [NCBIParser(seq_entry).map(cls) for seq_entry in seq_entries]
+        proteins = [NCBIProteinParser(seq_entry).map(cls) for seq_entry in seq_entries]
+
+        tax_ids = set([protein.organism.taxonomy_id for protein in proteins])
+
+        tax_records = get_ncbi_taxonomy(list(tax_ids), email=email, api_key=api_key)
+
+        for protein in proteins:
+            for tax_record in tax_records:
+
+                if tax_record["TaxId"] == protein.organism.taxonomy_id:
+                    protein.organism = NCBITaxonomyParser(tax_record).map(Organism)
+
+        return proteins
 
     def ncbi_blastp(
         self,
@@ -237,7 +260,9 @@ class ProteinInfo(AbstractSequence):
         blast_record = NCBIXML.read(result_handle)
 
         accessions = self._get_accessions(blast_record)
-        seq_records = get_ncbi_entrys(accessions, "protein", api_key=api_key)
+        seq_records = get_ncbi_entrys(
+            accessions, "protein", api_key=api_key, retmode="text"
+        )
 
         protein_infos = []
         for record in seq_records:
