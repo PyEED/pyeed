@@ -1,6 +1,6 @@
-import os
 import re
 import logging
+import secrets
 import logging.config
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -19,33 +19,50 @@ from pyeed.core.span import Span
 
 path_config = Path(__file__).parent.parent.parent / "logging.conf"
 logging.config.fileConfig(path_config)
-logger = logging.getLogger("pyeed")
+LOGGER = logging.getLogger("pyeed")
 
 
-class DataParser(ABC):
-    def __init__(self, source: Any):
-        self.source = source
+class AbstractFetcher(ABC):
+    def __init__(self, foreign_id: str):
+        super().__init__()
+        self.foreign_id = foreign_id
 
     @abstractmethod
-    def fetch_entry(self):
+    def get(self):
         pass
 
     @abstractmethod
-    def parse_organism(self):
+    def map(self, handle: Any, cls):
         pass
 
-    @abstractmethod
-    def map(self):
-        pass
+    @staticmethod
+    def get_substitute_email() -> str:
+        return f"{secrets.token_hex(8)}@gmail.com"
+
+    @staticmethod
+    def make_chunks(input_list: list, chunk_size: int = 100) -> List[list]:
+        """
+        Splits a list into chunks of a given size.
+        """
+        if input_list is None:
+            raise ValueError("input_list cannot be None.")
+
+        if not isinstance(input_list, list):
+            raise TypeError("input_list must be a list")
+
+        return [
+            input_list[i : i + chunk_size]
+            for i in range(0, len(input_list), chunk_size)
+        ]
 
 
-class NCBIParser(DataParser):
+class NCBIProteinParser(AbstractFetcher):
 
     def map(self, cls: "ProteinInfo"):
 
         protein_info = cls(source_id=self.source.id, sequence=str(self.source.seq))
 
-        protein_info.organism = self.parse_organism()
+        protein_info.organism = self.map_organism()
         protein_info = self.map_protein(protein_info)
         protein_info = self.map_regions(protein_info)
         protein_info = self.map_sites(protein_info)
@@ -53,7 +70,7 @@ class NCBIParser(DataParser):
 
         return protein_info
 
-    def parse_organism(self) -> Organism:
+    def map_organism(self) -> Organism:
         """
         Gets the organism name and taxonomy ID from the source data.
         Maps it to an Organism object.
@@ -61,41 +78,49 @@ class NCBIParser(DataParser):
 
         feature = self.get_feature("source")
         if len(feature) != 1:
-            logger.debug(
+            LOGGER.debug(
                 f"Multiple features ({len(feature)}) of type `source` found for {self.source.id}: {feature}"
             )
         feature = feature[0]
 
         try:
-            taxonomy_id = feature.qualifiers["db_xref"]
+            if len(feature.qualifiers["db_xref"]) != 1:
+                LOGGER.info(
+                    f"For {self.source.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
+                )
+                return None
+
+            taxonomy_id = feature.qualifiers["db_xref"][0]
+
+            if ":" in taxonomy_id:
+                taxonomy_id = int(taxonomy_id.split(":")[1])
+
         except KeyError:
-            logger.debug(
-                f"No taxonomy ID found for {self.source.id}: {feature[0].qualifiers}"
-            )
-            taxonomy_id = None
+            LOGGER.debug(f"No taxonomy ID found for {self.source.id}: {feature}")
+            return None
 
         try:
             organism_name = feature.qualifiers["organism"]
         except KeyError:
-            logger.debug(
+            LOGGER.debug(
                 f"No organism name found for {self.source.id}: {feature[0].qualifiers}"
             )
             organism_name = None
 
-        return Organism(name=organism_name[0], taxonomy_id=taxonomy_id[0])
+        return Organism(name=organism_name[0], taxonomy_id=taxonomy_id)
 
     def map_protein(self, protein_info: ProteinInfo):
 
         protein = self.get_feature("Protein")
         if len(protein) == 0:
-            logger.debug(
+            LOGGER.debug(
                 f"No protein feature found for {self.source.id}: {self.source.features}"
             )
 
             return protein_info
 
         if len(protein) > 1:
-            logger.debug(
+            LOGGER.debug(
                 f"Multiple features ({len(protein)}) of type `Protein` found for {self.source.id}"
             )
 
@@ -103,13 +128,13 @@ class NCBIParser(DataParser):
         try:
             protein_info.name = protein.qualifiers["product"][0]
         except KeyError:
-            logger.debug(
+            LOGGER.debug(
                 f"No protein name found for {self.source.id}: {protein.qualifiers}"
             )
             try:
                 protein_info.name = protein.qualifiers["name"][0]
             except KeyError:
-                logger.debug(
+                LOGGER.debug(
                     f"No protein name found for {self.source.id}: {protein.qualifiers}"
                 )
                 protein_info.name = None
@@ -117,7 +142,7 @@ class NCBIParser(DataParser):
         try:
             protein_info.mol_weight = protein.qualifiers["calculated_mol_wt"][0]
         except KeyError:
-            logger.debug(
+            LOGGER.debug(
                 f"No molecular weight found for {self.source.id}: {protein.qualifiers}"
             )
             protein_info.mol_weight = None
@@ -125,7 +150,7 @@ class NCBIParser(DataParser):
         try:
             protein_info.ec_number = protein.qualifiers["EC_number"][0]
         except KeyError:
-            logger.debug(
+            LOGGER.debug(
                 f"No EC number found for {self.source.id}: {protein.qualifiers}"
             )
             protein_info.ec_number = None
@@ -151,7 +176,7 @@ class NCBIParser(DataParser):
                     )
                 )
             except KeyError:
-                logger.debug(
+                LOGGER.debug(
                     f"Incomplete region data found for {self.source.id}: {region.qualifiers}, skipping region"
                 )
 
@@ -171,7 +196,7 @@ class NCBIParser(DataParser):
                     cross_ref=site.qualifiers["db_xref"][0],
                 )
             except KeyError:
-                logger.warning(
+                LOGGER.warning(
                     f"Incomplete site data found for {self.source.id}: {site.qualifiers}, skipping site"
                 )
 
@@ -181,14 +206,14 @@ class NCBIParser(DataParser):
 
         cds = self.get_feature("CDS")
         if len(cds) > 1:
-            logger.info(
+            LOGGER.info(
                 f"Multiple features ({len(cds)}) of type `CDS` found for {self.source.id}"
             )
 
         try:
             cds = cds[0]
         except IndexError:
-            logger.debug(f"No CDS found for {self.source.id}: {cds}")
+            LOGGER.debug(f"No CDS found for {self.source.id}: {cds}")
 
             return protein_info
 
@@ -197,7 +222,7 @@ class NCBIParser(DataParser):
                 cds.qualifiers["coded_by"][0]
             )
         except IndexError:
-            logger.debug(
+            LOGGER.debug(
                 f"No coding sequence reference found for {self.source.id}: {cds.qualifiers}"
             )
 
@@ -220,7 +245,7 @@ class NCBIParser(DataParser):
         if not all(
             [reference_id == reference_ids[0] for reference_id in reference_ids]
         ):
-            logger.warning(
+            LOGGER.warning(
                 "Nucleotide sequence references are not identical: {reference_ids}"
             )
 
@@ -238,14 +263,6 @@ class NCBIParser(DataParser):
 
         return region
 
-    def fetch_entry(self, identifier: str):
-        # Implementation for fetching data from NCBI
-        logger.debug(f"Fetching NCBI data for {identifier}")
-
-    def parse_data(self, data):
-        # Implementation for parsing NCBI data
-        logger.debug("Parsing NCBI data")
-
     def get_feature(self, feature_type: str) -> "Bio.SeqFeature.SeqFeature":
         return [
             feature
@@ -254,34 +271,17 @@ class NCBIParser(DataParser):
         ]
 
 
-class UniProtParser(DataParser):
+class UniProtParser(AbstractFetcher):
 
-    def parse_organism():
+    def map():
         pass
-
-    def fetch_entry(self, identifier: str):
-        # Implementation for fetching data from UniProt
-        pass
-
-    def parse_data(self, data):
-        # Implementation for parsing UniProt data
-        pass
-
-
-class ParserFactory:
-    @staticmethod
-    def get_parser(source: str) -> DataParser:
-        parsers = {"NCBI": NCBIParser(), "UniProt": UniProtParser()}
-        parser = parsers.get(source.upper())
-        if not parser:
-            raise ValueError(f"Parser for {source} not found.")
-        return parser
 
 
 if __name__ == "__main__":
-    from pyeed.ncbi.seq_io import get_ncbi_entry
+    from pyeed.ncbi.seq_io import get_ncbi_entry, get_ncbi_taxonomy
+    from pyeed.core import Organism
 
-    entry = get_ncbi_entry("7P82_A", "protein")
+    entry = get_ncbi_taxonomy("311400")
 
-    parser = NCBIParser(entry)
-    print(parser.map(ProteinInfo))
+    parser = NCBITaxonomyParser(entry[0])
+    print(parser.map(Organism))
