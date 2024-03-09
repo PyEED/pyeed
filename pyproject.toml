@@ -33,6 +33,7 @@ docker = "^7.0.0"
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
 pytest = "^8.0.1"
+python-dotenv = "^1.0.1"
 
 [build-system]
 requires = ["poetry-core"]

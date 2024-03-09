@@ -16,6 +16,9 @@ class NCBITaxonomyParser(AbstractFetcher):
             self.email = self.get_substitute_email()
 
     def get(self):
+        """
+        Fetches taxonomy data from NCBI and returns a list of dictionaries of the results.
+        """
 
         if isinstance(self.foreign_id, list):
             return list(self.get_multiple_ids())
@@ -23,6 +26,10 @@ class NCBITaxonomyParser(AbstractFetcher):
             return list(self.get_single_id())
 
     def make_request(self, request_string: str) -> Generator:
+        """
+        Makes a request to the NCBI taxonomy database and returns the results.
+        """
+
         Entrez.email = self.email
         Entrez.api_key = self.api_key
 
@@ -32,25 +39,30 @@ class NCBITaxonomyParser(AbstractFetcher):
             retmode="xml",
             api_key=self.api_key,
         ) as handle:
-            yield handle
+            return Entrez.read(handle)
 
     def get_single_id(self):
-        handle = next(self.make_request(self.foreign_id))
-        return Entrez.read(handle)
+        """Gets a single texonomy entry from NCBI."""
+        return self.make_request(self.foreign_id)
 
     def get_multiple_ids(self):
-        with tqdm(
-            total=len(self.foreign_id),
-            desc="⬇️ Fetching taxonomy data",
-        ) as pbar:
+        """
+        Gets multiple taxonomy entries from NCBI. Requests are made in chunks, making the
+        process more reliable.
+        """
 
-            for chunk in self.make_chunks(self.foreign_id):
-                request_string = ",".join(chunk)
+        request_chunks = tqdm(
+            self.make_chunks(self.foreign_id, 100),
+            desc=f"f⬇️ Fetching {len(self.foreign_id)} taxonomy entries...",
+        )
 
-                for handle in self.make_request(request_string):
+        results = []
+        for chunk in request_chunks:
+            request_string = ",".join(chunk)
 
-                    pbar.update(1)
-                    yield Entrez.read(handle)
+            results.extend(self.make_request(request_string))
+
+        return results
 
     def map(self, cls: "Organism"):
 
@@ -91,8 +103,8 @@ class NCBITaxonomyParser(AbstractFetcher):
 
 if __name__ == "__main__":
     single_tax_id = "9606"
-    multiple_tax_ids = ["9606"]
+    multiple_tax_ids = ["9606", "10090", "10116"]
 
-    # print(NCBITaxonomyParser(single_tax_id).get())
+    mul_res = NCBITaxonomyParser(multiple_tax_ids).get()
 
-    print(NCBITaxonomyParser(multiple_tax_ids).get())
+    single_res = NCBITaxonomyParser(single_tax_id).get()
