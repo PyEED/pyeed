@@ -1,9 +1,11 @@
 import os
 from typing import List, Optional
+import warnings
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
+
 
 from .dnainfo import DNAInfo
 from .proteinregion import ProteinRegion
@@ -160,43 +162,34 @@ class ProteinInfo(AbstractSequence):
         return self.substrates[-1]
 
     @classmethod
-    def from_ncbi(cls, accession_id: str) -> "ProteinInfo":
-        from ..parsers.abstractparser import NCBIParser
-        from ..ncbi.seq_io import get_ncbi_entry
+    def get_id(cls, protein_id: str) -> "ProteinInfo":
+        from pyeed.fetchers import NCBIProteinFetcher, NCBITaxonomyFetcher
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
 
         Args:
-            accession_id (str): NCBI accession ID of the protein sequence.
+            protein_id (str): ID of the protein in NCBI or UniProt database.
 
         Returns:
-            ProteinInfo: 'ProteinInfo' object that corresponds to the given NCBI ID.
+            ProteinInfo: 'ProteinInfo' with information of the corresponding protein_id.
         """
 
-        if isinstance(accession_id, list) and all(
-            isinstance(x, str) for x in accession_id
-        ):
-            return cls.from_accessions(accession_id)
+        if isinstance(protein_id, list) and all(isinstance(x, str) for x in protein_id):
+            warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
+            return cls.get_ids(protein_id)
 
-        seq_record = get_ncbi_entry(accession_id, "protein")
-        return NCBIParser(seq_record).map(cls)
+        return NCBIProteinFetcher(protein_id).fetch(cls)[0]
 
     @classmethod
-    def from_accessions(
+    def get_ids(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
-        from ..ncbi.seq_io import get_ncbi_entrys
-        from ..parsers.abstractparser import NCBIParser
+        from pyeed.fetchers import NCBIProteinFetcher
 
-        seq_entries = get_ncbi_entrys(
-            accession_ids=accession_ids,
-            database="protein",
-            email=email,
-            api_key=api_key,
-        )
+        proteins = NCBIProteinFetcher(accession_ids, email, api_key).fetch(cls)
 
-        return [NCBIParser(seq_entry).map(cls) for seq_entry in seq_entries]
+        return proteins
 
     def ncbi_blastp(
         self,
@@ -217,7 +210,7 @@ class ProteinInfo(AbstractSequence):
         Returns:
             List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
         """
-        from ..ncbi.seq_io import get_ncbi_entrys
+        from pyeed.fetchers import NCBIProteinFetcher
 
         print("🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")
@@ -237,11 +230,11 @@ class ProteinInfo(AbstractSequence):
         blast_record = NCBIXML.read(result_handle)
 
         accessions = self._get_accessions(blast_record)
-        seq_records = get_ncbi_entrys(accessions, "protein", api_key=api_key)
 
-        protein_infos = []
-        for record in seq_records:
-            protein_infos.append(self._from_seq_record(record))
+        protein_infos = NCBIProteinFetcher(
+            foreign_id=accessions, api_key=api_key
+        ).fetch(ProteinInfo)
+        protein_infos.insert(0, self)
 
         print("🎉 Done\n")
         return protein_infos
@@ -259,6 +252,7 @@ class ProteinInfo(AbstractSequence):
         threshold: int = 11,
         n_cores: int = os.cpu_count(),
         ncbi_key: str = None,
+        email: str = None,
     ):
         blaster = Blastp(
             _db_path=db_path,
@@ -275,9 +269,12 @@ class ProteinInfo(AbstractSequence):
         )
 
         command = blaster.setup_command()
-        accession_ids = blaster.run_container(command=command, data=self.to_fasta())
-        accession_ids.insert(0, self.source_id)
-        return ProteinInfo.from_accessions(accession_ids)
+        accession_ids = blaster.run_container(
+            command=command, data=self._fasta_string()
+        )
+        protein_infos = ProteinInfo.get_ids(accession_ids, email, ncbi_key)
+        protein_infos.insert(0, self)
+        return protein_infos
 
     def get_dna(self):
         if not self.coding_sequence_ref:
@@ -293,3 +290,9 @@ class ProteinInfo(AbstractSequence):
     @staticmethod
     def _get_accessions(blast_record: NCBIXML) -> List[str]:
         return [alignment.accession for alignment in blast_record.alignments]
+
+    def from_ncbi(self):
+        raise DeprecationWarning("This method is deprecated. Use `get_id` instead.")
+
+    def from_accessions(self):
+        raise DeprecationWarning("This method is deprecated. Use `get_ids` instead.")

@@ -7,7 +7,7 @@ A sequence object can be created by passing a sequence string to the constructor
 === "Protein"
 
     ``` py
-    from pyEED.core import ProteinInfo
+    from pyeed.core import ProteinInfo
 
     protein = ProteinInfo(sequence="MTEITAAMVKELREDKAVQLLREKGLGK")
     ```
@@ -15,7 +15,7 @@ A sequence object can be created by passing a sequence string to the constructor
 === "DNA"
 
     ``` py
-    from pyEED.core import DNAInfo
+    from pyeed.core import DNAInfo
 
     dna = DNAInfo(sequence="ATGCGTACGTCGATCGATCGATCGATCGATCGATCGATCGATCGTAGTC")
     ```
@@ -23,18 +23,18 @@ A sequence object can be created by passing a sequence string to the constructor
 
 ## 🔎 Search for a sequence
 
-Besides adding sequence information manually, PyEED also allows to search for sequences in the NCBI and UniProt databases. Therefore, the `from_db()` method can be used. In addition to the sequence itself, the method also returns the sequence's annotations and maps them to the corresponding attributes of the sequence object.
+Besides adding sequence information manually, PyEED also allows searching for sequences in the NCBI and UniProt databases. Therefore, the `get_id()` method can be used. In addition to the sequence itself, the method also returns the sequence's annotations and maps them to the corresponding attributes of the sequence object.
 
 === "Protein"
 
     ``` py
-    protein = ProteinInfo.from_db("UCS38941.1")
+    protein = ProteinInfo.get_id("UCS38941.1")
     ```
 
 === "DNA"
 
     ``` py
-    dna = DNAInfo.from_db("NC_000913.3")
+    dna = DNAInfo.get_id("NC_000913.3")
     ```
 
 Alternatively, the sequence can be initiated from a sequence string, triggering a BLAST search in the NCBI database. If the sequence is found, the sequence object is filled with the corresponding information.
@@ -55,7 +55,8 @@ Alternatively, the sequence can be initiated from a sequence string, triggering 
 
 ### To file
 
-The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML`file format. Therefore, the respective method can be used.
+The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML` file format. Therefore, the respective method can be used.
+The file path is passed as an argument to the method.
 
 === "FASTA"
 

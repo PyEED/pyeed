@@ -7,12 +7,11 @@ license = "MIT"
 readme = "README.md"
 packages = [
     { include = "pyeed/core" },
-    { include = "pyeed/ncbi" },
+    { include = "pyeed/fetchers" },
     { include = "pyeed/network" },
     { include = "pyeed/aligners" },
     { include = "pyeed/containers" },
     { include = "pyeed/utility" },
-    { include = "pyeed/parsers" }
 ]
 
 [tool.poetry.dependencies]
@@ -33,6 +32,8 @@ docker = "^7.0.0"
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
 pytest = "^8.0.1"
+python-dotenv = "^1.0.1"
+pytest-mock = "^3.12.0"
 
 [build-system]
 requires = ["poetry-core"]

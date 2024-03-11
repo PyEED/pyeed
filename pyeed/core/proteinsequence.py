@@ -160,28 +160,6 @@ class ProteinSequence(sdRDM.DataModel):
         seq_record = cls._get_ncbi_entry(accession_id, "protein")
         return _seqio_to_protein_sequence(cls, seq_record)
 
-    @staticmethod
-    def _get_ncbi_entry(
-        accession_id: str, database: str, email: str = None
-    ) -> SeqIO.SeqRecord:
-        # generate generic mail if none is given
-        if email is None:
-            email = f"{secrets.token_hex(8)}@gmail.com"
-
-        Entrez.email = email
-
-        databases = {"nucleotide", "protein"}
-        if database not in databases:
-            raise ValueError(f"database must be one of {databases}")
-
-        handle = Entrez.efetch(
-            db=database, id=accession_id, rettype="gb", retmode="text"
-        )
-        seq_record = SeqIO.read(handle, "genbank")
-
-        handle.close()
-        return seq_record
-
     def pblast(self, n_hits: int) -> List["ProteinSequence"]:
         """Run protein blast for `ProteinSequence`.
 
@@ -192,16 +170,6 @@ class ProteinSequence(sdRDM.DataModel):
             List[ProteinSequence]: List of 'ProteinSequence' objects that are the result of the blast search.
         """
         return self._pblast(self.sequence, n_hits)
-
-    def get_nucleotide_seq(self):
-        if not self.coding_sequence:
-            return
-
-        seq_record = self._get_ncbi_entry(
-            accession_id=self.coding_sequence.id, database="nucleotide"
-        )
-
-        extract_nucleotide_seq(seq_record, self.coding_sequence)
 
     def _pblast(self, sequence: str, n_hits: int = None) -> List["ProteinSequence"]:
         print(f"Running pblast search for {self.name} from {self.organism.name}...")

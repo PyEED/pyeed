@@ -14,14 +14,14 @@ Both alignment objects contain the following attributes:
 Besides the `Alignment` object, PyEED also provides a `PairwiseAlignment` object, containing the alignment score, identity, similarity, gaps, and mismatches of a pairwise alignment.
 
 
-Before running the alignment, an `Alignment` needs to be created. This can be done by passing a list of `ProteinInfo` or `DNAInfo` objects to the constructor. The alignment can then be run by calling the `align()` method, passing the alignment method as an argument. The method returns the alignment object, containing the aligned sequences.
+Before running the alignment, an `Alignment` needs to be created. This can be done by passing a list of `ProteinInfo` or `DNAInfo` objects to the constructor. The alignment can then be run by calling the `align`()` method and passing the alignment method as an argument. The method returns the alignment object, containing the aligned sequences.
 
 ``` py
 from pyeed.core import ProteinInfo, Alignment
 
 # Get two ProteinInfo objects
-tem1 = ProteinInfo.from_ncbi("QGC48744.1")
-tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+tem1 = ProteinInfo.get_id("QGC48744.1")
+tem109 = ProteinInfo.get_id("AAT46413.1")
 
 # Create an Alignment
 alignment = Alignment(input_sequences=[tem1, tem109])
@@ -33,8 +33,8 @@ Alternatively, the `from_sequneces()` class method can be used to create an alig
 from pyeed.core import ProteinInfo, Alignment
 
 # Get two ProteinInfo objects
-tem1 = ProteinInfo.from_ncbi("QGC48744.1")
-tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+tem1 = ProteinInfo.get_id("QGC48744.1")
+tem109 = ProteinInfo.get_id("AAT46413.1")
 list_of_sequences = [tem1, tem109]
 
 # Create an Alignment
@@ -50,8 +50,8 @@ alignment = Alignment.from_sequences(list_of_sequences)
     from pyeed.aligners import PairwiseAligner
 
     # Get two ProteinInfo objects
-    tem1 = ProteinInfo.from_ncbi("QGC48744.1")
-    tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+    tem1 = ProteinInfo.get_id("QGC48744.1")
+    tem109 = ProteinInfo.get_id("AAT46413.1")
 
     # Create and run alignment
     alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner, mode="local")
@@ -63,8 +63,8 @@ alignment = Alignment.from_sequences(list_of_sequences)
     from pyeed.aligners import PairwiseAligner
 
     # Get two ProteinInfo objects
-    tem1 = ProteinInfo.from_ncbi("QGC48744.1")
-    tem109 = ProteinInfo.from_ncbi("AAT46413.1")
+    tem1 = ProteinInfo.get_id("QGC48744.1")
+    tem109 = ProteinInfo.get_id("AAT46413.1")
 
     # Create and run alignment
     alignment = PairwiseAlignment([tem1, tem109], aligner=PairwiseAligner, mode="global")
@@ -80,7 +80,7 @@ alignment = Alignment.from_sequences(list_of_sequences)
 
     # Get sequences
     ncbi_accessions = ["QGC48744.1", "AAT46413.1", "AAT46414.1", "AAT46415.1"]
-    sequences = ProteinInfo.from_ncbi(ncbi_accessions)
+    sequences = ProteinInfo.get_ids(ncbi_accessions)
 
     # Create and run alignment
     alignment = Alignment.from_sequences(sequences, aligner=PairwiseAligner, mode="global)
@@ -99,7 +99,7 @@ Most sequence alignment tools are implemented as command line tools, which need 
 
     # Get sequences
     ncbi_accessions = ["QGC48744.1", "AAT46413.1", "AAT46414.1", "AAT46415.1"]
-    sequences = ProteinInfo.from_ncbi(ncbi_accessions)
+    sequences = ProteinInfo.get_ids(ncbi_accessions)
 
     # Create and run alignment
     alignment = Alignment.from_sequences(sequences, aligner=ClustalOmega)
