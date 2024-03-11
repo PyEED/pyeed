@@ -1,3 +1,4 @@
+import os
 import sdRDM
 
 from typing import Optional
@@ -45,5 +46,9 @@ class AbstractSequence(sdRDM.DataModel):
     def _fasta_string(self):
         return f">{self.source_id}\n{self.sequence}"
 
-    def to_fasta(self):
-        return self._fasta_string()
+    def to_fasta(self, outdir: Optional[str] = None):
+        if not outdir:
+            outdir = os.getcwd() + "/" + self.source_id + ".fasta"
+
+        with open(outdir, "w") as f:
+            f.write(self._fasta_string())
