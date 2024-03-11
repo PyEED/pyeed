@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .abstractsequence import AbstractSequence
     from pyeed.containers.abstract_container import AbstractContainer
     from pyeed.aligners.pairwise import PairwiseAligner
+    from pyeed.core import PairwiseAlignment
 
 
 from .standardnumbering import StandardNumbering
@@ -424,7 +425,7 @@ class Alignment(sdRDM.DataModel):
                 "Sequences must be aligned first. Run the align() method first."
             )
 
-        if reference == None:
+        if reference is None:
             reference = self.aligned_sequences[0]
             aligned_sequences = self.aligned_sequences[1:]
 
