@@ -30,7 +30,6 @@ class NCBITaxonomyFetcher(AbstractFetcher):
         self.api_key: str = api_key
         if email is None:
             self.email: str = self.get_substitute_email()
-        self.taxonomy_dicts: List[dict] = None
 
     def fetch(self, cls: "Organism"):
         """
