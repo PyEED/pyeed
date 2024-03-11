@@ -1,10 +1,8 @@
-from typing import Generator, List
-from Bio import Entrez
-from tqdm import tqdm
+from typing import List
 
 from pyeed.core.organism import Organism
-from pyeed.fetchers.abstractfetcher import AbstractFetcher
-from pyeed.fetchers.abstractfetcher import LOGGER
+from pyeed.fetchers.abstractfetcher import AbstractFetcher, LOGGER
+from pyeed.fetchers.entrezrequester import NCBIRequester
 
 
 class NCBITaxonomyFetcher(AbstractFetcher):
@@ -46,51 +44,9 @@ class NCBITaxonomyFetcher(AbstractFetcher):
         Fetches taxonomy data from NCBI and returns a list of dictionaries of the results.
         """
 
-        if isinstance(self.foreign_id, list):
-            self.taxonomy_dicts = self.get_multiple_ids()
-            return self.taxonomy_dicts
-        else:
-            self.taxonomy_dicts = self.get_single_id()
-            return self.taxonomy_dicts
-
-    def make_request(self, request_string: str) -> Generator:
-        """
-        Makes a request to the NCBI taxonomy database and returns the results.
-        """
-
-        Entrez.email = self.email
-        Entrez.api_key = self.api_key
-
-        with Entrez.efetch(
-            db="taxonomy",
-            id=request_string,
-            retmode="xml",
-            api_key=self.api_key,
-        ) as handle:
-            return Entrez.read(handle)
-
-    def get_single_id(self):
-        """Gets a single texonomy entry from NCBI."""
-        return self.make_request(self.foreign_id)
-
-    def get_multiple_ids(self):
-        """
-        Gets multiple taxonomy entries from NCBI. Requests are made in chunks, making the
-        process more reliable.
-        """
-
-        request_chunks = tqdm(
-            self.make_chunks(self.foreign_id, 100),
-            desc=f"f⬇️ Fetching {len(self.foreign_id)} taxonomy entries...",
-        )
-
-        results = []
-        for chunk in request_chunks:
-            request_string = ",".join(map(str, chunk))
-
-            results.extend(self.make_request(request_string))
-
-        return results
+        return NCBIRequester(
+            self.foreign_id, self.email, self.api_key, "xml", "taxonomy"
+        ).make_request()
 
     @staticmethod
     def map(taxonomy_dicts: List[dict], cls: "Organism") -> List["Organism"]:
@@ -141,5 +97,7 @@ if __name__ == "__main__":
     multiple_tax_ids = [9606, "10090", 10116]
 
     mul = NCBITaxonomyFetcher(multiple_tax_ids).fetch(Organism)
+    print(mul[-2])
 
     other = NCBITaxonomyFetcher(single_tax_id).fetch(Organism)
+    print(other[0])
