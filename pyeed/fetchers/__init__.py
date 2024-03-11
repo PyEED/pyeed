@@ -1,3 +1,3 @@
-from .abstractfetcher import AbstractFetcher
+from .abstractfetcher import AbstractFetcher, LOGGER
 from .ncbitaxonomy import NCBITaxonomyFetcher
-from .abstractfetcher import LOGGER
+from .ncbiprotein import NCBIProteinFetcher

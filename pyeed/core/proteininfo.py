@@ -164,8 +164,7 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from ..fetchers import NCBIProteinParser, NCBITaxonomyFetcher
-        from ..ncbi.seq_io import get_ncbi_entry, get_ncbi_taxonomy
+        from pyeed.fetchers import NCBIProteinFetcher, NCBITaxonomyFetcher
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
@@ -181,43 +180,15 @@ class ProteinInfo(AbstractSequence):
             warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
             return cls.get_ids(protein_id)
 
-        seq_record = get_ncbi_entry(
-            accession_id=protein_id, database="protein", retmode="text"
-        )
-        protein = NCBIProteinParser(seq_record).map(cls)
-
-        if protein.organism:
-            tax_record = get_ncbi_taxonomy(protein.organism.taxonomy_id)
-            protein.organism = NCBITaxonomyFetcher(tax_record[0]).map(Organism)
-
-        return protein
+        return
 
     @classmethod
     def get_ids(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
-        from ..ncbi.seq_io import get_ncbi_entrys, get_ncbi_taxonomy
-        from ..fetchers.abstractfetcher import NCBIProteinParser, NCBITaxonomyParser
+        from pyeed.fetchers import NCBIProteinFetcher
 
-        seq_entries = get_ncbi_entrys(
-            accession_ids=accession_ids,
-            database="protein",
-            retmode="text",
-            email=email,
-            api_key=api_key,
-        )
-
-        proteins = [NCBIProteinParser(seq_entry).map(cls) for seq_entry in seq_entries]
-
-        tax_ids = set([protein.organism.taxonomy_id for protein in proteins])
-
-        tax_records = get_ncbi_taxonomy(list(tax_ids), email=email, api_key=api_key)
-
-        for protein in proteins:
-            for tax_record in tax_records:
-
-                if tax_record["TaxId"] == protein.organism.taxonomy_id:
-                    protein.organism = NCBITaxonomyParser(tax_record).map(Organism)
+        proteins = NCBIProteinFetcher(accession_ids, email, api_key).fetch(cls)
 
         return proteins
 

@@ -27,9 +27,12 @@ class NCBITaxonomyFetcher(AbstractFetcher):
     ):
         super().__init__(foreign_id)
 
-        self.api_key: str = api_key
+        self.api_key = api_key
         if email is None:
-            self.email: str = self.get_substitute_email()
+            print("generating substitute email")
+            self.email = self.get_substitute_email()
+        else:
+            self.email = email
 
     def fetch(self, cls: "Organism"):
         """

@@ -17,33 +17,10 @@ def mock_ncbi_get(mocker):
 
 class TestNCBITaxonomyParser:
 
-    def test_make_chunks_single_input(self):
-        single_list = [1]
-        tax_fetcher = NCBITaxonomyFetcher(single_list)
-
-        chunks = tax_fetcher.make_chunks(single_list, 100)
-
-        assert len(chunks) == 1
-        assert len(chunks[0]) == 1
-        assert chunks[0][0] == 1
-
-    def test_make_chunks(self):
-        long_list = list(range(987))
-        tax_fetcher = NCBITaxonomyFetcher(long_list)
-
-        chunks = tax_fetcher.make_chunks(long_list, 100)
-
-        assert len(chunks) == 10
-        assert len(chunks[0]) == 100
-        assert len(chunks[-1]) == 87
-        assert chunks[0][0] == 0
-        assert chunks[-1][-1] == 986
-        assert chunks[0][-1] == 99
-
     def test_map(self, mock_ncbi_get):
         tax_fetcher = NCBITaxonomyFetcher(TAXONOMY_ID)
-        tax_fetcher.taxonomy_dicts = tax_fetcher.get()
-        organisms = tax_fetcher.map(Organism)
+        tax_dict = tax_fetcher.get()
+        organisms = tax_fetcher.map(tax_dict, Organism)
 
         assert len(organisms) == 1
         assert organisms[0].taxonomy_id == "9606"
