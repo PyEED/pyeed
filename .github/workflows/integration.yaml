@@ -1,6 +1,6 @@
 name: Integration Tests (MySQL)
 
-on: [push]
+on: [release]
 
 jobs:
   test:
