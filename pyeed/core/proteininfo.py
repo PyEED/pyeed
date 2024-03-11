@@ -164,7 +164,7 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from ..fetchers.abstractfetcher import NCBIProteinParser, NCBITaxonomyParser
+        from ..fetchers import NCBIProteinParser, NCBITaxonomyFetcher
         from ..ncbi.seq_io import get_ncbi_entry, get_ncbi_taxonomy
 
         """
@@ -188,7 +188,7 @@ class ProteinInfo(AbstractSequence):
 
         if protein.organism:
             tax_record = get_ncbi_taxonomy(protein.organism.taxonomy_id)
-            protein.organism = NCBITaxonomyParser(tax_record[0]).map(Organism)
+            protein.organism = NCBITaxonomyFetcher(tax_record[0]).map(Organism)
 
         return protein
 

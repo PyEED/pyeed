@@ -1,7 +1,7 @@
 import pytest
 import json
 
-from pyeed.fetchers.ncbitaxonomy import NCBITaxonomyParser
+from pyeed.fetchers.ncbitaxonomy import NCBITaxonomyFetcher
 from pyeed.core import Organism
 
 TAXONOMY_ID = 9606
@@ -11,7 +11,7 @@ TAXONOMY_ID = 9606
 def mock_ncbi_get(mocker):
     with open("tests/fixtures/data/ecoli_taxonomy_response.json") as f:
         mock_response = json.load(f)
-    mocker.patch.object(NCBITaxonomyParser, "get", return_value=mock_response)
+    mocker.patch.object(NCBITaxonomyFetcher, "get", return_value=mock_response)
     return mock_response
 
 
@@ -19,7 +19,7 @@ class TestNCBITaxonomyParser:
 
     def test_make_chunks_single_input(self):
         single_list = [1]
-        tax_fetcher = NCBITaxonomyParser(single_list)
+        tax_fetcher = NCBITaxonomyFetcher(single_list)
 
         chunks = tax_fetcher.make_chunks(single_list, 100)
 
@@ -29,7 +29,7 @@ class TestNCBITaxonomyParser:
 
     def test_make_chunks(self):
         long_list = list(range(987))
-        tax_fetcher = NCBITaxonomyParser(long_list)
+        tax_fetcher = NCBITaxonomyFetcher(long_list)
 
         chunks = tax_fetcher.make_chunks(long_list, 100)
 
@@ -41,7 +41,7 @@ class TestNCBITaxonomyParser:
         assert chunks[0][-1] == 99
 
     def test_map(self, mock_ncbi_get):
-        tax_fetcher = NCBITaxonomyParser(TAXONOMY_ID)
+        tax_fetcher = NCBITaxonomyFetcher(TAXONOMY_ID)
         tax_fetcher.taxonomy_dicts = tax_fetcher.get()
         organisms = tax_fetcher.map(Organism)
 
