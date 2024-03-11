@@ -1,0 +1,246 @@
+[
+    {
+        "TaxId": "9606",
+        "ScientificName": "Homo sapiens",
+        "OtherNames": {
+            "Anamorph": [],
+            "Teleomorph": [],
+            "Misnomer": [],
+            "EquivalentName": [],
+            "Synonym": [],
+            "Includes": [],
+            "GenbankSynonym": [],
+            "Name": [
+                {
+                    "ClassCDE": "authority",
+                    "DispName": "Homo sapiens Linnaeus, 1758"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Home sapiens"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sampiens"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapeins"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapian"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapians"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapien"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapience"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapiense"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapients"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo sapines"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo spaiens"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Homo spiens"
+                },
+                {
+                    "ClassCDE": "misspelling",
+                    "DispName": "Humo sapiens"
+                }
+            ],
+            "Misspelling": [],
+            "Inpart": [],
+            "CommonName": [],
+            "Acronym": [],
+            "GenbankAnamorph": [],
+            "GenbankCommonName": "human"
+        },
+        "ParentTaxId": "9605",
+        "Rank": "species",
+        "Division": "Primates",
+        "GeneticCode": {
+            "GCId": "1",
+            "GCName": "Standard"
+        },
+        "MitoGeneticCode": {
+            "MGCId": "2",
+            "MGCName": "Vertebrate Mitochondrial"
+        },
+        "Lineage": "cellular organisms; Eukaryota; Opisthokonta; Metazoa; Eumetazoa; Bilateria; Deuterostomia; Chordata; Craniata; Vertebrata; Gnathostomata; Teleostomi; Euteleostomi; Sarcopterygii; Dipnotetrapodomorpha; Tetrapoda; Amniota; Mammalia; Theria; Eutheria; Boreoeutheria; Euarchontoglires; Primates; Haplorrhini; Simiiformes; Catarrhini; Hominoidea; Hominidae; Homininae; Homo",
+        "LineageEx": [
+            {
+                "TaxId": "131567",
+                "ScientificName": "cellular organisms",
+                "Rank": "no rank"
+            },
+            {
+                "TaxId": "2759",
+                "ScientificName": "Eukaryota",
+                "Rank": "superkingdom"
+            },
+            {
+                "TaxId": "33154",
+                "ScientificName": "Opisthokonta",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "33208",
+                "ScientificName": "Metazoa",
+                "Rank": "kingdom"
+            },
+            {
+                "TaxId": "6072",
+                "ScientificName": "Eumetazoa",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "33213",
+                "ScientificName": "Bilateria",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "33511",
+                "ScientificName": "Deuterostomia",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "7711",
+                "ScientificName": "Chordata",
+                "Rank": "phylum"
+            },
+            {
+                "TaxId": "89593",
+                "ScientificName": "Craniata",
+                "Rank": "subphylum"
+            },
+            {
+                "TaxId": "7742",
+                "ScientificName": "Vertebrata",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "7776",
+                "ScientificName": "Gnathostomata",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "117570",
+                "ScientificName": "Teleostomi",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "117571",
+                "ScientificName": "Euteleostomi",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "8287",
+                "ScientificName": "Sarcopterygii",
+                "Rank": "superclass"
+            },
+            {
+                "TaxId": "1338369",
+                "ScientificName": "Dipnotetrapodomorpha",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "32523",
+                "ScientificName": "Tetrapoda",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "32524",
+                "ScientificName": "Amniota",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "40674",
+                "ScientificName": "Mammalia",
+                "Rank": "class"
+            },
+            {
+                "TaxId": "32525",
+                "ScientificName": "Theria",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "9347",
+                "ScientificName": "Eutheria",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "1437010",
+                "ScientificName": "Boreoeutheria",
+                "Rank": "clade"
+            },
+            {
+                "TaxId": "314146",
+                "ScientificName": "Euarchontoglires",
+                "Rank": "superorder"
+            },
+            {
+                "TaxId": "9443",
+                "ScientificName": "Primates",
+                "Rank": "order"
+            },
+            {
+                "TaxId": "376913",
+                "ScientificName": "Haplorrhini",
+                "Rank": "suborder"
+            },
+            {
+                "TaxId": "314293",
+                "ScientificName": "Simiiformes",
+                "Rank": "infraorder"
+            },
+            {
+                "TaxId": "9526",
+                "ScientificName": "Catarrhini",
+                "Rank": "parvorder"
+            },
+            {
+                "TaxId": "314295",
+                "ScientificName": "Hominoidea",
+                "Rank": "superfamily"
+            },
+            {
+                "TaxId": "9604",
+                "ScientificName": "Hominidae",
+                "Rank": "family"
+            },
+            {
+                "TaxId": "207598",
+                "ScientificName": "Homininae",
+                "Rank": "subfamily"
+            },
+            {
+                "TaxId": "9605",
+                "ScientificName": "Homo",
+                "Rank": "genus"
+            }
+        ],
+        "CreateDate": "1995/02/27 09:24:00",
+        "UpdateDate": "2021/09/24 13:17:40",
+        "PubDate": "1992/05/26 01:00:00"
+    }
+]
