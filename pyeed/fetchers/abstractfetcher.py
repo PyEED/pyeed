@@ -35,6 +35,10 @@ class AbstractFetcher(ABC):
     def map(self, handle: Any, cls):
         pass
 
+    @abstractmethod
+    def fetch(self):
+        pass
+
     @staticmethod
     def get_substitute_email() -> str:
         return f"{secrets.token_hex(8)}@gmail.com"

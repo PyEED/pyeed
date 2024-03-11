@@ -7,42 +7,21 @@ from pyeed.fetchers.abstractfetcher import AbstractFetcher
 from pyeed.fetchers.abstractfetcher import LOGGER
 
 
-class NCBITaxonomyParser(AbstractFetcher):
+class NCBITaxonomyFetcher(AbstractFetcher):
     """
-    ## Summary
-    The `NCBITaxonomyParser` class is a subclass of the `AbstractFetcher` class and is used to fetch taxonomy data from the NCBI database. It provides methods to fetch taxonomy data for a single ID or multiple IDs in chunks. The fetched data is then mapped to an instance of the `Organism` class.
+    The `NCBITaxonomyFetcher` class is a subclass of the `AbstractFetcher` class and is used
+    to fetch taxonomy data from the NCBI database.
+    It provides methods to fetch taxonomy data for a single ID or multiple IDs in chunks.
+    The fetched data is then mapped to an instance of the `Organism` class.
 
-    ## Example Usage
-    ```python
-    # Create an instance of NCBITaxonomyParser
-    parser = NCBITaxonomyParser(["9606", 10090"], email="example@gmail.com", api_key="API_KEY")
+    Example Usage:
+        ```py
+        # Create an instance of NCBITaxonomyParser
+        fetcher = NCBITaxonomyFetcher(foreign_id=[9606, 10090], email="example@gmail.com", api_key="API_KEY")
 
-    # Fetch taxonomy data for multiple IDs
-    results = parser.get()
-
-    # Map the fetched data to Organism instances
-    organisms = [parser.map(Organism) for result in results]
-    ```
-
-    ## Code Analysis
-    ### Main functionalities
-    - Fetch taxonomy data from the NCBI database for a single ID or multiple IDs
-    - Split the request for multiple IDs into chunks for more reliable processing
-    - Map the fetched data to instances of the `Organism` class
-    ___
-    ### Methods
-    - `__init__(self, foreign_id: List[str], email: str = None, api_key: str = None)`: Initializes the `NCBITaxonomyParser` instance with the provided foreign IDs, email, and API key.
-    - `get(self)`: Fetches taxonomy data from the NCBI database and returns a list of dictionaries containing the results.
-    - `make_request(self, request_string: str) -> Generator`: Makes a request to the NCBI taxonomy database and returns the results as a generator.
-    - `get_single_id(self)`: Gets a single taxonomy entry from NCBI.
-    - `get_multiple_ids(self)`: Gets multiple taxonomy entries from NCBI by making requests in chunks.
-    - `map(self, cls: "Organism")`: Maps the fetched taxonomy data to an instance of the `Organism` class.
-    ___
-    ### Fields
-    - `foreign_id: List[str]`: A list of foreign IDs for which taxonomy data needs to be fetched.
-    - `email: str`: The email address to be used for making requests to the NCBI database. If not provided, a substitute email is generated.
-    - `api_key: str`: The API key to be used for making requests to the NCBI database.
-    ___
+        # Fetch taxonomy data for multiple IDs
+        results = fetcher.fetch(Organism)
+        ```
     """
 
     def __init__(
@@ -54,6 +33,13 @@ class NCBITaxonomyParser(AbstractFetcher):
         if email is None:
             self.email: str = self.get_substitute_email()
         self.taxonomy_dicts: List[dict] = None
+
+    def fetch(self, cls: "Organism"):
+        """
+        Fetches taxonomy data from NCBI and returns a list of instances of the 'Organism' class.
+        """
+        tax_dicts = self.get()
+        return self.map(tax_dicts, cls)
 
     def get(self) -> List[dict]:
         """
@@ -100,16 +86,17 @@ class NCBITaxonomyParser(AbstractFetcher):
 
         results = []
         for chunk in request_chunks:
-            request_string = ",".join(str(chunk))
+            request_string = ",".join(map(str, chunk))
 
             results.extend(self.make_request(request_string))
 
         return results
 
-    def map(self, cls: "Organism"):
+    @staticmethod
+    def map(taxonomy_dicts: List[dict], cls: "Organism") -> List["Organism"]:
 
         organisms = []
-        for taxonomy_dict in self.taxonomy_dicts:
+        for taxonomy_dict in taxonomy_dicts:
             tax_id = taxonomy_dict.get("TaxId")
             organism = cls(taxonomy_id=tax_id)
 
@@ -150,9 +137,9 @@ class NCBITaxonomyParser(AbstractFetcher):
 if __name__ == "__main__":
     from pyeed.core import Organism
 
-    single_tax_id = 9606
-    multiple_tax_ids = [9606, 10090, 10116]
+    single_tax_id = "9606"
+    multiple_tax_ids = [9606, "10090", 10116]
 
-    mul = NCBITaxonomyParser(multiple_tax_ids).map(Organism)
+    mul = NCBITaxonomyFetcher(multiple_tax_ids).fetch(Organism)
 
-    other = NCBITaxonomyParser(single_tax_id).map(Organism)
+    other = NCBITaxonomyFetcher(single_tax_id).fetch(Organism)
