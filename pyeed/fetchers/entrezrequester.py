@@ -1,6 +1,8 @@
 from typing import List
 from Bio import Entrez, SeqIO
+from requests import HTTPError
 from tqdm import tqdm
+from pyeed.fetchers import LOGGER
 
 
 class NCBIRequester:
@@ -22,7 +24,7 @@ class NCBIRequester:
         self.retmode = retmode
         self.db = db
         self.chunk_size = chunk_size
-        self._is_multiple: bool = isinstance(foreign_id, list)
+        self._is_multiple: bool = self._check_is_multiple()
 
     @staticmethod
     def _construct_request_string(request_list: list) -> str:
@@ -31,6 +33,17 @@ class NCBIRequester:
         """
         return ",".join(map(str, request_list))
 
+    def _check_is_multiple(self) -> bool:
+        """
+        Checks if the foreign_id attribute is a list.
+        """
+        if isinstance(self.foreign_id, list):
+            if len(self.foreign_id) == 1:
+                self.foreign_id = self.foreign_id[0]
+                return False
+            return True
+        return False
+
     def make_request(self) -> List:
         """
         Makes a request to the NCBI taxonomy database and returns the response.
@@ -38,12 +51,9 @@ class NCBIRequester:
 
         if self._is_multiple:
             sequence_results = []
-            request_chunks = tqdm(
-                self.make_chunks(self.foreign_id, self.chunk_size),
-                desc=f"f⬇️ Fetching {len(self.foreign_id)} {self.db} entries for NCBI...",
-            )
+            print(f"⬇️ Fetching {len(self.foreign_id)} {self.db} entries for NCBI...")
 
-            for chunk in request_chunks:
+            for chunk in self.make_chunks(self.foreign_id, self.chunk_size):
                 sequence_results.extend(
                     self.fetch(self._construct_request_string(chunk))
                 )
@@ -57,23 +67,28 @@ class NCBIRequester:
         """
         Fetches data from NCBI using the Entrez.efetch method.
         """
+        LOGGER.debug(f"Fetching {self.db} data from NCBI for {request_string}...")
 
-        Entrez.email = self.email
-        Entrez.api_key = self.api_key
-        with Entrez.efetch(
-            db=self.db,
-            id=request_string,
-            retmode=self.retmode,
-            rettype=self.rettype,
-        ) as handle:
-            if self.rettype == "genbank":
-                results = []
-                for record in SeqIO.parse(handle, "genbank"):
-                    results.append(record)
-                return results
+        try:
+            Entrez.email = self.email
+            Entrez.api_key = self.api_key
+            with Entrez.efetch(
+                db=self.db,
+                id=request_string,
+                retmode=self.retmode,
+                rettype=self.rettype,
+            ) as handle:
+                if self.rettype == "genbank":
+                    results = []
+                    for record in SeqIO.parse(handle, "genbank"):
+                        results.append(record)
+                    return results
 
-            else:
-                return Entrez.read(handle)
+                else:
+                    return Entrez.read(handle)
+        except HTTPError() as e:
+            LOGGER.error(f"Error fetching data from NCBI: {e}")
+            return self.fetch(request_string)
 
     @staticmethod
     def make_chunks(input_list: list, chunk_size: int = 100) -> List[list]:

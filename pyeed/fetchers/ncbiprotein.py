@@ -136,7 +136,7 @@ class NCBIProteinFetcher(AbstractFetcher):
         protein = self.get_feature(seq_record, "Protein")
         if len(protein) == 0:
             LOGGER.debug(
-                f"No protein feature found for {seq_record.id}: {self.source.features}"
+                f"No protein feature found for {seq_record.id}: {seq_record.features}"
             )
 
             return protein_info
@@ -220,7 +220,7 @@ class NCBIProteinFetcher(AbstractFetcher):
                     cross_ref=site.qualifiers["db_xref"][0],
                 )
             except KeyError:
-                LOGGER.warning(
+                LOGGER.debug(
                     f"Incomplete site data found for {seq_record.id}: {site.qualifiers}, skipping site"
                 )
 
