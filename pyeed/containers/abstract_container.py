@@ -25,6 +25,7 @@ logger = logging.getLogger("pyeed")
 class ToolImage(Enum):
     CLUSTALO = "biocontainers/clustal-omega:v1.2.1_cv5"
     BLAST = "haeussma/blast:latest"
+    MMSEQS2 = "soedinglab/mmseqs2:master"
 
 
 class AbstractContainer(BaseModel, ABC):

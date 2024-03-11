@@ -22,7 +22,7 @@ A `SequenceNetwork` is created using a list of `PairwiseAlignment` objects, and 
         "WP_048165429.1",
         "ACS90033.1",
     ]
-    mats = ProteinInfo.from_ncbi(mat_accessions)
+    mats = ProteinInfo.get_ids(mat_accessions)
 
     # Create pairwise alignments between all sequences
     alignments = Alignment.from_sequences(mats, aligner=PairwiseAligner)
@@ -59,7 +59,7 @@ A `SequenceNetwork` is created using a list of `PairwiseAlignment` objects, and 
         "WP_048165429.1",
         "ACS90033.1",
     ]
-    mats = ProteinInfo.from_ncbi(mat_accessions)
+    mats = ProteinInfo.get_ids(mat_accessions)
 
     # Create pairwise alignments between all sequences
     alignments = Alignment.from_sequences(mats, aligner=PairwiseAligner)

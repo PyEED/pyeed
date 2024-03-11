@@ -64,7 +64,9 @@ class DNAInfo(sdRDM.DataModel):
     def from_ncbi(cls, accession_id: str) -> "DNAInfo":
         from pyeed.ncbi.seq_io import get_ncbi_entry, _seqio_to_dna_info
 
-        seq_record = get_ncbi_entry(accession_id=accession_id, database="nucleotide")
+        seq_record = get_ncbi_entry(
+            accession_id=accession_id, database="nucleotide", retmode="text"
+        )
         return _seqio_to_dna_info(cls, seq_record)
 
     # def extract_nucleotide_seq(self, dna_region: DNARegion):
