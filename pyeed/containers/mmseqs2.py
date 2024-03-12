@@ -23,7 +23,7 @@ class MMSeqs2(AbstractContainer):
     protein sequence sets.
 
     ## Attributes:
-        min_seq_id (float): Minimum sequence identity threshold for clustering. Value
+        identity (float): Minimum sequence identity threshold for clustering. Value
             should be between 0 and 1. Default is 0.
         coverage (float): Minimum fraction of aligned (covered) residues to consider a
             match. Value should be between 0 and 1. Default is 0.8.
@@ -53,14 +53,14 @@ class MMSeqs2(AbstractContainer):
         description="Search mode",
         default="easy-cluster",
     )
-    min_seq_id: float = Field(
-        description="List matches above this sequence identity (for clustering)",
+    identity: float = Field(
+        description="Minimum sequence identity threshold for clustering",
         default=0,
         ge=0,
         le=1,
     )
     coverage: float = Field(
-        description="List matches above this fraction of aligned (covered) residues",
+        description="Minimum fraction of aligned (covered) residues to consider a match",
         default=0.8,
         gt=0,
         le=1,
@@ -137,7 +137,7 @@ class MMSeqs2(AbstractContainer):
             print("🏃 Clustering sequences with MMSeqs2...")
             print(f"╭── initial sequences: {data.count('>')}")
             print(f"├── min. coverage: {int(self.coverage*100)} %")
-            print(f"╰── min. sequence identity: {int(self.min_seq_id*100)} %")
+            print(f"╰── min. sequence identity: {int(self.identity*100)} %")
 
             logger.debug(f"🏃 Running {self._container_info.name}")
             self._client.containers.run(
@@ -153,25 +153,23 @@ class MMSeqs2(AbstractContainer):
             # output = container.attach(stdout=True, stream=True, logs=True)
             # Set detatch True to access stream
 
-            print("🎉 Clustering completed")
-
             return self.extract_output_data()
 
         except Exception as e:
             logger.error(f"Error running {self._container_info} container: {e}")
 
-    def setup_command(self):
+    def setup_command(self, mode: str):
         """Sets up the command to run the MMSeqs2 container."""
 
         command = (
             "mmseqs "
-            f"{self.mode} "
+            f"{mode} "
             f"/app/input.fasta "
             f"/app/result "
             f"temp "
             f"-c {self.coverage} "
             f"--cov-mode {self.cov_mode} "
-            f"--min-seq-id {self.min_seq_id} "
+            f"--min-seq-id {self.identity} "
             f"--alignment-mode {self.alignment_mode} "
             f"--alignment-output-mode {self.alignment_output_mode} "
             f"--cluster-mode {self.cluster_mode} "
@@ -179,22 +177,35 @@ class MMSeqs2(AbstractContainer):
 
         return command
 
-    def cluster(self, sequences: List[AbstractSequence]) -> List[AbstractSequence]:
-        """Clusters a list of sequences using MMSeqs2.
+    @classmethod
+    def easy_cluster(
+        cls,
+        sequences: List[AbstractSequence],
+        identity: float = 0,
+        coverage: float = 0.8,
+        cov_mode: int = 0,
+        alignment_mode: int = 3,
+        alignment_output_mode: int = 0,
+        cluster_mode: int = 0,
+    ) -> List[AbstractSequence]:
 
-        Args:
-            sequences (List[AbstractSequence]): `ProteinInfo` or `DNAInfo` objects to be clustered.
+        mode = "easy-cluster"
+        instance = cls(
+            identity=identity,
+            coverage=coverage,
+            cov_mode=cov_mode,
+            alignment_mode=alignment_mode,
+            alignment_output_mode=alignment_output_mode,
+            cluster_mode=cluster_mode,
+        )
 
-        Returns:
-            List[AbstractSequence]: Representatives of the clusters.
-        """
+        command = instance.setup_command(mode)
 
         multifasta = "\n".join(
             [f">{seq.source_id}\n{seq.sequence}" for seq in sequences]
         )
 
-        result = self.run_container(self.setup_command(), multifasta)
-        print()
+        result = instance.run_container(command, multifasta)
 
         ids = re.findall(r">([A-Z0-9\.]+) ", result["representatives"])
 
@@ -208,5 +219,11 @@ class MMSeqs2(AbstractContainer):
         with open(f"{self._tempdir_path}/result_cluster.tsv") as f:
             results["cluster"] = f.read()
 
+        n_clusters = results["representatives"].count(">")
+
         self._delete_temp_dir()
+        print(
+            f"🎉 Clustered intitial sequences in {n_clusters} representative sequences"
+        )
+
         return results
