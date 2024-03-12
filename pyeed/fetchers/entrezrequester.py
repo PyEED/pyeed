@@ -1,3 +1,4 @@
+import time
 from typing import List, Union
 from Bio import Entrez, SeqIO
 from requests import HTTPError
@@ -50,7 +51,7 @@ class NCBIRequester:
 
         if self._is_multiple:
             sequence_results = []
-            print(f"⬇️ Fetching {len(self.foreign_id)} {self.db} entries for NCBI...")
+            print(f"⬇️ Fetching {len(self.foreign_id)} {self.db} entries from NCBI...")
 
             for chunk in self.make_chunks(self.foreign_id, self.chunk_size):
                 sequence_results.extend(
@@ -62,32 +63,43 @@ class NCBIRequester:
         else:
             return self.fetch(self.foreign_id)
 
-    def fetch(self, request_string: str) -> List[dict]:
+    def fetch(
+        self, request_string: str, attempts: int = 3, delay: int = 5
+    ) -> List[dict]:
         """
         Fetches data from NCBI using the Entrez.efetch method.
         """
         LOGGER.debug(f"Fetching {self.db} data from NCBI for {request_string}...")
+        for attempt in range(attempts):
 
-        try:
-            Entrez.email = self.email
-            Entrez.api_key = self.api_key
-            with Entrez.efetch(
-                db=self.db,
-                id=request_string,
-                retmode=self.retmode,
-                rettype=self.rettype,
-            ) as handle:
-                if self.rettype == "genbank":
-                    results = []
-                    for record in SeqIO.parse(handle, "genbank"):
-                        results.append(record)
-                    return results
+            try:
+                Entrez.email = self.email
+                Entrez.api_key = self.api_key
+                with Entrez.efetch(
+                    db=self.db,
+                    id=request_string,
+                    retmode=self.retmode,
+                    rettype=self.rettype,
+                ) as handle:
+                    if self.rettype == "genbank":
+                        results = []
+                        for record in SeqIO.parse(handle, "genbank"):
+                            results.append(record)
+                        return results
 
+                    else:
+                        return Entrez.read(handle)
+            except HTTPError as e:
+                print(
+                    f"Attempt {attempt + 1} of {attempts} failed: Error fetching data from NCBI: {e}"
+                )
+                LOGGER.error(
+                    f"Attempt {attempt + 1} of {attempts} failed: Error fetching data from NCBI: {e}"
+                )
+                if attempt < attempts:
+                    time.sleep(delay)
                 else:
-                    return Entrez.read(handle)
-        except HTTPError() as e:
-            LOGGER.error(f"Error fetching data from NCBI: {e}")
-            return self.fetch(request_string)
+                    raise
 
     @staticmethod
     def make_chunks(input_list: list, chunk_size: int = 100) -> List[list]:
