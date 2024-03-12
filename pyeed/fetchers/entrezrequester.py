@@ -1,7 +1,8 @@
+from http.client import IncompleteRead
 import time
 from typing import List, Union
 from Bio import Entrez, SeqIO
-from requests import HTTPError
+from urllib.error import HTTPError
 from pyeed.fetchers import LOGGER
 
 
@@ -89,7 +90,7 @@ class NCBIRequester:
 
                     else:
                         return Entrez.read(handle)
-            except HTTPError as e:
+            except (HTTPError, IncompleteRead) as e:
                 print(
                     f"Attempt {attempt + 1} of {attempts} failed: Error fetching data from NCBI: {e}"
                 )
