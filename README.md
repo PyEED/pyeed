@@ -58,4 +58,4 @@ use the build-in tools, and store sequence data in databases.
 - [x] Network analysis / visualization
 - [ ] Create phylogenetic trees
 - [x] Multi-sequence alignments
-- [ ] Representative clustering
+- [x] Representative clustering
