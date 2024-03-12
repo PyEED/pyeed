@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Union
 from pyeed.fetchers import AbstractFetcher, LOGGER, NCBITaxonomyFetcher
 from pyeed.fetchers.entrezrequester import NCBIRequester
 
@@ -22,7 +22,7 @@ class NCBIProteinFetcher(AbstractFetcher):
     """
 
     def __init__(
-        self, foreign_id: int | List[int], email: str = None, api_key: str = None
+        self, foreign_id: Union[int, List[int]], email: str = None, api_key: str = None
     ):
         super().__init__(foreign_id)
 
