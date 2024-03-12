@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from pyeed.core.organism import Organism
 from pyeed.fetchers.abstractfetcher import AbstractFetcher, LOGGER
@@ -23,7 +23,7 @@ class NCBITaxonomyFetcher(AbstractFetcher):
     """
 
     def __init__(
-        self, foreign_id: int | List[int], email: str = None, api_key: str = None
+        self, foreign_id: Union[int, List[int]], email: str = None, api_key: str = None
     ):
         super().__init__(foreign_id)
 

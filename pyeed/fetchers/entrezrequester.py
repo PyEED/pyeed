@@ -1,7 +1,6 @@
-from typing import List
+from typing import List, Union
 from Bio import Entrez, SeqIO
 from requests import HTTPError
-from tqdm import tqdm
 from pyeed.fetchers import LOGGER
 
 
@@ -9,7 +8,7 @@ class NCBIRequester:
 
     def __init__(
         self,
-        foreign_id: int | List[int],
+        foreign_id: Union[int, List[int]],
         email: str,
         api_key: str,
         retmode: str,
