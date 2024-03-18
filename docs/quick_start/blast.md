@@ -10,7 +10,7 @@ from pyEED.core import ProteinInfo
 protein = ProteinInfo.get_id("UCS38941.1")
 
 # Perform a BLAST search
-blast_results = protein.ncbi_blast()
+blast_results = protein.ncbi_blastp()
 ```
 !!! info "NCBI BLAST performance"
 
@@ -31,3 +31,4 @@ Building a local BLAST database is a good way to speed up BLAST searches. PyEED 
         e_value=0.001,
         word_size=3,
     )
+```

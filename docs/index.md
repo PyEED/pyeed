@@ -2,7 +2,7 @@
 
 !!! warning "API under construction 🏗️"
 
-    The API is currently under construction and is subject to change. Check out the current [development status](##Installation)
+    The API is currently under construction and is subject to change.
 
 ## What is PyEED?
 
