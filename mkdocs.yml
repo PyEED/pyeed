@@ -14,8 +14,8 @@ nav:
     - Aligning Sequences: quick_start/alignments.md
     - Clustering Sequences: quick_start/clustering.md
     - Creating Sequence Networks: quick_start/networks.md
-  #- 🔎 Use cases:
-  #  - Get an Overview over a Protein Family: usecases/usecase1.md
+  - 🔎 Examples:
+    - Create a sequence network: usecases/usecase1.md
   - ⬇️ Installation:
     - via PIP: installation/via_pip.md
     - Docker: installation/docker.md
@@ -64,6 +64,7 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - admonition
+  - pymdownx.keys
   - pymdownx.details
   - pymdownx.inlinehilite
   - pymdownx.snippets
