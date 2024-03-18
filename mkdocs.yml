@@ -14,11 +14,13 @@ nav:
     - Aligning Sequences: quick_start/alignments.md
     - Clustering Sequences: quick_start/clustering.md
     - Creating Sequence Networks: quick_start/networks.md
-  - 🔎 Use cases:
-    - Get an Overview over a Protein Family: usecases/usecase1.md
+  #- 🔎 Use cases:
+  #  - Get an Overview over a Protein Family: usecases/usecase1.md
   - ⬇️ Installation:
-    - Install PyEED: installation/install_pyeed.md
-    - Setup Local BLAST database: installation/setup_local_blast.md
+    - via PIP: installation/via_pip.md
+    - Docker: installation/docker.md
+    - JupyterLab with PyEED: installation/jupyterlab.md
+    # - Local BLAST: installation/setup_local_blast.md
 
 
 theme:
