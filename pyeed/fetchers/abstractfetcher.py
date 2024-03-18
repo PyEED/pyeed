@@ -6,9 +6,11 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 
-path_config = Path(__file__).parent.parent.parent / "logging.conf"
-logging.config.fileConfig(path_config)
-LOGGER = logging.getLogger("pyeed")
+# path_config = Path(__file__).parent.parent.parent / "logging.conf"
+# logging.config.fileConfig(path_config)
+# LOGGER = logging.getLogger("pyeed")
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AbstractFetcher(ABC):

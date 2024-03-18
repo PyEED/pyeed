@@ -17,9 +17,11 @@ from docker.models.containers import Container
 from docker.models.images import Image
 from docker.errors import DockerException
 
-path_config = Path(__file__).parent.parent.parent / "logging.conf"
-logging.config.fileConfig(path_config)
-logger = logging.getLogger("pyeed")
+# path_config = Path(__file__).parent.parent.parent / "logging.conf"
+# logging.config.fileConfig(path_config)
+# logger = logging.getLogger("pyeed")
+
+logger = logging.getLogger(__name__)
 
 
 class ToolImage(Enum):
