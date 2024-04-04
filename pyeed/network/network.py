@@ -1,19 +1,27 @@
-from typing import List, Optional
+import pandas as pd
+from tqdm import tqdm
 import networkx as nx
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
+from typing import List, Optional
+from itertools import combinations
 from pydantic import BaseModel, Field
+from Bio.Align import Alignment as BioAlignment
+from joblib import Parallel, delayed, cpu_count
+from typing import List, Optional, Union, Tuple, TYPE_CHECKING
 
+from pyeed.core.sequence import Sequence
 from pyeed.core.abstractsequence import AbstractSequence
 from pyeed.core.pairwisealignment import PairwiseAlignment
 from pyeed.core.proteininfo import ProteinInfo
+from pyeed.aligners.pairwise import PairwiseAligner
 
 
 class SequenceNetwork(BaseModel):
     """
     A class representing a sequence network.
 
-    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of AbstractSequence objects and a list of PairwiseAlignment objects as input. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
+    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of AbstractSequence objects. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
 
     Attributes:
         sequences (Optional[List[AbstractSequence]]): A list of AbstractSequence objects to be compared in the network. Default is an empty list.
@@ -32,11 +40,6 @@ class SequenceNetwork(BaseModel):
     sequences: Optional[List[AbstractSequence]] = Field(
         default=[],
         description="List of sequences to be compared",
-    )
-
-    pairwise_alignments: Optional[List[PairwiseAlignment]] = Field(
-        default=[],
-        description="List of pairwise alignments",
     )
 
     weight: Optional[str] = Field(
@@ -68,10 +71,112 @@ class SequenceNetwork(BaseModel):
         default=[],
         description="List of selected sequences",
     )
+    
+
+    def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
+        super().__init__()
+        self._alignments = self._create_pairwise_alignments()
+
 
     def add_target(self, target: AbstractSequence):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
+
+
+    def _map_pairwise_alignment_results(self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str) -> "pd.DataFrame":
+        """
+        Maps the results of pairwise alignments to a dataframe.
+
+        Args:
+            alignment_result (BioAlignment): The result of the pairwise alignment.
+            pair (Tuple[Sequence, Sequence]): The pair of sequences being aligned.
+            mode (str): The mode of the pairwise alignment.
+
+        Returns:
+            PairwiseAlignmentDataFrame: A dataframe with the alignment results.
+        """
+        df = pd.DataFrame(
+            {
+                "source_id": pair[0].source_id,
+                "target_id": pair[1].source_id,
+                "score": alignment_result.score,
+                "identity": alignment_result.identity,
+                "similarity": alignment_result.similarity,
+                "gaps": alignment_result.gaps,
+                "mismatches": alignment_result.mismatches,
+                "mode": mode,
+            },
+            index=[0],
+        )
+        return df
+
+    def _create_pairwise_alignments(self, aligner: "PairwiseAligner", **kwargs):
+        """
+        Creates pairwise alignments between sequences. And writes the aligments in the right dataframe structure. This structure is later used in cytoscope to build the graph.
+
+        This method creates pairwise alignments between sequences in the network.
+        The pairwise alignments are stored in the 'pairwise_alignments' attribute of the SequenceNetwork object.
+        This is done for the later visualization of the network graph with cytoscope.
+
+        Args:
+            aligner (PairwiseAligner): Python-based aligner to be called.
+
+        Raises:
+            ValueError: If the number of sequences is less than 2.
+
+        Returns:
+            Dataframe with the aligments
+        """
+
+        # Pairwise alignment
+        if len(self.input_sequences) == 2:
+
+            pairwise_aligner = aligner(
+                sequences=[
+                    self.input_sequences[0].sequence,
+                    self.input_sequences[1].sequence,
+                ],
+                **kwargs,
+            )
+            alignment_result = pairwise_aligner.align()
+            self.method = pairwise_aligner.mode
+
+            return self._map_pairwise_alignment_results(
+                alignment_result,
+                pair=(
+                    self.input_sequences[0],
+                    self.input_sequences[1],
+                ),
+                mode=pairwise_aligner.mode,
+            )
+
+        # Multi pairwise alignment
+        elif len(self.input_sequences) > 2:
+            pairs = list(combinations(self.input_sequences, 2))
+
+            aligners = [
+                aligner(sequences=[s.sequence for s in pair], **kwargs)
+                for pair in pairs
+            ]
+
+            alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
+                delayed(a.align)()
+                for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
+            )
+
+            df_alignment = None
+            for alignment, pair in zip(alignments, pairs):
+                if df_alignment is None:
+                    df_alignment = self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode)
+                else:
+                    df_alignment = pd.concat(self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode), df_alignment)
+
+            return df_alignment
+
+        else:
+            raise ValueError(
+                f"Alignment Error. Recieved {len(self.input_sequences)} sequences. Expected 2."
+            )        
 
     @property
     def graph(self) -> nx.Graph:
