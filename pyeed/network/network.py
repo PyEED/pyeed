@@ -71,11 +71,65 @@ class SequenceNetwork(BaseModel):
         default=[],
         description="List of selected sequences",
     )
+
+    ### Alignment results they will need to be stored, but can't be in a pd.DataFrame, therefore here we go with fieilds
+    """
+    "source_id": pair[0].source_id,
+    "target_id": pair[1].source_id,
+    "score": alignment_result.score,
+    "identity": identity,
+    "similarity": alignment_result.similarity,
+    "gaps": alignment_result.gaps,
+    "mismatches": alignment_result.mismatches,
+    "mode": mode,
+    """
+    source_ids: Optional[List[str]] = Field(
+        default=[],
+        description="Source sequence IDs",
+    )
+
+    target_ids: Optional[List[str]] = Field(
+        default=[],
+        description="Target sequence IDs",
+    )
+
+    scores: Optional[List[float]] = Field(
+        default=[],
+        description="Alignment scores",
+    )
+
+    identities: Optional[List[float]] = Field(
+        default=[],
+        description="Alignment identities",
+    )
+
+    gaps: Optional[List[int]] = Field(
+        default=[],
+        description="Alignment gaps",
+    )
+
+    mismatches: Optional[List[int]] = Field(  
+        default=[],
+        description="Alignment mismatches",
+    )
     
+    mode: Optional[str] = Field(
+        default=None,
+        description="Mode of the pairwise alignment",
+    )
+
+    ###### End of alignment results  defintion
+
+    shorter_seq: Optional[int] = Field(
+        default=None,
+        description="Shorter sequence in the network",
+    )
+
 
     def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
         super().__init__()
-        self._alignments = self._create_pairwise_alignments()
+        self.shorter_seq = None
+        self._create_pairwise_alignments(sequences, aligner=PairwiseAligner, mode="global")
 
 
     def add_target(self, target: AbstractSequence):
@@ -83,9 +137,9 @@ class SequenceNetwork(BaseModel):
             self.targets.append(target.source_id)
 
 
-    def _map_pairwise_alignment_results(self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str) -> "pd.DataFrame":
+    def _map_pairwise_alignment_results(self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str):
         """
-        Maps the results of pairwise alignments to a dataframe.
+        Maps the results of pairwise alignments to internal fields.
 
         Args:
             alignment_result (BioAlignment): The result of the pairwise alignment.
@@ -93,24 +147,22 @@ class SequenceNetwork(BaseModel):
             mode (str): The mode of the pairwise alignment.
 
         Returns:
-            PairwiseAlignmentDataFrame: A dataframe with the alignment results.
+            None
         """
-        df = pd.DataFrame(
-            {
-                "source_id": pair[0].source_id,
-                "target_id": pair[1].source_id,
-                "score": alignment_result.score,
-                "identity": alignment_result.identity,
-                "similarity": alignment_result.similarity,
-                "gaps": alignment_result.gaps,
-                "mismatches": alignment_result.mismatches,
-                "mode": mode,
-            },
-            index=[0],
-        )
-        return df
 
-    def _create_pairwise_alignments(self, aligner: "PairwiseAligner", **kwargs):
+        identities = alignment_result.counts().identities
+        identity = identities / len(self.shorter_seq.sequence)
+
+        self.source_ids.append(pair[0].source_id)
+        self.target_ids.append(pair[1].source_id)
+        self.scores.append(alignment_result.score)
+        self.identities.append(identity)
+        # self.similarities.append(alignment_result.similarity)
+        self.gaps.append(alignment_result.counts().gaps)
+        self.mismatches.append(alignment_result.counts().mismatches)
+
+
+    def _create_pairwise_alignments(self, input_sequences, aligner: "PairwiseAligner", **kwargs):
         """
         Creates pairwise alignments between sequences. And writes the aligments in the right dataframe structure. This structure is later used in cytoscope to build the graph.
 
@@ -125,34 +177,36 @@ class SequenceNetwork(BaseModel):
             ValueError: If the number of sequences is less than 2.
 
         Returns:
-            Dataframe with the aligments
+            Nothing the data is stored internally in fields of the class.
         """
+        # this is later used as a normaliztion factor in the idetnty entry in the dataframe
+        self.shorter_seq = min(input_sequences, key=lambda x: len(x.sequence))
 
         # Pairwise alignment
-        if len(self.input_sequences) == 2:
+        if len(input_sequences) == 2:
 
             pairwise_aligner = aligner(
                 sequences=[
-                    self.input_sequences[0].sequence,
-                    self.input_sequences[1].sequence,
+                    input_sequences[0].sequence,
+                    input_sequences[1].sequence,
                 ],
                 **kwargs,
             )
             alignment_result = pairwise_aligner.align()
-            self.method = pairwise_aligner.mode
+            self.mode = pairwise_aligner.mode
 
             return self._map_pairwise_alignment_results(
                 alignment_result,
                 pair=(
-                    self.input_sequences[0],
-                    self.input_sequences[1],
+                    input_sequences[0],
+                    input_sequences[1],
                 ),
                 mode=pairwise_aligner.mode,
             )
 
         # Multi pairwise alignment
-        elif len(self.input_sequences) > 2:
-            pairs = list(combinations(self.input_sequences, 2))
+        elif len(input_sequences) > 2:
+            pairs = list(combinations(input_sequences, 2))
 
             aligners = [
                 aligner(sequences=[s.sequence for s in pair], **kwargs)
@@ -164,14 +218,8 @@ class SequenceNetwork(BaseModel):
                 for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
             )
 
-            df_alignment = None
             for alignment, pair in zip(alignments, pairs):
-                if df_alignment is None:
-                    df_alignment = self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode)
-                else:
-                    df_alignment = pd.concat(self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode), df_alignment)
-
-            return df_alignment
+                self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode)
 
         else:
             raise ValueError(
