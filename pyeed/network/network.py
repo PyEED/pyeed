@@ -72,99 +72,18 @@ class SequenceNetwork(BaseModel):
         description="List of selected sequences",
     )
 
-    ### Alignment results they will need to be stored, but can't be in a pd.DataFrame, therefore here we go with fieilds
-    """
-    "source_id": pair[0].source_id,
-    "target_id": pair[1].source_id,
-    "score": alignment_result.score,
-    "identity": identity,
-    "similarity": alignment_result.similarity,
-    "gaps": alignment_result.gaps,
-    "mismatches": alignment_result.mismatches,
-    "mode": mode,
-    """
-    source_ids: Optional[List[str]] = Field(
-        default=[],
-        description="Source sequence IDs",
-    )
-
-    target_ids: Optional[List[str]] = Field(
-        default=[],
-        description="Target sequence IDs",
-    )
-
-    scores: Optional[List[float]] = Field(
-        default=[],
-        description="Alignment scores",
-    )
-
-    identities: Optional[List[float]] = Field(
-        default=[],
-        description="Alignment identities",
-    )
-
-    gaps: Optional[List[int]] = Field(
-        default=[],
-        description="Alignment gaps",
-    )
-
-    mismatches: Optional[List[int]] = Field(  
-        default=[],
-        description="Alignment mismatches",
-    )
-    
-    mode: Optional[str] = Field(
-        default=None,
-        description="Mode of the pairwise alignment",
-    )
-
-    ###### End of alignment results  defintion
-
-    shorter_seq: Optional[int] = Field(
-        default=None,
-        description="Shorter sequence in the network",
-    )
-
-
     def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
         super().__init__()
-        self.shorter_seq = None
-        self._create_pairwise_alignments(sequences, aligner=PairwiseAligner, mode="global")
+        self.sequences = sequences
 
 
     def add_target(self, target: AbstractSequence):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
-
-    def _map_pairwise_alignment_results(self, alignment_result: BioAlignment, pair: Tuple[Sequence, Sequence], mode: str):
-        """
-        Maps the results of pairwise alignments to internal fields.
-
-        Args:
-            alignment_result (BioAlignment): The result of the pairwise alignment.
-            pair (Tuple[Sequence, Sequence]): The pair of sequences being aligned.
-            mode (str): The mode of the pairwise alignment.
-
-        Returns:
-            None
-        """
-
-        identities = alignment_result.counts().identities
-        identity = identities / len(self.shorter_seq.sequence)
-
-        self.source_ids.append(pair[0].source_id)
-        self.target_ids.append(pair[1].source_id)
-        self.scores.append(alignment_result.score)
-        self.identities.append(identity)
-        # self.similarities.append(alignment_result.similarity)
-        self.gaps.append(alignment_result.counts().gaps)
-        self.mismatches.append(alignment_result.counts().mismatches)
-
-
     def _create_pairwise_alignments(self, input_sequences, aligner: "PairwiseAligner", **kwargs):
         """
-        Creates pairwise alignments between sequences. And writes the aligments in the right dataframe structure. This structure is later used in cytoscope to build the graph.
+        Creates pairwise alignments between sequences.
 
         This method creates pairwise alignments between sequences in the network.
         The pairwise alignments are stored in the 'pairwise_alignments' attribute of the SequenceNetwork object.
@@ -179,8 +98,6 @@ class SequenceNetwork(BaseModel):
         Returns:
             Nothing the data is stored internally in fields of the class.
         """
-        # this is later used as a normaliztion factor in the idetnty entry in the dataframe
-        self.shorter_seq = min(input_sequences, key=lambda x: len(x.sequence))
 
         # Pairwise alignment
         if len(input_sequences) == 2:
@@ -193,7 +110,6 @@ class SequenceNetwork(BaseModel):
                 **kwargs,
             )
             alignment_result = pairwise_aligner.align()
-            self.mode = pairwise_aligner.mode
 
             return self._map_pairwise_alignment_results(
                 alignment_result,
@@ -218,12 +134,12 @@ class SequenceNetwork(BaseModel):
                 for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
             )
 
-            for alignment, pair in zip(alignments, pairs):
-                self._map_pairwise_alignment_results(alignment, pair, mode=aligners[0].mode)
+            return alignments, pairs, aligners[0].mode
+                
 
         else:
             raise ValueError(
-                f"Alignment Error. Recieved {len(self.input_sequences)} sequences. Expected 2."
+                f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
             )        
 
     @property
@@ -245,8 +161,11 @@ class SequenceNetwork(BaseModel):
             - The graph can be visualized in 2D or 3D using the visualize() method.
         """
         graph = nx.Graph()
+        alignments, pairs, mode = self._create_pairwise_alignments(self.sequences, PairwiseAligner, mode="global")
+        shorter_seq = min(self.sequences, key=lambda x: len(x.sequence))
 
         # Add nodes and assign node attributes
+        # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
         if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
             for sequence in self.sequences:
                 graph.add_node(
@@ -284,25 +203,33 @@ class SequenceNetwork(BaseModel):
 
         # Add edges and assign edge attributes
         if self.threshold != None:
-            for alignment in self.pairwise_alignments:
-                if alignment.identity >= self.threshold:
+            for alignment, pair in zip(alignments, pairs):
+                identities = alignment.counts().identities
+                identity = identities / len(shorter_seq.sequence)
+
+                if identity >= self.threshold:
                     graph.add_edge(
-                        alignment.input_sequences[0].source_id,
-                        alignment.input_sequences[1].source_id,
-                        identity=alignment.identity,
-                        gaps=1 / (alignment.gaps + 1),
-                        mismatches=1 / (alignment.mismatches + 1),
-                        score=alignment.score,
-                    )
+                        list(pair)[0].source_id,
+                        list(pair)[1].source_id,
+                        identity=identity,
+                        gaps = 1 / (alignment.counts().gaps + 1),
+                        mismatches = 1 / (alignment.counts().mismatches + 1),
+                        score = alignment.score,
+                    )                
+
         else:
-            for alignment in self.pairwise_alignments:
+            for alignment, pair in zip(alignments, pairs):
+
+                identities = alignment.counts().identities
+                identity = identities / len(shorter_seq.sequence)
+
                 graph.add_edge(
-                    alignment.input_sequences[0].source_id,
-                    alignment.input_sequences[1].source_id,
-                    identity=alignment.identity,
-                    gaps=1 / (alignment.gaps + 1),
-                    mismatches=1 / (alignment.mismatches + 1),
-                    score=alignment.score,
+                        list(pair)[0].source_id,
+                        list(pair)[1].source_id,
+                        identity=identity,
+                        gaps = 1 / (alignment.counts().gaps + 1),
+                        mismatches = 1 / (alignment.counts().mismatches + 1),
+                        score = alignment.score,
                 )
 
         # Calculate betweenness centrality

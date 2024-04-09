@@ -51,5 +51,5 @@ class TestNetworkGraphBuild:
         )
 
         # Check if the graph is created
-        graph = network.graph()
+        graph = network.graph
 
