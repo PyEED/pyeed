@@ -2111,6 +2111,34 @@ files = [
 ]
 
 [[package]]
+name = "psutil"
+version = "5.9.8"
+description = "Cross-platform lib for process and system monitoring in Python."
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
+files = [
+    {file = "psutil-5.9.8-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:26bd09967ae00920df88e0352a91cff1a78f8d69b3ecabbfe733610c0af486c8"},
+    {file = "psutil-5.9.8-cp27-cp27m-manylinux2010_i686.whl", hash = "sha256:05806de88103b25903dff19bb6692bd2e714ccf9e668d050d144012055cbca73"},
+    {file = "psutil-5.9.8-cp27-cp27m-manylinux2010_x86_64.whl", hash = "sha256:611052c4bc70432ec770d5d54f64206aa7203a101ec273a0cd82418c86503bb7"},
+    {file = "psutil-5.9.8-cp27-cp27mu-manylinux2010_i686.whl", hash = "sha256:50187900d73c1381ba1454cf40308c2bf6f34268518b3f36a9b663ca87e65e36"},
+    {file = "psutil-5.9.8-cp27-cp27mu-manylinux2010_x86_64.whl", hash = "sha256:02615ed8c5ea222323408ceba16c60e99c3f91639b07da6373fb7e6539abc56d"},
+    {file = "psutil-5.9.8-cp27-none-win32.whl", hash = "sha256:36f435891adb138ed3c9e58c6af3e2e6ca9ac2f365efe1f9cfef2794e6c93b4e"},
+    {file = "psutil-5.9.8-cp27-none-win_amd64.whl", hash = "sha256:bd1184ceb3f87651a67b2708d4c3338e9b10c5df903f2e3776b62303b26cb631"},
+    {file = "psutil-5.9.8-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:aee678c8720623dc456fa20659af736241f575d79429a0e5e9cf88ae0605cc81"},
+    {file = "psutil-5.9.8-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:8cb6403ce6d8e047495a701dc7c5bd788add903f8986d523e3e20b98b733e421"},
+    {file = "psutil-5.9.8-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d06016f7f8625a1825ba3732081d77c94589dca78b7a3fc072194851e88461a4"},
+    {file = "psutil-5.9.8-cp36-cp36m-win32.whl", hash = "sha256:7d79560ad97af658a0f6adfef8b834b53f64746d45b403f225b85c5c2c140eee"},
+    {file = "psutil-5.9.8-cp36-cp36m-win_amd64.whl", hash = "sha256:27cc40c3493bb10de1be4b3f07cae4c010ce715290a5be22b98493509c6299e2"},
+    {file = "psutil-5.9.8-cp37-abi3-win32.whl", hash = "sha256:bc56c2a1b0d15aa3eaa5a60c9f3f8e3e565303b465dbf57a1b730e7a2b9844e0"},
+    {file = "psutil-5.9.8-cp37-abi3-win_amd64.whl", hash = "sha256:8db4c1b57507eef143a15a6884ca10f7c73876cdf5d51e713151c1236a0e68cf"},
+    {file = "psutil-5.9.8-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:d16bbddf0693323b8c6123dd804100241da461e41d6e332fb0ba6058f630f8c8"},
+    {file = "psutil-5.9.8.tar.gz", hash = "sha256:6be126e3225486dff286a8fb9a06246a5253f4c7c53b475ea5f5ac934e64194c"},
+]
+
+[package.extras]
+test = ["enum34", "ipaddress", "mock", "pywin32", "wmi"]
+
+[[package]]
 name = "psycopg2"
 version = "2.9.9"
 description = "psycopg2 - Python-PostgreSQL Database Adapter"
@@ -2318,6 +2346,57 @@ files = [
 [package.extras]
 plugins = ["importlib-metadata"]
 windows-terminal = ["colorama (>=0.4.6)"]
+
+[[package]]
+name = "pyhmmer"
+version = "0.10.11"
+description = "Cython bindings and Python interface to HMMER3."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pyhmmer-0.10.11-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:8cee5adbbe4050ccb51e83f26b99215644d7b675d3bdf2b25b7e293b9a92f3ea"},
+    {file = "pyhmmer-0.10.11-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:657299ab8c8ab5bd5597c538181ab090c04fc7004898571ff48c4cfcd54bd237"},
+    {file = "pyhmmer-0.10.11-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:08dfacef5ec922f6b095635c0ff3937bced775da174a8877e206006d4769f308"},
+    {file = "pyhmmer-0.10.11-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:87e60a30fd2295a65d391cf5509e11c9d5632f1575d9a1d2be76bf68ab7422be"},
+    {file = "pyhmmer-0.10.11-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:47071eeaf1fbe94aa87db52fd4049805c861f5738b2e20e2e36a0ac724c48fc7"},
+    {file = "pyhmmer-0.10.11-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:47413e98ef9a79da1038fe581a538c9fed902a83151840f0bf1a10d43e4bb609"},
+    {file = "pyhmmer-0.10.11-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f3cf9d36a99dfca377880586f9011eb9ad81588844d6e629d8983f963c97b060"},
+    {file = "pyhmmer-0.10.11-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5c0bb3cc82c5b87ab9f803430efd8e39c3e7e30314bd516ec2f1ba4bbacfa099"},
+    {file = "pyhmmer-0.10.11-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:2963515e6647219d06530bdf31c2afe06aea12864ad51e317c1acb198a3a59a6"},
+    {file = "pyhmmer-0.10.11-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:766ad5d4eda3d25f52cf7983b0c447e36d32fe5ef0405dd12266ed42623cc587"},
+    {file = "pyhmmer-0.10.11-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:51e9269425196e181c4b4dd756817ac78ce0bd982e5c839de1cb791e08bcef0c"},
+    {file = "pyhmmer-0.10.11-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:458c4016e6c57d39e30092fc129a2de727080c86c32be5337decbac142a7dde7"},
+    {file = "pyhmmer-0.10.11-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:64a5048a4d11ba340670a22806f727e866be9310418ca1da1661bfc9fabc5f80"},
+    {file = "pyhmmer-0.10.11-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a710e59767137222146475027fac300a3a45419bffc04d06af5db2ea3bb6c605"},
+    {file = "pyhmmer-0.10.11-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:545e5ba8052f18367cbf64dc725b60b5ce31f3b5f2be0100fb8dfc6e714fb95e"},
+    {file = "pyhmmer-0.10.11-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:4d45a8c0e256e43031b1957a466aee52c107fa4d4d3cf898c8ee510f425f9ec1"},
+    {file = "pyhmmer-0.10.11-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:177f18374975f80e9739f8bf75e1a6a9e0471c274f25654d2147cef94dcd4788"},
+    {file = "pyhmmer-0.10.11-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f4615da2819c470b49b33087f4acfb55ee37ea25032122b8d4721cb1ad380b09"},
+    {file = "pyhmmer-0.10.11-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:cc55c8ad002bb332840994e83132de0623ac78d0da03d5a2df5ab9851a70796e"},
+    {file = "pyhmmer-0.10.11-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:1c220ddbd9eada2e65975aa6e630b7312aafdac07b11b52701d31ab9361738bf"},
+    {file = "pyhmmer-0.10.11-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:63b662d9b78607fd428a14e99885df6c11ccf2517fbc6c742a5acf7b72b55646"},
+    {file = "pyhmmer-0.10.11-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:09a8184839062cb42fc9f114fb4c8ef5764fe8386ef064de2ac5d8524c4e86c0"},
+    {file = "pyhmmer-0.10.11-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:5eaa67e802b1e5f09d3ce1b959672971893eb0284fcaf7a2d5f573defd482670"},
+    {file = "pyhmmer-0.10.11-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:f3e80efb849b580930da5aa2298821a9aa5f635efac513b0df6b00e0b0eb5135"},
+    {file = "pyhmmer-0.10.11-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:52465fd0b32cd2f8467dcb9b344b74b399217575057e274758d5a9301e12fd1a"},
+    {file = "pyhmmer-0.10.11-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4ab0faac1bd88c2b5634ee7d8f20473b0f772fc4d66081adb07cb0fb14b55e41"},
+    {file = "pyhmmer-0.10.11-pp310-pypy310_pp73-macosx_10_9_x86_64.whl", hash = "sha256:2e6d94193af8e26b27029f654cbf49d18ac1cfb9bcff129d18625345b6919382"},
+    {file = "pyhmmer-0.10.11-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:292c429edbc1198675c4370066bab1b004a6ae4dec7bb3885a029aefbc251d53"},
+    {file = "pyhmmer-0.10.11-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d03e2287eee073154fcc7bc6dd1e8785f1005364165c4aaac7179496617c18ea"},
+    {file = "pyhmmer-0.10.11-pp37-pypy37_pp73-macosx_10_9_x86_64.whl", hash = "sha256:0b117b6a8c6aa82c39722020acdd0c99ec94968e9e6764efb52f1def7da44b25"},
+    {file = "pyhmmer-0.10.11-pp37-pypy37_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3160869bb4acae7747fd1920e75f4ee259fcda0625232f40d0a1c790804518c3"},
+    {file = "pyhmmer-0.10.11-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6e42c272ca18cda18482dc2b2839c44db415e11cee2e87376f1d2774180cc10b"},
+    {file = "pyhmmer-0.10.11-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:cd00037355e8b6e23bd93e84a4e94f6c286f81289775993e05bd014d9ffcbc65"},
+    {file = "pyhmmer-0.10.11-pp38-pypy38_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ae57b36030cdeb4f223df3126c9eeb069da13218fa8fc912698dbcbc579d3741"},
+    {file = "pyhmmer-0.10.11-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7c71d06f7a5c03cacbb285e62f6a37f82f200becbae8d8920d465168d3878809"},
+    {file = "pyhmmer-0.10.11-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:6a20c7c9d99f8048f36ebb214f60cb942d4c464d6260e427d56fbee5917ca006"},
+    {file = "pyhmmer-0.10.11-pp39-pypy39_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:816eb51a359a01983fec8f9aa57325b99a30a127b2948df029455fe94419d163"},
+    {file = "pyhmmer-0.10.11-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6446207747925218e90d6d828f445f5a4d78bbc24b86335306afcadf4e1ecde8"},
+    {file = "pyhmmer-0.10.11.tar.gz", hash = "sha256:c45a2335e6dc5b7d3f3db424e234c398b21b6063ad48b19c90abde0120c3d866"},
+]
+
+[package.dependencies]
+psutil = ">=5.8,<6.0"
 
 [[package]]
 name = "pymdown-extensions"
@@ -3603,4 +3682,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "d5a5f011ccb69c31c9f1fee45ba3f1090d438918485dc18bdd754534c1ae4f71"
+content-hash = "cf918f6913548892e94ccad62231325b1c516d112794432720f2e38b1f5a2044"
