@@ -444,3 +444,7 @@ class Alignment(sdRDM.DataModel):
             )
 
         self.standard_numberings = standard_numberings
+
+    def show(self):
+        for seq in self.aligned_sequences:
+            print(seq.source_id, "\t", seq.sequence)
