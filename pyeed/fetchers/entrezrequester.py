@@ -10,7 +10,7 @@ class NCBIRequester:
 
     def __init__(
         self,
-        foreign_id: Union[int, List[int]],
+        foreign_id: Union[str, List[str]],
         email: str,
         api_key: str,
         retmode: str,
@@ -117,32 +117,3 @@ class NCBIRequester:
             input_list[i : i + chunk_size]
             for i in range(0, len(input_list), chunk_size)
         ]
-
-
-if __name__ == "__main__":
-    # Example usage
-    email = "d@des.de"
-    # ids = [9606, 10090, 10116]
-    # ids = 9606
-    # rentrez = NCBIRequester(
-    #     foreign_id=ids,
-    #     email=email,
-    #     api_key=None,
-    #     retmode="xml",
-    #     db="taxonomy",
-    # )
-
-    protein_ids = ["NP_001191", "UCS38941.1", "NP_001191", "UCS38941.1"]
-
-    rentrez = NCBIRequester(
-        foreign_id=protein_ids,
-        email=email,
-        api_key=None,
-        retmode="text",
-        db="protein",
-        rettype="genbank",
-    )
-
-    res = rentrez.make_request()
-
-    print(res)
