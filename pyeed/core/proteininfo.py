@@ -196,6 +196,7 @@ class ProteinInfo(AbstractSequence):
         n_hits: int,
         e_value: float = 10.0,
         api_key: str = None,
+        database: str = "nr",
         **kwargs,
     ) -> List["ProteinInfo"]:
         """Run protein blast for a `ProteinInfo`.
@@ -205,6 +206,7 @@ class ProteinInfo(AbstractSequence):
             n_hits (int): Number of hits to return.
             e_value (float, optional): E-value threshold. Defaults to 10.0.
             api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
+            database (str, optional): Database to search. Defaults to "nr" (Non Redundant).
 
 
         Returns:
@@ -221,7 +223,7 @@ class ProteinInfo(AbstractSequence):
 
         result_handle = NCBIWWW.qblast(
             "blastp",
-            "nr",
+            database,
             self.sequence,
             hitlist_size=n_hits,
             expect=e_value,
