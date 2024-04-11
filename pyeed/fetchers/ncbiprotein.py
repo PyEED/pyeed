@@ -184,14 +184,12 @@ class NCBIProteinFetcher(AbstractFetcher):
 
         regions = self.get_feature(seq_record, "region")
         for region in regions:
-            print(region, "\n")
             try:
                 if "db_xref" not in region.qualifiers:
                     db_xref = None
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
-                if "id" in region.qualifiers:
-                    print("there is an id")
+
                 protein_info.regions.append(
                     ProteinRegion(
                         name=region.qualifiers["region_name"][0],
