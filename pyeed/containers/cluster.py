@@ -4,6 +4,10 @@ from pyeed.core import AbstractSequence
 
 class Cluster(BaseModel):
 
+    name: str = Field(
+        description="The name of the cluster",
+        default=None,
+    )
     representative: AbstractSequence = Field(
         description="The representative sequence of the cluster",
         default=None,
