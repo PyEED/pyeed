@@ -152,6 +152,8 @@ class MMSeqs2(AbstractContainer):
                 auto_remove=True,
                 volumes={self._tempdir_path: {"bind": "/app", "mode": "rw"}},
             )
+
+            # Possibility to stream output for progress bar
             # output = container.attach(stdout=True, stream=True, logs=True)
             # Set detatch True to access stream
 
