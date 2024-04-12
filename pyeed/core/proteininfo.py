@@ -164,7 +164,7 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from pyeed.fetchers import NCBIProteinFetcher, NCBITaxonomyFetcher
+        from pyeed.fetchers import NCBIProteinFetcher
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
@@ -236,6 +236,9 @@ class ProteinInfo(AbstractSequence):
         uniprot_accessions = self._filter_uniprot_accessions(accessions)
         ncbi_accessions = list(set(accessions) - set(uniprot_accessions))
 
+        print(f"🔍 Found {len(ncbi_accessions)} NCBI accessions")
+        print(f"🔍 Found {len(uniprot_accessions)} UniProt accessions")
+
         protein_infos = NCBIProteinFetcher(
             foreign_id=ncbi_accessions, api_key=api_key
         ).fetch(ProteinInfo)
@@ -306,7 +309,7 @@ class ProteinInfo(AbstractSequence):
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
         result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
-        blast_record = NCBIXML.read(result_handle)
+        # blast_record = NCBIXML.read(result_handle)
         raise NotImplementedError("This method is not implemented yet.")
 
     @staticmethod

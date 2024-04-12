@@ -45,5 +45,3 @@ class InterProRequester:
             print(f"Request error occurred: {e}")
         except httpx.HTTPStatusError as e:
             print(f"HTTP status error occurred: {e}")
-        finally:
-            await response.aclose()
