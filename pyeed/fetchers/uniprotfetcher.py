@@ -1,5 +1,6 @@
 import re
 import asyncio
+import nest_asyncio
 from typing import List, Union
 
 from pyeed.core.dnaregion import DNARegion
@@ -23,9 +24,9 @@ class UniprotFetcher(AbstractFetcher):
         if email is None:
             self.email: str = self.get_substitute_email()
         self.taxonomy_dicts: List[dict] = None
+        nest_asyncio.apply()
 
     def get(self):
-        # TODO: catch 204 error (no entry)
         entries = UniprotRequester(self.foreign_id).make_request()
         return self._get_uniprot_result_dict(entries)
 
@@ -85,11 +86,15 @@ class UniprotFetcher(AbstractFetcher):
             taxonomy_id=uniprot["organism"]["taxonomy"],
         )
 
+        try:
+            ec_number = uniprot["protein"]["recommendedName"]["ecNumber"][0]["value"]
+        except KeyError:
+            ec_number = None
         protein_info = cls(
             source_id=uniprot["accession"],
             sequence=uniprot["sequence"]["sequence"],
             name=uniprot["protein"]["recommendedName"]["fullName"]["value"],
-            ec_number=uniprot["protein"]["recommendedName"]["ecNumber"][0]["value"],
+            ec_number=ec_number,
             mol_weight=uniprot["sequence"]["mass"],
             organism=organism,
         )
@@ -135,3 +140,9 @@ class UniprotFetcher(AbstractFetcher):
                 )
 
         return protein_info
+
+
+if __name__ == "__main__":
+    fetcher = UniprotFetcher(["P51587"])
+    protein_info = fetcher.fetch()
+    print(protein_info)
