@@ -31,12 +31,17 @@ class UniprotFetcher(AbstractFetcher):
         return self._get_uniprot_result_dict(entries)
 
     def _get_uniprot_result_dict(self, records: List[dict]) -> dict:
+        """Maps the uniprot records to a dictionary with the accession as the key."""
         uniprot_dict = {}
         for record in records:
             uniprot_dict[record["accession"].upper()] = record
         return uniprot_dict
 
     def get_interpro_entries(self) -> dict:
+        """
+        Makes a request to the InterPro API and returns the results as a
+        dictionary with the accession as the key.
+        """
 
         if not isinstance(self.foreign_id, list):
             self.foreign_id = [self.foreign_id]
@@ -46,6 +51,7 @@ class UniprotFetcher(AbstractFetcher):
         return self._get_interpro_result_dict(entries)
 
     def _get_interpro_result_dict(self, interpro_records: List[dict]) -> dict:
+        """Maps the interpro records to a dictionary with the accession as the key."""
         interpro_dict = {}
         for record in interpro_records:
             try:
@@ -57,6 +63,7 @@ class UniprotFetcher(AbstractFetcher):
         return interpro_dict
 
     def fetch(self) -> List["ProteinInfo"]:
+        """Executes requests to Uniprot and InterPro and maps the results to ProteinInfo objects."""
         uniprot_records_dict = self.get()
         interpro_records_dict = self.get_interpro_entries()
 
@@ -76,6 +83,7 @@ class UniprotFetcher(AbstractFetcher):
         interpro: dict,
         cls: "ProteinInfo",
     ):
+        """Maps the Uniprot and InterPro records to a ProteinInfo object."""
 
         assert (
             interpro["results"][0]["proteins"][0]["accession"].upper()
@@ -118,6 +126,7 @@ class UniprotFetcher(AbstractFetcher):
     def map_interpro(
         self, interpro: dict, protein_info: "ProteinInfo"
     ) -> "ProteinInfo":
+        """Maps the InterPro records to a ProteinInfo object."""
 
         interpro_pattern = re.compile(r"IPR\d{6}")
         # pfam_pattern = re.compile(r"PF\d{5}")
@@ -140,9 +149,3 @@ class UniprotFetcher(AbstractFetcher):
                 )
 
         return protein_info
-
-
-if __name__ == "__main__":
-    fetcher = UniprotFetcher(["P51587"])
-    protein_info = fetcher.fetch()
-    print(protein_info)
