@@ -1,3 +1,4 @@
+import re
 import os
 from typing import List, Optional
 import warnings
@@ -232,14 +233,33 @@ class ProteinInfo(AbstractSequence):
         blast_record = NCBIXML.read(result_handle)
 
         accessions = self._get_accessions(blast_record)
+        uniprot_accessions = self._filter_uniprot_accessions(accessions)
+        ncbi_accessions = list(set(accessions) - set(uniprot_accessions))
 
         protein_infos = NCBIProteinFetcher(
-            foreign_id=accessions, api_key=api_key
+            foreign_id=ncbi_accessions, api_key=api_key
         ).fetch(ProteinInfo)
         protein_infos.insert(0, self)
 
+        if uniprot_accessions:
+            from pyeed.fetchers.uniprotfetcher import UniprotFetcher
+
+            uniprot_proteins = UniprotFetcher(foreign_id=uniprot_accessions).fetch()
+            protein_infos.extend(uniprot_proteins)
+
         print("🎉 Done\n")
         return protein_infos
+
+    def _filter_uniprot_accessions(self, accessions: List[str]) -> List[str]:
+        uniprot_pattern = re.compile(
+            r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}"
+        )
+
+        return [
+            uniprot_pattern.match(acc)[0]
+            for acc in accessions
+            if uniprot_pattern.match(acc)
+        ]
 
     def blastp(
         self,
