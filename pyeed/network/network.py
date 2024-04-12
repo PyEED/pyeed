@@ -75,6 +75,7 @@ class SequenceNetwork(BaseModel):
     def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
         super().__init__()
         self.sequences = sequences
+        self.threshold = threshold
 
 
     def add_target(self, target: AbstractSequence):
@@ -202,10 +203,15 @@ class SequenceNetwork(BaseModel):
                 )
 
         # Add edges and assign edge attributes
+        identities_2 = 0
+        print('this is the threshold', self.threshold)
         if self.threshold != None:
             for alignment, pair in zip(alignments, pairs):
                 identities = alignment.counts().identities
                 identity = identities / len(shorter_seq.sequence)
+                
+                # TODO just test cases
+                identities_2 += identity
 
                 if identity >= self.threshold:
                     graph.add_edge(
@@ -215,7 +221,9 @@ class SequenceNetwork(BaseModel):
                         gaps = 1 / (alignment.counts().gaps + 1),
                         mismatches = 1 / (alignment.counts().mismatches + 1),
                         score = alignment.score,
-                    )                
+                    )
+
+            print(identities_2 / len(alignments))
 
         else:
             for alignment, pair in zip(alignments, pairs):
