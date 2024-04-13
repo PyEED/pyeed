@@ -163,7 +163,6 @@ class SequenceNetwork(BaseModel):
         """
         graph = nx.Graph()
         alignments, pairs, mode = self._create_pairwise_alignments(self.sequences, PairwiseAligner, mode="global")
-        shorter_seq = min(self.sequences, key=lambda x: len(x.sequence))
 
         # Add nodes and assign node attributes
         # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
@@ -202,28 +201,29 @@ class SequenceNetwork(BaseModel):
                     taxonomy_id=sequence.organism.taxonomy_id,
                 )
 
-        # Add edges and assign edge attributes
-        identities_2 = 0
         print('this is the threshold', self.threshold)
+
+
         if self.threshold != None:
+
+            # create a datafarme for the egdes
+            edge_data = []
+
             for alignment, pair in zip(alignments, pairs):
+                shorter_seq = min(list(pair), key=lambda x: len(x.sequence))
+
                 identities = alignment.counts().identities
                 identity = identities / len(shorter_seq.sequence)
-                
-                # TODO just test cases
-                identities_2 += identity
 
                 if identity >= self.threshold:
-                    graph.add_edge(
-                        list(pair)[0].source_id,
-                        list(pair)[1].source_id,
-                        identity=identity,
-                        gaps = 1 / (alignment.counts().gaps + 1),
-                        mismatches = 1 / (alignment.counts().mismatches + 1),
-                        score = alignment.score,
-                    )
-
-            print(identities_2 / len(alignments))
+                    edge_data.append(((list(pair)[0].source_id, list(pair)[1].source_id,{ 
+                        'identity': identity, 
+                        'gaps': 1 / (alignment.counts().gaps + 1), 
+                        'mismatches': 1 / (alignment.counts().mismatches + 1), 
+                        'score': alignment.score} )))
+            
+            graph.add_edges_from(edge_data)
+                    
 
         else:
             for alignment, pair in zip(alignments, pairs):
