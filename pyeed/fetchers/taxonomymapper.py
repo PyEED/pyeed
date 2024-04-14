@@ -2,13 +2,12 @@ import logging
 import xml.etree.ElementTree as ET
 
 from pyeed.core.organism import Organism
-from pyeed.fetchers.requester import AsyncRequester
 
 
 LOGGER = logging.getLogger(__name__)
 
 
-class NCBITaxonomyMapper:
+class TaxonomyMapper:
 
     def __init__(self):
         pass
@@ -28,7 +27,7 @@ class NCBITaxonomyMapper:
         taxon_info = root.find("taxon")
 
         organism = Organism(
-            name=taxon_info.get("ScientificName"),
+            name=taxon_info.get("scientificName"),
             taxonomy_id=taxon_info.get("taxId"),
             domain=self.get_scientific_name_by_rank(root, "superkingdom"),
             kingdom=self.get_scientific_name_by_rank(root, "kingdom"),
@@ -37,7 +36,7 @@ class NCBITaxonomyMapper:
             order=self.get_scientific_name_by_rank(root, "order"),
             family=self.get_scientific_name_by_rank(root, "family"),
             genus=self.get_scientific_name_by_rank(root, "genus"),
-            species=taxon_info.get("ScientificName"),
+            species=taxon_info.get("species"),
         )
 
         return organism
