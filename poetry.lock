@@ -97,6 +97,21 @@ yarl = ">=1.0,<2.0"
 speedups = ["Brotli", "aiodns", "brotlicffi"]
 
 [[package]]
+name = "aiometer"
+version = "0.5.0"
+description = "A Python concurrency scheduling library, compatible with asyncio and trio"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "aiometer-0.5.0-py3-none-any.whl", hash = "sha256:57e54a067e6918504844610da23aabf6e179cb0f01104503b3db4bfb39f5e1f2"},
+    {file = "aiometer-0.5.0.tar.gz", hash = "sha256:1d441ad3c16eaa56d438e5f9a2f9fbccdb29f6140fb36f9cb68183545ec48691"},
+]
+
+[package.dependencies]
+anyio = ">=3.2,<5"
+exceptiongroup = {version = "*", markers = "python_version < \"3.11\""}
+
+[[package]]
 name = "aiosignal"
 version = "1.3.1"
 description = "aiosignal: a list of registered asynchronous callbacks"
@@ -3878,4 +3893,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "df3e5b84daa220a2363ffc9fd599cce70551b6b867ac607ae60184e26b299972"
+content-hash = "d6311f66e4f88d037d71db7bd3a41f8deb13f7718361b455c136daebbe5b614f"
