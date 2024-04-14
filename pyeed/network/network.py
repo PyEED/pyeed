@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from Bio.Align import Alignment as BioAlignment
 from joblib import Parallel, delayed, cpu_count
 from typing import List, Optional, Union, Tuple, TYPE_CHECKING
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 from pyeed.core.sequence import Sequence
 from pyeed.core.abstractsequence import AbstractSequence
@@ -167,23 +169,75 @@ class SequenceNetwork(BaseModel):
         # Add nodes and assign node attributes
         # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
         if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
-            for sequence in self.sequences:
-                graph.add_node(
-                    sequence.source_id,
-                    name=sequence.name,
-                    familiy_name=sequence.family_name,
-                    domain=sequence.organism.domain,
-                    kingdome=sequence.organism.kingdom,
-                    phylum=sequence.organism.phylum,
-                    tax_class=sequence.organism.tax_class,
-                    order=sequence.organism.order,
-                    family=sequence.organism.family,
-                    genus=sequence.organism.genus,
-                    species=sequence.organism.species,
-                    ec_number=sequence.ec_number,
-                    mol_weight=sequence.mol_weight,
-                    taxonomy_id=sequence.organism.taxonomy_id,
-                )
+            
+            node_data = []
+            
+            def process_sequence(sequence):
+                return (sequence.source_id, {
+                    'name': sequence.name,
+                    'family_name': sequence.family_name,
+                    'domain': sequence.organism.domain,
+                    'kingdom': sequence.organism.kingdom,
+                    'phylum': sequence.organism.phylum,
+                    'tax_class': sequence.organism.tax_class,
+                    'order': sequence.organism.order,
+                    'family': sequence.organism.family,
+                    'genus': sequence.organism.genus,
+                    'species': sequence.organism.species,
+                    'ec_number': sequence.ec_number,
+                    'mol_weight': sequence.mol_weight,
+                    'taxonomy_id': sequence.organism.taxonomy_id,
+                })
+
+            # Setting up a ThreadPoolExecutor to manage a pool of threads
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                # Submitting tasks to the executor
+                futures = [executor.submit(process_sequence, seq) for seq in self.sequences]
+
+                # Collecting results as they complete
+                for future in as_completed(futures):
+                    node_data.append(future.result())
+
+
+
+            # for sequence in self.sequences:
+
+            #     node_data.append((sequence.source_id, {
+            #         'name': sequence.name,
+            #         'family_name': sequence.family_name,
+            #         'domain': sequence.organism.domain,
+            #         'kingdom': sequence.organism.kingdom,
+            #         'phylum': sequence.organism.phylum,
+            #         'tax_class': sequence.organism.tax_class,
+            #         'order': sequence.organism.order,
+            #         'family': sequence.organism.family,
+            #         'genus': sequence.organism.genus,
+            #         'species': sequence.organism.species,
+            #         'ec_number': sequence.ec_number,
+            #         'mol_weight': sequence.mol_weight,
+            #         'taxonomy_id': sequence.organism.taxonomy_id,
+            #     }))                
+
+                # graph.add_node(
+                #     sequence.source_id,
+                #     name=sequence.name,
+                #     familiy_name=sequence.family_name,
+                #     domain=sequence.organism.domain,
+                #     kingdome=sequence.organism.kingdom,
+                #     phylum=sequence.organism.phylum,
+                #     tax_class=sequence.organism.tax_class,
+                #     order=sequence.organism.order,
+                #     family=sequence.organism.family,
+                #     genus=sequence.organism.genus,
+                #     species=sequence.organism.species,
+                #     ec_number=sequence.ec_number,
+                #     mol_weight=sequence.mol_weight,
+                #     taxonomy_id=sequence.organism.taxonomy_id,
+                # )
+
+                graph.add_nodes_from(node_data)
+
+
 
         else:
             for sequence in self.sequences:
@@ -209,18 +263,48 @@ class SequenceNetwork(BaseModel):
             # create a datafarme for the egdes
             edge_data = []
 
-            for alignment, pair in zip(alignments, pairs):
-                shorter_seq = min(list(pair), key=lambda x: len(x.sequence))
-
+            def process_pair(alignment, pair):
+                shorter_seq = min(pair, key=lambda x: len(x.sequence))
+                
                 identities = alignment.counts().identities
                 identity = identities / len(shorter_seq.sequence)
-
+                
                 if identity >= self.threshold:
-                    edge_data.append(((list(pair)[0].source_id, list(pair)[1].source_id,{ 
-                        'identity': identity, 
-                        'gaps': 1 / (alignment.counts().gaps + 1), 
-                        'mismatches': 1 / (alignment.counts().mismatches + 1), 
-                        'score': alignment.score} )))
+                    return (
+                        pair[0].source_id, pair[1].source_id,
+                        {
+                            'identity': identity,
+                            'gaps': 1 / (alignment.counts().gaps + 1),
+                            'mismatches': 1 / (alignment.counts().mismatches + 1),
+                            'score': alignment.score
+                        }
+                    )
+                return None
+
+            with ThreadPoolExecutor() as executor:
+                # Submit tasks to the executor.
+                future_to_pair = {executor.submit(process_pair, alignment, pair): (alignment, pair) for alignment, pair in zip(alignments, pairs)}
+                
+                # Collecting results as they complete.
+                for future in as_completed(future_to_pair):
+                    result = future.result()
+                    if result is not None:
+                        edge_data.append(result)
+
+
+
+            # for alignment, pair in zip(alignments, pairs):
+            #     shorter_seq = min(list(pair), key=lambda x: len(x.sequence))
+
+            #     identities = alignment.counts().identities
+            #     identity = identities / len(shorter_seq.sequence)
+
+            #     if identity >= self.threshold:
+            #         edge_data.append(((list(pair)[0].source_id, list(pair)[1].source_id,{ 
+            #             'identity': identity, 
+            #             'gaps': 1 / (alignment.counts().gaps + 1), 
+            #             'mismatches': 1 / (alignment.counts().mismatches + 1), 
+            #             'score': alignment.score} )))
             
             graph.add_edges_from(edge_data)
                     
