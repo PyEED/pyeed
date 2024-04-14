@@ -6,11 +6,11 @@ from typing import List
 from rich.console import Console
 from rich.progress import Progress
 
-from pyeed.fetchers.dbsort import SortIDs, DBPattern
-from pyeed.fetchers.uniprotmapper import UniprotMapper
-from pyeed.fetchers.ncbiproteinmapper import NCBIProteinMapper
-from pyeed.fetchers.taxonomymapper import TaxonomyMapper
-from pyeed.fetchers.requester import AsyncRequester
+from pyeed.fetch.dbsort import SortIDs, DBPattern
+from pyeed.fetch.uniprotmapper import UniprotMapper
+from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
+from pyeed.fetch.taxonomymapper import TaxonomyMapper
+from pyeed.fetch.requester import AsyncRequester
 
 
 LOGGER = logging.getLogger(__name__)

@@ -1,4 +1,3 @@
-from numpy import short
 import sdRDM
 from tqdm import tqdm
 from itertools import combinations
@@ -13,8 +12,8 @@ if TYPE_CHECKING:
     from pyeed.core.dnainfo import DNAInfo
     from pyeed.core.proteininfo import ProteinInfo
     from .abstractsequence import AbstractSequence
-    from pyeed.containers.abstract_container import AbstractContainer
-    from pyeed.aligners.pairwise import PairwiseAligner
+    from pyeed.container.abstract_container import AbstractContainer
+    from pyeed.align.pairwise import PairwiseAligner
     from pyeed.core import PairwiseAlignment
 
 
@@ -188,8 +187,8 @@ class Alignment(sdRDM.DataModel):
             ValueError: If the aligner is not an instance of AbstractContainer or PairwiseAligner.
         """
 
-        from pyeed.containers.abstract_container import AbstractContainer
-        from pyeed.aligners.pairwise import PairwiseAligner
+        from pyeed.container.abstract_container import AbstractContainer
+        from pyeed.align.pairwise import PairwiseAligner
 
         if issubclass(aligner, AbstractContainer):
             return self._container_align(aligner, **kwargs)

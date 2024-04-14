@@ -1,4 +1,3 @@
-from ctypes import alignment
 import os
 import pyhmmer
 from typing import List, Union

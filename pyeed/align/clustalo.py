@@ -2,7 +2,7 @@ import os
 from typing import List
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
-from pyeed.containers import AbstractContainer, ToolImage
+from pyeed.container import AbstractContainer, ToolImage
 
 
 class ClustalOmega(AbstractContainer):

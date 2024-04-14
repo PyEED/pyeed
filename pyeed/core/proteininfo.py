@@ -18,7 +18,7 @@ from .proteinregiontype import ProteinRegionType
 from .substrate import Substrate
 from .dnaregion import DNARegion
 from .proteinsitetype import ProteinSiteType
-from pyeed.containers.abstract_container import Blastp
+from pyeed.container.abstract_container import Blastp
 
 
 @forge_signature
@@ -164,7 +164,7 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from pyeed.fetchers import NCBIProteinFetcher
+        from pyeed.fetch import NCBIProteinFetcher
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.
@@ -186,7 +186,7 @@ class ProteinInfo(AbstractSequence):
     def get_ids(
         cls, accession_ids: List[str], email: str = None, api_key: str = None
     ) -> List["ProteinInfo"]:
-        from pyeed.fetchers import NCBIProteinFetcher
+        from pyeed.fetch import NCBIProteinFetcher
 
         proteins = NCBIProteinFetcher(accession_ids, email, api_key).fetch(cls)
 
@@ -213,7 +213,7 @@ class ProteinInfo(AbstractSequence):
         Returns:
             List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
         """
-        from pyeed.fetchers import NCBIProteinFetcher
+        from pyeed.fetch import NCBIProteinFetcher
 
         print("🏃🏼‍♀️ Running PBLAST")
         print(f"╭── protein name: {self.name}")
@@ -245,7 +245,7 @@ class ProteinInfo(AbstractSequence):
         protein_infos.insert(0, self)
 
         if uniprot_accessions:
-            from pyeed.fetchers.uniprotfetcher import UniprotFetcher
+            from pyeed.fetch.uniprotmapper import UniprotFetcher
 
             uniprot_proteins = UniprotFetcher(foreign_id=uniprot_accessions).fetch()
             protein_infos.extend(uniprot_proteins)
@@ -308,7 +308,6 @@ class ProteinInfo(AbstractSequence):
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
-        result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
         # blast_record = NCBIXML.read(result_handle)
         raise NotImplementedError("This method is not implemented yet.")
 
