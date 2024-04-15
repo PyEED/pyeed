@@ -1,9 +1,11 @@
-from numpy import short
 import sdRDM
+from rich.status import Status, Console
 from tqdm import tqdm
 from itertools import combinations
 from typing import List, Optional, Union, Tuple, TYPE_CHECKING
 from pydantic import Field, validator
+from IPython.display import clear_output
+
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Align import Alignment as BioAlignment
@@ -13,8 +15,8 @@ if TYPE_CHECKING:
     from pyeed.core.dnainfo import DNAInfo
     from pyeed.core.proteininfo import ProteinInfo
     from .abstractsequence import AbstractSequence
-    from pyeed.containers.abstract_container import AbstractContainer
-    from pyeed.aligners.pairwise import PairwiseAligner
+    from pyeed.container.abstract_container import AbstractContainer
+    from pyeed.align.pairwise import PairwiseAligner
     from pyeed.core import PairwiseAlignment
 
 
@@ -188,8 +190,8 @@ class Alignment(sdRDM.DataModel):
             ValueError: If the aligner is not an instance of AbstractContainer or PairwiseAligner.
         """
 
-        from pyeed.containers.abstract_container import AbstractContainer
-        from pyeed.aligners.pairwise import PairwiseAligner
+        from pyeed.container.abstract_container import AbstractContainer
+        from pyeed.align.pairwise import PairwiseAligner
 
         if issubclass(aligner, AbstractContainer):
             return self._container_align(aligner, **kwargs)
@@ -368,8 +370,16 @@ class Alignment(sdRDM.DataModel):
             input_sequences=sequences,
         )
 
-        if aligner is not None:
-            return alignment.align(aligner, **kwargs)
+        with Status("Running ClustalOmega...", console=Console(force_terminal=False)):
+
+            if aligner is not None:
+
+                result = alignment.align(aligner, **kwargs)
+
+        clear_output()
+        if result:
+            print("✅ Alignment completed")
+            return result
 
         return alignment
 
@@ -444,3 +454,7 @@ class Alignment(sdRDM.DataModel):
             )
 
         self.standard_numberings = standard_numberings
+
+    def show(self):
+        for seq in self.aligned_sequences:
+            print(seq.source_id, "\t", seq.sequence)

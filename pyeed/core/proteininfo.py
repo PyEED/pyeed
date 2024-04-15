@@ -1,23 +1,27 @@
 import os
+import asyncio
 from typing import List, Optional
+from IPython.display import clear_output
+from rich.status import Status, Console
+from concurrent.futures import ThreadPoolExecutor
 import warnings
 from pydantic import Field
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
-from Bio.Blast import NCBIWWW, NCBIXML
+from Bio.Blast import NCBIXML
 
 
-from .dnainfo import DNAInfo
-from .proteinregion import ProteinRegion
-from .abstractsequence import AbstractSequence
-from .site import Site
-from .citation import Citation
-from .span import Span
-from .proteinregiontype import ProteinRegionType
-from .substrate import Substrate
-from .dnaregion import DNARegion
-from .proteinsitetype import ProteinSiteType
-from pyeed.containers.abstract_container import Blastp
+from pyeed.core.dnainfo import DNAInfo
+from pyeed.core.proteinregion import ProteinRegion
+from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.core.site import Site
+from pyeed.core.citation import Citation
+from pyeed.core.span import Span
+from pyeed.core.proteinregiontype import ProteinRegionType
+from pyeed.core.substrate import Substrate
+from pyeed.core.dnaregion import DNARegion
+from pyeed.core.proteinsitetype import ProteinSiteType
+from pyeed.container.abstract_container import Blastp
 
 
 @forge_signature
@@ -163,10 +167,13 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from pyeed.fetchers import NCBIProteinFetcher, NCBITaxonomyFetcher
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
+        import nest_asyncio
+
+        nest_asyncio.apply()
 
         """
-        This method creates a 'ProteinInfo' object from a given NCBI ID.
+        This method creates a 'ProteinInfo' object from a given protein accession ID.
 
         Args:
             protein_id (str): ID of the protein in NCBI or UniProt database.
@@ -179,65 +186,146 @@ class ProteinInfo(AbstractSequence):
             warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
             return cls.get_ids(protein_id)
 
-        return NCBIProteinFetcher(protein_id).fetch(cls)[0]
+        sequences = asyncio.run(ProteinFetcher(ids=[protein_id]).fetch(quiet=True))[0]
+        clear_output()
+        return sequences
 
     @classmethod
-    def get_ids(
-        cls, accession_ids: List[str], email: str = None, api_key: str = None
-    ) -> List["ProteinInfo"]:
-        from pyeed.fetchers import NCBIProteinFetcher
+    def get_ids(cls, accession_ids: List[str]) -> List["ProteinInfo"]:
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
+        import nest_asyncio
 
-        proteins = NCBIProteinFetcher(accession_ids, email, api_key).fetch(cls)
+        nest_asyncio.apply()
 
-        return proteins
+        return asyncio.run(
+            ProteinFetcher(ids=accession_ids).fetch(force_terminal=False)
+        )
 
-    def ncbi_blastp(
+    @classmethod
+    def from_sequence(
+        cls,
+        sequence: str,
+        exact_match: bool = True,
+        database: str = "nr",
+        matrix: str = "BLOSUM62",
+    ):
+        """
+        Creates a 'ProteinInfo' object from a given protein sequence by
+        performing a BLAST search on NCBI server.
+
+        Args:
+            sequence (str): The protein sequence to search for.
+            exact_match (bool, optional): If True, only exact matches will be considered.
+                If False, approximate matches will also be included. Defaults to True.
+            database (str, optional): The database to search against. Must be one of
+                the supported databases: 'nr', 'swissprot', 'pdb', 'refseq_protein'.
+                Defaults to 'nr'.
+
+        Returns:
+            ProteinInfo: A 'ProteinInfo' object representing the protein sequence
+                found in the database.
+
+        Raises:
+            AssertionError: If the specified database is not supported.
+        """
+
+        import nest_asyncio
+        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
+
+        nest_asyncio.apply()
+
+        assert (
+            database in NCBIDataBase
+        ), f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
+
+        identity = 1 if exact_match else 0
+
+        blaster = Blast(
+            query=sequence,
+            n_hits=1,
+            identity=identity,
+            matrix=matrix,
+        )
+
+        with Status("Running BLAST", console=Console(force_terminal=False)) as status:
+            result = asyncio.run(
+                blaster.async_run(
+                    NCBIDataBase.NR.value,
+                    BlastProgram.BLASTP.value,
+                )
+            )
+            clear_output()
+
+            accession = blaster.extract_accession(result)
+
+            status.update("Fetching protein data")
+
+            if accession:
+                return asyncio.run(
+                    ProteinFetcher(ids=accession).fetch(force_terminal=False)
+                )[0]
+
+        return
+
+    def ncbi_blast(
         self,
         n_hits: int,
         e_value: float = 10.0,
-        api_key: str = None,
+        database: str = "nr",
+        matrix: str = "BLOSUM62",
+        identity: float = 0.0,
         **kwargs,
     ) -> List["ProteinInfo"]:
-        """Run protein blast for a `ProteinInfo`.
-        Additional keyword arguments can be pass according to the blast [specifications](https://biopython.org/docs/1.75/api/Bio.Blast.NCBIWWW.html).
+        """
+        Runs a BLAST search using the NCBI BLAST service to find similar protein sequences.
 
         Args:
-            n_hits (int): Number of hits to return.
-            e_value (float, optional): E-value threshold. Defaults to 10.0.
-            api_key (str, optional): NCBI API key for sequence retrieval. Defaults to None.
-
+            n_hits (int): The number of hits to retrieve.
+            e_value (float, optional): The maximum E-value threshold for reporting hits. Defaults to 10.0.
+            database (str, optional): The database to search against. Defaults to "nr".
+            matrix (str, optional): The substitution matrix to use. Defaults to "BLOSUM62".
+            identity (float, optional): The minimum sequence identity threshold for reporting hits. Defaults to 0.0.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            List[ProteinInfo]: List of 'ProteinInfo' objects that are the result of the blast search.
+            List[ProteinInfo]: A list of ProteinInfo objects representing the similar protein sequences found.
+
+        Raises:
+            AssertionError: If the specified database is not supported.
+
+        Example:
+            protein_info = ProteinInfo()
+            similar_proteins = protein_info.ncbi_blast(n_hits=10, e_value=0.001, database="swissprot")
         """
-        from pyeed.fetchers import NCBIProteinFetcher
 
-        print("🏃🏼‍♀️ Running PBLAST")
-        print(f"╭── protein name: {self.name}")
-        print(f"├── accession: {self.source_id}")
-        print(f"├── organism: {self.organism.name}")
-        print(f"├── e-value: {e_value}")
-        print(f"╰── max hits: {n_hits}")
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
+        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
+        import nest_asyncio
 
-        result_handle = NCBIWWW.qblast(
-            "blastp",
-            "nr",
-            self.sequence,
-            hitlist_size=n_hits,
-            expect=e_value,
-            **kwargs,
+        nest_asyncio.apply()
+
+        assert database in NCBIDataBase
+
+        program = BlastProgram.BLASTP.value
+        executor = ThreadPoolExecutor(max_workers=1)
+        blaster = Blast(
+            query=self.sequence,
+            n_hits=n_hits,
+            evalue=e_value,
+            matrix=matrix,
+            identity=identity,
         )
-        blast_record = NCBIXML.read(result_handle)
 
-        accessions = self._get_accessions(blast_record)
+        with Status(
+            "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
+        ):
+            result = asyncio.run(blaster.async_run(database, program, executor))
+            clear_output()
 
-        protein_infos = NCBIProteinFetcher(
-            foreign_id=accessions, api_key=api_key
-        ).fetch(ProteinInfo)
-        protein_infos.insert(0, self)
+        accessions = blaster.extract_accession(result)
 
-        print("🎉 Done\n")
-        return protein_infos
+        return asyncio.run(ProteinFetcher(ids=accessions).fetch(force_terminal=False))
 
     def blastp(
         self,
@@ -283,8 +371,7 @@ class ProteinInfo(AbstractSequence):
         return DNAInfo.from_ncbi(self.coding_sequence_ref.id)
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinInfo"]:
-        result_handle = NCBIWWW.qblast("blastn", "nr", sequence, hitlist_size=n_hits)
-        blast_record = NCBIXML.read(result_handle)
+        # blast_record = NCBIXML.read(result_handle)
         raise NotImplementedError("This method is not implemented yet.")
 
     @staticmethod
@@ -296,3 +383,10 @@ class ProteinInfo(AbstractSequence):
 
     def from_accessions(self):
         raise DeprecationWarning("This method is deprecated. Use `get_ids` instead.")
+
+
+if __name__ == "__main__":
+    seq_string = "MSDRNIRVEPVVGRAVEEQDVEIVERKGLGHPDSLCDGIAEHVSQALARAYIDRVGKVLHYNTDETQLVAGTAAPAFGGGEVVDPIYLLITGRATKEYEGTKIPAETIALRAAREYINETLPFLEFGTDVVVDVKLGEGSGDLQEVFGEDGKQVPMSNDTSFGVGHAPLTETERIVLEAERALNGDYSDDNPAVGQDIKVMGKREGDDIDVTVAVAMVDRYVDDLDGYEAAVAGVREFVADLATDYTDRNVSVHVNTADDYDEGAIYLTTTGTSAEQGDDGSVGRGNRSNGLITPNRSMSMEATSGKNPVNHIGKIYNLLSTEIARTVVDEVDGIREIRIRLLSQIGQPIDKPHVADANLVTEDGIEIADIEDEVEAIIDAELENVTSITERVIDGELTTF"
+
+    seq = ProteinInfo.from_sequence(seq_string)
+    print(seq)
