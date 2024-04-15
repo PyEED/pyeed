@@ -1,14 +1,12 @@
 from pydantic import Field, validator
 from typing import TYPE_CHECKING
 
-from pyeed.aligners import AbstractAligner
+from pyeed.align import AbstractAligner
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 
 if TYPE_CHECKING:
     from Bio.Align import Alignment as BioAlignment
     from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
-
-from pyeed.core.sequence import Sequence
 
 
 class PairwiseAligner(AbstractAligner):
@@ -92,8 +90,3 @@ class PairwiseAligner(AbstractAligner):
         from Bio.Align import substitution_matrices
 
         return substitution_matrices.load(self.substitution_matrix)
-
-
-if __name__ == "__main__":
-
-    seq1 = Sequence(sequence="wee")

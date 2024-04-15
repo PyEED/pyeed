@@ -1,9 +1,9 @@
+import io
 import re
-from typing import List, Union
-from pyeed.fetchers import AbstractFetcher, LOGGER, NCBITaxonomyFetcher
-from pyeed.fetchers.entrezrequester import NCBIRequester
+import logging
+from typing import List
 
-import Bio
+from Bio import SeqIO, SeqFeature
 from Bio.SeqRecord import SeqRecord
 from pyeed.core.dnaregion import DNARegion
 from pyeed.core.dnaregiontype import DNARegionType
@@ -14,47 +14,34 @@ from pyeed.core.proteinregion import ProteinRegion
 from pyeed.core.proteinsitetype import ProteinSiteType
 from pyeed.core.span import Span
 
+LOGGER = logging.getLogger(__name__)
 
-class NCBIProteinFetcher(AbstractFetcher):
-    """
-    The `NCBIProteinFetcher` class is a subclass of the `AbstractFetcher` class and is used
-    to fetch protein data from the NCBI database.
-    """
 
-    def __init__(
-        self, foreign_id: Union[int, List[int]], email: str = None, api_key: str = None
-    ):
-        super().__init__(foreign_id)
+class NCBIProteinMapper:
 
-        self.api_key: str = api_key
-        if email is None:
-            self.email: str = self.get_substitute_email()
-        self.taxonomy_dicts: List[dict] = None
+    def __init__(self):
+        pass
 
-    def get(self) -> List[SeqRecord]:
+    def _to_seq_records(self, responses: List[str]) -> List[SeqRecord]:
         """
-        Fetches protein data from NCBI and returns a list of dictionaries of the results.
+        Converts the fetched data to a list of `Bio.SeqRecord.SeqRecord` objects.
         """
+        records = []
+        for response in responses:
+            records.extend(SeqIO.parse(io.StringIO(response), "gb"))
 
-        return NCBIRequester(
-            foreign_id=self.foreign_id,
-            email=self.email,
-            db="protein",
-            api_key=self.api_key,
-            retmode="text",
-            rettype="genbank",
-        ).make_request()
+        return records
 
-    def map(
-        self, seq_records: List[SeqRecord], cls: "ProteinInfo"
-    ) -> List["ProteinInfo"]:
+    def map(self, responses: List[str]) -> List[ProteinInfo]:
         """
         Maps the fetched data to an instance of the `ProteinInfo` class.
         """
 
+        seq_records = self._to_seq_records(responses)
+
         protein_infos = []
         for record in seq_records:
-            protein_info = cls(source_id=record.id, sequence=str(record.seq))
+            protein_info = ProteinInfo(source_id=record.id, sequence=str(record.seq))
 
             protein_info.organism = Organism(**self.map_organism(record))
 
@@ -109,28 +96,7 @@ class NCBIProteinFetcher(AbstractFetcher):
 
         return {"name": organism_name[0], "taxonomy_id": taxonomy_id}
 
-    def fetch(self, cls: "ProteinInfo") -> List[ProteinInfo]:
-        """
-        Fetches protein data from NCBI and returns a list of instances of the 'ProteinInfo' class.
-        """
-
-        seq_records = self.get()
-        protein_infos = self.map(seq_records, cls)
-
-        unique_tax_ids = set([info.organism.taxonomy_id for info in protein_infos])
-
-        organisms = NCBITaxonomyFetcher(
-            list(unique_tax_ids), self.email, self.api_key
-        ).fetch(Organism)
-
-        for protein_info in protein_infos:
-            for organism in organisms:
-                if protein_info.organism.taxonomy_id == organism.taxonomy_id:
-                    protein_info.organism = organism
-
-        return protein_infos
-
-    def map_protein(self, seq_record: SeqRecord, protein_info: "ProteinInfo"):
+    def map_protein(self, seq_record: SeqRecord, protein_info: ProteinInfo):
         """Maps protein data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
         protein = self.get_feature(seq_record, "Protein")
@@ -179,12 +145,17 @@ class NCBIProteinFetcher(AbstractFetcher):
 
         return protein_info
 
-    def map_regions(self, seq_record: SeqRecord, protein_info: "ProteinInfo"):
+    def map_regions(self, seq_record: SeqRecord, protein_info: ProteinInfo):
         """Maps region data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
         regions = self.get_feature(seq_record, "region")
         for region in regions:
             try:
+                if "db_xref" not in region.qualifiers:
+                    db_xref = None
+                else:
+                    db_xref = region.qualifiers["db_xref"][0]
+
                 protein_info.regions.append(
                     ProteinRegion(
                         name=region.qualifiers["region_name"][0],
@@ -195,7 +166,7 @@ class NCBIProteinFetcher(AbstractFetcher):
                             )
                         ],
                         note=region.qualifiers["note"][0],
-                        cross_reference=region.qualifiers["db_xref"][0],
+                        cross_reference=db_xref,
                     )
                 )
             except KeyError:
@@ -288,20 +259,10 @@ class NCBIProteinFetcher(AbstractFetcher):
 
         return region
 
-    def get_feature(
-        self, seq_record: SeqRecord, feature_type: str
-    ) -> "Bio.SeqFeature.SeqFeature":
+    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
             feature
             for feature in seq_record.features
             if feature.type.lower() == feature_type.lower()
         ]
-
-
-if __name__ == "__main__":
-    id = ["UCS38941.1", "NP_001191"]
-    fetcher = NCBIProteinFetcher(id)
-    res = fetcher.fetch()
-    print(res[0])
-    print(res[1])
