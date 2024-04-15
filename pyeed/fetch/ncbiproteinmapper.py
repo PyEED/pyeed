@@ -22,18 +22,22 @@ class NCBIProteinMapper:
     def __init__(self):
         pass
 
-    def _to_seq_records(self, data: dict) -> List[SeqRecord]:
+    def _to_seq_records(self, responses: List[str]) -> List[SeqRecord]:
         """
         Converts the fetched data to a list of `Bio.SeqRecord.SeqRecord` objects.
         """
-        return SeqIO.parse(io.StringIO(data[0]), "gb")
+        records = []
+        for response in responses:
+            records.extend(SeqIO.parse(io.StringIO(response), "gb"))
 
-    def map(self, seq_records: List[str]) -> List[ProteinInfo]:
+        return records
+
+    def map(self, responses: List[str]) -> List[ProteinInfo]:
         """
         Maps the fetched data to an instance of the `ProteinInfo` class.
         """
 
-        seq_records = self._to_seq_records(seq_records)
+        seq_records = self._to_seq_records(responses)
 
         protein_infos = []
         for record in seq_records:

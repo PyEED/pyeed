@@ -23,7 +23,7 @@ class ProteinFetcher:
         # self.ncbi_key = ncbi_key #TODO: Add NCBI key to NCBI requester
         nest_asyncio.apply()
 
-    async def fetch(self, force_terminal: bool = False):
+    async def fetch(self, **console_kwargs):
         """
         Fetches protein data from various databases based on the provided IDs.
 
@@ -40,7 +40,9 @@ class ProteinFetcher:
         """
         db_entries = SortIDs.sort(self.ids)
 
-        with Progress(console=Console(force_terminal=force_terminal)) as progress:
+        with Progress(
+            console=Console(**console_kwargs),
+        ) as progress:
             requesters: List[AsyncRequester] = []
             for db_name, db_ids in db_entries.items():
 
@@ -112,9 +114,10 @@ class ProteinFetcher:
             )
 
             # map data to objects
-            ncbi_response, uniprot_response = self.identify_data_source(responses)
+            ncbi_responses, uniprot_response = self.identify_data_source(responses)
 
-            ncbi_entries = NCBIProteinMapper().map(ncbi_response)
+            ncbi_entries = NCBIProteinMapper().map(ncbi_responses)
+
             uniprot_entries = [
                 UniprotMapper().map(*resp) for resp in uniprot_response.values()
             ]
@@ -136,11 +139,13 @@ class ProteinFetcher:
                 task_id=task_id,
                 progress=progress,
                 batch_size=1,
-                rate_limit=10,
+                rate_limit=50,
                 n_concurrent=20,
             )
 
             taxonomies = await tax_requester.make_request()
+
+            progress.update(task_id, completed=len(unique_tax_ids))
 
             # map taxonomy data to objects
             organisms = [TaxonomyMapper().map(entry) for entry in taxonomies]
@@ -166,22 +171,23 @@ class ProteinFetcher:
 
         """
         uniprot = {}
+        ncbi = None
         for response in responses:
             if response[0].startswith("LOCUS"):
                 ncbi = response
-                print("NCBI detected")
             elif response[0].startswith("{"):
-                print("INTERPRO detected")
                 uniprot[DBPattern.INTERPRO.name] = [
                     json.loads(entry) for entry in response
                 ]
             elif response[0].startswith("["):
-                print("UNIPROT detected")
                 uniprot[DBPattern.UNIPROT.name] = [
                     json.loads(entry)[0] for entry in response
                 ]
             else:
                 LOGGER.warning(f"Response could not be mapped to mapper: {response[0]}")
+
+        if not ncbi:
+            ncbi = []
 
         if uniprot:
             uniprot_dict = self.sort_uniprot_by_id(uniprot)

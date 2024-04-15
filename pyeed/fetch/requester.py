@@ -51,7 +51,7 @@ class AsyncRequester:
         self.progress = Progress(disable=True)
         self.task_id = self.progress.add_task("Requesting data...", total=len(self.ids))
 
-    async def send_request(self, args: RequestArgs):
+    async def send_request(self, args: RequestArgs) -> str:
         """
         Sends an asynchronous HTTP GET request to the specified URL using the provided
         AsyncClient.
@@ -63,7 +63,6 @@ class AsyncRequester:
         Returns:
             str: The response text from the request.
         """
-
         client = args.client
         url = args.url
 
