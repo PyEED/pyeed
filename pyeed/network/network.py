@@ -1,6 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 import networkx as nx
+import py4cytoscape as p4c
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Optional
@@ -10,7 +11,7 @@ from Bio.Align import Alignment as BioAlignment
 from joblib import Parallel, delayed, cpu_count
 from typing import List, Optional, Union, Tuple, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+from py4cytoscape import gen_node_color_map, gen_node_size_map, scheme_c_number_continuous
 
 from pyeed.core.sequence import Sequence
 from pyeed.core.abstractsequence import AbstractSequence
@@ -79,7 +80,6 @@ class SequenceNetwork(BaseModel):
         self.sequences = sequences
         self.threshold = threshold
 
-
     def add_target(self, target: AbstractSequence):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
@@ -145,6 +145,35 @@ class SequenceNetwork(BaseModel):
                 f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
             )        
 
+    def create_cytoscope_graph(self, collection: str, title: str, threshold):
+        # assert that the cytoscope API is running and cytoscope is running in the background
+        assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
+        assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
+        # TODO fix that the title an dcollection is set unique in order to avoid confuing when using the software
+        p4c.create_network_from_networkx(self.graph, collection=collection, title=title)
+
+
+    def set_layout(self, layout_name: str="force-directed", properties_dict: dict={"defaultSpringCoefficient": 4e-5, "defaultSpringLength": 100, "defaultNodeMass": 3, "numIterations": 50,}):
+        p4c.layout_network(layout_name)
+        # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
+        p4c.set_layout_properties(layout_name=layout_name, properties_dict=properties_dict)
+
+        p4c.scale_layout(axis='Both Axis', scale_factor=1.0)
+        p4c.layout_network(layout_name)
+
+    def filter_cytoscope_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
+        # this is a filter for the network in cytoscope
+        # here the nodes and edges not relevant are filtered out
+        p4c.create_column_filter(name, parameter, [min_val, max_val] , "BETWEEN", type='edges', apply=True, hide=True)
+
+    def calculate_degree(self):
+        # Calculate degree of nodes with filtering
+        g = p4c.create_networkx_from_network()
+        nx.set_node_attributes(g, dict(nx.degree(self.graph)), "degree")
+        p4c.create_network_from_networkx(g, collection='tet', title='hfjakd')
+
+
+
     @property
     def graph(self) -> nx.Graph:
         """
@@ -189,54 +218,14 @@ class SequenceNetwork(BaseModel):
                     'taxonomy_id': sequence.organism.taxonomy_id,
                 })
 
-            # Setting up a ThreadPoolExecutor to manage a pool of threads
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                # Submitting tasks to the executor
-                futures = [executor.submit(process_sequence, seq) for seq in self.sequences]
+            print('Processing Sequences in for loop')
 
-                # Collecting results as they complete
-                for future in as_completed(futures):
-                    node_data.append(future.result())
+            for sequence in self.sequences:
+                node_data.append(process_sequence(sequence))
+            print('Adding in networx')
 
-
-
-            # for sequence in self.sequences:
-
-            #     node_data.append((sequence.source_id, {
-            #         'name': sequence.name,
-            #         'family_name': sequence.family_name,
-            #         'domain': sequence.organism.domain,
-            #         'kingdom': sequence.organism.kingdom,
-            #         'phylum': sequence.organism.phylum,
-            #         'tax_class': sequence.organism.tax_class,
-            #         'order': sequence.organism.order,
-            #         'family': sequence.organism.family,
-            #         'genus': sequence.organism.genus,
-            #         'species': sequence.organism.species,
-            #         'ec_number': sequence.ec_number,
-            #         'mol_weight': sequence.mol_weight,
-            #         'taxonomy_id': sequence.organism.taxonomy_id,
-            #     }))                
-
-                # graph.add_node(
-                #     sequence.source_id,
-                #     name=sequence.name,
-                #     familiy_name=sequence.family_name,
-                #     domain=sequence.organism.domain,
-                #     kingdome=sequence.organism.kingdom,
-                #     phylum=sequence.organism.phylum,
-                #     tax_class=sequence.organism.tax_class,
-                #     order=sequence.organism.order,
-                #     family=sequence.organism.family,
-                #     genus=sequence.organism.genus,
-                #     species=sequence.organism.species,
-                #     ec_number=sequence.ec_number,
-                #     mol_weight=sequence.mol_weight,
-                #     taxonomy_id=sequence.organism.taxonomy_id,
-                # )
-
-                graph.add_nodes_from(node_data)
-
+            graph.add_nodes_from(node_data)
+            print('nodes added ')
 
 
         else:
@@ -255,79 +244,43 @@ class SequenceNetwork(BaseModel):
                     taxonomy_id=sequence.organism.taxonomy_id,
                 )
 
-        print('this is the threshold', self.threshold)
 
+        # create a datafarme for the egdes
+        edge_data = []
 
-        if self.threshold != None:
-
-            # create a datafarme for the egdes
-            edge_data = []
-
-            def process_pair(alignment, pair):
-                shorter_seq = min(pair, key=lambda x: len(x.sequence))
-                
-                identities = alignment.counts().identities
-                identity = identities / len(shorter_seq.sequence)
-                
-                if identity >= self.threshold:
-                    return (
-                        pair[0].source_id, pair[1].source_id,
-                        {
-                            'identity': identity,
-                            'gaps': 1 / (alignment.counts().gaps + 1),
-                            'mismatches': 1 / (alignment.counts().mismatches + 1),
-                            'score': alignment.score
-                        }
-                    )
-                return None
-
-            with ThreadPoolExecutor() as executor:
-                # Submit tasks to the executor.
-                future_to_pair = {executor.submit(process_pair, alignment, pair): (alignment, pair) for alignment, pair in zip(alignments, pairs)}
-                
-                # Collecting results as they complete.
-                for future in as_completed(future_to_pair):
-                    result = future.result()
-                    if result is not None:
-                        edge_data.append(result)
-
-
-
-            # for alignment, pair in zip(alignments, pairs):
-            #     shorter_seq = min(list(pair), key=lambda x: len(x.sequence))
-
-            #     identities = alignment.counts().identities
-            #     identity = identities / len(shorter_seq.sequence)
-
-            #     if identity >= self.threshold:
-            #         edge_data.append(((list(pair)[0].source_id, list(pair)[1].source_id,{ 
-            #             'identity': identity, 
-            #             'gaps': 1 / (alignment.counts().gaps + 1), 
-            #             'mismatches': 1 / (alignment.counts().mismatches + 1), 
-            #             'score': alignment.score} )))
+        def process_pair(alignment, pair):
+            shorter_seq = min(pair, key=lambda x: len(x.sequence))
             
-            graph.add_edges_from(edge_data)
-                    
+            identities = alignment.counts().identities
+            identity = identities / len(shorter_seq.sequence)
+            if self.threshold is not None and identity < self.threshold:
+                return None
+            return (
+                pair[0].source_id, pair[1].source_id,
+                {
+                    'identity': identity,
+                    'gaps': 1 / (alignment.counts().gaps + 1),
+                    'mismatches': 1 / (alignment.counts().mismatches + 1),
+                    'score': alignment.score
+                }
+            )
 
-        else:
-            for alignment, pair in zip(alignments, pairs):
+        print('Processing Pairs in for loop')
 
-                identities = alignment.counts().identities
-                identity = identities / len(shorter_seq.sequence)
-
-                graph.add_edge(
-                        list(pair)[0].source_id,
-                        list(pair)[1].source_id,
-                        identity=identity,
-                        gaps = 1 / (alignment.counts().gaps + 1),
-                        mismatches = 1 / (alignment.counts().mismatches + 1),
-                        score = alignment.score,
-                )
-
+        for alignment, pair in zip(alignments, pairs):
+            edge = process_pair(alignment, pair)
+            if edge:
+                edge_data.append(edge)
+        print('Adding in networx')
+        graph.add_edges_from(edge_data)
+        print('edges added ')
         # Calculate betweenness centrality
         betweenness = nx.betweenness_centrality(graph)
         for node, betw_value in betweenness.items():
             graph.nodes[node]["betweenness"] = betw_value
+
+        # Calculate degree of nodes without filtering
+        nx.set_node_attributes(graph, dict(nx.degree(graph)), "degree_all")
 
         # Calculate node positions based on dimensions
         if self.dimensions == 2:
