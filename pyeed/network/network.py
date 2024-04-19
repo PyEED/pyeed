@@ -40,6 +40,13 @@ class SequenceNetwork(BaseModel):
         visualize(): Visualizes the network graph.
     """
 
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            nx.Graph: lambda g: nx.node_link_data(g),
+        }
+
+
     sequences: Optional[List[AbstractSequence]] = Field(
         default=[],
         description="List of sequences to be compared",
@@ -74,6 +81,12 @@ class SequenceNetwork(BaseModel):
         default=[],
         description="List of selected sequences",
     )
+
+    network: Optional[nx.Graph] = Field(
+        default=None,
+        description="Network graph with networkx",
+    )
+
 
     def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
         super().__init__()
@@ -143,14 +156,91 @@ class SequenceNetwork(BaseModel):
         else:
             raise ValueError(
                 f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
-            )        
+            )   
+     
+    def _process_pair(self, alignment, pair):
+            shorter_seq = min(pair, key=lambda x: len(x.sequence))
+            
+            identities = alignment.counts().identities
+            identity = identities / len(shorter_seq.sequence)
+            return (
+                pair[0].source_id, pair[1].source_id,
+                {
+                    'identity': identity,
+                    'gaps': 1 / (alignment.counts().gaps + 1),
+                    'mismatches': 1 / (alignment.counts().mismatches + 1),
+                    'score': alignment.score
+                }
+            )
+    
+    def _process_sequence(self, sequence):
+        return (sequence.source_id, {
+            'name': sequence.name,
+            'sequence': sequence.sequence,
+            'family_name': sequence.family_name,
+            'domain': sequence.organism.domain,
+            'kingdom': sequence.organism.kingdom,
+            'phylum': sequence.organism.phylum,
+            'tax_class': sequence.organism.tax_class,
+            'order': sequence.organism.order,
+            'family': sequence.organism.family,
+            'genus': sequence.organism.genus,
+            'species': sequence.organism.species,
+            'ec_number': sequence.ec_number,
+            'mol_weight': sequence.mol_weight,
+            'taxonomy_id': sequence.organism.taxonomy_id,
+        })
 
-    def create_cytoscope_graph(self, collection: str, title: str, threshold):
+    def create_networkx_graph(self):
+        # TODO: check if such a graph already exists
+        self.network = nx.Graph()
+        # create the alignments
+        alignments, pairs, mode = self._create_pairwise_alignments(self.sequences, PairwiseAligner, mode="global")
+        # Add nodes and assign node attributes
+        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
+            # the node data list
+            node_data = []
+
+            for sequence in self.sequences:
+                node_data.append(self._process_sequence(sequence))
+            # here the actual add happens
+            self.network.add_nodes_from(node_data)
+
+        else:
+            for sequence in self.sequences:
+                self.network.add_node(
+                    sequence.source_id,
+                    name=sequence.name,
+                    domain=sequence.organism.domain,
+                    kingdome=sequence.organism.kingdom,
+                    phylum=sequence.organism.phylum,
+                    tax_class=sequence.organism.tax_class,
+                    order=sequence.organism.order,
+                    family=sequence.organism.family,
+                    genus=sequence.organism.genus,
+                    species=sequence.organism.species,
+                    taxonomy_id=sequence.organism.taxonomy_id,
+                )
+
+        # create the edge data --> this will have no threshold, the threshold will be set in the create_cytoscope_graph method, for ech graph individually
+        edge_data = []
+
+        for alignment, pair in zip(alignments, pairs):
+            edge = self._process_pair(alignment, pair)
+            if edge:
+                edge_data.append(edge)
+
+        self.network.add_edges_from(edge_data)
+
+
+
+
+    def create_cytoscope_graph(self, collection: str, title: str, threshold: float = 0.8):
         # assert that the cytoscope API is running and cytoscope is running in the background
         assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
         assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
         # TODO fix that the title an dcollection is set unique in order to avoid confuing when using the software
-        p4c.create_network_from_networkx(self.graph, collection=collection, title=title)
+        p4c.create_network_from_networkx(self.graph, collection=collection, title=title+'_'+str(threshold))
 
 
     def set_layout(self, layout_name: str="force-directed", properties_dict: dict={"defaultSpringCoefficient": 4e-5, "defaultSpringLength": 100, "defaultNodeMass": 3, "numIterations": 50,}):
