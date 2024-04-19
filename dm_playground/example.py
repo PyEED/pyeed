@@ -22,6 +22,7 @@ family1 = protein.add_to_families(
 print("annotations of the protein: ", protein.annotations_)
 print("annotations of the domain", protein.domains[0].annotations_)
 print("annotations of the family", protein.families[0].annotations_)
+print(protein.accession_id.__annotations__)
 
 
 
