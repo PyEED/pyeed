@@ -9,7 +9,7 @@ prefixes:
 
 ### SequenceRecord (EDAM:data_0848)
 
-A molecular sequence and associated metadata.
+A molecular sequence and associated annotation data.
 
 - uri
   - Type: string
