@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate sdRDM library
-        uses: JR-1991/generate-sdrdm-api@main
+        uses: JR-1991/generate-sdrdm-api@63-terms-and-external-model-handling
         with:
           library_name: pyeed
           schema_path: "./specifications/sequence_record.md"
