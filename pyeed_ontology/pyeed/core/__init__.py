@@ -9,7 +9,6 @@ from .annotationtype import AnnotationType
 from .sequencetype import SequenceType
 
 __doc__ = ""
-
 __all__ = [
     "SequenceRecord",
     "ProteinRecord",
