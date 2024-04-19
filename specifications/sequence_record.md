@@ -11,6 +11,18 @@ prefixes:
 
 A molecular sequence and associated metadata.
 
+- uri
+  - Type: string
+  - Description: URI of the sequence.
+  - Term: EDAM:data_0848
+- accession_id
+  - Type: string
+  - Description: Accession ID of the sequence.
+  - Term: EDAM:data_2091
+- name
+  - Type: string
+  - Description: Arbtrary name of the sequence.
+  - Term: EDAM:data_1009
 - organism
   - Type: Organism
   - Description: The organism from which the sequence was obtained.
@@ -19,32 +31,20 @@ A molecular sequence and associated metadata.
 
 A protein sequence and associated metadata.
 
-- accession_id
-  - Type: string
-  - Description: Accession ID of the protein sequence.
-  - Term: EDAM:data_2091
-- name
-  - Type: string
-  - Description: Name of the protein sequence.
-  - Term: EDAM:data_1009
 - **sequence**
   - Type: string
   - Description: Amino acid sequence of the protein.
   - Term: EDAM:data_2976
-- families
+- regions
   - Type: Region[]
-  - Description: Family of the protein
-  - Term: EDAM:data_1131
-- domains
-  - Type: Region[]
-  - Description: Domains of the protein
-  - Term: EDAM:data_1468
+  - Description: Defines regions within the protein sequence
 - sites
-  - Type: Position[]
-  - Description: Annotations of different sites
+  - Type: Site[]
+  - Description: Defines sites within the protein sequence
 - coding_sequence
   - Type: Region[]
   - Description: Defines the coding sequence of the protein
+  - Term: EDAM:topic_3511
 - ec_number
   - Type: string
   - Description: An Enzyme Commission (EC) number of an enzyme.
@@ -55,31 +55,31 @@ A protein sequence and associated metadata.
 - pdb_id
   - Type: string
   - Description: Protein Data Bank (PDB) identifier.
-- alphafold_id
-  - Type: string
-  - Description: AlphaFold identifier.
+  - Term: EDAM:data_1127
 
-### DNARecord[_SequenceRecord_] (EDAM:data_0848)
+### DNARecord[_SequenceRecord_] (EDAM:data_2887)
 
 Description of a nucleotide sequence 🧬.
 
-- name
-  - Type: string
-  - Description: Name of the nucleotide sequence.
 - **sequence**
   - Type: string
   - Description: Nucleotide sequence.
+  - Term: EDAM:data_3494
 - regions
-  - Type: Region
-  - Description: Defines regions within the nucleotide sequence that code for the protein sequence
-- ori
-  - Type: Position
-  - Description: Origin of replication
+  - Type: Region[]
+  - Description: Defines regions within the nucleotide sequence.
+- sites
+  - Type: Site[]
+  - Description: Defines sites within the nucleotide sequence that code for the protein sequence.
+- gc_content
+  - Type: float
+  - Description: GC content of the sequence.
 
-## Annotations
+### AbstractAnnotation
 
-### Annotation
-
+- uri
+  - Type: string
+  - Description: URI of the annotation.
 - accession_id
   - Type: string
   - Description: Accession ID of the annotation.
@@ -87,35 +87,25 @@ Description of a nucleotide sequence 🧬.
 - name
   - Type: string
   - Description: A name of a sequence feature, e.g. the name of a feature
-- publications
-  - Type: DOI[]
-  - Description: DOI of the publication(s) referenced in the annotation.
 
-### DOI
+### Site[_AbstractAnnotation_]
 
-- doi
-  - Type: string
-  - Description: Digital Object Identifier (DOI) of a publication.
-  - Term: EDAM:data_0849
+Position(s) constituting a site within a sequence.
 
-### Region[_Annotation_]
+- positions
+  - Type: integer[]
+  - Description: Position of the site(s) within the sequence.
 
-Annotation of a region within a sequence 🗺️.
+### Region
+
+Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions.
 
 - start
   - Type: integer
-  - Description: Start position in the amino acid sequence of the annotated region.
+  - Description: Start position of the site.
 - end
   - Type: integer
-  - Description: End position position in the amino acid sequence of the annotated region.
-
-### Position
-
-Annotation of a site within a sequence 📍.
-
-- position
-  - Type: integer
-  - Description: Position in a sequence.
+  - Description: End position of the site.
 
 ### Organism
 
@@ -157,3 +147,26 @@ Description of an organism 🦠.
   - Type: string
   - Description: The name of a species (typically a taxonomic group) of organism.
   - Term: EDAM:data_1045
+
+## Enumerations
+
+### AnnotationType
+
+Ontology terms for different sections of a sequence.
+
+```python
+ACTIVE_SITE = "http://semanticscience.org/resource/SIO_010041"
+BINDING_SITE = "http://semanticscience.org/resource/SIO_010040"
+DOMAIN = "http://semanticscience.org/resource/SIO_001379"
+FAMILY = "http://semanticscience.org/resource/SIO_001380"
+MOTIVE = "http://semanticscience.org/resource/SIO_000131"
+```
+
+### SequenceType
+
+Ontology terms for different types of sequences.
+
+```python
+DNA = "http://semanticscience.org/resource/SIO_010018"
+PROTEIN = "http://semanticscience.org/resource/SIO_010015"
+```

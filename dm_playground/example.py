@@ -1,31 +1,15 @@
-from pyeed_ontology.core import ProteinRecord, Region
+from pyeed_ontology.core import ProteinRecord, Region, AnnotationType
 
 protein = ProteinRecord(
     name="my_protein",
     sequence="MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEG",
 )
 
-# Add annotations to the protein
-atp_hydrolysis_activity = "http://purl.obolibrary.org/obo/GO_0016887"
-protein.annotations_.append(atp_hydrolysis_activity)
-
-# Add a region, annotated as a domain to the protein
-domain1 = protein.add_to_domains(
-    start=1, end=34, name="domain1", accession_id="PF00001"
+protein.add_to_sites(
+    positions=[5, 7, 11],
+    annotation=AnnotationType.ACTIVE_SITE.value,
+    name="my_active_site",
 )
 
-# Add a region, annotated as a family to the protein
-family1 = protein.add_to_families(
-    name="family1", accession_id="pfam00001", start=1, end=34
-)
-
-print("annotations of the protein: ", protein.annotations_)
-print("annotations of the domain", protein.domains[0].annotations_)
-print("annotations of the family", protein.families[0].annotations_)
-print(protein.accession_id.__annotations__)
-
-
-
-
-# with open("dm_playground/protein.json", "w") as f:
-#     f.write(protein.json())
+with open("protein.json", "w") as f:
+    f.write(protein.model_dump_json())

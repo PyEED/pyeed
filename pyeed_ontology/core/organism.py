@@ -1,18 +1,22 @@
 import sdRDM
-
 import validators
+
 from typing import Dict, List, Optional
-from pydantic import PrivateAttr, field_validator, model_validator
 from uuid import uuid4
+from pydantic import PrivateAttr, field_validator, model_validator
 from pydantic_xml import attr, element
 from lxml.etree import _Element
+
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 
 @forge_signature
-class Organism(sdRDM.DataModel, search_mode="unordered"):
+class Organism(
+    sdRDM.DataModel,
+    search_mode="unordered",
+):
     """Description of an organism 🦠."""
 
     id: Optional[str] = attr(
@@ -28,14 +32,18 @@ class Organism(sdRDM.DataModel, search_mode="unordered"):
             " order, or any other group in the NCBI taxonomy database."
         ),
         tag="taxonomy_id",
-        json_schema_extra=dict(term="http://edamontology.org/data_1179"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_1179",
+        ),
     )
 
     name: Optional[str] = element(
         description="The name of an organism (or group of organisms).",
         default=None,
         tag="name",
-        json_schema_extra=dict(term="http://edamontology.org/data_2909"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2909",
+        ),
     )
 
     domain: Optional[str] = element(
@@ -49,7 +57,9 @@ class Organism(sdRDM.DataModel, search_mode="unordered"):
         description="Kingdom of the organism",
         default=None,
         tag="kingdom",
-        json_schema_extra=dict(term="http://edamontology.org/data_1044"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_1044",
+        ),
     )
 
     phylum: Optional[str] = element(
@@ -77,51 +87,53 @@ class Organism(sdRDM.DataModel, search_mode="unordered"):
         description="The name of a family of organism.",
         default=None,
         tag="family",
-        json_schema_extra=dict(term="http://edamontology.org/data_2732"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2732",
+        ),
     )
 
     genus: Optional[str] = element(
         description="The name of a genus of organism.",
         default=None,
         tag="genus",
-        json_schema_extra=dict(term="http://edamontology.org/data_1870"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_1870",
+        ),
     )
 
     species: Optional[str] = element(
         description="The name of a species (typically a taxonomic group) of organism.",
         default=None,
         tag="species",
-        json_schema_extra=dict(term="http://edamontology.org/data_1045"),
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_1045",
+        ),
     )
 
     annotations_: List[str] = element(
         tag="annotations_",
         alias="@type",
         description="Annotation of the given object.",
-        default=["Organism"],
+        default=[
+            "Organism",
+        ],
     )
+
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
     def _parse_raw_xml_data(self):
         for attr, value in self:
             if isinstance(value, (ListPlus, list)) and all(
-                (isinstance(i, _Element) for i in value)
+                isinstance(i, _Element) for i in value
             ):
                 self._raw_xml_data[attr] = [elem2dict(i) for i in value]
             elif isinstance(value, _Element):
                 self._raw_xml_data[attr] = elem2dict(value)
+
         return self
 
     @field_validator("annotations_")
-    @classmethod
-    def _validate_annotation(cls, annotations):
-        """Check if the annotation that has been set is a valid URL."""
-        for annotation in annotations:
-            if not validators.url(annotation) and annotation != cls.__name__:
-                raise ValueError(f"Invalid Annotation URL: {annotation}")
-        return annotations
-
     @classmethod
     def _validate_annotation(cls, annotations):
         """Check if the annotation that has been set is a valid URL."""

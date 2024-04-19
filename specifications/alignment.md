@@ -2,7 +2,7 @@
 
 ## Objects
 
-### Alignment
+### AlignmentResult
 
 - input_sequences
   - Type: Sequence[]
@@ -21,7 +21,7 @@
   - Description: Standard numbering of the aligned sequences
   - Multiple: True
 
-### PairwiseAlignment[_Alignment_]
+### PairwiseAlignment[_AlignmentData_]
 
 - score
   - Type: float
