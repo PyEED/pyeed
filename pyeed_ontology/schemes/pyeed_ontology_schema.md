@@ -2,56 +2,50 @@
 classDiagram
     SequenceRecord <-- ProteinRecord
     SequenceRecord <-- DNARecord
-    Annotation <-- Region
+    AbstractAnnotation <-- Site
     SequenceRecord *-- Organism
+    ProteinRecord *-- Site
     ProteinRecord *-- Region
-    ProteinRecord *-- Position
+    DNARecord *-- Site
     DNARecord *-- Region
-    DNARecord *-- Position
-    Annotation *-- DOI
     
     class SequenceRecord {
+        +string uri
+        +string accession_id
+        +string name
         +Organism organism
     }
     
     class ProteinRecord {
-        +string accession_id
-        +string name
         +string sequence*
-        +Region[0..*] families
-        +Region[0..*] domains
-        +Position[0..*] sites
+        +Region[0..*] regions
+        +Site[0..*] sites
         +Region[0..*] coding_sequence
         +string ec_number
         +float mol_weight
         +string pdb_id
-        +string alphafold_id
     }
     
     class DNARecord {
-        +string name
         +string sequence*
-        +Region regions
-        +Position ori
+        +Region[0..*] regions
+        +Site[0..*] sites
+        +float gc_content
     }
     
-    class Annotation {
+    class AbstractAnnotation {
+        +string uri
         +string accession_id
         +string name
-        +DOI[0..*] publications
     }
     
-    class DOI {
-        +string doi
+    class Site {
+        +integer[0..*] positions
     }
     
     class Region {
         +integer start
         +integer end
-    }
-    
-    class Position {
-        +integer position
     }
     
     class Organism {
@@ -65,6 +59,21 @@ classDiagram
         +string family
         +string genus
         +string species
+    }
+    
+    class AnnotationType {
+        << Enumeration >>
+        +ACTIVE_SITE
+        +BINDING_SITE
+        +DOMAIN
+        +FAMILY
+        +MOTIVE
+    }
+    
+    class SequenceType {
+        << Enumeration >>
+        +DNA
+        +PROTEIN
     }
     
 ```

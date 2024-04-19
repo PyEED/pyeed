@@ -1,20 +1,23 @@
 from .sequencerecord import SequenceRecord
 from .proteinrecord import ProteinRecord
 from .dnarecord import DNARecord
-from .annotation import Annotation
-from .doi import DOI
+from .abstractannotation import AbstractAnnotation
+from .site import Site
 from .region import Region
-from .position import Position
 from .organism import Organism
+from .annotationtype import AnnotationType
+from .sequencetype import SequenceType
 
 __doc__ = ""
+
 __all__ = [
     "SequenceRecord",
     "ProteinRecord",
     "DNARecord",
-    "Annotation",
-    "DOI",
+    "AbstractAnnotation",
+    "Site",
     "Region",
-    "Position",
     "Organism",
+    "AnnotationType",
+    "SequenceType",
 ]
