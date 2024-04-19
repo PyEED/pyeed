@@ -11,5 +11,5 @@ protein.add_to_sites(
     name="my_active_site",
 )
 
-with open("protein.json", "w") as f:
+with open("proteiin.json", "w") as f:
     f.write(protein.model_dump_json())
