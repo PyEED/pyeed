@@ -11,5 +11,5 @@ jobs:
         with:
           library_name: pyeed
           schema_path: "./specifications/sequence_record.md"
-          out_dir: "./pyeed"
+          out_dir: "./"
           branch: "63-terms-and-external-model-handling"
