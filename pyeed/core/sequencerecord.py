@@ -1,10 +1,9 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional, Set
 from uuid import uuid4
 
 import sdRDM
-import validators
 from lxml.etree import _Element
-from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
@@ -61,15 +60,12 @@ class SequenceRecord(
         ),
     )
 
-    annotations_: List[str] = element(
-        tag="annotations_",
-        alias="@type",
-        description="Annotation of the given object.",
-        default=[
-            "SequenceRecord",
-            "http://edamontology.org/data_0849",
-        ],
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="a74a385ecb66052de0f011cd5cade02033188e55"
     )
+
+    _object_terms: Set[str] = PrivateAttr(default={"http://edamontology.org/data_0849"})
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
@@ -84,14 +80,3 @@ class SequenceRecord(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
-
-    @field_validator("annotations_")
-    @classmethod
-    def _validate_annotation(cls, annotations):
-        """Check if the annotation that has been set is a valid URL."""
-
-        for annotation in annotations:
-            if not validators.url(annotation) and annotation != cls.__name__:
-                raise ValueError(f"Invalid Annotation URL: {annotation}")
-
-        return annotations

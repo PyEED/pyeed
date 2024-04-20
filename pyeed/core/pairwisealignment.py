@@ -1,18 +1,15 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from uuid import uuid4
 
-import validators
 from lxml.etree import _Element
-from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 from .alignmentdata import AlignmentData
 
 
-@forge_signature
 class PairwiseAlignment(
     AlignmentData,
     search_mode="unordered",
@@ -61,13 +58,9 @@ class PairwiseAlignment(
         json_schema_extra=dict(),
     )
 
-    annotations_: List[str] = element(
-        tag="annotations_",
-        alias="@type",
-        description="Annotation of the given object.",
-        default=[
-            "PairwiseAlignment",
-        ],
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="a74a385ecb66052de0f011cd5cade02033188e55"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -83,14 +76,3 @@ class PairwiseAlignment(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
-
-    @field_validator("annotations_")
-    @classmethod
-    def _validate_annotation(cls, annotations):
-        """Check if the annotation that has been set is a valid URL."""
-
-        for annotation in annotations:
-            if not validators.url(annotation) and annotation != cls.__name__:
-                raise ValueError(f"Invalid Annotation URL: {annotation}")
-
-        return annotations
