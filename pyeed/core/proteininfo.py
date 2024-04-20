@@ -1,23 +1,22 @@
+
 import os
-from typing import List, Optional
 import warnings
-from pydantic import Field
+from typing import List, Optional
+from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
-
-
-from .dnainfo import DNAInfo
+from pyeed.containers.abstract_container import Blastp
+from .proteinsitetype import ProteinSiteType
 from .proteinregion import ProteinRegion
+from .span import Span
+from .substrate import Substrate
+from .citation import Citation
+from .proteinregiontype import ProteinRegionType
+from .dnaregion import DNARegion
 from .abstractsequence import AbstractSequence
 from .site import Site
-from .citation import Citation
-from .span import Span
-from .proteinregiontype import ProteinRegionType
-from .substrate import Substrate
-from .dnaregion import DNARegion
-from .proteinsitetype import ProteinSiteType
-from pyeed.containers.abstract_container import Blastp
+from .dnainfo import DNAInfo
 
 
 @forge_signature
@@ -66,6 +65,10 @@ class ProteinInfo(AbstractSequence):
         description="Promiscuous substrates of the protein",
         default_factory=ListPlus,
         multiple=True,
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
     )
 
     def add_to_regions(
@@ -163,7 +166,7 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from pyeed.fetchers import NCBIProteinFetcher, NCBITaxonomyFetcher
+        from pyeed.fetchers import NCBIProteinFetcher
 
         """
         This method creates a 'ProteinInfo' object from a given NCBI ID.

@@ -1,66 +1,38 @@
-from numpy import short
 import sdRDM
-from tqdm import tqdm
-from itertools import combinations
-from typing import List, Optional, Union, Tuple, TYPE_CHECKING
-from pydantic import Field, validator
+
+from typing import List, Optional, Tuple, Union
+from pydantic import PrivateAttr, Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
+from tqdm import tqdm
+from itertools import combinations
 from Bio.Align import Alignment as BioAlignment
 from joblib import Parallel, delayed, cpu_count
-
-if TYPE_CHECKING:
-    from pyeed.core.dnainfo import DNAInfo
-    from pyeed.core.proteininfo import ProteinInfo
-    from .abstractsequence import AbstractSequence
-    from pyeed.containers.abstract_container import AbstractContainer
-    from pyeed.aligners.pairwise import PairwiseAligner
-    from pyeed.core import PairwiseAlignment
-
-
-from .standardnumbering import StandardNumbering
+from pyeed.core.dnainfo import DNAInfo
+from pyeed.core.proteininfo import ProteinInfo
+from pyeed.containers.abstract_container import AbstractContainer
+from pyeed.aligners.pairwise import PairwiseAligner
+from pyeed.core import PairwiseAlignment
+from pyeed.core.pairwisealignment import PairwiseAlignment
 from .sequence import Sequence
+from .standardnumbering import StandardNumbering
 from .abstractsequence import AbstractSequence
 
 
 @forge_signature
 class Alignment(sdRDM.DataModel):
-    """
-    Description of the Alignment class.
-
-    Attributes:
-        id (Optional[str]): Unique identifier of the given object.
-        method (Optional[str]): Applied alignment method.
-        consensus (Optional[str]): Consensus sequence of the alignment.
-        input_sequences (List[Sequence]): Sequences of the alignment.
-        aligned_sequences (List[Sequence]): Aligned sequences of the alignment.
-        standard_numberings (List[StandardNumbering]): Standard numbering of the aligned sequences.
-
-    Methods:
-        add_to_input_sequences(source_id: Optional[str] = None, sequence: Optional[str] = None, id: Optional[str] = None) -> None:
-            Adds an object of type 'Sequence' to attribute input_sequences.
-
-        add_to_aligned_sequences(source_id: Optional[str] = None, sequence: Optional[str] = None, id: Optional[str] = None) -> None:
-            Adds an object of type 'Sequence' to attribute aligned_sequences.
-
-        add_to_standard_numberings(reference_id: Optional[str] = None, numbered_id: Optional[str] = None, numbering: List[str] = ListPlus(), id: Optional[str] = None) -> None:
-            Adds an object of type 'StandardNumbering' to attribute standard_numberings.
-
-        align(aligner: Union["AbstractContainer", "PairwiseAligner"], **kwargs):
-            Aligns the input sequences using the specified aligner.
-
-        apply_standard_numbering(reference: Sequence = None):
-            Applies standard numbering to the aligned sequences.
-
-        from_sequences(sequences: List[Union["ProteinInfo", "DNAInfo"]], aligner: Union["AbstractContainer", "PairwiseAligner"] = None, **kwargs):
-            Creates an Alignment object from a list of sequences and optionally aligns them.
-
-    """
+    """"""
 
     id: Optional[str] = Field(
         description="Unique identifier of the given object.",
         default_factory=IDGenerator("alignmentINDEX"),
         xml="@id",
+    )
+
+    input_sequences: List[Sequence] = Field(
+        description="Sequences of the alignment",
+        default_factory=ListPlus,
+        multiple=True,
     )
 
     method: Optional[str] = Field(
@@ -71,12 +43,6 @@ class Alignment(sdRDM.DataModel):
     consensus: Optional[str] = Field(
         default=None,
         description="Consensus sequence of the alignment",
-    )
-
-    input_sequences: List[Sequence] = Field(
-        description="Sequences of the alignment",
-        default_factory=ListPlus,
-        multiple=True,
     )
 
     aligned_sequences: List[Sequence] = Field(
@@ -90,6 +56,76 @@ class Alignment(sdRDM.DataModel):
         default_factory=ListPlus,
         multiple=True,
     )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
+    )
+
+    def add_to_input_sequences(
+        self,
+        source_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Sequence' to attribute input_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
+        """
+        params = {"source_id": source_id, "sequence": sequence}
+        if id is not None:
+            params["id"] = id
+        self.input_sequences.append(Sequence(**params))
+        return self.input_sequences[-1]
+
+    def add_to_aligned_sequences(
+        self,
+        source_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'Sequence' to attribute aligned_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            source_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Sequence of the alignment. Gaps are represented by '-'. Defaults to None
+        """
+        params = {"source_id": source_id, "sequence": sequence}
+        if id is not None:
+            params["id"] = id
+        self.aligned_sequences.append(Sequence(**params))
+        return self.aligned_sequences[-1]
+
+    def add_to_standard_numberings(
+        self,
+        reference_id: Optional[str] = None,
+        numbered_id: Optional[str] = None,
+        numbering: List[str] = ListPlus(),
+        id: Optional[str] = None,
+    ) -> None:
+        """
+        This method adds an object of type 'StandardNumbering' to attribute standard_numberings
+
+        Args:
+            id (str): Unique identifier of the 'StandardNumbering' object. Defaults to 'None'.
+            reference_id (): Standard numbering of the reference sequence. Defaults to None
+            numbered_id (): Standard numbering of the query sequence. Defaults to None
+            numbering (): Standard numbering of the aligned sequence. Defaults to ListPlus()
+        """
+        params = {
+            "reference_id": reference_id,
+            "numbered_id": numbered_id,
+            "numbering": numbering,
+        }
+        if id is not None:
+            params["id"] = id
+        self.standard_numberings.append(StandardNumbering(**params))
+        return self.standard_numberings[-1]
 
     @validator("input_sequences", pre=True)
     def sequences_validator(cls, sequences):

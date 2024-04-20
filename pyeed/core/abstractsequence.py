@@ -1,8 +1,8 @@
-import os
 import sdRDM
 
+import os
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 from .citation import Citation
 from .organism import Organism
@@ -41,6 +41,10 @@ class AbstractSequence(sdRDM.DataModel):
     citation: Optional[Citation] = Field(
         description="Publication of the sequence",
         default_factory=Citation,
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
     )
 
     def _fasta_string(self):

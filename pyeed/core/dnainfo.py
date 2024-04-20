@@ -1,12 +1,12 @@
 import sdRDM
 
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from .span import Span
-from .dnaregiontype import DNARegionType
 from .dnaregion import DNARegion
+from .dnaregiontype import DNARegionType
 
 
 @forge_signature
@@ -20,12 +20,13 @@ class DNAInfo(sdRDM.DataModel):
     )
 
     regions: List[DNARegion] = Field(
-        description=(
-            "Defines regions within the nucleotide sequence that code for the protein"
-            " sequence"
-        ),
+        description="Defines regions within the nucleotide sequence that code for the protein sequence",
         default_factory=ListPlus,
         multiple=True,
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
     )
 
     def add_to_regions(

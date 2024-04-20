@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 
 
@@ -63,4 +63,8 @@ class Organism(sdRDM.DataModel):
     species: Optional[str] = Field(
         default=None,
         description="Species of the organism",
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
     )
