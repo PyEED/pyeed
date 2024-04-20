@@ -4,7 +4,6 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from Bio.Blast import NCBIXML
 from IPython.display import clear_output
 from pydantic import Field
 from rich.console import Console
@@ -13,16 +12,7 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 
 from pyeed.container.abstract_container import Blastp
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.citation import Citation
-from pyeed.core.dnainfo import DNAInfo
-from pyeed.core.dnaregion import DNARegion
-from pyeed.core.proteinregion import ProteinRegion
-from pyeed.core.proteinregiontype import ProteinRegionType
-from pyeed.core.proteinsitetype import ProteinSiteType
 from pyeed.core.site import Site
-from pyeed.core.span import Span
-from pyeed.core.substrate import Substrate
 
 
 @forge_signature
