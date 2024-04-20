@@ -7,14 +7,14 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Blast import NCBIWWW, NCBIXML
 from pyeed.containers.abstract_container import Blastp
+from .abstractsequence import AbstractSequence
 from .proteinsitetype import ProteinSiteType
 from .proteinregion import ProteinRegion
-from .span import Span
-from .substrate import Substrate
-from .citation import Citation
 from .proteinregiontype import ProteinRegionType
+from .substrate import Substrate
 from .dnaregion import DNARegion
-from .abstractsequence import AbstractSequence
+from .citation import Citation
+from .span import Span
 from .site import Site
 from .dnainfo import DNAInfo
 
@@ -68,7 +68,7 @@ class ProteinInfo(AbstractSequence):
     )
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     __commit__: Optional[str] = PrivateAttr(
-        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
+        default="c7afb06dff889f46d0d56f3c0563e0698a525d5a"
     )
 
     def add_to_regions(

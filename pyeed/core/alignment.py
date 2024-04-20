@@ -1,6 +1,6 @@
 import sdRDM
 
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union, List, Tuple
 from pydantic import PrivateAttr, Field, validator
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
@@ -14,8 +14,8 @@ from pyeed.containers.abstract_container import AbstractContainer
 from pyeed.aligners.pairwise import PairwiseAligner
 from pyeed.core import PairwiseAlignment
 from pyeed.core.pairwisealignment import PairwiseAlignment
-from .sequence import Sequence
 from .standardnumbering import StandardNumbering
+from .sequence import Sequence
 from .abstractsequence import AbstractSequence
 
 
@@ -58,7 +58,7 @@ class Alignment(sdRDM.DataModel):
     )
     __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     __commit__: Optional[str] = PrivateAttr(
-        default="2c478e9b9618bfdc095c0c8906fbe67c80a3e2d7"
+        default="c7afb06dff889f46d0d56f3c0563e0698a525d5a"
     )
 
     def add_to_input_sequences(
