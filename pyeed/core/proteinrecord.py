@@ -1,9 +1,8 @@
 from typing import Dict, List, Optional
 from uuid import uuid4
 
-import validators
 from lxml.etree import _Element
-from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
@@ -89,13 +88,9 @@ class ProteinRecord(
         ),
     )
 
-    annotations_: List[str] = element(
-        tag="annotations_",
-        alias="@type",
-        description="Annotation of the given object.",
-        default=[
-            "ProteinRecord",
-        ],
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="a74a385ecb66052de0f011cd5cade02033188e55"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -112,23 +107,11 @@ class ProteinRecord(
 
         return self
 
-    @field_validator("annotations_")
-    @classmethod
-    def _validate_annotation(cls, annotations):
-        """Check if the annotation that has been set is a valid URL."""
-
-        for annotation in annotations:
-            if not validators.url(annotation) and annotation != cls.__name__:
-                raise ValueError(f"Invalid Annotation URL: {annotation}")
-
-        return annotations
-
     def add_to_regions(
         self,
         start: Optional[int] = None,
         end: Optional[int] = None,
         id: Optional[str] = None,
-        annotation: Optional[str] = None,
         **kwargs,
     ) -> Region:
         """
@@ -150,9 +133,6 @@ class ProteinRecord(
 
         obj = Region(**params)
 
-        if annotation:
-            obj.annotations_.append(annotation)
-
         self.regions.append(obj)
 
         return self.regions[-1]
@@ -164,7 +144,6 @@ class ProteinRecord(
         accession_id: Optional[str] = None,
         name: Optional[str] = None,
         id: Optional[str] = None,
-        annotation: Optional[str] = None,
         **kwargs,
     ) -> Site:
         """
@@ -190,9 +169,6 @@ class ProteinRecord(
 
         obj = Site(**params)
 
-        if annotation:
-            obj.annotations_.append(annotation)
-
         self.sites.append(obj)
 
         return self.sites[-1]
@@ -202,7 +178,6 @@ class ProteinRecord(
         start: Optional[int] = None,
         end: Optional[int] = None,
         id: Optional[str] = None,
-        annotation: Optional[str] = None,
         **kwargs,
     ) -> Region:
         """
@@ -223,9 +198,6 @@ class ProteinRecord(
             params["id"] = id
 
         obj = Region(**params)
-
-        if annotation:
-            obj.annotations_.append(annotation)
 
         self.coding_sequence.append(obj)
 
