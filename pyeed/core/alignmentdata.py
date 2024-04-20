@@ -1,27 +1,24 @@
-import validators
-
 from typing import Dict, List, Optional
 from uuid import uuid4
+
+import sdRDM
+import validators
+from lxml.etree import _Element
 from pydantic import PrivateAttr, field_validator, model_validator
 from pydantic_xml import attr, element
-from lxml.etree import _Element
-
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
-
-from .sequencerecord import SequenceRecord
-from .region import Region
-from .site import Site
+from .sequence import Sequence
 
 
 @forge_signature
-class DNARecord(
-    SequenceRecord,
+class AlignmentData(
+    sdRDM.DataModel,
     search_mode="unordered",
 ):
-    """Description of a nucleotide sequence 🧬."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -30,40 +27,29 @@ class DNARecord(
         default_factory=lambda: str(uuid4()),
     )
 
-    sequence: str = element(
-        description="Nucleotide sequence.",
-        tag="sequence",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_3494",
-        ),
-    )
-
-    regions: List[Region] = element(
-        description="Defines regions within the nucleotide sequence.",
-        default_factory=ListPlus,
-        tag="regions",
-        json_schema_extra=dict(
-            multiple=True,
-        ),
-    )
-
-    sites: List[Site] = element(
-        description=(
-            "Defines sites within the nucleotide sequence that code for the protein"
-            " sequence."
-        ),
-        default_factory=ListPlus,
-        tag="sites",
-        json_schema_extra=dict(
-            multiple=True,
-        ),
-    )
-
-    gc_content: Optional[float] = element(
-        description="GC content of the sequence.",
+    consensus: Optional[str] = element(
+        description="Consensus sequence of the alignment.",
         default=None,
-        tag="gc_content",
+        tag="consensus",
         json_schema_extra=dict(),
+    )
+
+    sequences: List[Sequence] = element(
+        description="Sequences of the alignment.",
+        default_factory=ListPlus,
+        tag="sequences",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
+    )
+
+    aligned_sequences: List[Sequence] = element(
+        description="Aligned sequences as a result of the alignment.",
+        default_factory=ListPlus,
+        tag="aligned_sequences",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
     )
 
     annotations_: List[str] = element(
@@ -71,7 +57,7 @@ class DNARecord(
         alias="@type",
         description="Annotation of the given object.",
         default=[
-            "DNARecord",
+            "AlignmentData",
         ],
     )
 
@@ -100,76 +86,70 @@ class DNARecord(
 
         return annotations
 
-    def add_to_regions(
+    def add_to_sequences(
         self,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
+        sequence_id: Optional[str] = None,
+        sequence: Optional[str] = None,
         id: Optional[str] = None,
         annotation: Optional[str] = None,
         **kwargs,
-    ) -> Region:
+    ) -> Sequence:
         """
-        This method adds an object of type 'Region' to attribute regions
+        This method adds an object of type 'Sequence' to attribute sequences
 
         Args:
-            id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
-            start (): Start position of the site.. Defaults to None
-            end (): End position of the site.. Defaults to None
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            sequence_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Molecular sequence.. Defaults to None
         """
 
         params = {
-            "start": start,
-            "end": end,
+            "sequence_id": sequence_id,
+            "sequence": sequence,
         }
 
         if id is not None:
             params["id"] = id
 
-        obj = Region(**params)
+        obj = Sequence(**params)
 
         if annotation:
             obj.annotations_.append(annotation)
 
-        self.regions.append(obj)
+        self.sequences.append(obj)
 
-        return self.regions[-1]
+        return self.sequences[-1]
 
-    def add_to_sites(
+    def add_to_aligned_sequences(
         self,
-        positions: List[int] = ListPlus(),
-        uri: Optional[str] = None,
-        accession_id: Optional[str] = None,
-        name: Optional[str] = None,
+        sequence_id: Optional[str] = None,
+        sequence: Optional[str] = None,
         id: Optional[str] = None,
         annotation: Optional[str] = None,
         **kwargs,
-    ) -> Site:
+    ) -> Sequence:
         """
-        This method adds an object of type 'Site' to attribute sites
+        This method adds an object of type 'Sequence' to attribute aligned_sequences
 
         Args:
-            id (str): Unique identifier of the 'Site' object. Defaults to 'None'.
-            positions (): Position of the site(s) within the sequence.. Defaults to ListPlus()
-            uri (): URI of the annotation.. Defaults to None
-            accession_id (): Accession ID of the annotation.. Defaults to None
-            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            sequence_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Molecular sequence.. Defaults to None
         """
 
         params = {
-            "positions": positions,
-            "uri": uri,
-            "accession_id": accession_id,
-            "name": name,
+            "sequence_id": sequence_id,
+            "sequence": sequence,
         }
 
         if id is not None:
             params["id"] = id
 
-        obj = Site(**params)
+        obj = Sequence(**params)
 
         if annotation:
             obj.annotations_.append(annotation)
 
-        self.sites.append(obj)
+        self.aligned_sequences.append(obj)
 
-        return self.sites[-1]
+        return self.aligned_sequences[-1]

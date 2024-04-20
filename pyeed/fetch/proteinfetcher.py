@@ -1,17 +1,17 @@
-import json
 import asyncio
+import json
 import logging
-import nest_asyncio
 from typing import List
+
+import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
-from pyeed.fetch.dbsort import SortIDs, DBPattern
-from pyeed.fetch.uniprotmapper import UniprotMapper
+from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
-from pyeed.fetch.taxonomymapper import TaxonomyMapper
 from pyeed.fetch.requester import AsyncRequester
-
+from pyeed.fetch.taxonomymapper import TaxonomyMapper
+from pyeed.fetch.uniprotmapper import UniprotMapper
 
 LOGGER = logging.getLogger(__name__)
 

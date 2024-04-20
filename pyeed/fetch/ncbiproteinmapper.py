@@ -1,13 +1,13 @@
 import io
-import re
 import logging
+import re
 from typing import List
 
-from Bio import SeqIO, SeqFeature
+from Bio import SeqFeature, SeqIO
 from Bio.SeqRecord import SeqRecord
+
 from pyeed.core.dnaregion import DNARegion
 from pyeed.core.dnaregiontype import DNARegionType
-
 from pyeed.core.organism import Organism
 from pyeed.core.proteininfo import ProteinInfo
 from pyeed.core.proteinregion import ProteinRegion

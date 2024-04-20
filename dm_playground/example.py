@@ -1,4 +1,4 @@
-from pyeed_ontology.core import ProteinRecord, Region, AnnotationType
+from pyeed_ontology.core import AnnotationType, ProteinRecord, Region
 
 protein = ProteinRecord(
     name="my_protein",

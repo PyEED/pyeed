@@ -1,10 +1,9 @@
-import re
 import logging
+import re
 
+from pyeed.core import Organism, ProteinInfo
 from pyeed.core.dnaregion import DNARegion
-from pyeed.core import ProteinInfo, Organism
 from pyeed.core.proteinregiontype import ProteinRegionType
-
 
 LOGGER = logging.getLogger(__name__)
 

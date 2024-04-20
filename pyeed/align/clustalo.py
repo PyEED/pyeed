@@ -1,7 +1,9 @@
 import os
 from typing import List
+
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
+
 from pyeed.container import AbstractContainer, ToolImage
 
 

@@ -1,6 +1,7 @@
 import os
-import pyhmmer
 from typing import List, Union
+
+import pyhmmer
 from pydantic import BaseModel, Field
 
 from pyeed.core.abstractsequence import AbstractSequence

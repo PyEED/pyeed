@@ -1,27 +1,30 @@
-import os
 import asyncio
-from typing import List, Optional
-from IPython.display import clear_output
-from rich.status import Status, Console
-from concurrent.futures import ThreadPoolExecutor
+import os
 import warnings
-from pydantic import Field
-from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature, IDGenerator
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional
+
 from Bio.Blast import NCBIXML
+from IPython.display import clear_output
+from pydantic import Field
+from rich.status import Status
+from rich.console import Console
+from sdRDM.base.listplus import ListPlus
+from sdRDM.base.utils import forge_signature
 
 
-from pyeed.core.dnainfo import DNAInfo
-from pyeed.core.proteinregion import ProteinRegion
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.site import Site
-from pyeed.core.citation import Citation
-from pyeed.core.span import Span
-from pyeed.core.proteinregiontype import ProteinRegionType
-from pyeed.core.substrate import Substrate
-from pyeed.core.dnaregion import DNARegion
-from pyeed.core.proteinsitetype import ProteinSiteType
+
 from pyeed.container.abstract_container import Blastp
+from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.core.citation import Citation
+from pyeed.core.dnainfo import DNAInfo
+from pyeed.core.dnaregion import DNARegion
+from pyeed.core.proteinregion import ProteinRegion
+from pyeed.core.proteinregiontype import ProteinRegionType
+from pyeed.core.proteinsitetype import ProteinSiteType
+from pyeed.core.site import Site
+from pyeed.core.span import Span
+from pyeed.core.substrate import Substrate
 
 
 @forge_signature
@@ -167,8 +170,9 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinInfo":
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
         import nest_asyncio
+
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -192,8 +196,9 @@ class ProteinInfo(AbstractSequence):
 
     @classmethod
     def get_ids(cls, accession_ids: List[str]) -> List["ProteinInfo"]:
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
         import nest_asyncio
+
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -230,7 +235,8 @@ class ProteinInfo(AbstractSequence):
         """
 
         import nest_asyncio
-        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
+
+        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -299,9 +305,10 @@ class ProteinInfo(AbstractSequence):
             similar_proteins = protein_info.ncbi_blast(n_hits=10, e_value=0.001, database="swissprot")
         """
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
-        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
         import nest_asyncio
+
+        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 

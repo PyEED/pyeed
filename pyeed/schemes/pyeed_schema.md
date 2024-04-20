@@ -1,108 +1,60 @@
 ```mermaid
 classDiagram
-    AbstractSequence <-- ProteinInfo
-    AbstractRegion <-- DNARegion
-    AbstractRegion <-- ProteinRegion
-    Alignment <-- PairwiseAlignment
-    AbstractSequence *-- Citation
-    AbstractSequence *-- Organism
-    ProteinInfo *-- Substrate
-    ProteinInfo *-- DNARegion
-    ProteinInfo *-- ProteinRegion
-    ProteinInfo *-- Site
-    DNAInfo *-- DNARegion
-    Citation *-- Author
-    Substrate *-- Citation
-    AbstractRegion *-- Span
-    DNARegion *-- DNARegionType
-    ProteinRegion *-- ProteinRegionType
-    Site *-- ProteinSiteType
-    Alignment *-- Sequence
-    Alignment *-- StandardNumbering
+    SequenceRecord <-- ProteinRecord
+    SequenceRecord <-- DNARecord
+    AbstractAnnotation <-- Site
+    AlignmentData <-- PairwiseAlignment
+    AlignmentData <-- ClustalOmegaData
+    SequenceRecord *-- Organism
+    ProteinRecord *-- Site
+    ProteinRecord *-- Region
+    DNARecord *-- Site
+    DNARecord *-- Region
+    Cluster *-- Sequence
+    AlignmentData *-- Sequence
     
-    class AbstractSequence {
-        +string source_id
+    class SequenceRecord {
+        +string uri
+        +string accession_id
         +string name
-        +string sequence*
         +Organism organism
-        +Citation citation
     }
     
-    class ProteinInfo {
-        +string family_name
-        +ProteinRegion[0..*] regions
+    class ProteinRecord {
+        +string sequence*
+        +Region[0..*] regions
         +Site[0..*] sites
-        +DNARegion coding_sequence_ref
+        +Region[0..*] coding_sequence
         +string ec_number
         +float mol_weight
-        +Substrate[0..*] substrates
+        +string pdb_uri
     }
     
-    class Structure {
-        +string pdb_id
-        +string alphafold_id
-        +string method
-        +float resolution
-        +string[0..*] chains
-        +string[0..*] ligands
-        +int mutations
+    class DNARecord {
+        +string sequence*
+        +Region[0..*] regions
+        +Site[0..*] sites
+        +float gc_content
     }
     
-    class DNAInfo {
-        +DNARegion[0..*] regions
-    }
-    
-    class Citation {
-        +str doi
-        +str pubmed_id
-        +str medline_id
-        +int year
-        +Author[0..*] authors
-    }
-    
-    class Author {
-        +str given_name
-        +str family_name
-    }
-    
-    class Substrate {
-        +str name
-        +str inchi
-        +str smiles
-        +str chebi_id
-        +Citation citation
-    }
-    
-    class AbstractRegion {
+    class AbstractAnnotation {
+        +string uri
+        +string accession_id
         +string name
-        +Span[0..*] spans
-        +string note
-        +string cross_reference
     }
     
-    class DNARegion {
-        +DNARegionType type
+    class Site {
+        +integer[0..*] positions
     }
     
-    class ProteinRegion {
-        +ProteinRegionType type
-    }
-    
-    class Span {
+    class Region {
         +integer start
         +integer end
     }
     
-    class Site {
-        +string name
-        +ProteinSiteType type
-        +integer[0..*] positions
-        +string cross_ref
-    }
-    
     class Organism {
-        +string name
         +string taxonomy_id*
+        +string name
         +string domain
         +string kingdom
         +string phylum
@@ -113,12 +65,33 @@ classDiagram
         +string species
     }
     
-    class Alignment {
-        +string method
+    class BlastData {
+        +float identity
+        +float evalue
+        +int n_hits
+        +string substitution_matrix
+        +int word_size
+        +float gap_open
+        +float gap_extend
+        +float threshold
+        +string db_name
+    }
+    
+    class Cluster {
+        +string name
+        +Sequence representative
+        +Sequence[0..*] members
+    }
+    
+    class Sequence {
+        +string sequence_id
+        +string sequence
+    }
+    
+    class AlignmentData {
         +string consensus
-        +Sequence[0..*] input_sequences
+        +Sequence[0..*] sequences
         +Sequence[0..*] aligned_sequences
-        +StandardNumbering[0..*] standard_numberings
     }
     
     class PairwiseAlignment {
@@ -129,43 +102,30 @@ classDiagram
         +int mismatches
     }
     
-    class Sequence {
-        +string source_id
-        +string sequence
-    }
-    
     class StandardNumbering {
-        +str reference_id
-        +str numbered_id
+        +str reference_accession_id
+        +str numbered_accession_id
         +string[0..*] numbering
     }
     
-    class ProteinSiteType {
-        << Enumeration >>
-        +ACTIVE
-        +BINDING
-        +METAL_BINDING
-        +POST_TRANS_MODIFICATION
-        +UNANNOTATED
+    class ClustalOmegaData {
+        +string version
     }
     
-    class DNARegionType {
+    class AnnotationType {
         << Enumeration >>
-        +CODING_SEQUENCE
-        +EXON
-        +INTRON
-        +GENE
-        +PROMOTER
-        +ENHANCER
-        +UNANNOTATED
-    }
-    
-    class ProteinRegionType {
-        << Enumeration >>
+        +ACTIVE_SITE
+        +BINDING_SITE
         +DOMAIN
-        +SIGNAL_PEPTIDE
-        +TRANSMEMBRANE
-        +UNANNOTATED
+        +FAMILY
+        +MOTIVE
+        +CODING_SEQ
+    }
+    
+    class SequenceType {
+        << Enumeration >>
+        +DNA
+        +PROTEIN
     }
     
 ```
