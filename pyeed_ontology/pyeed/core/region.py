@@ -38,7 +38,7 @@ class Region(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="c9459b8fa4d64171f7a29b240c380d857a0c53b5"
+        default="8fcd5863a32aebddf25110be9cb7b228813e9105"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
