@@ -1,4 +1,3 @@
-
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -6,7 +5,6 @@ from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 from .region import Region
@@ -14,7 +12,6 @@ from .sequencerecord import SequenceRecord
 from .site import Site
 
 
-@forge_signature
 class DNARecord(
     SequenceRecord,
     search_mode="unordered",
@@ -65,7 +62,7 @@ class DNARecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="f67fe20dfaf0d9cfcf4455c132f9f6d0bce52c06"
+        default="c9459b8fa4d64171f7a29b240c380d857a0c53b5"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

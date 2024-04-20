@@ -16,6 +16,3 @@ from .core.sequencerecord import SequenceRecord
 from .core.sequencetype import SequenceType
 from .core.site import Site
 from .core.standardnumbering import StandardNumbering
-
-__URL__ = "https://github.com/PyEED/pyeed"
-__COMMIT__ = "f67fe20dfaf0d9cfcf4455c132f9f6d0bce52c06"
