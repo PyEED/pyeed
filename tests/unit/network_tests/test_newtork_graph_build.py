@@ -1,8 +1,10 @@
 import json
+
 import pytest
 
-from pyeed.network import SequenceNetwork
 from pyeed.core import ProteinInfo
+from pyeed.network import SequenceNetwork
+
 
 class TestNetworkGraphBuild:
 

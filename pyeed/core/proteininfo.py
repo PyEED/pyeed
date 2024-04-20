@@ -7,12 +7,10 @@ from typing import List, Optional
 from Bio.Blast import NCBIXML
 from IPython.display import clear_output
 from pydantic import Field
-from rich.status import Status
 from rich.console import Console
+from rich.status import Status
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
-
-
 
 from pyeed.container.abstract_container import Blastp
 from pyeed.core.abstractsequence import AbstractSequence
