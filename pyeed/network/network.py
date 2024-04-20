@@ -1,7 +1,8 @@
 from typing import List, Optional
+
 import networkx as nx
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 
 from pyeed.core.abstractsequence import AbstractSequence

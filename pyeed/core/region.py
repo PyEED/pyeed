@@ -1,47 +1,72 @@
+from typing import Dict, List, Optional
+from uuid import uuid4
+
 import sdRDM
+import validators
+from lxml.etree import _Element
+from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic_xml import attr, element
+from sdRDM.base.listplus import ListPlus
+from sdRDM.tools.utils import elem2dict
 
-from typing import Optional
-from pydantic import Field
-from sdRDM.base.utils import forge_signature, IDGenerator
 
+class Region(
+    sdRDM.DataModel,
+    search_mode="unordered",
+):
+    """Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions."""
 
-@forge_signature
-class Region(sdRDM.DataModel):
-    """Annotation of a region within a sequence 🗺️."""
-
-    id: Optional[str] = Field(
+    id: Optional[str] = attr(
+        name="id",
+        alias="@id",
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("regionINDEX"),
-        xml="@id",
+        default_factory=lambda: str(uuid4()),
     )
 
-    start: int = Field(
-        ...,
-        description=(
-            "Start position of the annotation. A single start position without an end"
-            " corresponds to a single amino acid"
-        ),
-    )
-
-    end: int = Field(
-        ...,
-        description=(
-            "Optional end position if the annotation contains more than a single amino"
-            " acid"
-        ),
-    )
-
-    note: Optional[str] = Field(
+    start: Optional[int] = element(
+        description="Start position of the site.",
         default=None,
-        description="Information found in 'note' of an ncbi protein sequence entry",
+        tag="start",
+        json_schema_extra=dict(),
     )
 
-    name: Optional[str] = Field(
+    end: Optional[int] = element(
+        description="End position of the site.",
         default=None,
-        description="Name of the annotation",
+        tag="end",
+        json_schema_extra=dict(),
     )
 
-    cross_reference: Optional[str] = Field(
-        default=None,
-        description="Database cross reference",
+    annotations_: List[str] = element(
+        tag="annotations_",
+        alias="@type",
+        description="Annotation of the given object.",
+        default=[
+            "Region",
+        ],
     )
+
+    _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _parse_raw_xml_data(self):
+        for attr, value in self:
+            if isinstance(value, (ListPlus, list)) and all(
+                isinstance(i, _Element) for i in value
+            ):
+                self._raw_xml_data[attr] = [elem2dict(i) for i in value]
+            elif isinstance(value, _Element):
+                self._raw_xml_data[attr] = elem2dict(value)
+
+        return self
+
+    @field_validator("annotations_")
+    @classmethod
+    def _validate_annotation(cls, annotations):
+        """Check if the annotation that has been set is a valid URL."""
+
+        for annotation in annotations:
+            if not validators.url(annotation) and annotation != cls.__name__:
+                raise ValueError(f"Invalid Annotation URL: {annotation}")
+
+        return annotations

@@ -1,10 +1,10 @@
 import asyncio
 import logging
-import aiometer
 from typing import List, NamedTuple
-from rich.progress import Progress, TaskID
-from httpx import AsyncClient, Limits, Response
 
+import aiometer
+from httpx import AsyncClient, Limits, Response
+from rich.progress import Progress, TaskID
 
 LOGGER = logging.getLogger(__name__)
 

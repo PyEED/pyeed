@@ -1,25 +1,24 @@
-import validators
-
 from typing import Dict, List, Optional
 from uuid import uuid4
+
+import sdRDM
+import validators
+from lxml.etree import _Element
 from pydantic import PrivateAttr, field_validator, model_validator
 from pydantic_xml import attr, element
-from lxml.etree import _Element
-
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
-
-from .abstractannotation import AbstractAnnotation
+from .sequence import Sequence
 
 
 @forge_signature
-class Site(
-    AbstractAnnotation,
+class Cluster(
+    sdRDM.DataModel,
     search_mode="unordered",
 ):
-    """Position(s) constituting a site within a sequence."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -28,10 +27,24 @@ class Site(
         default_factory=lambda: str(uuid4()),
     )
 
-    positions: List[int] = element(
-        description="Position of the site(s) within the sequence.",
+    name: Optional[str] = element(
+        description="Name of the cluster.",
+        default=None,
+        tag="name",
+        json_schema_extra=dict(),
+    )
+
+    representative: Optional[Sequence] = element(
+        description="Identifier of the representative sequence of the cluster.",
+        default_factory=Sequence,
+        tag="representative",
+        json_schema_extra=dict(),
+    )
+
+    members: List[Sequence] = element(
+        description="Sequences of the cluster.",
         default_factory=ListPlus,
-        tag="positions",
+        tag="members",
         json_schema_extra=dict(
             multiple=True,
         ),
@@ -42,7 +55,7 @@ class Site(
         alias="@type",
         description="Annotation of the given object.",
         default=[
-            "Site",
+            "Cluster",
         ],
     )
 
@@ -70,3 +83,37 @@ class Site(
                 raise ValueError(f"Invalid Annotation URL: {annotation}")
 
         return annotations
+
+    def add_to_members(
+        self,
+        sequence_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+        annotation: Optional[str] = None,
+        **kwargs,
+    ) -> Sequence:
+        """
+        This method adds an object of type 'Sequence' to attribute members
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            sequence_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Molecular sequence.. Defaults to None
+        """
+
+        params = {
+            "sequence_id": sequence_id,
+            "sequence": sequence,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = Sequence(**params)
+
+        if annotation:
+            obj.annotations_.append(annotation)
+
+        self.members.append(obj)
+
+        return self.members[-1]

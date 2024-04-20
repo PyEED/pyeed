@@ -3,7 +3,6 @@ import xml.etree.ElementTree as ET
 
 from pyeed.core.organism import Organism
 
-
 LOGGER = logging.getLogger(__name__)
 
 

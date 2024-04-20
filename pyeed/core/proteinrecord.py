@@ -1,22 +1,18 @@
-import validators
-
 from typing import Dict, List, Optional
 from uuid import uuid4
+
+import validators
+from lxml.etree import _Element
 from pydantic import PrivateAttr, field_validator, model_validator
 from pydantic_xml import attr, element
-from lxml.etree import _Element
-
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
-
-from .sequencerecord import SequenceRecord
 from .region import Region
+from .sequencerecord import SequenceRecord
 from .site import Site
 
 
-@forge_signature
 class ProteinRecord(
     SequenceRecord,
     search_mode="unordered",
@@ -44,6 +40,7 @@ class ProteinRecord(
         tag="regions",
         json_schema_extra=dict(
             multiple=True,
+            term="http://edamontology.org/data_1255",
         ),
     )
 
@@ -53,6 +50,7 @@ class ProteinRecord(
         tag="sites",
         json_schema_extra=dict(
             multiple=True,
+            term="http://edamontology.org/data_1255",
         ),
     )
 
@@ -82,12 +80,12 @@ class ProteinRecord(
         json_schema_extra=dict(),
     )
 
-    pdb_id: Optional[str] = element(
+    pdb_uri: Optional[str] = element(
         description="Protein Data Bank (PDB) identifier.",
         default=None,
-        tag="pdb_id",
+        tag="pdb_uri",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_1127",
+            term="http://edamontology.org/data_1047",
         ),
     )
 

@@ -1,26 +1,22 @@
-import sdRDM
-import validators
-
 from typing import Dict, List, Optional
 from uuid import uuid4
+
+import sdRDM
+import validators
+from lxml.etree import _Element
 from pydantic import PrivateAttr, field_validator, model_validator
 from pydantic_xml import attr, element
-from lxml.etree import _Element
-
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 
-from .organism import Organism
-
-
 @forge_signature
-class SequenceRecord(
+class BlastData(
     sdRDM.DataModel,
     search_mode="unordered",
 ):
-    """A molecular sequence and associated metadata."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -29,37 +25,69 @@ class SequenceRecord(
         default_factory=lambda: str(uuid4()),
     )
 
-    uri: Optional[str] = element(
-        description="URI of the sequence.",
-        default=None,
-        tag="uri",
+    identity: Optional[float] = element(
+        description="Minimum identity to safe hits.",
+        default=0.0,
+        tag="identity",
+        json_schema_extra=dict(),
+    )
+
+    evalue: Optional[float] = element(
+        description="Expectation value (E) to safe hits.",
+        default=10.0,
+        tag="evalue",
+        json_schema_extra=dict(),
+    )
+
+    n_hits: Optional[int] = element(
+        description="Number of hits to return.",
+        default=100,
+        tag="n_hits",
+        json_schema_extra=dict(),
+    )
+
+    substitution_matrix: Optional[str] = element(
+        description="Substitution matrix to use.",
+        default="'BLOSUM62'",
+        tag="substitution_matrix",
+        json_schema_extra=dict(),
+    )
+
+    word_size: Optional[int] = element(
+        description="Word size of the initial match.",
+        default=3,
+        tag="word_size",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_0848",
+            inclusivminimum=2,
+            inclusivemaximum=7,
         ),
     )
 
-    accession_id: Optional[str] = element(
-        description="Accession ID of the sequence.",
-        default=None,
-        tag="accession_id",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2091",
-        ),
+    gap_open: Optional[float] = element(
+        description="Gap open penalty.",
+        default=11.0,
+        tag="gap_open",
+        json_schema_extra=dict(),
     )
 
-    name: Optional[str] = element(
-        description="Arbtrary name of the sequence.",
-        default=None,
-        tag="name",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_1009",
-        ),
+    gap_extend: Optional[float] = element(
+        description="Gap extend penalty.",
+        default=1.0,
+        tag="gap_extend",
+        json_schema_extra=dict(),
     )
 
-    organism: Optional[Organism] = element(
-        description="The organism from which the sequence was obtained.",
+    threshold: Optional[float] = element(
+        description="Minimum score to add a word to the BLAST lookup table.",
+        default=11,
+        tag="threshold",
+        json_schema_extra=dict(),
+    )
+
+    db_name: Optional[str] = element(
+        description="Name of the database to search.",
         default=None,
-        tag="organism",
+        tag="db_name",
         json_schema_extra=dict(),
     )
 
@@ -68,8 +96,7 @@ class SequenceRecord(
         alias="@type",
         description="Annotation of the given object.",
         default=[
-            "SequenceRecord",
-            "http://edamontology.org/data_0848",
+            "BlastData",
         ],
     )
 

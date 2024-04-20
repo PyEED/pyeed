@@ -1,8 +1,9 @@
-from pydantic import Field, validator
 from typing import TYPE_CHECKING
 
-from pyeed.align import AbstractAligner
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
+from pydantic import Field, validator
+
+from pyeed.align import AbstractAligner
 
 if TYPE_CHECKING:
     from Bio.Align import Alignment as BioAlignment

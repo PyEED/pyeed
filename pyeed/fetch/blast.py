@@ -1,13 +1,13 @@
-import io
 import asyncio
+import io
 import logging
-from typing import List
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, EnumMeta
-from pydantic import BaseModel, Field
+from typing import List
+
 from Bio.Blast import NCBIWWW, NCBIXML
 from Bio.Blast.Record import Blast as BlastRecord
-from concurrent.futures import ThreadPoolExecutor
-
+from pydantic import BaseModel, Field
 
 LOGGER = logging.getLogger(__name__)
 

@@ -1,29 +1,75 @@
+from typing import Dict, List, Optional
+from uuid import uuid4
+
 import sdRDM
+import validators
+from lxml.etree import _Element
+from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic_xml import attr, element
+from sdRDM.base.listplus import ListPlus
+from sdRDM.tools.utils import elem2dict
 
-from typing import Optional
-from pydantic import Field
-from sdRDM.base.utils import forge_signature, IDGenerator
 
-
-@forge_signature
-class Sequence(sdRDM.DataModel):
+class Sequence(
+    sdRDM.DataModel,
+    search_mode="unordered",
+):
     """"""
 
-    id: Optional[str] = Field(
+    id: Optional[str] = attr(
+        name="id",
+        alias="@id",
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("sequenceINDEX"),
-        xml="@id",
+        default_factory=lambda: str(uuid4()),
     )
 
-    source_id: Optional[str] = Field(
-        default=None,
+    sequence_id: Optional[str] = element(
         description="Identifier of the sequence in the source database",
+        default=None,
+        tag="sequence_id",
+        json_schema_extra=dict(),
     )
 
-    sequence: Optional[str] = Field(
+    sequence: Optional[str] = element(
+        description="Molecular sequence.",
         default=None,
-        description="Sequence of the alignment. Gaps are represented by '-'",
+        tag="sequence",
+        json_schema_extra=dict(),
     )
+
+    annotations_: List[str] = element(
+        tag="annotations_",
+        alias="@type",
+        description="Annotation of the given object.",
+        default=[
+            "Sequence",
+        ],
+    )
+
+    _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _parse_raw_xml_data(self):
+        for attr, value in self:
+            if isinstance(value, (ListPlus, list)) and all(
+                isinstance(i, _Element) for i in value
+            ):
+                self._raw_xml_data[attr] = [elem2dict(i) for i in value]
+            elif isinstance(value, _Element):
+                self._raw_xml_data[attr] = elem2dict(value)
+
+        return self
+
+    @field_validator("annotations_")
+    @classmethod
+    def _validate_annotation(cls, annotations):
+        """Check if the annotation that has been set is a valid URL."""
+
+        for annotation in annotations:
+            if not validators.url(annotation) and annotation != cls.__name__:
+                raise ValueError(f"Invalid Annotation URL: {annotation}")
+
+        return annotations
 
     def fasta_string(self) -> str:
         """

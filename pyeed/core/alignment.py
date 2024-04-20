@@ -1,28 +1,31 @@
-import sdRDM
-from rich.status import Status, Console
-from tqdm import tqdm
 from itertools import combinations
-from typing import List, Optional, Union, Tuple, TYPE_CHECKING
-from pydantic import Field, validator
-from IPython.display import clear_output
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature, IDGenerator
 from Bio.Align import Alignment as BioAlignment
-from joblib import Parallel, delayed, cpu_count
+from IPython.display import clear_output
+from joblib import Parallel, cpu_count, delayed
+from pydantic import Field, validator
+from rich.status import Status
+from rich.console import Console
+from sdRDM.base.listplus import ListPlus
+from sdRDM.base.utils import forge_signature
+from tqdm import tqdm
 
 if TYPE_CHECKING:
+    from pyeed.align.pairwise import PairwiseAligner
+    from pyeed.container.abstract_container import AbstractContainer
+    from pyeed.core import PairwiseAlignment
     from pyeed.core.dnainfo import DNAInfo
     from pyeed.core.proteininfo import ProteinInfo
+
     from .abstractsequence import AbstractSequence
-    from pyeed.container.abstract_container import AbstractContainer
-    from pyeed.align.pairwise import PairwiseAligner
-    from pyeed.core import PairwiseAlignment
 
 
-from .standardnumbering import StandardNumbering
-from .sequence import Sequence
+import sdRDM
+
 from .abstractsequence import AbstractSequence
+from .sequence import Sequence
+from .standardnumbering import StandardNumbering
 
 
 @forge_signature
@@ -190,8 +193,8 @@ class Alignment(sdRDM.DataModel):
             ValueError: If the aligner is not an instance of AbstractContainer or PairwiseAligner.
         """
 
-        from pyeed.container.abstract_container import AbstractContainer
         from pyeed.align.pairwise import PairwiseAligner
+        from pyeed.container.abstract_container import AbstractContainer
 
         if issubclass(aligner, AbstractContainer):
             return self._container_align(aligner, **kwargs)
@@ -225,6 +228,7 @@ class Alignment(sdRDM.DataModel):
         # TODO: This is a workaround for the BioPython bug that causes the dumb_consensus() method to raise a warning
         # Need to find new way to calculate consensus
         import warnings
+
         from Bio.Align import AlignInfo
 
         with warnings.catch_warnings():
