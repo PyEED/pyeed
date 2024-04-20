@@ -5,8 +5,8 @@ from Bio.Align import Alignment as BioAlignment
 from IPython.display import clear_output
 from joblib import Parallel, cpu_count, delayed
 from pydantic import Field, validator
-from rich.status import Status
 from rich.console import Console
+from rich.status import Status
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from tqdm import tqdm

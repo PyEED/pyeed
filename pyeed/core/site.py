@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 import validators
 from lxml.etree import _Element
@@ -8,8 +9,6 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from .abstractannotation import AbstractAnnotation
-
-from uuid import uuid4
 
 
 class Site(
