@@ -1,23 +1,22 @@
-import pandas as pd
-from tqdm import tqdm
+from itertools import combinations
+from typing import List, Optional
+
 import networkx as nx
-import py4cytoscape as p4c
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import List, Optional
-from itertools import combinations
+import py4cytoscape as p4c
+from joblib import Parallel, cpu_count, delayed
+from py4cytoscape import (
+    gen_node_color_map,
+    gen_node_size_map,
+    scheme_c_number_continuous,
+)
 from pydantic import BaseModel, Field
-from Bio.Align import Alignment as BioAlignment
-from joblib import Parallel, delayed, cpu_count
-from typing import List, Optional, Union, Tuple, TYPE_CHECKING
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from py4cytoscape import gen_node_color_map, gen_node_size_map, scheme_c_number_continuous
+from tqdm import tqdm
 
-from pyeed.core.sequence import Sequence
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.pairwisealignment import PairwiseAlignment
-from pyeed.core.proteininfo import ProteinInfo
 from pyeed.aligners.pairwise import PairwiseAligner
+from pyeed.core.abstractsequence import AbstractSequence
+from pyeed.core.proteininfo import ProteinInfo
 
 
 class SequenceNetwork(BaseModel):
@@ -45,7 +44,6 @@ class SequenceNetwork(BaseModel):
         json_encoders = {
             nx.Graph: lambda g: nx.node_link_data(g),
         }
-
 
     sequences: Optional[List[AbstractSequence]] = Field(
         default=[],
@@ -87,8 +85,15 @@ class SequenceNetwork(BaseModel):
         description="Network graph with networkx",
     )
 
-
-    def __init__(self, sequences: List[AbstractSequence], weight: str = "identity", color: str = "name", threshold: float = None, label: str = "name", dimensions: int = 3):
+    def __init__(
+        self,
+        sequences: List[AbstractSequence],
+        weight: str = "identity",
+        color: str = "name",
+        threshold: float = None,
+        label: str = "name",
+        dimensions: int = 3,
+    ):
         super().__init__()
         self.sequences = sequences
         self.threshold = threshold
@@ -97,7 +102,9 @@ class SequenceNetwork(BaseModel):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
-    def _create_pairwise_alignments(self, input_sequences, aligner: "PairwiseAligner", **kwargs):
+    def _create_pairwise_alignments(
+        self, input_sequences, aligner: "PairwiseAligner", **kwargs
+    ):
         """
         Creates pairwise alignments between sequences.
 
@@ -117,7 +124,6 @@ class SequenceNetwork(BaseModel):
 
         # Pairwise alignment
         if len(input_sequences) == 2:
-
             pairwise_aligner = aligner(
                 sequences=[
                     input_sequences[0].sequence,
@@ -151,51 +157,56 @@ class SequenceNetwork(BaseModel):
             )
 
             return alignments, pairs, aligners[0].mode
-                
 
         else:
             raise ValueError(
                 f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
-            )   
-     
-    def _process_pair(self, alignment, pair):
-            shorter_seq = min(pair, key=lambda x: len(x.sequence))
-            
-            identities = alignment.counts().identities
-            identity = identities / len(shorter_seq.sequence)
-            return (
-                pair[0].source_id, pair[1].source_id,
-                {
-                    'identity': identity,
-                    'gaps': 1 / (alignment.counts().gaps + 1),
-                    'mismatches': 1 / (alignment.counts().mismatches + 1),
-                    'score': alignment.score
-                }
             )
-    
+
+    def _process_pair(self, alignment, pair):
+        shorter_seq = min(pair, key=lambda x: len(x.sequence))
+
+        identities = alignment.counts().identities
+        identity = identities / len(shorter_seq.sequence)
+        return (
+            pair[0].source_id,
+            pair[1].source_id,
+            {
+                "identity": identity,
+                "gaps": 1 / (alignment.counts().gaps + 1),
+                "mismatches": 1 / (alignment.counts().mismatches + 1),
+                "score": alignment.score,
+            },
+        )
+
     def _process_sequence(self, sequence):
-        return (sequence.source_id, {
-            'name': sequence.name,
-            'sequence': sequence.sequence,
-            'family_name': sequence.family_name,
-            'domain': sequence.organism.domain,
-            'kingdom': sequence.organism.kingdom,
-            'phylum': sequence.organism.phylum,
-            'tax_class': sequence.organism.tax_class,
-            'order': sequence.organism.order,
-            'family': sequence.organism.family,
-            'genus': sequence.organism.genus,
-            'species': sequence.organism.species,
-            'ec_number': sequence.ec_number,
-            'mol_weight': sequence.mol_weight,
-            'taxonomy_id': sequence.organism.taxonomy_id,
-        })
+        return (
+            sequence.source_id,
+            {
+                "name": sequence.name,
+                "sequence": sequence.sequence,
+                "family_name": sequence.family_name,
+                "domain": sequence.organism.domain,
+                "kingdom": sequence.organism.kingdom,
+                "phylum": sequence.organism.phylum,
+                "tax_class": sequence.organism.tax_class,
+                "order": sequence.organism.order,
+                "family": sequence.organism.family,
+                "genus": sequence.organism.genus,
+                "species": sequence.organism.species,
+                "ec_number": sequence.ec_number,
+                "mol_weight": sequence.mol_weight,
+                "taxonomy_id": sequence.organism.taxonomy_id,
+            },
+        )
 
     def create_networkx_graph(self):
         # TODO: check if such a graph already exists
         self.network = nx.Graph()
         # create the alignments
-        alignments, pairs, mode = self._create_pairwise_alignments(self.sequences, PairwiseAligner, mode="global")
+        alignments, pairs, mode = self._create_pairwise_alignments(
+            self.sequences, PairwiseAligner, mode="global"
+        )
         # Add nodes and assign node attributes
         if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
             # the node data list
@@ -232,37 +243,56 @@ class SequenceNetwork(BaseModel):
 
         self.network.add_edges_from(edge_data)
 
-
-
-
-    def create_cytoscope_graph(self, collection: str, title: str, threshold: float = 0.8):
+    def create_cytoscope_graph(
+        self, collection: str, title: str, threshold: float = 0.8
+    ):
         # assert that the cytoscope API is running and cytoscope is running in the background
         assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
         assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
         # TODO fix that the title an dcollection is set unique in order to avoid confuing when using the software
-        p4c.create_network_from_networkx(self.graph, collection=collection, title=title+'_'+str(threshold))
+        p4c.create_network_from_networkx(
+            self.graph, collection=collection, title=title + "_" + str(threshold)
+        )
 
-
-    def set_layout(self, layout_name: str="force-directed", properties_dict: dict={"defaultSpringCoefficient": 4e-5, "defaultSpringLength": 100, "defaultNodeMass": 3, "numIterations": 50,}):
+    def set_layout(
+        self,
+        layout_name: str = "force-directed",
+        properties_dict: dict = {
+            "defaultSpringCoefficient": 4e-5,
+            "defaultSpringLength": 100,
+            "defaultNodeMass": 3,
+            "numIterations": 50,
+        },
+    ):
         p4c.layout_network(layout_name)
         # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
-        p4c.set_layout_properties(layout_name=layout_name, properties_dict=properties_dict)
+        p4c.set_layout_properties(
+            layout_name=layout_name, properties_dict=properties_dict
+        )
 
-        p4c.scale_layout(axis='Both Axis', scale_factor=1.0)
+        p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
         p4c.layout_network(layout_name)
 
-    def filter_cytoscope_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
+    def filter_cytoscope_edges_by_parameter(
+        self, name: str, parameter: str, min_val: float, max_val: float
+    ):
         # this is a filter for the network in cytoscope
         # here the nodes and edges not relevant are filtered out
-        p4c.create_column_filter(name, parameter, [min_val, max_val] , "BETWEEN", type='edges', apply=True, hide=True)
+        p4c.create_column_filter(
+            name,
+            parameter,
+            [min_val, max_val],
+            "BETWEEN",
+            type="edges",
+            apply=True,
+            hide=True,
+        )
 
     def calculate_degree(self):
         # Calculate degree of nodes with filtering
         g = p4c.create_networkx_from_network()
         nx.set_node_attributes(g, dict(nx.degree(self.graph)), "degree")
-        p4c.create_network_from_networkx(g, collection='tet', title='hfjakd')
-
-
+        p4c.create_network_from_networkx(g, collection="tet", title="hfjakd")
 
     @property
     def graph(self) -> nx.Graph:
@@ -283,40 +313,43 @@ class SequenceNetwork(BaseModel):
             - The graph can be visualized in 2D or 3D using the visualize() method.
         """
         graph = nx.Graph()
-        alignments, pairs, mode = self._create_pairwise_alignments(self.sequences, PairwiseAligner, mode="global")
+        alignments, pairs, mode = self._create_pairwise_alignments(
+            self.sequences, PairwiseAligner, mode="global"
+        )
 
         # Add nodes and assign node attributes
         # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
         if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
-            
             node_data = []
-            
-            def process_sequence(sequence):
-                return (sequence.source_id, {
-                    'name': sequence.name,
-                    'family_name': sequence.family_name,
-                    'domain': sequence.organism.domain,
-                    'kingdom': sequence.organism.kingdom,
-                    'phylum': sequence.organism.phylum,
-                    'tax_class': sequence.organism.tax_class,
-                    'order': sequence.organism.order,
-                    'family': sequence.organism.family,
-                    'genus': sequence.organism.genus,
-                    'species': sequence.organism.species,
-                    'ec_number': sequence.ec_number,
-                    'mol_weight': sequence.mol_weight,
-                    'taxonomy_id': sequence.organism.taxonomy_id,
-                })
 
-            print('Processing Sequences in for loop')
+            def process_sequence(sequence):
+                return (
+                    sequence.source_id,
+                    {
+                        "name": sequence.name,
+                        "family_name": sequence.family_name,
+                        "domain": sequence.organism.domain,
+                        "kingdom": sequence.organism.kingdom,
+                        "phylum": sequence.organism.phylum,
+                        "tax_class": sequence.organism.tax_class,
+                        "order": sequence.organism.order,
+                        "family": sequence.organism.family,
+                        "genus": sequence.organism.genus,
+                        "species": sequence.organism.species,
+                        "ec_number": sequence.ec_number,
+                        "mol_weight": sequence.mol_weight,
+                        "taxonomy_id": sequence.organism.taxonomy_id,
+                    },
+                )
+
+            print("Processing Sequences in for loop")
 
             for sequence in self.sequences:
                 node_data.append(process_sequence(sequence))
-            print('Adding in networx')
+            print("Adding in networx")
 
             graph.add_nodes_from(node_data)
-            print('nodes added ')
-
+            print("nodes added ")
 
         else:
             for sequence in self.sequences:
@@ -334,36 +367,36 @@ class SequenceNetwork(BaseModel):
                     taxonomy_id=sequence.organism.taxonomy_id,
                 )
 
-
         # create a datafarme for the egdes
         edge_data = []
 
         def process_pair(alignment, pair):
             shorter_seq = min(pair, key=lambda x: len(x.sequence))
-            
+
             identities = alignment.counts().identities
             identity = identities / len(shorter_seq.sequence)
             if self.threshold is not None and identity < self.threshold:
                 return None
             return (
-                pair[0].source_id, pair[1].source_id,
+                pair[0].source_id,
+                pair[1].source_id,
                 {
-                    'identity': identity,
-                    'gaps': 1 / (alignment.counts().gaps + 1),
-                    'mismatches': 1 / (alignment.counts().mismatches + 1),
-                    'score': alignment.score
-                }
+                    "identity": identity,
+                    "gaps": 1 / (alignment.counts().gaps + 1),
+                    "mismatches": 1 / (alignment.counts().mismatches + 1),
+                    "score": alignment.score,
+                },
             )
 
-        print('Processing Pairs in for loop')
+        print("Processing Pairs in for loop")
 
         for alignment, pair in zip(alignments, pairs):
             edge = process_pair(alignment, pair)
             if edge:
                 edge_data.append(edge)
-        print('Adding in networx')
+        print("Adding in networx")
         graph.add_edges_from(edge_data)
-        print('edges added ')
+        print("edges added ")
         # Calculate betweenness centrality
         betweenness = nx.betweenness_centrality(graph)
         for node, betw_value in betweenness.items():
