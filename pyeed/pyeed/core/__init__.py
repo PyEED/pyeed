@@ -14,24 +14,3 @@ from .sequencerecord import SequenceRecord
 from .sequencetype import SequenceType
 from .site import Site
 from .standardnumbering import StandardNumbering
-
-__doc__ = ""
-
-__all__ = [
-    "SequenceRecord",
-    "ProteinRecord",
-    "DNARecord",
-    "AbstractAnnotation",
-    "Site",
-    "Region",
-    "Organism",
-    "BlastData",
-    "Cluster",
-    "Sequence",
-    "AlignmentData",
-    "PairwiseAlignment",
-    "StandardNumbering",
-    "ClustalOmegaData",
-    "AnnotationType",
-    "SequenceType",
-]

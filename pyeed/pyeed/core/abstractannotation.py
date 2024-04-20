@@ -6,11 +6,9 @@ from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 
-@forge_signature
 class AbstractAnnotation(
     sdRDM.DataModel,
     search_mode="unordered",
@@ -53,7 +51,7 @@ class AbstractAnnotation(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="76c673877728aa63336aadca5788565d1d63df03"
+        default="2d12ae490deb0e63388285c0d1c4c8de4231942d"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
