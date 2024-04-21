@@ -24,5 +24,8 @@ response_dict = json.loads(response[0])[0]
 # Map the response to a ProteinRecord object
 uniprot_mapper = UniprotMapper()
 print(type(response_dict))
+
+with open("response_dict.json", "w") as f:
+    json.dump(response_dict, f, indent=4)
 protein_info = uniprot_mapper.map_uniprot_data(response_dict)
 print(protein_info)

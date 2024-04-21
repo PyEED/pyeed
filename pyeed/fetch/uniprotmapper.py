@@ -1,7 +1,8 @@
 import logging
 import re
 
-from pyeed.core import Organism, ProteinRecord
+from pyeed.core import Organism, ProteinRecord, Annotation
+from pyeed.core.ontology import Ontology
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +24,6 @@ class UniprotMapper:
             ec_number = None
 
         protein_info = ProteinRecord(
-            uri=uniprot_data["uri"],
             accession_id=uniprot_data["accession"],
             sequence=uniprot_data["sequence"]["sequence"],
             name=uniprot_data["protein"]["recommendedName"]["fullName"]["value"],
@@ -31,6 +31,12 @@ class UniprotMapper:
             mol_weight=uniprot_data["sequence"]["mass"],
             organism=organism,
         )
+
+        global_go_annotations = [
+            Ontology.GO.value + go_annotation["id"]
+            for go_annotation in uniprot_data["dbReferences"]
+            if go_annotation["type"] == "GO"
+        ]
 
         return protein_info
 

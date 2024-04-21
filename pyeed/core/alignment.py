@@ -1,5 +1,5 @@
 from itertools import combinations
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import sdRDM
 from Bio.Align import Alignment as BioAlignment

@@ -273,7 +273,17 @@ Description of an organism 🦠.
 
 ## Enumerations
 
-### AnnotationType
+### Ontology
+
+Ontology endponts for different types of sequences.
+
+```python
+GO = "https://amigo.geneontology.org/amigo/term/"
+SIO = "http://semanticscience.org/resource/"
+ECO = "https://www.evidenceontology.org/term/"
+```
+
+### Annotation
 
 Ontology terms for different sections of a sequence.
 

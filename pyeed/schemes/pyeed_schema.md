@@ -112,7 +112,14 @@ classDiagram
         +string version
     }
     
-    class AnnotationType {
+    class Ontology {
+        << Enumeration >>
+        +GO
+        +SIO
+        +ECO
+    }
+    
+    class Annotation {
         << Enumeration >>
         +ACTIVE_SITE
         +BINDING_SITE
