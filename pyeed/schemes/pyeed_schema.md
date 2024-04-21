@@ -53,7 +53,7 @@ classDiagram
     }
     
     class Organism {
-        +string taxonomy_id*
+        +integer taxonomy_id*
         +string name
         +string domain
         +string kingdom
@@ -112,7 +112,14 @@ classDiagram
         +string version
     }
     
-    class AnnotationType {
+    class Ontology {
+        << Enumeration >>
+        +GO
+        +SIO
+        +ECO
+    }
+    
+    class Annotation {
         << Enumeration >>
         +ACTIVE_SITE
         +BINDING_SITE

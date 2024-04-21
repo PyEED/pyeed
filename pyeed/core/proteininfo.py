@@ -4,7 +4,6 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from IPython.display import clear_output
 from pydantic import Field
 from rich.console import Console
 from rich.status import Status
@@ -179,7 +178,6 @@ class ProteinInfo(AbstractSequence):
             return cls.get_ids(protein_id)
 
         sequences = asyncio.run(ProteinFetcher(ids=[protein_id]).fetch(quiet=True))[0]
-        clear_output()
         return sequences
 
     @classmethod
@@ -249,7 +247,6 @@ class ProteinInfo(AbstractSequence):
                     BlastProgram.BLASTP.value,
                 )
             )
-            clear_output()
 
             accession = blaster.extract_accession(result)
 
@@ -316,7 +313,6 @@ class ProteinInfo(AbstractSequence):
             "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
         ):
             result = asyncio.run(blaster.async_run(database, program, executor))
-            clear_output()
 
         accessions = blaster.extract_accession(result)
 
