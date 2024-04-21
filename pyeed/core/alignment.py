@@ -1,8 +1,8 @@
 from itertools import combinations
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
+import sdRDM
 from Bio.Align import Alignment as BioAlignment
-from IPython.display import clear_output
 from joblib import Parallel, cpu_count, delayed
 from pydantic import Field, validator
 from rich.console import Console
@@ -11,19 +11,11 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature
 from tqdm import tqdm
 
-if TYPE_CHECKING:
-    from pyeed.align.pairwise import PairwiseAligner
-    from pyeed.container.abstract_container import AbstractContainer
-    from pyeed.core import PairwiseAlignment
-    from pyeed.core.dnainfo import DNAInfo
-    from pyeed.core.proteininfo import ProteinInfo
+from pyeed.align.pairwise import PairwiseAligner
+from pyeed.container.abstract_container import AbstractContainer
+from pyeed.core import PairwiseAlignment
+from pyeed.core.proteininfo import ProteinInfo
 
-    from .abstractsequence import AbstractSequence
-
-
-import sdRDM
-
-from .abstractsequence import AbstractSequence
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 
@@ -95,20 +87,6 @@ class Alignment(sdRDM.DataModel):
         default_factory=ListPlus,
         multiple=True,
     )
-
-    @validator("input_sequences", pre=True)
-    def sequences_validator(cls, sequences):
-        if all(isinstance(seq, AbstractSequence) for seq in sequences):
-            return [
-                Sequence(source_id=seq.source_id, sequence=seq.sequence)
-                for seq in sequences
-            ]
-        elif all(isinstance(seq, Sequence) for seq in sequences):
-            return sequences
-        else:
-            raise ValueError(
-                "Invalid sequence type. Sequences must be of type AbstractSequence or Sequence"
-            )
 
     def add_to_input_sequences(
         self,
@@ -380,7 +358,6 @@ class Alignment(sdRDM.DataModel):
 
                 result = alignment.align(aligner, **kwargs)
 
-        clear_output()
         if result:
             print("✅ Alignment completed")
             return result

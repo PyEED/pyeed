@@ -1,9 +1,7 @@
 import logging
 import re
 
-from pyeed.core import Organism, ProteinInfo
-from pyeed.core.dnaregion import DNARegion
-from pyeed.core.proteinregiontype import ProteinRegionType
+from pyeed.core import Organism, ProteinRecord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -12,11 +10,35 @@ class UniprotMapper:
     def __init__(self):
         pass
 
+    def map_uniprot_data(self, uniprot_data: dict) -> ProteinRecord:
+
+        # Organism information
+        organism = Organism(
+            taxonomy_id=uniprot_data["organism"]["taxonomy"],
+        )
+
+        try:
+            ec_number = uniprot_data["protein"]["recommendedName"]["ecNumber"][0]["value"]
+        except KeyError:
+            ec_number = None
+
+        protein_info = ProteinRecord(
+            uri=uniprot_data["uri"],
+            accession_id=uniprot_data["accession"],
+            sequence=uniprot_data["sequence"]["sequence"],
+            name=uniprot_data["protein"]["recommendedName"]["fullName"]["value"],
+            ec_number=ec_number,
+            mol_weight=uniprot_data["sequence"]["mass"],
+            organism=organism,
+        )
+
+        return protein_info
+
     def map(
         self,
         uniprot: dict,
         interpro: dict,
-    ) -> ProteinInfo:
+    ) -> ProteinRecord:
         """Maps the sequence information from Uniprot and annotations from InterPro
         records to a ProteinInfo object."""
 
@@ -34,8 +56,9 @@ class UniprotMapper:
         except KeyError:
             ec_number = None
 
-        protein_info = ProteinInfo(
-            source_id=uniprot["accession"],
+        protein_info = ProteinRecord(
+            uri=uniprot["uri"],
+            accession_id=uniprot["accession"],
             sequence=uniprot["sequence"]["sequence"],
             name=uniprot["protein"]["recommendedName"]["fullName"]["value"],
             ec_number=ec_number,
@@ -59,7 +82,7 @@ class UniprotMapper:
 
         return protein_info
 
-    def map_interpro(self, interpro: dict, protein_info: ProteinInfo) -> ProteinInfo:
+    def map_interpro(self, interpro: dict, protein_info: ProteinRecord) -> ProteinRecord:
         """Maps the InterPro records to a ProteinInfo object."""
 
         interpro_pattern = re.compile(r"IPR\d{6}")

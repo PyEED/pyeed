@@ -6,14 +6,6 @@ from typing import List
 from Bio import SeqFeature, SeqIO
 from Bio.SeqRecord import SeqRecord
 
-from pyeed.core.dnaregion import DNARegion
-from pyeed.core.dnaregiontype import DNARegionType
-from pyeed.core.organism import Organism
-from pyeed.core.proteininfo import ProteinInfo
-from pyeed.core.proteinregion import ProteinRegion
-from pyeed.core.proteinsitetype import ProteinSiteType
-from pyeed.core.span import Span
-
 LOGGER = logging.getLogger(__name__)
 
 
