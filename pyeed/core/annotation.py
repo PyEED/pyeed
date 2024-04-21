@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class AnnotationType(Enum):
+class Annotation(Enum):
 
     ACTIVE_SITE = "http://semanticscience.org/resource/SIO_010041"
     BINDING_SITE = "http://semanticscience.org/resource/SIO_010040"
