@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -87,11 +86,6 @@ class ProteinRecord(
         json_schema_extra=dict(
             term="http://edamontology.org/data_1047",
         ),
-    )
-
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="a74a385ecb66052de0f011cd5cade02033188e55"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

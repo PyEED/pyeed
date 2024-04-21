@@ -53,7 +53,7 @@ classDiagram
     }
     
     class Organism {
-        +string taxonomy_id*
+        +integer taxonomy_id*
         +string name
         +string domain
         +string kingdom

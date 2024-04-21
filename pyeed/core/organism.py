@@ -22,7 +22,7 @@ class Organism(
         default_factory=lambda: str(uuid4()),
     )
 
-    taxonomy_id: str = element(
+    taxonomy_id: int = element(
         description=(
             "A stable unique identifier for each taxon (for a species, a family, an"
             " order, or any other group in the NCBI taxonomy database."
@@ -104,11 +104,6 @@ class Organism(
         json_schema_extra=dict(
             term="http://edamontology.org/data_1045",
         ),
-    )
-
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="a74a385ecb66052de0f011cd5cade02033188e55"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

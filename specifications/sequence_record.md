@@ -120,7 +120,7 @@ Regional annotation of a feature within a sequence. The direction of the region 
 Description of an organism 🦠.
 
 - **taxonomy_id**
-  - Type: string
+  - Type: integer
   - Description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group in the NCBI taxonomy database.
   - Term: EDAM:data_1179
 - name
