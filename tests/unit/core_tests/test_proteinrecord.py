@@ -2,21 +2,20 @@
 import pytest
 
 from pyeed.core.organism import Organism
-from pyeed.core.proteininfo import ProteinInfo
-from pyeed.core.proteinregiontype import ProteinRegionType
-from pyeed.core.proteinsitetype import ProteinSiteType
-from pyeed.core.span import Span
+from pyeed.core.proteinrecord import ProteinRecord
+from pyeed.core.region import Region
+from pyeed.core.site import Site
 
 
-class TestProteinInfo:
+class TestProteinRecord:
 
     # In Docs
     def test_instantiation_from_ncbi(self):
-        protein_info = ProteinInfo.get_id("UCS38941.1")
+        proteinRecord = ProteinRecord.get_id("UCS38941.1")
 
     # create a ProteinInfo object with all required fields
     def test_create_protein_info_with_required_fields(self):
-        protein_info = ProteinInfo(
+        protein_record = ProteinRecord(
             name="MyProtein",
             source_id="ABC123",
             sequence="MVKLQWERTY",
@@ -34,23 +33,24 @@ class TestProteinInfo:
             ),
         )
 
-        assert protein_info.name == "MyProtein"
-        assert protein_info.source_id == "ABC123"
-        assert protein_info.sequence == "MVKLQWERTY"
-        assert protein_info.organism.name == "Homo sapiens"
-        assert protein_info.organism.taxonomy_id == "tax12345"
-        assert protein_info.organism.domain == "Eukaryota"
-        assert protein_info.organism.kingdom == "Animalia"
-        assert protein_info.organism.phylum == "Chordata"
-        assert protein_info.organism.tax_class == "Mammalia"
-        assert protein_info.organism.order == "Primates"
-        assert protein_info.organism.family == "Hominidae"
-        assert protein_info.organism.genus == "Homo"
-        assert protein_info.organism.species == "sapiens"
-
+        assert protein_record.name == "MyProtein"
+        assert protein_record.source_id == "ABC123"
+        assert protein_record.sequence == "MVKLQWERTY"
+        assert protein_record.organism.name == "Homo sapiens"
+        assert protein_record.organism.taxonomy_id == "tax12345"
+        assert protein_record.organism.domain == "Eukaryota"
+        assert protein_record.organism.kingdom == "Animalia"
+        assert protein_record.organism.phylum == "Chordata"
+        assert protein_record.organism.tax_class == "Mammalia"
+        assert protein_record.organism.order == "Primates"
+        assert protein_record.organism.family == "Hominidae"
+        assert protein_record.organism.genus == "Homo"
+        assert protein_record.organism.species == "sapiens"
+    
+    
     # add a region to ProteinInfo object
     def test_add_region_to_protein_info(self):
-        protein_info = ProteinInfo(
+        protein_record = ProteinRecord(
             name="MyProtein",
             source_id="ABC123",
             sequence="MVKLQWERTY",
@@ -68,21 +68,21 @@ class TestProteinInfo:
             ),
         )
 
-        region = protein_info.add_to_regions(
-            type=ProteinRegionType.DOMAIN.value,
-            name="Domain1",
-            spans=[Span(start=1, end=10, id="span1")],
+        region = protein_record.add_to_regions(
+            start=1, 
+            end=10,
+            id="SpecialRegion",
         )
 
-        assert len(protein_info.regions) == 1
-        assert protein_info.regions[0] == region
-        assert protein_info.regions[0].type == ProteinRegionType.DOMAIN.value
-        assert protein_info.regions[0].name == "Domain1"
-        assert protein_info.regions[0].spans == [Span(start=1, end=10, id="span1")]
+        assert len(protein_record.regions) == 1
+        assert protein_record.regions[0] == region
+        assert protein_record.regions[0].id == "SpecialRegion"
+        assert protein_record.regions[0].start == 1
+        assert protein_record.regions[0].end == 10
 
     # add a site to ProteinInfo object
     def test_add_site_to_protein_info(self):
-        protein_info = ProteinInfo(
+        protein_record = ProteinRecord(
             name="MyProtein",
             source_id="ABC123",
             sequence="MVKLQWERTY",
@@ -100,14 +100,16 @@ class TestProteinInfo:
             ),
         )
 
-        site = protein_info.add_to_sites(
+        site = protein_record.add_to_sites(
             name="Site1",
-            type=ProteinSiteType.ACTIVE.value,
+            uri="TestUri",
+            accession_id='1234',
+            id='idTest',
             positions=[1, 2, 3],
         )
 
-        assert len(protein_info.sites) == 1
-        assert protein_info.sites[0] == site
-        assert protein_info.sites[0].name == "Site1"
-        assert protein_info.sites[0].type == ProteinSiteType.ACTIVE.value
-        assert protein_info.sites[0].positions == [1, 2, 3]
+        assert len(protein_record.sites) == 1
+        assert protein_record.sites[0] == site
+        assert protein_record.sites[0].name == "Site1"
+        assert protein_record.sites[0].accession_id == '1234'
+        assert protein_record.sites[0].positions == [1, 2, 3]

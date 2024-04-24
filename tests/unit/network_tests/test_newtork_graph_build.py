@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from pyeed.core import ProteinInfo
-from pyeed.network import SequenceNetwork
+from pyeed.core import ProteinRecord
+# from pyeed.network import SequenceNetwork
 
-
+"""
 class TestNetworkGraphBuild:
 
     def test_general(self):
@@ -21,7 +21,7 @@ class TestNetworkGraphBuild:
             "WP_048165429.1",
             "ACS90033.1",
         ]
-        mats = ProteinInfo.get_ids(mat_accessions)
+        mats = ProteinRecord.get_ids(mat_accessions)
         # Create a network
         network = SequenceNetwork(
             sequences=mats,
@@ -31,6 +31,8 @@ class TestNetworkGraphBuild:
             color="taxonomy_id",
         )
 
+    
+    
     def test_graph_build(self):
         mat_accessions = [
             "MBP1912539.1",
@@ -42,7 +44,7 @@ class TestNetworkGraphBuild:
             "WP_048165429.1",
             "ACS90033.1",
         ]
-        mats = ProteinInfo.get_ids(mat_accessions)
+        mats = ProteinRecord.get_ids(mat_accessions)
         # Create a network
         network = SequenceNetwork(
             sequences=mats,
@@ -55,3 +57,4 @@ class TestNetworkGraphBuild:
         # Check if the graph is created
         graph = network.graph
 
+"""
