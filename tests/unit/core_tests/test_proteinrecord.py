@@ -13,16 +13,15 @@ class TestProteinRecord:
     def test_instantiation_from_ncbi(self):
         proteinRecord = ProteinRecord.get_id("UCS38941.1")
 
-    """
     # create a ProteinInfo object with all required fields
     def test_create_protein_info_with_required_fields(self):
         protein_record = ProteinRecord(
             name="MyProtein",
-            source_id="ABC123",
+            id="ABC123",
             sequence="MVKLQWERTY",
             organism=Organism(
                 name="Homo sapiens",
-                taxonomy_id="tax12345",
+                taxonomy_id="12345",
                 domain="Eukaryota",
                 kingdom="Animalia",
                 phylum="Chordata",
@@ -35,10 +34,10 @@ class TestProteinRecord:
         )
 
         assert protein_record.name == "MyProtein"
-        assert protein_record.source_id == "ABC123"
+        assert protein_record.id == "ABC123"
         assert protein_record.sequence == "MVKLQWERTY"
         assert protein_record.organism.name == "Homo sapiens"
-        assert protein_record.organism.taxonomy_id == "tax12345"
+        assert protein_record.organism.taxonomy_id == 12345
         assert protein_record.organism.domain == "Eukaryota"
         assert protein_record.organism.kingdom == "Animalia"
         assert protein_record.organism.phylum == "Chordata"
@@ -57,7 +56,7 @@ class TestProteinRecord:
             sequence="MVKLQWERTY",
             organism=Organism(
                 name="Homo sapiens",
-                taxonomy_id="tax12345",
+                taxonomy_id="12345",
                 domain="Eukaryota",
                 kingdom="Animalia",
                 phylum="Chordata",
@@ -89,7 +88,7 @@ class TestProteinRecord:
             sequence="MVKLQWERTY",
             organism=Organism(
                 name="Homo sapiens",
-                taxonomy_id="tax12345",
+                taxonomy_id="12345",
                 domain="Eukaryota",
                 kingdom="Animalia",
                 phylum="Chordata",
@@ -114,4 +113,3 @@ class TestProteinRecord:
         assert protein_record.sites[0].name == "Site1"
         assert protein_record.sites[0].accession_id == '1234'
         assert protein_record.sites[0].positions == [1, 2, 3]
-    """

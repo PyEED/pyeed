@@ -234,7 +234,7 @@ class ProteinRecord(
             warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
             return cls.get_ids(protein_id)
 
-        sequences = asyncio.run(ProteinFetcher(ids=[protein_id]).fetch(quiet=True))[0]
+        sequences = asyncio.run(ProteinFetcher(ids=[protein_id]).fetch(quiet=False))[0]
         clear_output()
         return sequences
 
