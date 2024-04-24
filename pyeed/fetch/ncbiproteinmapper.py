@@ -6,6 +6,12 @@ from typing import List
 from Bio import SeqFeature, SeqIO
 from Bio.SeqRecord import SeqRecord
 
+from pyeed.core.organism import Organism
+from pyeed.core.region import Region
+from pyeed.core.dnarecord import DNARecord
+from pyeed.core.annotation import Annotation
+from pyeed.core.proteinrecord import ProteinRecord
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -24,7 +30,7 @@ class NCBIProteinMapper:
 
         return records
 
-    def map(self, responses: List[str]) -> List[ProteinInfo]:
+    def map(self, responses: List[str]) -> List[ProteinRecord]:
         """
         Maps the fetched data to an instance of the `ProteinInfo` class.
         """
@@ -33,7 +39,7 @@ class NCBIProteinMapper:
 
         protein_infos = []
         for record in seq_records:
-            protein_info = ProteinInfo(source_id=record.id, sequence=str(record.seq))
+            protein_info = ProteinRecord(source_id=record.id, sequence=str(record.seq))
 
             protein_info.organism = Organism(**self.map_organism(record))
 
@@ -88,7 +94,7 @@ class NCBIProteinMapper:
 
         return {"name": organism_name[0], "taxonomy_id": taxonomy_id}
 
-    def map_protein(self, seq_record: SeqRecord, protein_info: ProteinInfo):
+    def map_protein(self, seq_record: SeqRecord, protein_info: ProteinRecord):
         """Maps protein data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
         protein = self.get_feature(seq_record, "Protein")
@@ -137,7 +143,7 @@ class NCBIProteinMapper:
 
         return protein_info
 
-    def map_regions(self, seq_record: SeqRecord, protein_info: ProteinInfo):
+    def map_regions(self, seq_record: SeqRecord, protein_info: ProteinRecord):
         """Maps region data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
         regions = self.get_feature(seq_record, "region")
@@ -149,14 +155,10 @@ class NCBIProteinMapper:
                     db_xref = region.qualifiers["db_xref"][0]
 
                 protein_info.regions.append(
-                    ProteinRegion(
-                        name=region.qualifiers["region_name"][0],
-                        spans=[
-                            Span(
-                                start=int(region.location.start),
-                                end=int(region.location.end),
-                            )
-                        ],
+                    Region(
+                        id=region.qualifiers["region_name"][0],
+                        start=int(region.location.start),
+                        end=int(region.location.end),
                         note=region.qualifiers["note"][0],
                         cross_reference=db_xref,
                     )
@@ -168,7 +170,7 @@ class NCBIProteinMapper:
 
         return protein_info
 
-    def map_sites(self, seq_record: SeqRecord, protein_info: ProteinInfo):
+    def map_sites(self, seq_record: SeqRecord, protein_info: ProteinRecord):
         """Maps site data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
         sites = self.get_feature(seq_record, "site")
@@ -176,9 +178,7 @@ class NCBIProteinMapper:
             try:
                 protein_info.add_to_sites(
                     name=site.qualifiers["site_type"][0],
-                    type=ProteinSiteType.match_string(
-                        site.qualifiers["site_type"][0].lower()
-                    ),
+                    id=site.qualifiers["site_type"][0].lower(),
                     positions=[int(part.start) for part in site.location.parts],
                     cross_ref=site.qualifiers["db_xref"][0],
                 )
@@ -189,8 +189,8 @@ class NCBIProteinMapper:
 
         return protein_info
 
-    def map_cds(self, seq_record: SeqRecord, protein_info: ProteinInfo):
-        """Maps coding sequence data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
+    def map_cds(self, seq_record: SeqRecord, protein_record: ProteinRecord):
+        """Maps coding sequence data from a `Bio.SeqRecord` to a `ProteinRecord` object."""
 
         cds = self.get_feature(seq_record, "CDS")
         if len(cds) > 1:
@@ -203,10 +203,10 @@ class NCBIProteinMapper:
         except IndexError:
             LOGGER.debug(f"No CDS found for {seq_record.id}: {cds}")
 
-            return protein_info
+            return protein_record
 
         try:
-            protein_info.coding_sequence_ref = self.get_cds_regions(
+            protein_record.coding_sequence = self.get_cds_regions(
                 cds.qualifiers["coded_by"][0]
             )
         except IndexError:
@@ -214,10 +214,10 @@ class NCBIProteinMapper:
                 f"No coding sequence reference found for {seq_record.id}: {cds.qualifiers}"
             )
 
-        return protein_info
+        return protein_record
 
     @staticmethod
-    def get_cds_regions(coded_by: dict) -> List[DNARegion]:
+    def get_cds_regions(coded_by: dict) -> List[DNARecord]:
         """Extract coding sequence from the 'coded_by' qualifier and return a list of DNARegion objects."""
 
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
@@ -237,19 +237,22 @@ class NCBIProteinMapper:
                 "Nucleotide sequence references are not identical: {reference_ids}"
             )
 
+        # TODO MAX ist hier nicht früher ein Fehler gewesen? es wird doch nur die etzte Region return, macht doch kein Sinn
         # Extract the start and end position of each region
         cds_ranges = [region.split(":")[1] for region in cds_regions]
+        regions = []
         for region in cds_ranges:
             start, end = region.split("..")
-            span = Span(start=int(start), end=int(end))  # noqa: F821
 
-            region = DNARegion(
+            region = Region(
                 id=reference_ids[0],
-                spans=[span],
-                type=DNARegionType.CODING_SEQUENCE,
+                start = int(start),
+                end = int(end),
+                type=Annotation.CODING_SEQ,
             )
+            regions.append(region)
 
-        return region
+        return regions
 
     def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
