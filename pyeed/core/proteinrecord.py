@@ -1,24 +1,25 @@
-import os
 import asyncio
+import os
 import warnings
-from uuid import uuid4
-from rich.status import Status, Console
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 from Bio.Blast import NCBIXML
-from lxml.etree import _Element
-from pydantic_xml import attr, element
-from sdRDM.tools.utils import elem2dict
-from sdRDM.base.listplus import ListPlus
 from IPython.display import clear_output
-from concurrent.futures import ThreadPoolExecutor
+from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
+from pydantic_xml import attr, element
+from rich.status import Console, Status
+from sdRDM.base.listplus import ListPlus
+from sdRDM.tools.utils import elem2dict
 
-from .site import Site
-from .region import Region
-from .dnarecord import DNARecord
-from .sequencerecord import SequenceRecord
 from pyeed.container.abstract_container import Blastp
+
+from .dnarecord import DNARecord
+from .region import Region
+from .sequencerecord import SequenceRecord
+from .site import Site
 
 
 class ProteinRecord(
@@ -99,7 +100,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="9cf5a53e2161d63c639e27dadd2d0bda5c174f67"
+        default="b755c1986bcbcc531f544c54a2087022331279fc"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -212,10 +213,8 @@ class ProteinRecord(
 
         return self.coding_sequence[-1]
 
-
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinRecord":
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
         import nest_asyncio
 
         nest_asyncio.apply()
@@ -240,7 +239,6 @@ class ProteinRecord(
 
     @classmethod
     def get_ids(cls, accession_ids: List[str]) -> List["ProteinRecord"]:
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
         import nest_asyncio
 
         nest_asyncio.apply()
@@ -277,8 +275,7 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        import nest_asyncio
-        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
+        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -347,9 +344,9 @@ class ProteinRecord(
             similar_proteins = protein_info.ncbi_blast(n_hits=10, e_value=0.001, database="swissprot")
         """
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
-        from pyeed.fetch.blast import Blast, NCBIDataBase, BlastProgram
         import nest_asyncio
+
+        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
 
         nest_asyncio.apply()
 
