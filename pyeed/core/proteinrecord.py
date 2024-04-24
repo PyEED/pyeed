@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 from uuid import uuid4
 
+import nest_asyncio
 from Bio.Blast import NCBIXML
 from IPython.display import clear_output
 from lxml.etree import _Element
@@ -15,6 +16,7 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from pyeed.container.abstract_container import Blastp
+from pyeed.fetch.proteinfetcher import ProteinFetcher
 
 from .dnarecord import DNARecord
 from .region import Region
@@ -100,7 +102,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="b755c1986bcbcc531f544c54a2087022331279fc"
+        default="b2f6f60101c154abdc98b6cf13ec48dc7f557f67"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -275,7 +277,7 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
+        from pyeed.fetch.blast import BlastProgram, NCBIDataBase
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -346,7 +348,7 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
+        from pyeed.fetch.blast import BlastProgram, NCBIDataBase
 
         nest_asyncio.apply()
 
