@@ -216,6 +216,7 @@ class ProteinRecord(
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinRecord":
         import nest_asyncio
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
