@@ -102,7 +102,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="b2f6f60101c154abdc98b6cf13ec48dc7f557f67"
+        default="29cf09884547d4761a0fc9070d62063a996a585d"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -218,6 +218,7 @@ class ProteinRecord(
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinRecord":
         import nest_asyncio
+
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -278,7 +279,7 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        from pyeed.fetch.blast import BlastProgram, NCBIDataBase
+        from pyeed.fetch.blast import BlastProgram
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -349,7 +350,7 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.blast import BlastProgram, NCBIDataBase
+        from pyeed.fetch.blast import NCBIDataBase
 
         nest_asyncio.apply()
 
