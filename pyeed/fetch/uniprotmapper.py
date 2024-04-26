@@ -1,8 +1,16 @@
+from __future__ import annotations
+
 import logging
 import re
 
-from pyeed.core import Organism, ProteinRecord, Annotation
+from typing import List, TYPE_CHECKING
+
+from pyeed.core import Organism, Annotation
 from pyeed.core.ontology import Ontology
+
+
+if TYPE_CHECKING:
+    from pyeed.core import ProteinRecord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -13,13 +21,17 @@ class UniprotMapper:
 
     def map_uniprot_data(self, uniprot_data: dict) -> ProteinRecord:
 
+        from pyeed.core import ProteinRecord
+
         # Organism information
         organism = Organism(
             taxonomy_id=uniprot_data["organism"]["taxonomy"],
         )
 
         try:
-            ec_number = uniprot_data["protein"]["recommendedName"]["ecNumber"][0]["value"]
+            ec_number = uniprot_data["protein"]["recommendedName"]["ecNumber"][0][
+                "value"
+            ]
         except KeyError:
             ec_number = None
 
@@ -47,6 +59,8 @@ class UniprotMapper:
     ) -> ProteinRecord:
         """Maps the sequence information from Uniprot and annotations from InterPro
         records to a ProteinInfo object."""
+
+        from pyeed.core import ProteinRecord
 
         assert (
             interpro["results"][0]["proteins"][0]["accession"].upper()
@@ -88,8 +102,14 @@ class UniprotMapper:
 
         return protein_info
 
-    def map_interpro(self, interpro: dict, protein_info: ProteinRecord) -> ProteinRecord:
+    def map_interpro(
+        self, interpro: dict, protein_info: ProteinRecord
+    ) -> ProteinRecord:
         """Maps the InterPro records to a ProteinInfo object."""
+
+        raise NotImplementedError(
+            f"This method uses the old schema and does not support ProteinRegionType"
+        )
 
         interpro_pattern = re.compile(r"IPR\d{6}")
         # pfam_pattern = re.compile(r"PF\d{5}")
