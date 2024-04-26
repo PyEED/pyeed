@@ -16,6 +16,7 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from pyeed.container.abstract_container import Blastp
+from pyeed.fetch.blast import BlastProgram, NCBIDataBase
 from pyeed.fetch.proteinfetcher import ProteinFetcher
 
 from .dnarecord import DNARecord
@@ -102,7 +103,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="29cf09884547d4761a0fc9070d62063a996a585d"
+        default="7da344c92b6a3a45e387eb9947755ed64094c455"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
