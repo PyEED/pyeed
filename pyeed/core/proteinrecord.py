@@ -16,7 +16,6 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from pyeed.container.abstract_container import Blastp
-from pyeed.fetch.proteinfetcher import ProteinFetcher
 
 from .dnarecord import DNARecord
 from .region import Region
