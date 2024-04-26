@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import io
 import logging
 import re
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from Bio import SeqFeature, SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -10,7 +12,9 @@ from pyeed.core.organism import Organism
 from pyeed.core.region import Region
 from pyeed.core.dnarecord import DNARecord
 from pyeed.core.annotation import Annotation
-from pyeed.core.proteinrecord import ProteinRecord
+
+if TYPE_CHECKING:
+    from pyeed.core.proteinrecord import ProteinRecord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +38,8 @@ class NCBIProteinMapper:
         """
         Maps the fetched data to an instance of the `ProteinInfo` class.
         """
+
+        from pyeed.core.proteinrecord import ProteinRecord
 
         seq_records = self._to_seq_records(responses)
 
@@ -246,8 +252,8 @@ class NCBIProteinMapper:
 
             region = Region(
                 id=reference_ids[0],
-                start = int(start),
-                end = int(end),
+                start=int(start),
+                end=int(end),
                 type=Annotation.CODING_SEQ,
             )
             regions.append(region)
