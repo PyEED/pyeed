@@ -9,6 +9,9 @@ if TYPE_CHECKING:
     from Bio.Align import Alignment as BioAlignment
     from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 
+# ----------------------------------------------------------------------------------------------------------------------
+# THIS IS THE OLD ALINGER CLASS - SHOULD BE REMOVED AT SOME POINT
+# ----------------------------------------------------------------------------------------------------------------------
 
 class PairwiseAligner(AbstractAligner):
 
@@ -87,7 +90,4 @@ class PairwiseAligner(AbstractAligner):
 
         return alignment_result
 
-    def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
-        from Bio.Align import substitution_matrices
 
-        return substitution_matrices.load(self.substitution_matrix)
