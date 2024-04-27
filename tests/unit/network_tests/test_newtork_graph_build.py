@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from pyeed.core import ProteinRecord
+# from pyeed.core import ProteinRecord
 # from pyeed.network import SequenceNetwork
 
 """

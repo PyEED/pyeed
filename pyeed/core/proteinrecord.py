@@ -291,7 +291,7 @@ class ProteinRecord(
 
         identity = 1 if exact_match else 0
 
-        blaster = Blast(
+        blaster = Blastp(
             query=sequence,
             n_hits=1,
             identity=identity,
@@ -359,7 +359,7 @@ class ProteinRecord(
 
         program = BlastProgram.BLASTP.value
         executor = ThreadPoolExecutor(max_workers=1)
-        blaster = Blast(
+        blaster = Blastp(
             query=self.sequence,
             n_hits=n_hits,
             evalue=e_value,
