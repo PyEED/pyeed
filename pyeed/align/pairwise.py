@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
-from pydantic import Field, validator
+from pydantic import Field
 
 from pyeed.align import AbstractAligner
 
@@ -41,6 +41,7 @@ class PairwiseAligner(AbstractAligner):
         default="None",
     )
 
+    """
     @validator("mode")
     def mode_validator(cls, mode):
         modes = ["global", "local"]
@@ -62,6 +63,8 @@ class PairwiseAligner(AbstractAligner):
             )
 
         return substitution_matrix
+
+    """
 
     def align(self) -> "BioAlignment":
         """
@@ -89,5 +92,3 @@ class PairwiseAligner(AbstractAligner):
         alignment_result = aligner.align(self.sequences[0], self.sequences[1])[0]
 
         return alignment_result
-
-
