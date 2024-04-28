@@ -1,32 +1,28 @@
-from itertools import combinations
 from typing import List, Optional
+from itertools import combinations
 
+from tqdm import tqdm
 import networkx as nx
+import py4cytoscape as p4c
 import plotly.express as px
 import plotly.graph_objects as go
-import py4cytoscape as p4c
-from joblib import Parallel, cpu_count, delayed
 from pydantic import BaseModel, Field
-from tqdm import tqdm
+from joblib import Parallel, cpu_count, delayed
 
-from pyeed.aligners.pairwise import PairwiseAligner
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.proteininfo import ProteinInfo
+from pyeed.core.proteinrecord import ProteinRecord
+from pyeed.core.sequencerecord import SequenceRecord
+from pyeed.align.pairwise_aligner import PairwiseAligner
 
 
 class SequenceNetwork(BaseModel):
     """
     A class representing a sequence network.
 
-    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of AbstractSequence objects. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
+    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of SequenceRecords objects. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
 
     Attributes:
-        sequences (Optional[List[AbstractSequence]]): A list of AbstractSequence objects to be compared in the network. Default is an empty list.
-        pairwise_alignments (Optional[List[PairwiseAlignment]]): A list of PairwiseAlignment objects representing the pairwise alignments between sequences. Default is an empty list.
+        sequences (Optional[List[SequenceRecord]]): A list of AbstractSequence objects to be compared in the network. Default is an empty list.
         weight (Optional[str]): The attribute of the Alignment object to weight the edges in the network. Default is "identity".
-        color (Optional[str]): The attribute of the ProteinInfo object to colorize the nodes in the network. Default is "name".
-        threshold (Optional[float]): Sequences with a weight higher than the threshold are connected in the network. Default is None.
-        label (Optional[str]): The node label in the graph. Default is "name".
         dimensions (Optional[int]): The dimension of the network graph. Default is 3.
 
     Methods:
@@ -40,29 +36,19 @@ class SequenceNetwork(BaseModel):
             nx.Graph: lambda g: nx.node_link_data(g),
         }
 
-    sequences: Optional[List[AbstractSequence]] = Field(
+    sequences: Optional[List[SequenceRecord]] = Field(
         default=[],
         description="List of sequences to be compared",
+    )
+
+    mode: Optional[str] = Field(
+        default="global",
+        description="Alignment mode",
     )
 
     weight: Optional[str] = Field(
         default="identity",
         description="Attribute of Alignment to weight the edges",
-    )
-
-    color: Optional[str] = Field(
-        default="name",
-        description="Attribute of ProteinInfo to colorize nodes",
-    )
-
-    threshold: Optional[float] = Field(
-        default=None,
-        description="Sequences with a weight higher than the threshold are connected in the network",
-    )
-
-    label: Optional[str] = Field(
-        default="name",
-        description="Node label in the graph",
     )
 
     dimensions: Optional[int] = Field(
@@ -82,20 +68,127 @@ class SequenceNetwork(BaseModel):
 
     def __init__(
         self,
-        sequences: List[AbstractSequence],
+        sequences: List[SequenceRecord],
         weight: str = "identity",
-        color: str = "name",
-        threshold: float = None,
-        label: str = "name",
         dimensions: int = 3,
+        mode = "global"
     ):
         super().__init__()
+        self.weight = weight
+        self.dimensions = dimensions
+        self.mode = mode
         self.sequences = sequences
-        self.threshold = threshold
+        self.network = nx.Graph()
 
-    def add_target(self, target: AbstractSequence):
+
+    def add_target(self, target: SequenceRecord):
+        # TODO find out what to do with targets
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
+
+    def _create_graph(self):
+
+        alignments_results = []
+
+        if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
+            node_data = []
+
+            def process_sequence(sequence):
+                return (
+                    sequence.source_id,
+                    {
+                        "name": sequence.name,
+                        "family_name": sequence.family_name,
+                        "domain": sequence.organism.domain,
+                        "kingdom": sequence.organism.kingdom,
+                        "phylum": sequence.organism.phylum,
+                        "tax_class": sequence.organism.tax_class,
+                        "order": sequence.organism.order,
+                        "family": sequence.organism.family,
+                        "genus": sequence.organism.genus,
+                        "species": sequence.organism.species,
+                        "ec_number": sequence.ec_number,
+                        "mol_weight": sequence.mol_weight,
+                        "taxonomy_id": sequence.organism.taxonomy_id,
+                    },
+                )
+
+            print("Processing Sequences in for loop")
+
+            for sequence in self.sequences:
+                node_data.append(process_sequence(sequence))
+            print("Adding in networx")
+
+            self.network.add_nodes_from(node_data)
+            print("nodes added ")
+
+        else:
+            for sequence in self.sequences:
+                self.network.add_node(
+                    sequence.source_id,
+                    name=sequence.name,
+                    domain=sequence.organism.domain,
+                    kingdome=sequence.organism.kingdom,
+                    phylum=sequence.organism.phylum,
+                    tax_class=sequence.organism.tax_class,
+                    order=sequence.organism.order,
+                    family=sequence.organism.family,
+                    genus=sequence.organism.genus,
+                    species=sequence.organism.species,
+                    taxonomy_id=sequence.organism.taxonomy_id,
+                )
+
+        # create a datafarme for the egdes
+        edge_data = []
+
+        def process_pair(alignment, pair):
+            shorter_seq = min(pair, key=lambda x: len(x.sequence))
+
+            identities = alignment.counts().identities
+            identity = identities / len(shorter_seq.sequence)
+            if self.threshold is not None and identity < self.threshold:
+                return None
+            return (
+                pair[0].source_id,
+                pair[1].source_id,
+                {
+                    "identity": identity,
+                    "gaps": 1 / (alignment.counts().gaps + 1),
+                    "mismatches": 1 / (alignment.counts().mismatches + 1),
+                    "score": alignment.score,
+                },
+            )
+
+        print("Processing Pairs in for loop")
+        """
+        for alignment, pair in zip(alignments, pairs):
+            edge = process_pair(alignment, pair)
+            if edge:
+                edge_data.append(edge)
+        """
+        print("Adding in networx")
+        self.network.add_edges_from(edge_data)
+        print("edges added ")
+        # Calculate betweenness centrality
+        betweenness = nx.betweenness_centrality(self.network)
+        for node, betw_value in betweenness.items():
+            self.network.nodes[node]["betweenness"] = betw_value
+
+        # Calculate degree of nodes without filtering
+        nx.set_node_attributes(self.network, dict(nx.degree(self.network)), "degree_all")
+
+        # Calculate node positions based on dimensions
+        if self.dimensions == 2:
+            return self._2d_position_nodes_and_edges(self.network)
+        elif self.dimensions == 3:
+            return self._3d_position_nodes_and_edges(self.network)
+        else:
+            if self.dimensions > 3:
+                raise ValueError(
+                    f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
+                )
+
+        return self.network
 
     def _create_pairwise_alignments(
         self, input_sequences, aligner: "PairwiseAligner", **kwargs
@@ -203,7 +296,7 @@ class SequenceNetwork(BaseModel):
             self.sequences, PairwiseAligner, mode="global"
         )
         # Add nodes and assign node attributes
-        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
+        if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
             # the node data list
             node_data = []
 
@@ -288,130 +381,6 @@ class SequenceNetwork(BaseModel):
         g = p4c.create_networkx_from_network()
         nx.set_node_attributes(g, dict(nx.degree(self.graph)), "degree")
         p4c.create_network_from_networkx(g, collection="tet", title="hfjakd")
-
-    @property
-    def graph(self) -> nx.Graph:
-        """
-        Maps properties of alignments to a network graph.
-
-        Returns:
-            nx.Graph: The network graph representing the sequence network.
-
-        Raises:
-            ValueError: If the dimensions of the network graph are greater than 3.
-
-        Notes:
-            - The graph is created using the NetworkX library.
-            - Nodes in the graph represent sequences, and edges represent alignments between sequences.
-            - Node attributes include the sequence name, organism, and taxonomy ID.
-            - Edge attributes include the alignment identity, gaps, mismatches, and score.
-            - The graph can be visualized in 2D or 3D using the visualize() method.
-        """
-        graph = nx.Graph()
-        alignments, pairs, mode = self._create_pairwise_alignments(
-            self.sequences, PairwiseAligner, mode="global"
-        )
-
-        # Add nodes and assign node attributes
-        # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
-        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
-            node_data = []
-
-            def process_sequence(sequence):
-                return (
-                    sequence.source_id,
-                    {
-                        "name": sequence.name,
-                        "family_name": sequence.family_name,
-                        "domain": sequence.organism.domain,
-                        "kingdom": sequence.organism.kingdom,
-                        "phylum": sequence.organism.phylum,
-                        "tax_class": sequence.organism.tax_class,
-                        "order": sequence.organism.order,
-                        "family": sequence.organism.family,
-                        "genus": sequence.organism.genus,
-                        "species": sequence.organism.species,
-                        "ec_number": sequence.ec_number,
-                        "mol_weight": sequence.mol_weight,
-                        "taxonomy_id": sequence.organism.taxonomy_id,
-                    },
-                )
-
-            print("Processing Sequences in for loop")
-
-            for sequence in self.sequences:
-                node_data.append(process_sequence(sequence))
-            print("Adding in networx")
-
-            graph.add_nodes_from(node_data)
-            print("nodes added ")
-
-        else:
-            for sequence in self.sequences:
-                graph.add_node(
-                    sequence.source_id,
-                    name=sequence.name,
-                    domain=sequence.organism.domain,
-                    kingdome=sequence.organism.kingdom,
-                    phylum=sequence.organism.phylum,
-                    tax_class=sequence.organism.tax_class,
-                    order=sequence.organism.order,
-                    family=sequence.organism.family,
-                    genus=sequence.organism.genus,
-                    species=sequence.organism.species,
-                    taxonomy_id=sequence.organism.taxonomy_id,
-                )
-
-        # create a datafarme for the egdes
-        edge_data = []
-
-        def process_pair(alignment, pair):
-            shorter_seq = min(pair, key=lambda x: len(x.sequence))
-
-            identities = alignment.counts().identities
-            identity = identities / len(shorter_seq.sequence)
-            if self.threshold is not None and identity < self.threshold:
-                return None
-            return (
-                pair[0].source_id,
-                pair[1].source_id,
-                {
-                    "identity": identity,
-                    "gaps": 1 / (alignment.counts().gaps + 1),
-                    "mismatches": 1 / (alignment.counts().mismatches + 1),
-                    "score": alignment.score,
-                },
-            )
-
-        print("Processing Pairs in for loop")
-
-        for alignment, pair in zip(alignments, pairs):
-            edge = process_pair(alignment, pair)
-            if edge:
-                edge_data.append(edge)
-        print("Adding in networx")
-        graph.add_edges_from(edge_data)
-        print("edges added ")
-        # Calculate betweenness centrality
-        betweenness = nx.betweenness_centrality(graph)
-        for node, betw_value in betweenness.items():
-            graph.nodes[node]["betweenness"] = betw_value
-
-        # Calculate degree of nodes without filtering
-        nx.set_node_attributes(graph, dict(nx.degree(graph)), "degree_all")
-
-        # Calculate node positions based on dimensions
-        if self.dimensions == 2:
-            return self._2d_position_nodes_and_edges(graph)
-        elif self.dimensions == 3:
-            return self._3d_position_nodes_and_edges(graph)
-        else:
-            if self.dimensions > 3:
-                raise ValueError(
-                    f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
-                )
-
-        return graph
 
     def visualize(self):
         """

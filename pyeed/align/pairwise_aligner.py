@@ -1,7 +1,6 @@
 from itertools import combinations
 from typing import Dict, List, TYPE_CHECKING
 
-import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed, cpu_count
 from Bio.Align import PairwiseAligner as BioPairwiseAligner

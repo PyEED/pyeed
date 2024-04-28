@@ -3,9 +3,9 @@ import json
 import pytest
 
 from pyeed.core import ProteinRecord
-# from pyeed.network import SequenceNetwork
+from pyeed.network import SequenceNetwork
 
-"""
+
 
 class TestNetworkGraphBuild:
 
@@ -27,12 +27,10 @@ class TestNetworkGraphBuild:
         network = SequenceNetwork(
             sequences=mats,
             weight="identity",
-            threshold=0.9,
             dimensions=2,
-            color="taxonomy_id",
         )
 
-    
+"""
     
     def test_graph_build(self):
         mat_accessions = [
