@@ -1,6 +1,7 @@
 from itertools import combinations
 from typing import Dict, List, TYPE_CHECKING
 
+import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed, cpu_count
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
@@ -30,7 +31,6 @@ class PairwiseAligner:
         Returns:
             dict: The alignment results.
         """
-
         aligner = BioPairwiseAligner()
         aligner.mode = self.mode
         aligner.match_score = self.match
@@ -60,7 +60,7 @@ class PairwiseAligner:
 
 
         alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
-            delayed(self.align_pairwise)(a[0], a[1])
+            delayed(self.align_pairwise)(sequences[a[0]], sequences[a[1]])
             for a in tqdm(pairs, desc="⛓️ Running pairwise alignments")
         )
 
@@ -94,4 +94,24 @@ class PairwiseAligner:
 
         return substitution_matrices.load(self.substitution_matrix)
     
- 
+
+
+if __name__ == "__main__":
+    aligner = PairwiseAligner(mode="global")
+    seq1 = "ATCG"
+    seq2 = "AGTC"
+    seq3 = "AAAA"
+    seq4 = "TTTT"
+    sequences = {
+        "seq1": seq1,
+        "seq2": seq2,
+        "seq3": seq3,
+        "seq4": seq4
+    }
+    alignment_result = aligner.align_multipairwise(sequences=sequences)
+    
+
+    print(alignment_result)
+
+    alignment_result = aligner.align_pairwise(seq1, seq2)
+    print(alignment_result)
