@@ -20,7 +20,7 @@ class PairwiseAligner:
         self.gap_extend = 0
         self.substitution_matrix = "None"
 
-    def align_pairwise(self, seq1: str, seq2: str) -> dict:
+    def align_pairwise(self, seq1: str, seq2: str, seq1_id: str, seq2_id: str) -> dict:
         """
         This function aligns two sequences and returns the alignment results.
 
@@ -42,7 +42,7 @@ class PairwiseAligner:
 
         alignment_result = aligner.align(seq1, seq2)
 
-        alignment_result_dic = self._map_alignment_results(alignment_result[0])
+        alignment_result_dic = self._map_alignment_results(alignment_result[0], seq1_id, seq2_id)
 
         return alignment_result_dic
 
@@ -59,13 +59,13 @@ class PairwiseAligner:
 
 
         alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
-            delayed(self.align_pairwise)(sequences[a[0]], sequences[a[1]])
+            delayed(self.align_pairwise)(sequences[a[0]], sequences[a[1]], a[0], a[1])
             for a in tqdm(pairs, desc="⛓️ Running pairwise alignments")
         )
 
         return alignments
 
-    def _map_alignment_results(self, alignment: "Alignment") -> List[dict]:
+    def _map_alignment_results(self, alignment: "Alignment", seq1_id, seq2_id) -> List[dict]:
         # this maps the alignment results to a dictionary
         # this dictionary is used to create the network graph
 
@@ -77,6 +77,8 @@ class PairwiseAligner:
         alignment_dic = {
             "seq1": alignment[0],
             "seq2": alignment[1],
+            "seq1_id": seq1_id,
+            "seq2_id": seq2_id,
             "score": alignment.score,
             "mismatches": 1 / (alignment.counts().mismatches + 1),
             "gaps": 1 / (alignment.counts().gaps + 1),

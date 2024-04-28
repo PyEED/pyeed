@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 from itertools import combinations
 
@@ -6,8 +7,8 @@ import networkx as nx
 import py4cytoscape as p4c
 import plotly.express as px
 import plotly.graph_objects as go
-from pydantic import BaseModel, Field
 from joblib import Parallel, cpu_count, delayed
+from pydantic import BaseModel, Field, PrivateAttr
 
 from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
@@ -66,6 +67,10 @@ class SequenceNetwork(BaseModel):
         description="Network graph with networkx",
     )
 
+    _aligner: Optional[PairwiseAligner] = PrivateAttr(
+        default=None,
+    )
+
     def __init__(
         self,
         sequences: List[SequenceRecord],
@@ -79,6 +84,9 @@ class SequenceNetwork(BaseModel):
         self.mode = mode
         self.sequences = sequences
         self.network = nx.Graph()
+        self._aligner = PairwiseAligner(mode=self.mode)
+
+        self._create_graph()
 
 
     def add_target(self, target: SequenceRecord):
@@ -86,47 +94,60 @@ class SequenceNetwork(BaseModel):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
+    def process_sequence(sequence):
+        return (
+            sequence.id,
+            sequence.sequence,
+            {
+                "name": sequence.name,
+                "family_name": sequence.family_name,
+                "domain": sequence.organism.domain,
+                "kingdom": sequence.organism.kingdom,
+                "phylum": sequence.organism.phylum,
+                "tax_class": sequence.organism.tax_class,
+                "order": sequence.organism.order,
+                "family": sequence.organism.family,
+                "genus": sequence.organism.genus,
+                "species": sequence.organism.species,
+                "ec_number": sequence.ec_number,
+                "mol_weight": sequence.mol_weight,
+                "taxonomy_id": sequence.organism.taxonomy_id,
+            },
+        )
+
     def _create_graph(self):
 
-        alignments_results = []
+        # first we add the nodes to the network
+        # in the same loop we read out the sequences and the key in order to be able to perform the alignment next
+        alignment_data = {}
 
         if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
             node_data = []
 
-            def process_sequence(sequence):
-                return (
-                    sequence.source_id,
-                    {
-                        "name": sequence.name,
-                        "family_name": sequence.family_name,
-                        "domain": sequence.organism.domain,
-                        "kingdom": sequence.organism.kingdom,
-                        "phylum": sequence.organism.phylum,
-                        "tax_class": sequence.organism.tax_class,
-                        "order": sequence.organism.order,
-                        "family": sequence.organism.family,
-                        "genus": sequence.organism.genus,
-                        "species": sequence.organism.species,
-                        "ec_number": sequence.ec_number,
-                        "mol_weight": sequence.mol_weight,
-                        "taxonomy_id": sequence.organism.taxonomy_id,
-                    },
-                )
-
-            print("Processing Sequences in for loop")
+            print(time.time(), 'Processing in for loop')
 
             for sequence in self.sequences:
-                node_data.append(process_sequence(sequence))
-            print("Adding in networx")
+                id, seq, data = self._process_sequence(sequence)
+                node_data.append((id, data))
+                alignment_data[id] = seq
+
+            print(time.time(), "Adding in networx")
 
             self.network.add_nodes_from(node_data)
-            print("nodes added ")
+
+            print(time.time(), "nodes added ")
 
         else:
             for sequence in self.sequences:
+
+                id = sequence.id
+                seq = sequence.sequence
+                alignment_data[id] = seq
+
                 self.network.add_node(
-                    sequence.source_id,
+                    id,
                     name=sequence.name,
+                    sequence=seq,
                     domain=sequence.organism.domain,
                     kingdome=sequence.organism.kingdom,
                     phylum=sequence.organism.phylum,
@@ -138,7 +159,9 @@ class SequenceNetwork(BaseModel):
                     taxonomy_id=sequence.organism.taxonomy_id,
                 )
 
-        # create a datafarme for the egdes
+        # create the alignments
+        alignments_result = self._aligner.align_multipairwise(alignment_data)
+        # create a list for the egdes
         edge_data = []
 
         def process_pair(alignment, pair):
@@ -159,16 +182,18 @@ class SequenceNetwork(BaseModel):
                 },
             )
 
-        print("Processing Pairs in for loop")
-        """
-        for alignment, pair in zip(alignments, pairs):
-            edge = process_pair(alignment, pair)
+        print(time.time(), "Processing Pairs in for loop")
+        
+        for alignment_result in alignments_result:
+            edge = (alignments_result['seq1'], alignments_result['seq2'], )
             if edge:
                 edge_data.append(edge)
-        """
-        print("Adding in networx")
+    
+        print(time.time(), "Adding edeges from list in networx")
+
         self.network.add_edges_from(edge_data)
-        print("edges added ")
+
+        print(time.time(), "edges added in network")
         # Calculate betweenness centrality
         betweenness = nx.betweenness_centrality(self.network)
         for node, betw_value in betweenness.items():
