@@ -94,13 +94,12 @@ class SequenceNetwork(BaseModel):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
-    def process_sequence(sequence):
+    def _process_sequence(self, sequence: ProteinRecord):
         return (
             sequence.id,
             sequence.sequence,
             {
                 "name": sequence.name,
-                "family_name": sequence.family_name,
                 "domain": sequence.organism.domain,
                 "kingdom": sequence.organism.kingdom,
                 "phylum": sequence.organism.phylum,
@@ -124,28 +123,28 @@ class SequenceNetwork(BaseModel):
         if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
             node_data = []
 
-            print(time.time(), 'Processing in for loop')
+            print(time.time(), '----- Processing in for loop')
 
             for sequence in self.sequences:
-                id, seq, data = self._process_sequence(sequence)
-                node_data.append((id, data))
-                alignment_data[id] = seq
+                id_seq, seq, data = self._process_sequence(sequence)
+                node_data.append((id_seq, data))
+                alignment_data[id_seq] = seq
 
-            print(time.time(), "Adding in networx")
+            print(time.time(), "----- Adding in networx")
 
             self.network.add_nodes_from(node_data)
 
-            print(time.time(), "nodes added ")
+            print(time.time(), "----- nodes added ")
 
         else:
             for sequence in self.sequences:
 
-                id = sequence.id
+                id_seq = sequence.id
                 seq = sequence.sequence
-                alignment_data[id] = seq
+                alignment_data[id_seq] = seq
 
                 self.network.add_node(
-                    id,
+                    id_seq,
                     name=sequence.name,
                     sequence=seq,
                     domain=sequence.organism.domain,
@@ -160,32 +159,14 @@ class SequenceNetwork(BaseModel):
                 )
 
         # create the alignments
-        alignments_result = self._aligner.align_multipairwise(alignment_data)
+        alignments_results = self._aligner.align_multipairwise(alignment_data)
         # create a list for the egdes
         edge_data = []
 
-        def process_pair(alignment, pair):
-            shorter_seq = min(pair, key=lambda x: len(x.sequence))
-
-            identities = alignment.counts().identities
-            identity = identities / len(shorter_seq.sequence)
-            if self.threshold is not None and identity < self.threshold:
-                return None
-            return (
-                pair[0].source_id,
-                pair[1].source_id,
-                {
-                    "identity": identity,
-                    "gaps": 1 / (alignment.counts().gaps + 1),
-                    "mismatches": 1 / (alignment.counts().mismatches + 1),
-                    "score": alignment.score,
-                },
-            )
-
         print(time.time(), "Processing Pairs in for loop")
         
-        for alignment_result in alignments_result:
-            edge = (alignments_result['seq1'], alignments_result['seq2'], )
+        for alignment_result in alignments_results:
+            edge = (alignment_result['seq1_id'], alignment_result['seq2_id'], {key: value for key, value in alignment_result.items() if key not in ['seq1_id', 'seq2_id']})
             if edge:
                 edge_data.append(edge)
     
@@ -291,70 +272,6 @@ class SequenceNetwork(BaseModel):
                 "score": alignment.score,
             },
         )
-
-    def _process_sequence(self, sequence):
-        return (
-            sequence.source_id,
-            {
-                "name": sequence.name,
-                "sequence": sequence.sequence,
-                "family_name": sequence.family_name,
-                "domain": sequence.organism.domain,
-                "kingdom": sequence.organism.kingdom,
-                "phylum": sequence.organism.phylum,
-                "tax_class": sequence.organism.tax_class,
-                "order": sequence.organism.order,
-                "family": sequence.organism.family,
-                "genus": sequence.organism.genus,
-                "species": sequence.organism.species,
-                "ec_number": sequence.ec_number,
-                "mol_weight": sequence.mol_weight,
-                "taxonomy_id": sequence.organism.taxonomy_id,
-            },
-        )
-
-    def create_networkx_graph(self):
-        # TODO: check if such a graph already exists
-        self.network = nx.Graph()
-        # create the alignments
-        alignments, pairs, mode = self._create_pairwise_alignments(
-            self.sequences, PairwiseAligner, mode="global"
-        )
-        # Add nodes and assign node attributes
-        if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
-            # the node data list
-            node_data = []
-
-            for sequence in self.sequences:
-                node_data.append(self._process_sequence(sequence))
-            # here the actual add happens
-            self.network.add_nodes_from(node_data)
-
-        else:
-            for sequence in self.sequences:
-                self.network.add_node(
-                    sequence.source_id,
-                    name=sequence.name,
-                    domain=sequence.organism.domain,
-                    kingdome=sequence.organism.kingdom,
-                    phylum=sequence.organism.phylum,
-                    tax_class=sequence.organism.tax_class,
-                    order=sequence.organism.order,
-                    family=sequence.organism.family,
-                    genus=sequence.organism.genus,
-                    species=sequence.organism.species,
-                    taxonomy_id=sequence.organism.taxonomy_id,
-                )
-
-        # create the edge data --> this will have no threshold, the threshold will be set in the create_cytoscope_graph method, for ech graph individually
-        edge_data = []
-
-        for alignment, pair in zip(alignments, pairs):
-            edge = self._process_pair(alignment, pair)
-            if edge:
-                edge_data.append(edge)
-
-        self.network.add_edges_from(edge_data)
 
     def create_cytoscope_graph(
         self, collection: str, title: str, threshold: float = 0.8

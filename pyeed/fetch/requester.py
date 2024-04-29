@@ -135,17 +135,13 @@ class AsyncRequester:
         """
 
         batches = []
-        print(self.ids)
-        print(self.batch_size)
         for i in range(0, len(self.ids), self.batch_size):
             batch = self.ids[i : i + self.batch_size]
-            print(batch)
             if len(batch) > 1:
                 batch_string = ",".join(batch)
             else:
                 batch_string = str(batch[0])
             batches.append(batch_string)
 
-        print(batches)
         self.ids = batches
         return batches

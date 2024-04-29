@@ -1,5 +1,6 @@
 import numpy as np
 
+from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.align.pairwise_aligner import PairwiseAligner
 
 
@@ -84,4 +85,28 @@ class TestPairwiseAligner():
         assert alignments[2]['seq2'] == "TTTT"
         assert alignments[2]['score'] == -2.0
         assert alignments[2]['mismatches'] == 0.25
-        assert alignments[2]['gaps'] == 1.0    
+        assert alignments[2]['gaps'] == 1.0
+
+
+    def test_align_multi_pairwise_from_ncbi(self):
+        mat_accessions = [
+            "MBP1912539.1",
+            "SEV92896.1",
+            "MBO8174569.1",
+            "WP_042680787.1",
+            "NPA47376.1",
+            "WP_167889085.1",
+            "WP_048165429.1",
+            "ACS90033.1",
+        ]
+        mats = ProteinRecord.get_ids(mat_accessions)
+
+        aligner = PairwiseAligner(mode="global")
+
+        sequences_data_align = {mat.id: mat.sequence for mat in mats}
+
+        alignments = aligner.align_multipairwise(sequences_data_align)
+
+
+
+        assert len(sequences_data_align) == 8

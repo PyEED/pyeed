@@ -114,5 +114,4 @@ if __name__ == "__main__":
 
     print(alignment_result)
 
-    alignment_result = aligner.align_pairwise(seq1, seq2)
     print(alignment_result)

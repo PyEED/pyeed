@@ -19,10 +19,10 @@ from pyeed.container.abstract_container import Blastp
 from pyeed.fetch.blast import BlastProgram, NCBIDataBase
 from pyeed.fetch.proteinfetcher import ProteinFetcher
 
-from .dnarecord import DNARecord
-from .region import Region
-from .sequencerecord import SequenceRecord
-from .site import Site
+from pyeed.core.dnarecord import DNARecord
+from pyeed.core.region import Region
+from pyeed.core.sequencerecord import SequenceRecord
+from pyeed.core.site import Site
 
 
 class ProteinRecord(
@@ -280,7 +280,7 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        from pyeed.fetch.blast import BlastProgram
+        from pyeed.fetch.blast import BlastProgram, Blast
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -291,7 +291,7 @@ class ProteinRecord(
 
         identity = 1 if exact_match else 0
 
-        blaster = Blastp(
+        blaster = Blast(
             query=sequence,
             n_hits=1,
             identity=identity,
@@ -350,7 +350,7 @@ class ProteinRecord(
         """
 
         import nest_asyncio
-
+        from pyeed.fetch.blast import BlastProgram, Blast
         from pyeed.fetch.blast import NCBIDataBase
 
         nest_asyncio.apply()
@@ -359,7 +359,7 @@ class ProteinRecord(
 
         program = BlastProgram.BLASTP.value
         executor = ThreadPoolExecutor(max_workers=1)
-        blaster = Blastp(
+        blaster = Blast(
             query=self.sequence,
             n_hits=n_hits,
             evalue=e_value,
@@ -436,7 +436,18 @@ class ProteinRecord(
 
 
 if __name__ == "__main__":
-    seq_string = "MSDRNIRVEPVVGRAVEEQDVEIVERKGLGHPDSLCDGIAEHVSQALARAYIDRVGKVLHYNTDETQLVAGTAAPAFGGGEVVDPIYLLITGRATKEYEGTKIPAETIALRAAREYINETLPFLEFGTDVVVDVKLGEGSGDLQEVFGEDGKQVPMSNDTSFGVGHAPLTETERIVLEAERALNGDYSDDNPAVGQDIKVMGKREGDDIDVTVAVAMVDRYVDDLDGYEAAVAGVREFVADLATDYTDRNVSVHVNTADDYDEGAIYLTTTGTSAEQGDDGSVGRGNRSNGLITPNRSMSMEATSGKNPVNHIGKIYNLLSTEIARTVVDEVDGIREIRIRLLSQIGQPIDKPHVADANLVTEDGIEIADIEDEVEAIIDAELENVTSITERVIDGELTTF"
 
-    seq = ProteinRecord.from_sequence(seq_string)
-    print(seq)
+    mat_accessions = [
+            "MBP1912539.1",
+            "SEV92896.1",
+            "MBO8174569.1",
+            "WP_042680787.1",
+            "NPA47376.1",
+            "WP_167889085.1",
+            "WP_048165429.1",
+            "ACS90033.1",
+        ]
+
+    mats = ProteinRecord.get_ids(mat_accessions)
+
+    print(mats)
