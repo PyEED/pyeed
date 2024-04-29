@@ -1,13 +1,10 @@
 import time
 from typing import List, Optional
-from itertools import combinations
 
-from tqdm import tqdm
 import networkx as nx
 import py4cytoscape as p4c
 import plotly.express as px
 import plotly.graph_objects as go
-from joblib import Parallel, cpu_count, delayed
 from pydantic import BaseModel, Field, PrivateAttr
 
 from pyeed.core.proteinrecord import ProteinRecord
@@ -115,7 +112,6 @@ class SequenceNetwork(BaseModel):
         )
 
     def _create_graph(self):
-
         # first we add the nodes to the network
         # in the same loop we read out the sequences and the key in order to be able to perform the alignment next
         alignment_data = {}
@@ -160,6 +156,11 @@ class SequenceNetwork(BaseModel):
 
         # create the alignments
         alignments_results = self._aligner.align_multipairwise(alignment_data)
+        # now pydantic cant seem to handle the serialization of the alignment results in the field start and end
+        # so we need to convert them to lists
+        for alignment_result in alignments_results:
+            alignment_result['start'] = alignment_result['start'].tolist()
+            alignment_result['end'] = alignment_result['end'].tolist()
         # create a list for the egdes
         edge_data = []
 
@@ -193,95 +194,18 @@ class SequenceNetwork(BaseModel):
                 raise ValueError(
                     f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
                 )
-
-        return self.network
-
-    def _create_pairwise_alignments(
-        self, input_sequences, aligner: "PairwiseAligner", **kwargs
-    ):
-        """
-        Creates pairwise alignments between sequences.
-
-        This method creates pairwise alignments between sequences in the network.
-        The pairwise alignments are stored in the 'pairwise_alignments' attribute of the SequenceNetwork object.
-        This is done for the later visualization of the network graph with cytoscope.
-
-        Args:
-            aligner (PairwiseAligner): Python-based aligner to be called.
-
-        Raises:
-            ValueError: If the number of sequences is less than 2.
-
-        Returns:
-            Nothing the data is stored internally in fields of the class.
-        """
-
-        # Pairwise alignment
-        if len(input_sequences) == 2:
-            pairwise_aligner = aligner(
-                sequences=[
-                    input_sequences[0].sequence,
-                    input_sequences[1].sequence,
-                ],
-                **kwargs,
-            )
-            alignment_result = pairwise_aligner.align()
-
-            return self._map_pairwise_alignment_results(
-                alignment_result,
-                pair=(
-                    input_sequences[0],
-                    input_sequences[1],
-                ),
-                mode=pairwise_aligner.mode,
-            )
-
-        # Multi pairwise alignment
-        elif len(input_sequences) > 2:
-            pairs = list(combinations(input_sequences, 2))
-
-            aligners = [
-                aligner(sequences=[s.sequence for s in pair], **kwargs)
-                for pair in pairs
-            ]
-
-            alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
-                delayed(a.align)()
-                for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
-            )
-
-            return alignments, pairs, aligners[0].mode
-
-        else:
-            raise ValueError(
-                f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
-            )
-
-    def _process_pair(self, alignment, pair):
-        shorter_seq = min(pair, key=lambda x: len(x.sequence))
-
-        identities = alignment.counts().identities
-        identity = identities / len(shorter_seq.sequence)
-        return (
-            pair[0].source_id,
-            pair[1].source_id,
-            {
-                "identity": identity,
-                "gaps": 1 / (alignment.counts().gaps + 1),
-                "mismatches": 1 / (alignment.counts().mismatches + 1),
-                "score": alignment.score,
-            },
-        )
-
-    def create_cytoscope_graph(
+            
+    def create_cytoscape_graph(
         self, collection: str, title: str, threshold: float = 0.8
     ):
-        # assert that the cytoscope API is running and cytoscope is running in the background
+        # assert that the cytoscape API is running and cytoscape is running in the background
         assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
         assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
-        # TODO fix that the title an dcollection is set unique in order to avoid confuing when using the software
+        # filter the the edges by the threshold
+
+
         p4c.create_network_from_networkx(
-            self.graph, collection=collection, title=title + "_" + str(threshold)
+            self.network, collection=collection, title=title + "_" + str(threshold)
         )
 
     def set_layout(
@@ -303,10 +227,8 @@ class SequenceNetwork(BaseModel):
         p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
         p4c.layout_network(layout_name)
 
-    def filter_cytoscope_edges_by_parameter(
-        self, name: str, parameter: str, min_val: float, max_val: float
-    ):
-        # this is a filter for the network in cytoscope
+    def filter_cytoscape_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
+        # this is a filter for the network in cytoscape
         # here the nodes and edges not relevant are filtered out
         p4c.create_column_filter(
             name,
@@ -321,7 +243,7 @@ class SequenceNetwork(BaseModel):
     def calculate_degree(self):
         # Calculate degree of nodes with filtering
         g = p4c.create_networkx_from_network()
-        nx.set_node_attributes(g, dict(nx.degree(self.graph)), "degree")
+        nx.set_node_attributes(g, dict(nx.degree(self.network)), "degree")
         p4c.create_network_from_networkx(g, collection="tet", title="hfjakd")
 
     def visualize(self):

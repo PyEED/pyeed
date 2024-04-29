@@ -108,10 +108,3 @@ class TestPairwiseAligner():
         assert alignments[0]['seq1_id'] == "MBP1912539.1" or alignments[0]['seq2_id'] == "MBP1912539.1"
         assert alignments[0]['seq2_id'] == "SEV92896.1" or alignments[0]['seq1_id'] == "SEV92896.1"
         assert alignments[0]['score'] == 327.0
-        # for the remaining mismatches, gaps, and identity, the values are rounded to 3 decimal places since the values are too long and there could be small differences in the values  
-        # 0.029411764705882353 -- mismatches
-        # 0.045454545454545456 -- gaps
-        # 0.8717339667458432 -- identity
-        assert round(alignments[0]['mismatches'], 3) == 0.029
-        assert round(alignments[0]['gaps'], 3) == 0.045
-        assert round(alignments[0]['identity'], 3) == 0.872

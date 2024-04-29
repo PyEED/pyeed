@@ -110,7 +110,7 @@ class ProteinRecord(
 
     @model_validator(mode="after")
     def _parse_raw_xml_data(self):
-        for attr, value in self:
+        for attr, value in self:  # noqa: F402
             if isinstance(value, (ListPlus, list)) and all(
                 isinstance(i, _Element) for i in value
             ):
@@ -280,7 +280,7 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        from pyeed.fetch.blast import BlastProgram, Blast
+        from pyeed.fetch.blast import Blast
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -350,7 +350,7 @@ class ProteinRecord(
         """
 
         import nest_asyncio
-        from pyeed.fetch.blast import BlastProgram, Blast
+        from pyeed.fetch.blast import Blast
         from pyeed.fetch.blast import NCBIDataBase
 
         nest_asyncio.apply()
