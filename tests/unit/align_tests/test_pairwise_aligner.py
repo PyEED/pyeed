@@ -92,12 +92,6 @@ class TestPairwiseAligner():
         mat_accessions = [
             "MBP1912539.1",
             "SEV92896.1",
-            "MBO8174569.1",
-            "WP_042680787.1",
-            "NPA47376.1",
-            "WP_167889085.1",
-            "WP_048165429.1",
-            "ACS90033.1",
         ]
         mats = ProteinRecord.get_ids(mat_accessions)
 
@@ -107,6 +101,13 @@ class TestPairwiseAligner():
 
         alignments = aligner.align_multipairwise(sequences_data_align)
 
-
-
-        assert len(sequences_data_align) == 8
+        expected_keys = ["seq1", "seq2", "score", "mismatches", "gaps", "identity", "start", "end", "seq1_id", "seq2_id"]
+        assert isinstance(alignments, list)
+        assert all(isinstance(alignment, dict) for alignment in alignments)
+        assert all(all(key in alignment for key in expected_keys) for alignment in alignments)
+        assert alignments[0]['seq1_id'] == "MBP1912539.1"
+        assert alignments[0]['seq2_id'] == "SEV92896.1"
+        assert alignments[0]['score'] == 327.0
+        assert alignments[0]['mismatches'] == 0.029411764705882353
+        assert alignments[0]['gaps'] == 0.045454545454545456
+        assert alignments[0]['identity'] == 0.8717339667458432
