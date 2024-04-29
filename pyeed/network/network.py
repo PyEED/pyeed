@@ -208,6 +208,12 @@ class SequenceNetwork(BaseModel):
             self.network, collection=collection, title=title + "_" + str(threshold)
         )
 
+        self.filter_cytoscape_edges_by_parameter(
+            name="threshold", parameter="identity", min_val=threshold, max_val=1.0
+        )
+        # and yes the layout ignores hidden edges, i did a visual test
+        p4c.layout_network('grid')
+
     def set_layout(
         self,
         layout_name: str = "force-directed",
@@ -478,3 +484,10 @@ class SequenceNetwork(BaseModel):
     @staticmethod
     def _sample_colorscale(size: int) -> List[str]:
         return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
+
+
+    def _get_edges_cytoscape_graph(self, hidden_included = False):
+        return p4c.get_all_edges()
+    
+    def _get_edges_visibilities(self):
+        return p4c.get_edge_property(visual_property='EDGE_VISIBLE')
