@@ -62,7 +62,7 @@ class SequenceRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="8fcb5e88dbf43abb2393661d2c8f16d0c0022e27"
+        default="5f63c8da4e345268d0263ab65aca5d6fe2c3e226"
     )
 
     _object_terms: Set[str] = PrivateAttr(default={"http://edamontology.org/data_0849"})
@@ -71,7 +71,7 @@ class SequenceRecord(
 
     @model_validator(mode="after")
     def _parse_raw_xml_data(self):
-        for attr, value in self:  # noqa: F402
+        for attr, value in self:
             if isinstance(value, (ListPlus, list)) and all(
                 isinstance(i, _Element) for i in value
             ):

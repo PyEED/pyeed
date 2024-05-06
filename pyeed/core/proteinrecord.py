@@ -16,13 +16,16 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from pyeed.container.abstract_container import Blastp
-from pyeed.fetch.blast import BlastProgram, NCBIDataBase
-from pyeed.fetch.proteinfetcher import ProteinFetcher
-
 from pyeed.core.dnarecord import DNARecord
 from pyeed.core.region import Region
 from pyeed.core.sequencerecord import SequenceRecord
 from pyeed.core.site import Site
+from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
+from pyeed.fetch.proteinfetcher import ProteinFetcher
+
+from .region import Region
+from .sequencerecord import SequenceRecord
+from .site import Site
 
 
 class ProteinRecord(
@@ -103,14 +106,14 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="8fcb5e88dbf43abb2393661d2c8f16d0c0022e27"
+        default="5f63c8da4e345268d0263ab65aca5d6fe2c3e226"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
     def _parse_raw_xml_data(self):
-        for attr, value in self:  # noqa: F402
+        for attr, value in self:
             if isinstance(value, (ListPlus, list)) and all(
                 isinstance(i, _Element) for i in value
             ):
@@ -280,7 +283,6 @@ class ProteinRecord(
             AssertionError: If the specified database is not supported.
         """
 
-        from pyeed.fetch.blast import Blast
         from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
@@ -350,7 +352,7 @@ class ProteinRecord(
         """
 
         import nest_asyncio
-        from pyeed.fetch.blast import Blast
+
         from pyeed.fetch.blast import NCBIDataBase
 
         nest_asyncio.apply()
@@ -438,15 +440,15 @@ class ProteinRecord(
 if __name__ == "__main__":
 
     mat_accessions = [
-            "MBP1912539.1",
-            "SEV92896.1",
-            "MBO8174569.1",
-            "WP_042680787.1",
-            "NPA47376.1",
-            "WP_167889085.1",
-            "WP_048165429.1",
-            "ACS90033.1",
-        ]
+        "MBP1912539.1",
+        "SEV92896.1",
+        "MBO8174569.1",
+        "WP_042680787.1",
+        "NPA47376.1",
+        "WP_167889085.1",
+        "WP_048165429.1",
+        "ACS90033.1",
+    ]
 
     mats = ProteinRecord.get_ids(mat_accessions)
 
