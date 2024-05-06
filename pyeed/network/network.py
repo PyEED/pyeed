@@ -4,8 +4,10 @@ from typing import List, Optional
 import networkx as nx
 import py4cytoscape as p4c
 import plotly.express as px
+import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from pydantic import BaseModel, Field, PrivateAttr
+from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
 
 from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
@@ -176,13 +178,6 @@ class SequenceNetwork(BaseModel):
         self.network.add_edges_from(edge_data)
 
         print(time.time(), "edges added in network")
-        # Calculate betweenness centrality
-        betweenness = nx.betweenness_centrality(self.network)
-        for node, betw_value in betweenness.items():
-            self.network.nodes[node]["betweenness"] = betw_value
-
-        # Calculate degree of nodes without filtering
-        nx.set_node_attributes(self.network, dict(nx.degree(self.network)), "degree_all")
 
         # Calculate node positions based on dimensions
         if self.dimensions == 2:
@@ -201,9 +196,9 @@ class SequenceNetwork(BaseModel):
         # assert that the cytoscape API is running and cytoscape is running in the background
         assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
         assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
+        # create a degree column for the nodes based on the current choosen threshold
+        self.calculate_degree(threshold=threshold)
         # filter the the edges by the threshold
-
-
         p4c.create_network_from_networkx(
             self.network, collection=collection, title=title + "_" + str(threshold)
         )
@@ -246,11 +241,44 @@ class SequenceNetwork(BaseModel):
             hide=True,
         )
 
-    def calculate_degree(self):
+    def calculate_degree(self, threshold: float = 0.8):
         # Calculate degree of nodes with filtering
-        g = p4c.create_networkx_from_network()
-        nx.set_node_attributes(g, dict(nx.degree(self.network)), "degree")
-        p4c.create_network_from_networkx(g, collection="tet", title="hfjakd")
+        degree = {}
+        for u,v,d in self.network.edges(data=True):
+            if d['identity'] > threshold:
+                if u not in degree:
+                    degree[u] = 1
+                else:
+                    degree[u] += 1
+                if v not in degree:
+                    degree[v] = 1
+                else:
+                    degree[v] += 1
+
+        print(nx.degree(self.network))
+        nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
+
+    def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
+        p4c.set_node_shape_default('ELLIPSE', style_name)
+        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name))
+        p4c.set_node_label_mapping('name', style_name=style_name)
+        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name))    
+
+    def color_nodes(self, column_name: str, style_name: str = "default"):
+        df_nodes = p4c.get_table_columns(table='node')
+
+        data_color_names = list(set(df_nodes[column_name]))
+
+        colors = plt.cm.tab20(range(len(data_color_names)))
+        hex_colors = ['#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255)) for r, g, b, _ in colors]
+        # Convert RGB to hex colors for py4cytoscape
+        hex_colors = ['#' + ''.join([f'{int(c*255):02x}' for c in color[:3]]) for color in colors]
+
+        if style_name not in p4c.get_visual_style_names():
+            p4c.create_visual_style(style_name)
+
+        p4c.set_node_color_default('#FFFFFF', style_name)
+        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors)
 
     def visualize(self):
         """
@@ -484,7 +512,6 @@ class SequenceNetwork(BaseModel):
     @staticmethod
     def _sample_colorscale(size: int) -> List[str]:
         return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
-
 
     def _get_edges_cytoscape_graph(self, hidden_included = False):
         return p4c.get_all_edges()

@@ -71,7 +71,7 @@ class SequenceRecord(
 
     @model_validator(mode="after")
     def _parse_raw_xml_data(self):
-        for attr, value in self:
+        for attr, value in self:  # noqa: F402
             if isinstance(value, (ListPlus, list)) and all(
                 isinstance(i, _Element) for i in value
             ):
