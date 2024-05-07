@@ -20,6 +20,7 @@ from .sequence import Sequence
 from .standardnumbering import StandardNumbering
 
 
+
 @forge_signature
 class Alignment(sdRDM.DataModel):
     """
