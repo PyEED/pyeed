@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import os
-from typing import List, Union
+from typing import List, Union, TYPE_CHECKING
 
 import pyhmmer
 from pydantic import BaseModel, Field
 
-# TODO import sequence record
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.alignment import Alignment
-from pyeed.core.sequence import Sequence
+from pyeed.core.abstractannotation import AbstractAnnotation
+
+if TYPE_CHECKING:
+    from pyeed.core.alignment import Alignment
+    from pyeed.core.sequence import Sequence
 
 # TODO FIX ENTIRE THING
 
@@ -54,7 +57,7 @@ class HMM(BaseModel):
 
     def search(
         self,
-        sequence: Union[AbstractSequence, List[AbstractSequence]],
+        sequence: Union["AbstractSequence", List["AbstractSequence"]],
         **pipeline_kwargs,
     ):
 
@@ -103,7 +106,7 @@ class HMM(BaseModel):
         return cls(model=model, name=model.name)
 
     def _prepare_sequences(
-        self, sequences: Union[AbstractSequence, List[AbstractSequence]]
+        self, sequences: Union["AbstractSequence", List["AbstractSequence"]]
     ):
         if not isinstance(sequences, list):
             sequences = [sequences]
