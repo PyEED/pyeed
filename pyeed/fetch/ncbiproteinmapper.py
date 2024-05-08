@@ -47,6 +47,10 @@ class NCBIProteinMapper:
         for record in seq_records:
             protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
 
+            LOGGER.debug(f"Mapping record {record.id}")
+            LOGGER.debug(f"Record features: {record.features}")
+            LOGGER.debug(f"Dic for organism: {self.map_organism(record)}")
+
             protein_info.organism = Organism(**self.map_organism(record))
 
             protein_info = self.map_protein(record, protein_info)

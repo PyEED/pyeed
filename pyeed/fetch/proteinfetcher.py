@@ -40,6 +40,9 @@ class ProteinFetcher:
         """
         db_entries = SortIDs.sort(self.ids)
 
+        LOGGER.debug(f"DB entries: {db_entries}")
+        LOGGER.debug(f"IDs: {self.ids}")
+
         with Progress(
             console=Console(**console_kwargs),
         ) as progress:
@@ -115,6 +118,8 @@ class ProteinFetcher:
 
             # map data to objects
             ncbi_responses, uniprot_response = self.identify_data_source(responses)
+            
+            logging.debug(f"NCBI responses: {ncbi_responses}")
 
             ncbi_entries = NCBIProteinMapper().map(ncbi_responses)
 

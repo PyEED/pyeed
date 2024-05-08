@@ -70,12 +70,17 @@ class SequenceNetwork(BaseModel):
         default=None,
     )
 
+    _base_url: Optional[str] = PrivateAttr(
+        default="http://127.0.0.1:1234/v1",
+    )
+
     def __init__(
         self,
         sequences: List[SequenceRecord],
         weight: str = "identity",
         dimensions: int = 3,
-        mode = "global"
+        mode = "global",
+        base_url: str = "http://127.0.0.1:1234/v1",
     ):
         super().__init__()
         self.weight = weight
@@ -84,6 +89,7 @@ class SequenceNetwork(BaseModel):
         self.sequences = sequences
         self.network = nx.Graph()
         self._aligner = PairwiseAligner(mode=self.mode)
+        self._base_url = base_url
 
         self._create_graph()
 
@@ -194,20 +200,20 @@ class SequenceNetwork(BaseModel):
         self, collection: str, title: str, threshold: float = 0.8
     ):
         # assert that the cytoscape API is running and cytoscape is running in the background
-        assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
-        assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
+        assert p4c.cytoscape_ping(base_url=self._base_url), "Cytoscape is not running in the background"
+        assert p4c.cytoscape_version_info(base_url=self._base_url), "Cytoscape API is not running"
         # create a degree column for the nodes based on the current choosen threshold
         self.calculate_degree(threshold=threshold)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
-            self.network, collection=collection, title=title + "_" + str(threshold)
+            self.network, collection=collection, title=title + "_" + str(threshold), base_url=self._base_url
         )
 
         self.filter_cytoscape_edges_by_parameter(
-            name="threshold", parameter="identity", min_val=threshold, max_val=1.0
+            name="threshold", parameter="identity", min_val=threshold, max_val=1.0, base_url=self._base_url
         )
         # and yes the layout ignores hidden edges, i did a visual test
-        p4c.layout_network('grid')
+        p4c.layout_network('grid', base_url=self._base_url)
 
     def set_layout(
         self,
@@ -219,14 +225,14 @@ class SequenceNetwork(BaseModel):
             "numIterations": 50,
         },
     ):
-        p4c.layout_network(layout_name)
+        p4c.layout_network(layout_name, base_url=self._base_url)
         # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
         p4c.set_layout_properties(
-            layout_name=layout_name, properties_dict=properties_dict
+            layout_name=layout_name, properties_dict=properties_dict, base_url=self._base_url
         )
 
-        p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
-        p4c.layout_network(layout_name)
+        p4c.scale_layout(axis="Both Axis", scale_factor=1.0, base_url=self._base_url)
+        p4c.layout_network(layout_name, base_url=self._base_url)
 
     def filter_cytoscape_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
         # this is a filter for the network in cytoscape
@@ -239,6 +245,7 @@ class SequenceNetwork(BaseModel):
             type="edges",
             apply=True,
             hide=True,
+            base_url=self._base_url
         )
 
     def calculate_degree(self, threshold: float = 0.8):
@@ -259,10 +266,10 @@ class SequenceNetwork(BaseModel):
         nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
 
     def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
-        p4c.set_node_shape_default('ELLIPSE', style_name)
-        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name))
-        p4c.set_node_label_mapping('name', style_name=style_name)
-        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name))    
+        p4c.set_node_shape_default('ELLIPSE', style_name, base_url=self._base_url)
+        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name), base_url=self._base_url)
+        p4c.set_node_label_mapping('name', style_name=style_name, base_url=self._base_url)
+        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name), base_url=self._base_url)    
 
     def color_nodes(self, column_name: str, style_name: str = "default"):
         df_nodes = p4c.get_table_columns(table='node')
@@ -277,8 +284,8 @@ class SequenceNetwork(BaseModel):
         if style_name not in p4c.get_visual_style_names():
             p4c.create_visual_style(style_name)
 
-        p4c.set_node_color_default('#FFFFFF', style_name)
-        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors)
+        p4c.set_node_color_default('#FFFFFF', style_name, base_url=self._base_url)
+        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors, base_url=self._base_url)
 
     def visualize(self):
         """
@@ -514,7 +521,7 @@ class SequenceNetwork(BaseModel):
         return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
 
     def _get_edges_cytoscape_graph(self, hidden_included = False):
-        return p4c.get_all_edges()
+        return p4c.get_all_edges(base_url=self._base_url)
     
     def _get_edges_visibilities(self):
-        return p4c.get_edge_property(visual_property='EDGE_VISIBLE')
+        return p4c.get_edge_property(visual_property='EDGE_VISIBLE', base_url=self._base_url)
