@@ -267,12 +267,12 @@ class SequenceNetwork(BaseModel):
 
     def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
         p4c.set_node_shape_default('ELLIPSE', style_name, base_url=self._base_url)
-        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name), base_url=self._base_url)
+        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name, base_url=self._base_url))
         p4c.set_node_label_mapping('name', style_name=style_name, base_url=self._base_url)
-        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name), base_url=self._base_url)    
+        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name, base_url=self._base_url))    
 
     def color_nodes(self, column_name: str, style_name: str = "default"):
-        df_nodes = p4c.get_table_columns(table='node')
+        df_nodes = p4c.get_table_columns(table='node', base_url=self._base_url)
 
         data_color_names = list(set(df_nodes[column_name]))
 
@@ -281,8 +281,8 @@ class SequenceNetwork(BaseModel):
         # Convert RGB to hex colors for py4cytoscape
         hex_colors = ['#' + ''.join([f'{int(c*255):02x}' for c in color[:3]]) for color in colors]
 
-        if style_name not in p4c.get_visual_style_names():
-            p4c.create_visual_style(style_name)
+        if style_name not in p4c.get_visual_style_names(base_url=self._base_url):
+            p4c.create_visual_style(style_name, base_url=self._base_url)
 
         p4c.set_node_color_default('#FFFFFF', style_name, base_url=self._base_url)
         p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors, base_url=self._base_url)

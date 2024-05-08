@@ -93,6 +93,6 @@ class TestNetworkGraphBuild:
         # now create a cytoscape graph
         network.create_cytoscape_graph(collection="tests", title="test_cytoscape", threshold=threshhold)
         network.set_nodes_size(column_name="degree_with_threshold_{}".format(threshhold), min_size=20, max_size=100)
-        network.color_nodes(column_name='species')
+        #network.color_nodes(column_name='species')
 
         
