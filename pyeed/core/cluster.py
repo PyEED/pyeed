@@ -49,7 +49,7 @@ class Cluster(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="9cf5a53e2161d63c639e27dadd2d0bda5c174f67"
+        default="5f63c8da4e345268d0263ab65aca5d6fe2c3e226"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

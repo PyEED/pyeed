@@ -4,10 +4,12 @@ from typing import List, Union
 import pyhmmer
 from pydantic import BaseModel, Field
 
+# TODO import sequence record
 from pyeed.core.abstractsequence import AbstractSequence
 from pyeed.core.alignment import Alignment
 from pyeed.core.sequence import Sequence
 
+# TODO FIX ENTIRE THING
 
 class HMM(BaseModel):
     class Config:

@@ -32,7 +32,7 @@ class ProteinFetcher:
             for progress tracking.
 
         Returns:
-            List[ProteinInfo]: A list of ProteinInfo objects containing the fetched protein data.
+            List[ProteinRecord]: A list of ProteinRecord objects containing the fetched protein data.
 
         Raises:
             Exception: If there is an error during the fetching process.
