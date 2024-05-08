@@ -14,7 +14,7 @@ tqdm = "^4.66.1"
 sdrdm-database = { extras = [
     "postgres",
 ], git = "https://github.com/JR-1991/sdrdm-database.git", branch = "iterative-linking-tables" }
-psycopg2 = "^2.9.9"
+psycopg2-binary = "^2.9.9"
 networkx = "^3.2.1"
 plotly = "^5.18.0"
 nbformat = "^5.9.2"

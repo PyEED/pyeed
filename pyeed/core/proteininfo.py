@@ -13,6 +13,7 @@ from sdRDM.base.utils import forge_signature
 from pyeed.container.abstract_container import Blastp
 from pyeed.core.site import Site
 
+"""
 
 @forge_signature
 class ProteinInfo(AbstractSequence):
@@ -381,3 +382,4 @@ if __name__ == "__main__":
 
     seq = ProteinInfo.from_sequence(seq_string)
     print(seq)
+"""

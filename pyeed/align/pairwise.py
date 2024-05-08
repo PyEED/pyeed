@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
-from pydantic import Field, validator
+from pydantic import Field
 
 from pyeed.align import AbstractAligner
 
@@ -9,6 +9,9 @@ if TYPE_CHECKING:
     from Bio.Align import Alignment as BioAlignment
     from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 
+# ----------------------------------------------------------------------------------------------------------------------
+# THIS IS THE OLD ALINGER CLASS - SHOULD BE REMOVED AT SOME POINT
+# ----------------------------------------------------------------------------------------------------------------------
 
 class PairwiseAligner(AbstractAligner):
 
@@ -38,6 +41,7 @@ class PairwiseAligner(AbstractAligner):
         default="None",
     )
 
+    """
     @validator("mode")
     def mode_validator(cls, mode):
         modes = ["global", "local"]
@@ -59,6 +63,8 @@ class PairwiseAligner(AbstractAligner):
             )
 
         return substitution_matrix
+
+    """
 
     def align(self) -> "BioAlignment":
         """
@@ -86,8 +92,3 @@ class PairwiseAligner(AbstractAligner):
         alignment_result = aligner.align(self.sequences[0], self.sequences[1])[0]
 
         return alignment_result
-
-    def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
-        from Bio.Align import substitution_matrices
-
-        return substitution_matrices.load(self.substitution_matrix)
