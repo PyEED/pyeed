@@ -103,7 +103,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="6c9e70ca7a0928f3e16ace15c2fd2e16a2b6c0d7"
+        default="d98e05d5a30350ef1c359b6992d3097ee1d8a444"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -433,4 +433,3 @@ class ProteinRecord(
 
     def from_accessions(self):
         raise DeprecationWarning("This method is deprecated. Use `get_ids` instead.")
-
