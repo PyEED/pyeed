@@ -35,7 +35,7 @@ class Site(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="81f90abdab2c365e1abb57b48c394ba21d18a7c5"
+        default="09cbb0949d98f9c950f8189f0273f16b0895ace2"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
