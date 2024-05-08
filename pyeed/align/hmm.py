@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pyeed.core.alignment import Alignment
     from pyeed.core.sequence import Sequence
 
+# TODO FIX ENTIRE THING
 
 class HMM(BaseModel):
     class Config:

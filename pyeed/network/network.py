@@ -1,32 +1,28 @@
-from itertools import combinations
+import time
 from typing import List, Optional
 
 import networkx as nx
-import plotly.express as px
-import plotly.graph_objects as go
 import py4cytoscape as p4c
-from joblib import Parallel, cpu_count, delayed
-from pydantic import BaseModel, Field
-from tqdm import tqdm
+import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from pydantic import BaseModel, Field, PrivateAttr
+from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
 
-from pyeed.aligners.pairwise import PairwiseAligner
-from pyeed.core.abstractsequence import AbstractSequence
-from pyeed.core.proteininfo import ProteinInfo
+from pyeed.core.proteinrecord import ProteinRecord
+from pyeed.core.sequencerecord import SequenceRecord
+from pyeed.align.pairwise_aligner import PairwiseAligner
 
 
 class SequenceNetwork(BaseModel):
     """
     A class representing a sequence network.
 
-    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of AbstractSequence objects. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
+    The SequenceNetwork class is used to create and visualize a network of sequences. It takes a list of SequenceRecords objects. The network can be visualized in 2D or 3D, with nodes representing sequences and edges representing alignments between sequences.
 
     Attributes:
-        sequences (Optional[List[AbstractSequence]]): A list of AbstractSequence objects to be compared in the network. Default is an empty list.
-        pairwise_alignments (Optional[List[PairwiseAlignment]]): A list of PairwiseAlignment objects representing the pairwise alignments between sequences. Default is an empty list.
+        sequences (Optional[List[SequenceRecord]]): A list of AbstractSequence objects to be compared in the network. Default is an empty list.
         weight (Optional[str]): The attribute of the Alignment object to weight the edges in the network. Default is "identity".
-        color (Optional[str]): The attribute of the ProteinInfo object to colorize the nodes in the network. Default is "name".
-        threshold (Optional[float]): Sequences with a weight higher than the threshold are connected in the network. Default is None.
-        label (Optional[str]): The node label in the graph. Default is "name".
         dimensions (Optional[int]): The dimension of the network graph. Default is 3.
 
     Methods:
@@ -40,29 +36,19 @@ class SequenceNetwork(BaseModel):
             nx.Graph: lambda g: nx.node_link_data(g),
         }
 
-    sequences: Optional[List[AbstractSequence]] = Field(
+    sequences: Optional[List[SequenceRecord]] = Field(
         default=[],
         description="List of sequences to be compared",
+    )
+
+    mode: Optional[str] = Field(
+        default="global",
+        description="Alignment mode",
     )
 
     weight: Optional[str] = Field(
         default="identity",
         description="Attribute of Alignment to weight the edges",
-    )
-
-    color: Optional[str] = Field(
-        default="name",
-        description="Attribute of ProteinInfo to colorize nodes",
-    )
-
-    threshold: Optional[float] = Field(
-        default=None,
-        description="Sequences with a weight higher than the threshold are connected in the network",
-    )
-
-    label: Optional[str] = Field(
-        default="name",
-        description="Node label in the graph",
     )
 
     dimensions: Optional[int] = Field(
@@ -80,107 +66,39 @@ class SequenceNetwork(BaseModel):
         description="Network graph with networkx",
     )
 
+    _aligner: Optional[PairwiseAligner] = PrivateAttr(
+        default=None,
+    )
+
     def __init__(
         self,
-        sequences: List[AbstractSequence],
+        sequences: List[SequenceRecord],
         weight: str = "identity",
-        color: str = "name",
-        threshold: float = None,
-        label: str = "name",
         dimensions: int = 3,
+        mode = "global"
     ):
         super().__init__()
+        self.weight = weight
+        self.dimensions = dimensions
+        self.mode = mode
         self.sequences = sequences
-        self.threshold = threshold
+        self.network = nx.Graph()
+        self._aligner = PairwiseAligner(mode=self.mode)
 
-    def add_target(self, target: AbstractSequence):
+        self._create_graph()
+
+
+    def add_target(self, target: SequenceRecord):
+        # TODO find out what to do with targets
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
-    def _create_pairwise_alignments(
-        self, input_sequences, aligner: "PairwiseAligner", **kwargs
-    ):
-        """
-        Creates pairwise alignments between sequences.
-
-        This method creates pairwise alignments between sequences in the network.
-        The pairwise alignments are stored in the 'pairwise_alignments' attribute of the SequenceNetwork object.
-        This is done for the later visualization of the network graph with cytoscope.
-
-        Args:
-            aligner (PairwiseAligner): Python-based aligner to be called.
-
-        Raises:
-            ValueError: If the number of sequences is less than 2.
-
-        Returns:
-            Nothing the data is stored internally in fields of the class.
-        """
-
-        # Pairwise alignment
-        if len(input_sequences) == 2:
-            pairwise_aligner = aligner(
-                sequences=[
-                    input_sequences[0].sequence,
-                    input_sequences[1].sequence,
-                ],
-                **kwargs,
-            )
-            alignment_result = pairwise_aligner.align()
-
-            return self._map_pairwise_alignment_results(
-                alignment_result,
-                pair=(
-                    input_sequences[0],
-                    input_sequences[1],
-                ),
-                mode=pairwise_aligner.mode,
-            )
-
-        # Multi pairwise alignment
-        elif len(input_sequences) > 2:
-            pairs = list(combinations(input_sequences, 2))
-
-            aligners = [
-                aligner(sequences=[s.sequence for s in pair], **kwargs)
-                for pair in pairs
-            ]
-
-            alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
-                delayed(a.align)()
-                for a in tqdm(aligners, desc="⛓️ Running pairwise alignments")
-            )
-
-            return alignments, pairs, aligners[0].mode
-
-        else:
-            raise ValueError(
-                f"Alignment Error. Recieved {len(input_sequences)} sequences. Expected 2."
-            )
-
-    def _process_pair(self, alignment, pair):
-        shorter_seq = min(pair, key=lambda x: len(x.sequence))
-
-        identities = alignment.counts().identities
-        identity = identities / len(shorter_seq.sequence)
+    def _process_sequence(self, sequence: ProteinRecord):
         return (
-            pair[0].source_id,
-            pair[1].source_id,
-            {
-                "identity": identity,
-                "gaps": 1 / (alignment.counts().gaps + 1),
-                "mismatches": 1 / (alignment.counts().mismatches + 1),
-                "score": alignment.score,
-            },
-        )
-
-    def _process_sequence(self, sequence):
-        return (
-            sequence.source_id,
+            sequence.id,
+            sequence.sequence,
             {
                 "name": sequence.name,
-                "sequence": sequence.sequence,
-                "family_name": sequence.family_name,
                 "domain": sequence.organism.domain,
                 "kingdom": sequence.organism.kingdom,
                 "phylum": sequence.organism.phylum,
@@ -195,28 +113,38 @@ class SequenceNetwork(BaseModel):
             },
         )
 
-    def create_networkx_graph(self):
-        # TODO: check if such a graph already exists
-        self.network = nx.Graph()
-        # create the alignments
-        alignments, pairs, mode = self._create_pairwise_alignments(
-            self.sequences, PairwiseAligner, mode="global"
-        )
-        # Add nodes and assign node attributes
-        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
-            # the node data list
+    def _create_graph(self):
+        # first we add the nodes to the network
+        # in the same loop we read out the sequences and the key in order to be able to perform the alignment next
+        alignment_data = {}
+
+        if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
             node_data = []
 
+            print(time.time(), '----- Processing in for loop')
+
             for sequence in self.sequences:
-                node_data.append(self._process_sequence(sequence))
-            # here the actual add happens
+                id_seq, seq, data = self._process_sequence(sequence)
+                node_data.append((id_seq, data))
+                alignment_data[id_seq] = seq
+
+            print(time.time(), "----- Adding in networx")
+
             self.network.add_nodes_from(node_data)
+
+            print(time.time(), "----- nodes added ")
 
         else:
             for sequence in self.sequences:
+
+                id_seq = sequence.id
+                seq = sequence.sequence
+                alignment_data[id_seq] = seq
+
                 self.network.add_node(
-                    sequence.source_id,
+                    id_seq,
                     name=sequence.name,
+                    sequence=seq,
                     domain=sequence.organism.domain,
                     kingdome=sequence.organism.kingdom,
                     phylum=sequence.organism.phylum,
@@ -228,26 +156,58 @@ class SequenceNetwork(BaseModel):
                     taxonomy_id=sequence.organism.taxonomy_id,
                 )
 
-        # create the edge data --> this will have no threshold, the threshold will be set in the create_cytoscope_graph method, for ech graph individually
+        # create the alignments
+        alignments_results = self._aligner.align_multipairwise(alignment_data)
+        # now pydantic cant seem to handle the serialization of the alignment results in the field start and end
+        # so we need to convert them to lists
+        for alignment_result in alignments_results:
+            alignment_result['start'] = alignment_result['start'].tolist()
+            alignment_result['end'] = alignment_result['end'].tolist()
+        # create a list for the egdes
         edge_data = []
 
-        for alignment, pair in zip(alignments, pairs):
-            edge = self._process_pair(alignment, pair)
+        print(time.time(), "Processing Pairs in for loop")
+        
+        for alignment_result in alignments_results:
+            edge = (alignment_result['seq1_id'], alignment_result['seq2_id'], {key: value for key, value in alignment_result.items() if key not in ['seq1_id', 'seq2_id']})
             if edge:
                 edge_data.append(edge)
+    
+        print(time.time(), "Adding edeges from list in networx")
 
         self.network.add_edges_from(edge_data)
 
-    def create_cytoscope_graph(
+        print(time.time(), "edges added in network")
+
+        # Calculate node positions based on dimensions
+        if self.dimensions == 2:
+            return self._2d_position_nodes_and_edges(self.network)
+        elif self.dimensions == 3:
+            return self._3d_position_nodes_and_edges(self.network)
+        else:
+            if self.dimensions > 3:
+                raise ValueError(
+                    f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
+                )
+            
+    def create_cytoscape_graph(
         self, collection: str, title: str, threshold: float = 0.8
     ):
-        # assert that the cytoscope API is running and cytoscope is running in the background
+        # assert that the cytoscape API is running and cytoscape is running in the background
         assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
         assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
-        # TODO fix that the title an dcollection is set unique in order to avoid confuing when using the software
+        # create a degree column for the nodes based on the current choosen threshold
+        self.calculate_degree(threshold=threshold)
+        # filter the the edges by the threshold
         p4c.create_network_from_networkx(
-            self.graph, collection=collection, title=title + "_" + str(threshold)
+            self.network, collection=collection, title=title + "_" + str(threshold)
         )
+
+        self.filter_cytoscape_edges_by_parameter(
+            name="threshold", parameter="identity", min_val=threshold, max_val=1.0
+        )
+        # and yes the layout ignores hidden edges, i did a visual test
+        p4c.layout_network('grid')
 
     def set_layout(
         self,
@@ -268,10 +228,8 @@ class SequenceNetwork(BaseModel):
         p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
         p4c.layout_network(layout_name)
 
-    def filter_cytoscope_edges_by_parameter(
-        self, name: str, parameter: str, min_val: float, max_val: float
-    ):
-        # this is a filter for the network in cytoscope
+    def filter_cytoscape_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
+        # this is a filter for the network in cytoscape
         # here the nodes and edges not relevant are filtered out
         p4c.create_column_filter(
             name,
@@ -283,135 +241,44 @@ class SequenceNetwork(BaseModel):
             hide=True,
         )
 
-    def calculate_degree(self):
+    def calculate_degree(self, threshold: float = 0.8):
         # Calculate degree of nodes with filtering
-        g = p4c.create_networkx_from_network()
-        nx.set_node_attributes(g, dict(nx.degree(self.graph)), "degree")
-        p4c.create_network_from_networkx(g, collection="tet", title="hfjakd")
+        degree = {}
+        for u,v,d in self.network.edges(data=True):
+            if d['identity'] > threshold:
+                if u not in degree:
+                    degree[u] = 1
+                else:
+                    degree[u] += 1
+                if v not in degree:
+                    degree[v] = 1
+                else:
+                    degree[v] += 1
 
-    @property
-    def graph(self) -> nx.Graph:
-        """
-        Maps properties of alignments to a network graph.
+        print(nx.degree(self.network))
+        nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
 
-        Returns:
-            nx.Graph: The network graph representing the sequence network.
+    def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
+        p4c.set_node_shape_default('ELLIPSE', style_name)
+        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name))
+        p4c.set_node_label_mapping('name', style_name=style_name)
+        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name))    
 
-        Raises:
-            ValueError: If the dimensions of the network graph are greater than 3.
+    def color_nodes(self, column_name: str, style_name: str = "default"):
+        df_nodes = p4c.get_table_columns(table='node')
 
-        Notes:
-            - The graph is created using the NetworkX library.
-            - Nodes in the graph represent sequences, and edges represent alignments between sequences.
-            - Node attributes include the sequence name, organism, and taxonomy ID.
-            - Edge attributes include the alignment identity, gaps, mismatches, and score.
-            - The graph can be visualized in 2D or 3D using the visualize() method.
-        """
-        graph = nx.Graph()
-        alignments, pairs, mode = self._create_pairwise_alignments(
-            self.sequences, PairwiseAligner, mode="global"
-        )
+        data_color_names = list(set(df_nodes[column_name]))
 
-        # Add nodes and assign node attributes
-        # TODO die Aminosäuren sequenz soll jetzt auch noch da rein
-        if all([isinstance(sequence, ProteinInfo) for sequence in self.sequences]):
-            node_data = []
+        colors = plt.cm.tab20(range(len(data_color_names)))
+        hex_colors = ['#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255)) for r, g, b, _ in colors]
+        # Convert RGB to hex colors for py4cytoscape
+        hex_colors = ['#' + ''.join([f'{int(c*255):02x}' for c in color[:3]]) for color in colors]
 
-            def process_sequence(sequence):
-                return (
-                    sequence.source_id,
-                    {
-                        "name": sequence.name,
-                        "family_name": sequence.family_name,
-                        "domain": sequence.organism.domain,
-                        "kingdom": sequence.organism.kingdom,
-                        "phylum": sequence.organism.phylum,
-                        "tax_class": sequence.organism.tax_class,
-                        "order": sequence.organism.order,
-                        "family": sequence.organism.family,
-                        "genus": sequence.organism.genus,
-                        "species": sequence.organism.species,
-                        "ec_number": sequence.ec_number,
-                        "mol_weight": sequence.mol_weight,
-                        "taxonomy_id": sequence.organism.taxonomy_id,
-                    },
-                )
+        if style_name not in p4c.get_visual_style_names():
+            p4c.create_visual_style(style_name)
 
-            print("Processing Sequences in for loop")
-
-            for sequence in self.sequences:
-                node_data.append(process_sequence(sequence))
-            print("Adding in networx")
-
-            graph.add_nodes_from(node_data)
-            print("nodes added ")
-
-        else:
-            for sequence in self.sequences:
-                graph.add_node(
-                    sequence.source_id,
-                    name=sequence.name,
-                    domain=sequence.organism.domain,
-                    kingdome=sequence.organism.kingdom,
-                    phylum=sequence.organism.phylum,
-                    tax_class=sequence.organism.tax_class,
-                    order=sequence.organism.order,
-                    family=sequence.organism.family,
-                    genus=sequence.organism.genus,
-                    species=sequence.organism.species,
-                    taxonomy_id=sequence.organism.taxonomy_id,
-                )
-
-        # create a datafarme for the egdes
-        edge_data = []
-
-        def process_pair(alignment, pair):
-            shorter_seq = min(pair, key=lambda x: len(x.sequence))
-
-            identities = alignment.counts().identities
-            identity = identities / len(shorter_seq.sequence)
-            if self.threshold is not None and identity < self.threshold:
-                return None
-            return (
-                pair[0].source_id,
-                pair[1].source_id,
-                {
-                    "identity": identity,
-                    "gaps": 1 / (alignment.counts().gaps + 1),
-                    "mismatches": 1 / (alignment.counts().mismatches + 1),
-                    "score": alignment.score,
-                },
-            )
-
-        print("Processing Pairs in for loop")
-
-        for alignment, pair in zip(alignments, pairs):
-            edge = process_pair(alignment, pair)
-            if edge:
-                edge_data.append(edge)
-        print("Adding in networx")
-        graph.add_edges_from(edge_data)
-        print("edges added ")
-        # Calculate betweenness centrality
-        betweenness = nx.betweenness_centrality(graph)
-        for node, betw_value in betweenness.items():
-            graph.nodes[node]["betweenness"] = betw_value
-
-        # Calculate degree of nodes without filtering
-        nx.set_node_attributes(graph, dict(nx.degree(graph)), "degree_all")
-
-        # Calculate node positions based on dimensions
-        if self.dimensions == 2:
-            return self._2d_position_nodes_and_edges(graph)
-        elif self.dimensions == 3:
-            return self._3d_position_nodes_and_edges(graph)
-        else:
-            if self.dimensions > 3:
-                raise ValueError(
-                    f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
-                )
-
-        return graph
+        p4c.set_node_color_default('#FFFFFF', style_name)
+        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors)
 
     def visualize(self):
         """
@@ -645,3 +512,9 @@ class SequenceNetwork(BaseModel):
     @staticmethod
     def _sample_colorscale(size: int) -> List[str]:
         return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
+
+    def _get_edges_cytoscape_graph(self, hidden_included = False):
+        return p4c.get_all_edges()
+    
+    def _get_edges_visibilities(self):
+        return p4c.get_edge_property(visual_property='EDGE_VISIBLE')
