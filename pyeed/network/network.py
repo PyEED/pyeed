@@ -210,7 +210,7 @@ class SequenceNetwork(BaseModel):
         )
 
         self.filter_cytoscape_edges_by_parameter(
-            name="threshold", parameter="identity", min_val=threshold, max_val=1.0, base_url=self._base_url
+            name="threshold", parameter="identity", min_val=threshold, max_val=1.0
         )
         # and yes the layout ignores hidden edges, i did a visual test
         p4c.layout_network('grid', base_url=self._base_url)
