@@ -62,7 +62,7 @@ class SequenceRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="6c9e70ca7a0928f3e16ace15c2fd2e16a2b6c0d7"
+        default="d477784d718ad18c1cc179a31c8a8b7dceb28ba9"
     )
 
     _object_terms: Set[str] = PrivateAttr(default={"http://edamontology.org/data_0849"})
