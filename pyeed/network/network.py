@@ -194,20 +194,18 @@ class SequenceNetwork(BaseModel):
         self, collection: str, title: str, threshold: float = 0.8
     ):
         # assert that the cytoscape API is running and cytoscape is running in the background
-        assert p4c.cytoscape_ping(), "Cytoscape is not running in the background"
-        assert p4c.cytoscape_version_info(), "Cytoscape API is not running"
+        assert p4c.cytoscape_ping(base_url=self._base_url), "Cytoscape is not running in the background"
+        assert p4c.cytoscape_version_info(base_url=self._base_url), "Cytoscape API is not running"
         # create a degree column for the nodes based on the current choosen threshold
         self.calculate_degree(threshold=threshold)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
-            self.network, collection=collection, title=title + "_" + str(threshold)
+            self.network, collection=collection, title=title + "_" + str(threshold), base_url=self._base_url
         )
 
-        self.filter_cytoscape_edges_by_parameter(
-            name="threshold", parameter="identity", min_val=threshold, max_val=1.0
-        )
+        self.hide_under_threshold(threshold)
         # and yes the layout ignores hidden edges, i did a visual test
-        p4c.layout_network('grid')
+        p4c.layout_network('grid', base_url=self._base_url)
 
     def set_layout(
         self,
@@ -227,6 +225,18 @@ class SequenceNetwork(BaseModel):
 
         p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
         p4c.layout_network(layout_name)
+
+    def hide_under_threshold(self, threshold):
+        p4c.unhide_all(base_url=self._base_url)
+        
+        hide_list = []
+
+        for u,v,d in self.network.edges(data=True):
+            if d['identity'] > threshold:
+                hide_list.append('{} (interacts with) {}'.format(u, v))
+
+        p4c.hide_edges(hide_list, base_url=self._base_url)
+
 
     def filter_cytoscape_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
         # this is a filter for the network in cytoscape
