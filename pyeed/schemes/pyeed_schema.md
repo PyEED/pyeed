@@ -114,9 +114,9 @@ classDiagram
     }
     
     class Alignment {
+        +Sequence[0..*] input_sequences
         +string method
         +string consensus
-        +Sequence[0..*] input_sequences
         +Sequence[0..*] aligned_sequences
         +StandardNumbering[0..*] standard_numberings
     }

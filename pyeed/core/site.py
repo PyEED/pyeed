@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.listplus import ListPlus
 from sdRDM.base.utils import forge_signature, IDGenerator
 from .proteinsitetype import ProteinSiteType
@@ -36,4 +36,8 @@ class Site(sdRDM.DataModel):
     cross_ref: Optional[str] = Field(
         default=None,
         description="Database cross reference",
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="3607c4e340ae59061cd0b3fe9e724e58e70e0885"
     )

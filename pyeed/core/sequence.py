@@ -1,7 +1,7 @@
 import sdRDM
 
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from sdRDM.base.utils import forge_signature, IDGenerator
 
 
@@ -23,6 +23,10 @@ class Sequence(sdRDM.DataModel):
     sequence: Optional[str] = Field(
         default=None,
         description="Sequence of the alignment. Gaps are represented by '-'",
+    )
+    __repo__: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    __commit__: Optional[str] = PrivateAttr(
+        default="3607c4e340ae59061cd0b3fe9e724e58e70e0885"
     )
 
     def fasta_string(self) -> str:
