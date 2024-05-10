@@ -70,12 +70,17 @@ class SequenceNetwork(BaseModel):
         default=None,
     )
 
+    _base_url: Optional[str] = PrivateAttr(
+        default="http://127.0.0.1:1234/v1",
+    )
+
     def __init__(
         self,
         sequences: List[SequenceRecord],
         weight: str = "identity",
         dimensions: int = 3,
-        mode = "global"
+        mode = "global",
+        base_url: str = "http://127.0.0.1:1234/v1",
     ):
         super().__init__()
         self.weight = weight
@@ -84,6 +89,7 @@ class SequenceNetwork(BaseModel):
         self.sequences = sequences
         self.network = nx.Graph()
         self._aligner = PairwiseAligner(mode=self.mode)
+        self._base_url = base_url
 
         self._create_graph()
 
@@ -217,14 +223,14 @@ class SequenceNetwork(BaseModel):
             "numIterations": 50,
         },
     ):
-        p4c.layout_network(layout_name)
+        p4c.layout_network(layout_name, base_url=self._base_url)
         # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
         p4c.set_layout_properties(
-            layout_name=layout_name, properties_dict=properties_dict
+            layout_name=layout_name, properties_dict=properties_dict, base_url=self._base_url
         )
 
-        p4c.scale_layout(axis="Both Axis", scale_factor=1.0)
-        p4c.layout_network(layout_name)
+        p4c.scale_layout(axis="Both Axis", scale_factor=1.0, base_url=self._base_url)
+        p4c.layout_network(layout_name, base_url=self._base_url)
 
     def hide_under_threshold(self, threshold):
         p4c.unhide_all(base_url=self._base_url)
@@ -249,6 +255,7 @@ class SequenceNetwork(BaseModel):
             type="edges",
             apply=True,
             hide=True,
+            base_url=self._base_url,
         )
 
     def calculate_degree(self, threshold: float = 0.8):
@@ -269,13 +276,13 @@ class SequenceNetwork(BaseModel):
         nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
 
     def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
-        p4c.set_node_shape_default('ELLIPSE', style_name)
-        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name))
-        p4c.set_node_label_mapping('name', style_name=style_name)
-        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name))    
+        p4c.set_node_shape_default('ELLIPSE', style_name, base_url=self._base_url)
+        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name, base_url=self._base_url))
+        p4c.set_node_label_mapping('name', style_name=style_name, base_url=self._base_url)
+        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name, base_url=self._base_url))  
 
     def color_nodes(self, column_name: str, style_name: str = "default"):
-        df_nodes = p4c.get_table_columns(table='node')
+        df_nodes = p4c.get_table_columns(table='node', base_url=self._base_url)
 
         data_color_names = list(set(df_nodes[column_name]))
 
@@ -284,11 +291,11 @@ class SequenceNetwork(BaseModel):
         # Convert RGB to hex colors for py4cytoscape
         hex_colors = ['#' + ''.join([f'{int(c*255):02x}' for c in color[:3]]) for color in colors]
 
-        if style_name not in p4c.get_visual_style_names():
-            p4c.create_visual_style(style_name)
+        if style_name not in p4c.get_visual_style_names(base_url=self._base_url):
+            p4c.create_visual_style(style_name, base_url=self._base_url)
 
-        p4c.set_node_color_default('#FFFFFF', style_name)
-        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors)
+        p4c.set_node_color_default('#FFFFFF', style_name, base_url=self._base_url)
+        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors, base_url=self._base_url)
 
     def visualize(self):
         """
