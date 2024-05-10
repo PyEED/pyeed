@@ -88,6 +88,11 @@ class BlastData(
         json_schema_extra=dict(),
     )
 
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="04181daa6eef42033442b4f18f7dd2537f3b91df"
+    )
+
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
