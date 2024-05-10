@@ -51,7 +51,7 @@ class AlignmentResult(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="4ea18deaa0d8c27151d5ae1c6659e0fec3de233c"
+        default="7f66efcde1e80f0de25cd00e4d7d3045d84d492b"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
