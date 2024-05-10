@@ -207,13 +207,16 @@ class SequenceNetwork(BaseModel):
             "numIterations": 50,
         },
     ):
-        p4c.layout_network(layout_name, base_url=self._base_url)
-        # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
-        p4c.set_layout_properties(
-            layout_name=layout_name, properties_dict=properties_dict, base_url=self._base_url
-        )
+        if layout_name == 'force-directed':
+            p4c.layout_network(layout_name, base_url=self._base_url)
+            # ['numIterations', 'defaultSpringCoefficient', 'defaultSpringLength', 'defaultNodeMass', 'isDeterministic', 'singlePartition']
+            p4c.set_layout_properties(
+                layout_name=layout_name, properties_dict=properties_dict, base_url=self._base_url
+            )
 
-        p4c.layout_network(layout_name, base_url=self._base_url)
+            p4c.layout_network(layout_name, base_url=self._base_url)
+        else:
+            p4c.layout_network(layout_name, base_url=self._base_url)
 
     def hide_under_threshold(self, threshold):
         p4c.unhide_all(base_url=self._base_url)
