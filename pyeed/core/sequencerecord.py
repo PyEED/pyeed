@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 from uuid import uuid4
 
 import sdRDM
@@ -43,7 +43,7 @@ class SequenceRecord(
     )
 
     name: Optional[str] = element(
-        description="Arbtrary name of the sequence.",
+        description="Arbitrary name of the sequence.",
         default=None,
         tag="name",
         json_schema_extra=dict(
@@ -62,10 +62,8 @@ class SequenceRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="a7defc5c87a2296a2e4b522b07236b2aef6413ac"
+        default="d9135dbd1cbd205a7d0ddcbabc5d9a192e10a20b"
     )
-
-    _object_terms: Set[str] = PrivateAttr(default={"http://edamontology.org/data_0849"})
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 

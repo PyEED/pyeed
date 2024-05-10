@@ -3,15 +3,15 @@ classDiagram
     SequenceRecord <-- ProteinRecord
     SequenceRecord <-- DNARecord
     AbstractAnnotation <-- Site
-    AlignmentData <-- PairwiseAlignment
-    AlignmentData <-- ClustalOmegaData
+    AlignmentResult <-- PairwiseAlignmentResult
+    AlignmentResult <-- ClustalOmegaResult
     SequenceRecord *-- Organism
     ProteinRecord *-- Site
     ProteinRecord *-- Region
     DNARecord *-- Site
     DNARecord *-- Region
     Cluster *-- Sequence
-    AlignmentData *-- Sequence
+    AlignmentResult *-- Sequence
     
     class SequenceRecord {
         +string uri
@@ -88,13 +88,13 @@ classDiagram
         +string sequence
     }
     
-    class AlignmentData {
+    class AlignmentResult {
         +string consensus
         +Sequence[0..*] sequences
         +Sequence[0..*] aligned_sequences
     }
     
-    class PairwiseAlignment {
+    class PairwiseAlignmentResult {
         +float score
         +float identity
         +float similarity
@@ -108,7 +108,7 @@ classDiagram
         +string[0..*] numbering
     }
     
-    class ClustalOmegaData {
+    class ClustalOmegaResult {
         +string version
     }
     
