@@ -1,21 +1,23 @@
+
 from typing import Dict, Optional
 from uuid import uuid4
 
-import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
+from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
-from .organism import Organism
+from .alignmentresult import AlignmentResult
 
 
-class SequenceRecord(
-    sdRDM.DataModel,
+@forge_signature
+class PairwiseAlignmentResult(
+    AlignmentResult,
     search_mode="unordered",
 ):
-    """A molecular sequence and associated annotation data."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -24,40 +26,39 @@ class SequenceRecord(
         default_factory=lambda: str(uuid4()),
     )
 
-    uri: Optional[str] = element(
-        description="URI of the sequence.",
+    score: Optional[float] = element(
+        description="Alignment score",
         default=None,
-        tag="uri",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_1047",
-        ),
+        tag="score",
+        json_schema_extra=dict(),
     )
 
-    accession_id: Optional[str] = element(
-        description="Accession ID of the sequence.",
+    identity: Optional[float] = element(
+        description="Ratio of identical residues in the alignment",
         default=None,
-        tag="accession_id",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2091",
-        ),
+        tag="identity",
+        json_schema_extra=dict(),
     )
 
-    name: Optional[str] = element(
-        description="Arbitrary name of the sequence.",
+    similarity: Optional[float] = element(
+        description="Ratio of similar residues in the alignment",
         default=None,
-        tag="name",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2099",
-        ),
+        tag="similarity",
+        json_schema_extra=dict(),
     )
 
-    organism: Optional[Organism] = element(
-        description="The organism from which the sequence was obtained.",
+    gaps: Optional[int] = element(
+        description="Number of gaps in the alignment",
         default=None,
-        tag="organism",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2530",
-        ),
+        tag="gaps",
+        json_schema_extra=dict(),
+    )
+
+    mismatches: Optional[int] = element(
+        description="Number of mismatches in the alignment",
+        default=None,
+        tag="mismatches",
+        json_schema_extra=dict(),
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

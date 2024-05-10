@@ -11,7 +11,7 @@ from sdRDM.tools.utils import elem2dict
 from .sequence import Sequence
 
 
-class Cluster(
+class AlignmentResult(
     sdRDM.DataModel,
     search_mode="unordered",
 ):
@@ -24,24 +24,26 @@ class Cluster(
         default_factory=lambda: str(uuid4()),
     )
 
-    name: Optional[str] = element(
-        description="Name of the cluster.",
+    consensus: Optional[str] = element(
+        description="Consensus sequence of the alignment.",
         default=None,
-        tag="name",
+        tag="consensus",
         json_schema_extra=dict(),
     )
 
-    representative: Optional[Sequence] = element(
-        description="Identifier of the representative sequence of the cluster.",
-        default_factory=Sequence,
-        tag="representative",
-        json_schema_extra=dict(),
-    )
-
-    members: List[Sequence] = element(
-        description="Sequences of the cluster.",
+    sequences: List[Sequence] = element(
+        description="Sequences of the alignment.",
         default_factory=ListPlus,
-        tag="members",
+        tag="sequences",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
+    )
+
+    aligned_sequences: List[Sequence] = element(
+        description="Aligned sequences as a result of the alignment.",
+        default_factory=ListPlus,
+        tag="aligned_sequences",
         json_schema_extra=dict(
             multiple=True,
         ),
@@ -61,7 +63,7 @@ class Cluster(
 
         return self
 
-    def add_to_members(
+    def add_to_sequences(
         self,
         sequence_id: Optional[str] = None,
         sequence: Optional[str] = None,
@@ -69,7 +71,7 @@ class Cluster(
         **kwargs,
     ) -> Sequence:
         """
-        This method adds an object of type 'Sequence' to attribute members
+        This method adds an object of type 'Sequence' to attribute sequences
 
         Args:
             id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
@@ -87,6 +89,36 @@ class Cluster(
 
         obj = Sequence(**params)
 
-        self.members.append(obj)
+        self.sequences.append(obj)
 
-        return self.members[-1]
+        return self.sequences[-1]
+
+    def add_to_aligned_sequences(
+        self,
+        sequence_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> Sequence:
+        """
+        This method adds an object of type 'Sequence' to attribute aligned_sequences
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            sequence_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Molecular sequence.. Defaults to None
+        """
+
+        params = {
+            "sequence_id": sequence_id,
+            "sequence": sequence,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = Sequence(**params)
+
+        self.aligned_sequences.append(obj)
+
+        return self.aligned_sequences[-1]

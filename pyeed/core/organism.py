@@ -106,11 +106,6 @@ class Organism(
         ),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="a7defc5c87a2296a2e4b522b07236b2aef6413ac"
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")

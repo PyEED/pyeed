@@ -7,7 +7,7 @@ prefixes:
 
 ## Macromolecules
 
-### SequenceRecord (EDAM:data_0849)
+### SequenceRecord
 
 A molecular sequence and associated annotation data.
 
@@ -21,7 +21,7 @@ A molecular sequence and associated annotation data.
   - Term: EDAM:data_2091
 - name
   - Type: string
-  - Description: Arbtrary name of the sequence.
+  - Description: Arbitrary name of the sequence.
   - Term: EDAM:data_2099
 - organism
   - Type: Organism
@@ -223,7 +223,7 @@ Description of an organism 🦠.
   - Type: string
   - Description: Molecular sequence.
 
-### AlignmentData
+### AlignmentResult
 
 - consensus
   - Type: string
@@ -235,17 +235,17 @@ Description of an organism 🦠.
   - Type: Sequence[]
   - Description: Aligned sequences as a result of the alignment.
 
-### PairwiseAlignment(_AlignmentData_)
+### PairwiseAlignmentResult(_AlignmentResult_)
 
 - score
   - Type: float
   - Description: Alignment score
 - identity
   - Type: float
-  - Description: Ration of identical residues in the alignment
+  - Description: Ratio of identical residues in the alignment
 - similarity
   - Type: float
-  - Description: Ration of similar residues in the alignment
+  - Description: Ratio of similar residues in the alignment
 - gaps
   - Type: int
   - Description: Number of gaps in the alignment
@@ -265,7 +265,7 @@ Description of an organism 🦠.
   - Type: string[]
   - Description: Standard numbering of the aligned sequence
 
-### ClustalOmegaData(_AlignmentData_)
+### ClustalOmegaResult(_AlignmentResult_)
 
 - version
   - Type: string
@@ -275,7 +275,7 @@ Description of an organism 🦠.
 
 ### Ontology
 
-Ontology endponts for different types of sequences.
+Ontology endpoints for different types of sequences.
 
 ```python
 GO = "https://amigo.geneontology.org/amigo/term/"
