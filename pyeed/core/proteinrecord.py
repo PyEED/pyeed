@@ -16,7 +16,7 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from pyeed.container.abstract_container import Blastp
-from pyeed.fetch.blast import BlastProgram, NCBIDataBase
+from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
 from pyeed.fetch.proteinfetcher import ProteinFetcher
 
 from .dnarecord import DNARecord
@@ -103,7 +103,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="d98e05d5a30350ef1c359b6992d3097ee1d8a444"
+        default="17c2114e3543d29a1fa65b09941dece9b9ce15f5"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -218,12 +218,6 @@ class ProteinRecord(
 
     @classmethod
     def get_id(cls, protein_id: str) -> "ProteinRecord":
-        import nest_asyncio
-
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
-
-        nest_asyncio.apply()
-
         """
         This method creates a 'ProteinRecord' object from a given protein accession ID.
 
@@ -233,6 +227,12 @@ class ProteinRecord(
         Returns:
             ProteinRecord: 'ProteinRecord' with information of the corresponding protein_id.
         """
+
+        import nest_asyncio
+
+        from pyeed.fetch.proteinfetcher import ProteinFetcher
+
+        nest_asyncio.apply()
 
         if isinstance(protein_id, list) and all(isinstance(x, str) for x in protein_id):
             warnings.warn("For getting multiple sequences by ID use `get_ids` instead.")
