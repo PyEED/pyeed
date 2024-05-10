@@ -17,7 +17,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ProteinFetcher:
-
     def __init__(self, ids: List[str]):
         self.ids = ids
         # self.ncbi_key = ncbi_key #TODO: Add NCBI key to NCBI requester
@@ -45,7 +44,6 @@ class ProteinFetcher:
         ) as progress:
             requesters: List[AsyncRequester] = []
             for db_name, db_ids in db_entries.items():
-
                 if db_name == DBPattern.UNIPROT.name:
                     task_id = progress.add_task(
                         f"Requesting sequences from {db_name}...", total=len(db_ids)
@@ -89,7 +87,7 @@ class ProteinFetcher:
                             progress=progress,
                             batch_size=10,
                             rate_limit=2,
-                            n_concurrent=20,
+                            n_concurrent=5,
                         )
                     )
 
@@ -144,6 +142,10 @@ class ProteinFetcher:
             )
 
             taxonomies = await tax_requester.make_request()
+
+            taxonomies = [
+                tax for tax in taxonomies if "status" not in tax and "404" not in tax
+            ]
 
             progress.update(task_id, completed=len(unique_tax_ids))
 

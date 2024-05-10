@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import TYPE_CHECKING
 
-from typing import List, TYPE_CHECKING
-
-from pyeed.core import Organism, Annotation
+from pyeed.core import Organism
 from pyeed.core.ontology import Ontology
-
+from pyeed.core.region import Region
 
 if TYPE_CHECKING:
     from pyeed.core import ProteinRecord
@@ -20,7 +19,6 @@ class UniprotMapper:
         pass
 
     def map_uniprot_data(self, uniprot_data: dict) -> ProteinRecord:
-
         from pyeed.core import ProteinRecord
 
         # Organism information
@@ -50,6 +48,8 @@ class UniprotMapper:
             if go_annotation["type"] == "GO"
         ]
 
+        print(global_go_annotations)
+
         return protein_info
 
     def map(
@@ -77,7 +77,7 @@ class UniprotMapper:
             ec_number = None
 
         protein_info = ProteinRecord(
-            uri=uniprot["uri"],
+            id=uniprot["accession"],
             accession_id=uniprot["accession"],
             sequence=uniprot["sequence"]["sequence"],
             name=uniprot["protein"]["recommendedName"]["fullName"]["value"],
@@ -88,14 +88,14 @@ class UniprotMapper:
         for reference in uniprot["dbReferences"]:
             if reference["type"].upper() == "REFSEQ":
                 try:
-                    protein_info.coding_sequence_ref = DNARegion(
-                        cross_reference=reference["properties"][
-                            "nucleotide sequence ID"
-                        ],
+                    protein_info.coding_sequence.append(
+                        Region(
+                            id=reference["properties"]["nucleotide sequence ID"],
+                        )
                     )
                 except KeyError:
                     LOGGER.debug(
-                        f"Could not find the coding sequence reference for {protein_info.source_id}"
+                        f"Could not find the coding sequence reference for {protein_info.id}"
                     )
 
         protein_info = self.map_interpro(interpro, protein_info)
@@ -107,10 +107,6 @@ class UniprotMapper:
     ) -> ProteinRecord:
         """Maps the InterPro records to a ProteinInfo object."""
 
-        raise NotImplementedError(
-            f"This method uses the old schema and does not support ProteinRegionType"
-        )
-
         interpro_pattern = re.compile(r"IPR\d{6}")
         # pfam_pattern = re.compile(r"PF\d{5}")
         # panther_pattern = re.compile(r"PTHR\d{5}")
@@ -119,10 +115,7 @@ class UniprotMapper:
             if interpro_pattern.search(annotation["metadata"]["accession"]):
                 region = protein_info.add_to_regions(
                     name=annotation["metadata"]["name"],
-                    type=ProteinRegionType.DOMAIN,
                     cross_reference=annotation["metadata"]["accession"],
-                )
-                region.add_to_spans(
                     start=annotation["proteins"][0]["entry_protein_locations"][0][
                         "fragments"
                     ][0]["start"],
