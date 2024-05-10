@@ -60,7 +60,7 @@ class PairwiseAlignmentResult(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="d9135dbd1cbd205a7d0ddcbabc5d9a192e10a20b"
+        default="ab557adeeedc12e0571d262daa579fcbc5cda3a3"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
