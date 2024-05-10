@@ -5,20 +5,25 @@ from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
-from rich.console import Console
 from rich.progress import Progress
-
-from pyeed.core.pairwisealignmentresult import PairwiseAlignmentResult
 
 
 class PairwiseAligner:
-    def __init__(self, mode: str) -> None:
+    def __init__(
+        self,
+        mode: str = "global",
+        match: int = 1,
+        mismatch: int = -1,
+        gap_open: int = -1,
+        gap_exted: int = 0,
+        substitution_matrix: str = "None",
+    ) -> None:
         self.mode = mode
-        self.match = 1
-        self.mismatch = -1
-        self.gap_open = -1
-        self.gap_extend = 0
-        self.substitution_matrix = "None"
+        self.match = match
+        self.mismatch = mismatch
+        self.gap_open = gap_open
+        self.gap_extend = gap_exted
+        self.substitution_matrix = substitution_matrix
 
     def _align(
         self,
@@ -47,7 +52,7 @@ class PairwiseAligner:
         self,
         seq1: Dict[str, str],
         seq2: Dict[str, str],
-    ) -> PairwiseAlignmentResult:
+    ) -> dict:
         """Aligns two sequences and returns the alignment results.
 
         Args:
@@ -55,7 +60,7 @@ class PairwiseAligner:
             seq2 (Dict[str, str]): Sequence 2 to align. Key is the sequence ID.
 
         Returns:
-            PairwiseAlignmentResult: The alignment results.
+            dict: Has the same signature as a `PairwiseAlignmentResult` object.
         """
 
         alignment_result = self._align(seq1, seq2)
@@ -63,20 +68,25 @@ class PairwiseAligner:
         return self._map_alignment_results(alignment_result, seq1, seq2)
 
     def align_multipairwise(self, sequences: Dict[str, str], **kwargs) -> List[dict]:
-        """ """
-        # the sequences are stored in a dictionary, key = source.id value = sequence
-        # this creates a list of all possible pairs of sequences, on this list the alignment has to happen
+        """Creates all possible pairwise alignments from a dictionary of sequences.
+
+        Args:
+            sequences (Dict[str, str]): A dictionary of sequences to align. The key is the sequence ID.
+
+        Returns:
+            List[dict]: A list of dictionaries containing the alignment results.
+        """
+
         pairs = list(combinations(sequences.keys(), 2))
 
-        progress_bar = Progress(console=Console())
-
-        alignments = []
-        with progress_bar as progress:
+        with Progress() as progress:
             alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
                 delayed(self.align_pairwise)(
                     {pair[0]: sequences[pair[0]]}, {pair[1]: sequences[pair[1]]}
                 )
-                for pair in progress.track(pairs, description="⛓️ Aligning sequences...")
+                for pair in progress.track(
+                    pairs, description=f"⛓️ Aligning {len(pairs)} sequence pairs..."
+                )
             )
 
         return alignments
@@ -98,9 +108,13 @@ class PairwiseAligner:
 
     def _map_alignment_results(
         self, alignment: Alignment, seq1: Dict[str, str], seq2: Dict[str, str]
-    ) -> PairwiseAlignmentResult:
-        # this maps the alignment results to a dictionary
-        # this dictionary is used to create the network graph
+    ) -> dict:
+        """Maps the alignment results to a dictionary.
+        The dictionaly has the same signature as a `PairwiseAlignmentResult` object.
+
+        Returns:
+            dict: A dictionary containing the alignment results.
+        """
 
         shorter_seq = min(alignment[0], alignment[1], key=lambda x: len(x))
 
@@ -128,40 +142,9 @@ class PairwiseAligner:
             "aligned_sequences": aligned_sequences,
         }
 
-        # alignment_dic = {
-        #     "seq1": alignment[0],
-        #     "seq2": alignment[1],
-        #     "seq1_id": seq1_id,
-        #     "seq2_id": seq2_id,
-        #     "score": alignment.score,
-        #     "mismatches": 1 / (alignment.counts().mismatches + 1),
-        #     "gaps": 1 / (alignment.counts().gaps + 1),
-        #     "identity": identity,
-        #     "start": alignment.aligned[0],
-        #     "end": alignment.aligned[1],
-        # }
-
         return result_dict
 
     def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
         from Bio.Align import substitution_matrices
 
         return substitution_matrices.load(self.substitution_matrix)
-
-
-if __name__ == "__main__":
-    aligner = PairwiseAligner(mode="global")
-    seq1 = dict(s1="ATCG")
-    seq2 = dict(s2="ATCC")
-    seq3 = dict(s3="GGCC")
-    seq4 = dict(s4="GGGC")
-
-    all_seq = {**seq1, **seq2, **seq3, **seq4}
-
-    print(aligner.align_pairwise(seq1=seq1, seq2=seq2))
-
-    alignment_result = aligner.align_multipairwise(sequences=all_seq)
-
-    print(alignment_result)
-
-    print(alignment_result)
