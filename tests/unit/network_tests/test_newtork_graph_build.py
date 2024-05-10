@@ -5,7 +5,6 @@ import pytest
 from pyeed.core import ProteinRecord
 from pyeed.network import SequenceNetwork
 
-
 class TestNetworkGraphBuild:
 
     def test_general_build_networkx(self):
@@ -74,4 +73,3 @@ class TestNetworkGraphBuild:
         network.create_cytoscape_graph(collection="tests", title="test_cytoscape", threshold=threshhold)
         network.set_nodes_size(column_name="degree_with_threshold_{}".format(threshhold), min_size=20, max_size=100)
         network.color_nodes(column_name='species')
-
