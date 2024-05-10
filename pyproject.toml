@@ -29,7 +29,7 @@ joblib = "^1.4.0"
 python-igraph = "^0.11.5"
 requests = "^2.31.0"
 pandas = "^2.2.2"
-py4cytoscape = "^1.9.0"
+py4cytoscape = {git = "https://github.com/cytoscape/py4cytoscape.git" , branch = "1.10.0"}
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", rev = "63-terms-and-external-model-handling"}
 joblib-progress = "^1.0.5"
 
