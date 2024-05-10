@@ -32,7 +32,7 @@ class ClustalOmegaData(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="04c5124431d7b4fd0f10e1fc1b4e08fdcd3d8079"
+        default="426e964c64742a057dc3015c44795c4086348f29"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
