@@ -11,7 +11,7 @@ from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
 
 from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
-from pyeed.align.pairwise_aligner import PairwiseAligner
+from pyeed.align.pairwise import PairwiseAligner
 
 
 class SequenceNetwork(BaseModel):
@@ -127,18 +127,13 @@ class SequenceNetwork(BaseModel):
         if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
             node_data = []
 
-            print(time.time(), '----- Processing in for loop')
-
             for sequence in self.sequences:
                 id_seq, seq, data = self._process_sequence(sequence)
                 node_data.append((id_seq, data))
                 alignment_data[id_seq] = seq
 
-            print(time.time(), "----- Adding in networx")
-
             self.network.add_nodes_from(node_data)
 
-            print(time.time(), "----- nodes added ")
 
         else:
             for sequence in self.sequences:
@@ -164,26 +159,15 @@ class SequenceNetwork(BaseModel):
 
         # create the alignments
         alignments_results = self._aligner.align_multipairwise(alignment_data)
-        # now pydantic cant seem to handle the serialization of the alignment results in the field start and end
-        # so we need to convert them to lists
-        for alignment_result in alignments_results:
-            alignment_result['start'] = alignment_result['start'].tolist()
-            alignment_result['end'] = alignment_result['end'].tolist()
         # create a list for the egdes
         edge_data = []
-
-        print(time.time(), "Processing Pairs in for loop")
         
         for alignment_result in alignments_results:
-            edge = (alignment_result['seq1_id'], alignment_result['seq2_id'], {key: value for key, value in alignment_result.items() if key not in ['seq1_id', 'seq2_id']})
+            edge = (alignment_result['sequences'][0]['id'], alignment_result['sequences'][1]['id'], {key: value for key, value in alignment_result.items()})
             if edge:
                 edge_data.append(edge)
     
-        print(time.time(), "Adding edeges from list in networx")
-
         self.network.add_edges_from(edge_data)
-
-        print(time.time(), "edges added in network")
 
         # Calculate node positions based on dimensions
         if self.dimensions == 2:
