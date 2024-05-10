@@ -213,7 +213,6 @@ class SequenceNetwork(BaseModel):
             layout_name=layout_name, properties_dict=properties_dict, base_url=self._base_url
         )
 
-        p4c.scale_layout(axis="Both Axis", scale_factor=1.0, base_url=self._base_url)
         p4c.layout_network(layout_name, base_url=self._base_url)
 
     def hide_under_threshold(self, threshold):
@@ -222,7 +221,7 @@ class SequenceNetwork(BaseModel):
         hide_list = []
 
         for u,v,d in self.network.edges(data=True):
-            if d['identity'] > threshold:
+            if d['identity'] < threshold:
                 hide_list.append('{} (interacts with) {}'.format(u, v))
 
         p4c.hide_edges(hide_list, base_url=self._base_url)
@@ -256,7 +255,6 @@ class SequenceNetwork(BaseModel):
                 else:
                     degree[v] += 1
 
-        print(nx.degree(self.network))
         nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
 
     def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
