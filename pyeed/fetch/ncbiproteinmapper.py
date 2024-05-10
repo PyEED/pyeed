@@ -3,15 +3,15 @@ from __future__ import annotations
 import io
 import logging
 import re
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from Bio import SeqFeature, SeqIO
 from Bio.SeqRecord import SeqRecord
 
+from pyeed.core.annotation import Annotation
+from pyeed.core.dnarecord import DNARecord
 from pyeed.core.organism import Organism
 from pyeed.core.region import Region
-from pyeed.core.dnarecord import DNARecord
-from pyeed.core.annotation import Annotation
 
 if TYPE_CHECKING:
     from pyeed.core.proteinrecord import ProteinRecord
@@ -20,7 +20,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class NCBIProteinMapper:
-
     def __init__(self):
         pass
 
@@ -45,7 +44,7 @@ class NCBIProteinMapper:
 
         protein_infos = []
         for record in seq_records:
-            protein_info = ProteinRecord(source_id=record.id, sequence=str(record.seq))
+            protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
 
             protein_info.organism = Organism(**self.map_organism(record))
 

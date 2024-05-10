@@ -49,7 +49,6 @@ class SubstitutionMatrix(BaseEnum):
 
 
 class Blast(BaseModel):
-
     query: str = Field(
         description="The query sequence",
         default=None,
@@ -78,7 +77,6 @@ class Blast(BaseModel):
     )
 
     def run(self, program: str, ncbi_db: str) -> io.StringIO:
-
         assert (
             program in BlastProgram
         ), f"Invalid program: {program}, valid programs: {BlastProgram}"
@@ -101,7 +99,6 @@ class Blast(BaseModel):
         program: str = BlastProgram.BLASTP.value,
         foreign_executor: ThreadPoolExecutor = None,
     ) -> io.StringIO:
-
         assert program in BlastProgram
         assert ncbi_db in NCBIDataBase
 
@@ -124,7 +121,6 @@ class Blast(BaseModel):
         return NCBIXML.read(result)
 
     def extract_accession(self, record: io.StringIO) -> List[str]:
-
         record = NCBIXML.read(record)
 
         hits = []
