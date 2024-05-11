@@ -9,7 +9,6 @@ from .cluster import Cluster
 from .dnarecord import DNARecord
 from .ontology import Ontology
 from .organism import Organism
-from .pairwisealignment import PairwiseAlignment
 from .pairwisealignmentresult import PairwiseAlignmentResult
 from .proteinrecord import ProteinRecord
 from .region import Region
