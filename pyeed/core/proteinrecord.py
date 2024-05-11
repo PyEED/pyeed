@@ -1,5 +1,4 @@
 import asyncio
-import os
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
@@ -15,7 +14,6 @@ from rich.status import Console, Status
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
-from pyeed.container.abstract_container import Blastp
 from pyeed.fetch.blast import Blast, BlastProgram, NCBIDataBase
 from pyeed.fetch.proteinfetcher import ProteinFetcher
 
@@ -103,7 +101,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="f89ef126fe1aa442892f836b83534fb5ff5e7f5f"
+        default="e41320f57a661a2d2e1de780dce4f112cf79be9b"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -385,42 +383,42 @@ class ProteinRecord(
 
         return asyncio.run(ProteinFetcher(ids=accessions).fetch(force_terminal=False))
 
-    def blastp(
-        self,
-        db_path: str,
-        identity: float = 0,
-        evalue: float = 10,
-        n_hits: int = 500,
-        subst_matrix: str = "BLOSUM62",
-        word_size: int = 3,
-        gapopen: int = 11,
-        gapextend: int = 1,
-        threshold: int = 11,
-        n_cores: int = os.cpu_count(),
-        ncbi_key: str = None,
-        email: str = None,
-    ):
-        blaster = Blastp(
-            _db_path=db_path,
-            identity=identity,
-            evalue=evalue,
-            n_hits=n_hits,
-            subst_matrix=subst_matrix,
-            word_size=word_size,
-            gapopen=gapopen,
-            gapextend=gapextend,
-            threshold=threshold,
-            n_cores=n_cores,
-            ncbi_key=ncbi_key,
-        )
+    # def blastp(
+    #     self,
+    #     db_path: str,
+    #     identity: float = 0,
+    #     evalue: float = 10,
+    #     n_hits: int = 500,
+    #     subst_matrix: str = "BLOSUM62",
+    #     word_size: int = 3,
+    #     gapopen: int = 11,
+    #     gapextend: int = 1,
+    #     threshold: int = 11,
+    #     n_cores: int = os.cpu_count(),
+    #     ncbi_key: str = None,
+    #     email: str = None,
+    # ):
+    #     blaster = Blastp(
+    #         _db_path=db_path,
+    #         identity=identity,
+    #         evalue=evalue,
+    #         n_hits=n_hits,
+    #         subst_matrix=subst_matrix,
+    #         word_size=word_size,
+    #         gapopen=gapopen,
+    #         gapextend=gapextend,
+    #         threshold=threshold,
+    #         n_cores=n_cores,
+    #         ncbi_key=ncbi_key,
+    #     )
 
-        command = blaster.setup_command()
-        accession_ids = blaster.run_container(
-            command=command, data=self._fasta_string()
-        )
-        protein_infos = ProteinRecord.get_ids(accession_ids, email, ncbi_key)
-        protein_infos.insert(0, self)
-        return protein_infos
+    #     command = blaster.setup_command()
+    #     accession_ids = blaster.run_container(
+    #         command=command, data=self._fasta_string()
+    #     )
+    #     protein_infos = ProteinRecord.get_ids(accession_ids, email, ncbi_key)
+    #     protein_infos.insert(0, self)
+    #     return protein_infos
 
     def get_dna(self):
         if not self.coding_sequence_ref:
@@ -431,6 +429,15 @@ class ProteinRecord(
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinRecord"]:
         # blast_record = NCBIXML.read(result_handle)
         raise NotImplementedError("This method is not implemented yet.")
+
+    def fasta_string(self) -> str:
+        return f">{self.id}\n{self.sequence}"
+
+    def to_fasta(self, path: str):
+        with open(path, "w") as f:
+            f.write(self.fasta_string())
+
+        print(f"💾 Sequence saved to {path}")
 
     @staticmethod
     def _get_accessions(blast_record: NCBIXML) -> List[str]:

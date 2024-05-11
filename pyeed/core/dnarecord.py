@@ -62,7 +62,7 @@ class DNARecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="f89ef126fe1aa442892f836b83534fb5ff5e7f5f"
+        default="e41320f57a661a2d2e1de780dce4f112cf79be9b"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
