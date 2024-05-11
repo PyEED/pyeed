@@ -1,17 +1,16 @@
-import time
 from typing import List, Optional
 
-import networkx as nx
-import py4cytoscape as p4c
-import plotly.express as px
 import matplotlib.pyplot as plt
+import networkx as nx
+import plotly.express as px
 import plotly.graph_objects as go
-from pydantic import BaseModel, Field, PrivateAttr
+import py4cytoscape as p4c
 from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
+from pydantic import BaseModel, Field, PrivateAttr
 
+from pyeed.align.pairwise import PairwiseAligner
 from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
-from pyeed.align.pairwise import PairwiseAligner
 
 
 class SequenceNetwork(BaseModel):
@@ -79,7 +78,7 @@ class SequenceNetwork(BaseModel):
         sequences: List[SequenceRecord],
         weight: str = "identity",
         dimensions: int = 3,
-        mode = "global",
+        mode="global",
         base_url: str = "http://127.0.0.1:1234/v1",
     ):
         super().__init__()
@@ -92,7 +91,6 @@ class SequenceNetwork(BaseModel):
         self._base_url = base_url
 
         self._create_graph()
-
 
     def add_target(self, target: SequenceRecord):
         # TODO find out what to do with targets
@@ -134,10 +132,8 @@ class SequenceNetwork(BaseModel):
 
             self.network.add_nodes_from(node_data)
 
-
         else:
             for sequence in self.sequences:
-
                 id_seq = sequence.id
                 seq = sequence.sequence
                 alignment_data[id_seq] = seq
@@ -161,12 +157,16 @@ class SequenceNetwork(BaseModel):
         alignments_results = self._aligner.align_multipairwise(alignment_data)
         # create a list for the egdes
         edge_data = []
-        
+
         for alignment_result in alignments_results:
-            edge = (alignment_result['sequences'][0]['id'], alignment_result['sequences'][1]['id'], {key: value for key, value in alignment_result.items()})
+            edge = (
+                alignment_result["sequences"][0]["id"],
+                alignment_result["sequences"][1]["id"],
+                {key: value for key, value in alignment_result.items()},
+            )
             if edge:
                 edge_data.append(edge)
-    
+
         self.network.add_edges_from(edge_data)
 
         # Calculate node positions based on dimensions
@@ -179,42 +179,48 @@ class SequenceNetwork(BaseModel):
                 raise ValueError(
                     f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
                 )
-            
+
     def create_cytoscape_graph(
         self, collection: str, title: str, threshold: float = 0.8
     ):
         # assert that the cytoscape API is running and cytoscape is running in the background
-        assert p4c.cytoscape_ping(base_url=self._base_url), "Cytoscape is not running in the background"
-        assert p4c.cytoscape_version_info(base_url=self._base_url), "Cytoscape API is not running"
+        assert p4c.cytoscape_ping(
+            base_url=self._base_url
+        ), "Cytoscape is not running in the background"
+        assert p4c.cytoscape_version_info(
+            base_url=self._base_url
+        ), "Cytoscape API is not running"
         # create a degree column for the nodes based on the current choosen threshold
         self.calculate_degree(threshold=threshold)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
-            self.network, collection=collection, title=title + "_" + str(threshold), base_url=self._base_url
+            self.network,
+            collection=collection,
+            title=title + "_" + str(threshold),
+            base_url=self._base_url,
         )
 
         self.hide_under_threshold(threshold)
         # and yes the layout ignores hidden edges, i did a visual test
-        p4c.layout_network('grid', base_url=self._base_url)
+        p4c.layout_network("grid", base_url=self._base_url)
 
-    def set_layout(
-        self,
-        layout_name: str = "force-directed"):
+    def set_layout(self, layout_name: str = "force-directed"):
         p4c.layout_network(layout_name, base_url=self._base_url)
 
     def hide_under_threshold(self, threshold):
         p4c.unhide_all(base_url=self._base_url)
-        
+
         hide_list = []
 
-        for u,v,d in self.network.edges(data=True):
-            if d['identity'] < threshold:
-                hide_list.append('{} (interacts with) {}'.format(u, v))
+        for u, v, d in self.network.edges(data=True):
+            if d["identity"] < threshold:
+                hide_list.append("{} (interacts with) {}".format(u, v))
 
         p4c.hide_edges(hide_list, base_url=self._base_url)
 
-
-    def filter_cytoscape_edges_by_parameter(self, name: str, parameter: str, min_val: float, max_val: float):
+    def filter_cytoscape_edges_by_parameter(
+        self, name: str, parameter: str, min_val: float, max_val: float
+    ):
         # this is a filter for the network in cytoscape
         # here the nodes and edges not relevant are filtered out
         p4c.create_column_filter(
@@ -231,8 +237,8 @@ class SequenceNetwork(BaseModel):
     def calculate_degree(self, threshold: float = 0.8):
         # Calculate degree of nodes with filtering
         degree = {}
-        for u,v,d in self.network.edges(data=True):
-            if d['identity'] > threshold:
+        for u, v, d in self.network.edges(data=True):
+            if d["identity"] > threshold:
                 if u not in degree:
                     degree[u] = 1
                 else:
@@ -242,29 +248,67 @@ class SequenceNetwork(BaseModel):
                 else:
                     degree[v] += 1
 
-        nx.set_node_attributes(self.network, degree, "degree_with_threshold_{}".format(threshold))
+        nx.set_node_attributes(
+            self.network, degree, "degree_with_threshold_{}".format(threshold)
+        )
 
-    def set_nodes_size(self, column_name: str, min_size: int = 10, max_size: int = 100, style_name: str = "default"):
-        p4c.set_node_shape_default('ELLIPSE', style_name, base_url=self._base_url)
-        p4c.set_node_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(min_size, max_size), mapping_type='c', style_name=style_name, base_url=self._base_url))
-        p4c.set_node_label_mapping('name', style_name=style_name, base_url=self._base_url)
-        p4c.set_node_font_size_mapping(**gen_node_size_map(column_name, scheme_c_number_continuous(int(min_size/10), int(max_size/10)), style_name=style_name, base_url=self._base_url))  
+    def set_nodes_size(
+        self,
+        column_name: str,
+        min_size: int = 10,
+        max_size: int = 100,
+        style_name: str = "default",
+    ):
+        p4c.set_node_shape_default("ELLIPSE", style_name, base_url=self._base_url)
+        p4c.set_node_size_mapping(
+            **gen_node_size_map(
+                column_name,
+                scheme_c_number_continuous(min_size, max_size),
+                mapping_type="c",
+                style_name=style_name,
+                base_url=self._base_url,
+            )
+        )
+        p4c.set_node_label_mapping(
+            "name", style_name=style_name, base_url=self._base_url
+        )
+        p4c.set_node_font_size_mapping(
+            **gen_node_size_map(
+                column_name,
+                scheme_c_number_continuous(int(min_size / 10), int(max_size / 10)),
+                style_name=style_name,
+                base_url=self._base_url,
+            )
+        )
 
     def color_nodes(self, column_name: str, style_name: str = "default"):
-        df_nodes = p4c.get_table_columns(table='node', base_url=self._base_url)
+        df_nodes = p4c.get_table_columns(table="node", base_url=self._base_url)
 
         data_color_names = list(set(df_nodes[column_name]))
 
         colors = plt.cm.tab20(range(len(data_color_names)))
-        hex_colors = ['#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255)) for r, g, b, _ in colors]
+        hex_colors = [
+            "#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255))
+            for r, g, b, _ in colors
+        ]
         # Convert RGB to hex colors for py4cytoscape
-        hex_colors = ['#' + ''.join([f'{int(c*255):02x}' for c in color[:3]]) for color in colors]
+        hex_colors = [
+            "#" + "".join([f"{int(c*255):02x}" for c in color[:3]]) for color in colors
+        ]
 
         if style_name not in p4c.get_visual_style_names(base_url=self._base_url):
             p4c.create_visual_style(style_name, base_url=self._base_url)
 
-        p4c.set_node_color_default('#FFFFFF', style_name, base_url=self._base_url)
-        p4c.set_node_color_mapping(column_name, mapping_type='discrete', default_color='#654321', style_name=style_name, table_column_values=data_color_names, colors=hex_colors, base_url=self._base_url)
+        p4c.set_node_color_default("#FFFFFF", style_name, base_url=self._base_url)
+        p4c.set_node_color_mapping(
+            column_name,
+            mapping_type="discrete",
+            default_color="#654321",
+            style_name=style_name,
+            table_column_values=data_color_names,
+            colors=hex_colors,
+            base_url=self._base_url,
+        )
 
     def visualize(self):
         """
@@ -404,7 +448,22 @@ class SequenceNetwork(BaseModel):
                         symbol=symbol,
                     ),
                     text=node["name"],
-                    hovertemplate="<b>%{customdata[0]}</b><br>Family Name: %{customdata[1]}<br>Domain: %{customdata[2]}<br>Kingdom: %{customdata[3]}</b><br>Phylum: %{customdata[4]}<br>Class: %{customdata[5]}<br>Order: %{customdata[6]}<br>Family: %{customdata[7]}<br>Genus: %{customdata[8]}<br>Species: %{customdata[9]}<br>EC Number: %{customdata[10]}<br>Mol Weight: %{customdata[11]}<br>Taxonomy ID: %{customdata[12]}<extra></extra>",
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>"
+                        "Family Name: %{customdata[1]}<br>"
+                        "Domain: %{customdata[2]}<br>"
+                        "Kingdom: %{customdata[3]}</b><br>"
+                        "Phylum: %{customdata[4]}<br>"
+                        "Class: %{customdata[5]}<br>"
+                        "Order: %{customdata[6]}<br>"
+                        "Family: %{customdata[7]}<br>"
+                        "Genus: %{customdata[8]}<br>"
+                        "Species: %{customdata[9]}<br>"
+                        "EC Number: %{customdata[10]}<br>"
+                        "Mol Weight: %{customdata[11]}<br>"
+                        "Taxonomy ID: %{customdata[12]}"
+                        "<extra></extra>"
+                    ),
                     customdata=list((info)),
                 )
             )
@@ -475,7 +534,22 @@ class SequenceNetwork(BaseModel):
                         symbol=symbol,
                     ),
                     text=node["name"],
-                    hovertemplate="<b>%{customdata[0]}</b><br>Family Name: %{customdata[1]}<br>Domain: %{customdata[2]}<br>Kingdom: %{customdata[3]}</b><br>Phylum: %{customdata[4]}<br>Class: %{customdata[5]}<br>Order: %{customdata[6]}<br>Family: %{customdata[7]}<br>Genus: %{customdata[8]}<br>Species: %{customdata[9]}<br>EC Number: %{customdata[10]}<br>Mol Weight: %{customdata[11]}<br>Taxonomy ID: %{customdata[12]}<extra></extra>",
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>"
+                        "Family Name: %{customdata[1]}<br>"
+                        "Domain: %{customdata[2]}<br>"
+                        "Kingdom: %{customdata[3]}</b><br>"
+                        "Phylum: %{customdata[4]}<br>"
+                        "Class: %{customdata[5]}<br>"
+                        "Order: %{customdata[6]}<br>"
+                        "Family: %{customdata[7]}<br>"
+                        "Genus: %{customdata[8]}<br>"
+                        "Species: %{customdata[9]}<br>"
+                        "EC Number: %{customdata[10]}<br>"
+                        "Mol Weight: %{customdata[11]}<br>"
+                        "Taxonomy ID: %{customdata[12]}"
+                        "<extra></extra>"
+                    ),
                     customdata=list((info)),
                 )
             )
@@ -499,8 +573,8 @@ class SequenceNetwork(BaseModel):
     def _sample_colorscale(size: int) -> List[str]:
         return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
 
-    def _get_edges_cytoscape_graph(self, hidden_included = False):
+    def _get_edges_cytoscape_graph(self, hidden_included=False):
         return p4c.get_all_edges()
-    
+
     def _get_edges_visibilities(self):
-        return p4c.get_edge_property(visual_property='EDGE_VISIBLE')
+        return p4c.get_edge_property(visual_property="EDGE_VISIBLE")
