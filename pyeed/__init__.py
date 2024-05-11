@@ -11,7 +11,6 @@ from .core.cluster import Cluster
 from .core.dnarecord import DNARecord
 from .core.ontology import Ontology
 from .core.organism import Organism
-from .core.pairwisealignment import PairwiseAlignment
 from .core.pairwisealignmentresult import PairwiseAlignmentResult
 from .core.proteinrecord import ProteinRecord
 from .core.region import Region
