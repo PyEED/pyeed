@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import os
-from typing import List, Union, TYPE_CHECKING
+from typing import List, Union
 
 import pyhmmer
 from pydantic import BaseModel, Field
 
-from pyeed.core.abstractannotation import AbstractAnnotation
+from pyeed.core.alignmentresult import AlignmentResult
+from pyeed.core.sequencerecord import SequenceRecord
 
-if TYPE_CHECKING:
-    from pyeed.core.alignment import Alignment
-    from pyeed.core.sequence import Sequence
-
-# TODO FIX ENTIRE THING
 
 class HMM(BaseModel):
     class Config:
@@ -23,7 +19,7 @@ class HMM(BaseModel):
         default="msa",
     )
 
-    alignment: Alignment = Field(
+    alignment: AlignmentResult = Field(
         description="The alignment object to be used for HMM generation",
         default=None,
     )
@@ -57,10 +53,9 @@ class HMM(BaseModel):
 
     def search(
         self,
-        sequence: Union["AbstractSequence", List["AbstractSequence"]],
+        sequence: Union[List[str], List[SequenceRecord]],
         **pipeline_kwargs,
-    ):
-
+    ) -> pyhmmer.plan7.TopHits:
         query_seqs = self._prepare_sequences(sequence)
         seq_block = pyhmmer.easel.DigitalSequenceBlock(self.alphabet, query_seqs)
 
@@ -105,35 +100,27 @@ class HMM(BaseModel):
 
         return cls(model=model, name=model.name)
 
-    def _prepare_sequences(
-        self, sequences: Union["AbstractSequence", List["AbstractSequence"]]
-    ):
+    def _prepare_sequences(self, sequences: Union[List[SequenceRecord]]):
         if not isinstance(sequences, list):
             sequences = [sequences]
 
-        if not all(isinstance(seq, AbstractSequence) for seq in sequences) and not all(
-            isinstance(seq, Sequence) for seq in sequences
-        ):
+        if not all(isinstance(seq, SequenceRecord) for seq in sequences):
             raise ValueError("All sequences must be of type AbstractSequence")
 
         return [seq.digitize(self.alphabet) for seq in self._text_sequences(sequences)]
 
     def _text_sequences(
         self,
-        sequences: Union[
-            Sequence, List[Sequence], AbstractSequence, List[AbstractSequence]
-        ],
+        sequences: Union[List[SequenceRecord]],
     ) -> list[pyhmmer.easel.TextSequence]:
         return [
-            pyhmmer.easel.TextSequence(
-                name=f"{seq.source_id}".encode(), sequence=seq.sequence
-            )
+            pyhmmer.easel.TextSequence(name=f"{seq.id}".encode(), sequence=seq.sequence)
             for seq in sequences
         ]
 
     @property
     def alphabet(self):
-        if any("M" in seq.sequence.upper() for seq in self.alignment.input_sequences):
+        if any("M" in seq.sequence.upper() for seq in self.alignment.sequences):
             return pyhmmer.easel.Alphabet.amino()
         else:
             return pyhmmer.easel.Alphabet.dna()

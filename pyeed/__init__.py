@@ -1,11 +1,9 @@
 import os
 
 from .core.abstractannotation import AbstractAnnotation
-from .core.alignmentdata import AlignmentData
 from .core.alignmentresult import AlignmentResult
 from .core.annotation import Annotation
 from .core.blastdata import BlastData
-from .core.clustalomegadata import ClustalOmegaData
 from .core.clustalomegaresult import ClustalOmegaResult
 from .core.cluster import Cluster
 from .core.dnarecord import DNARecord
