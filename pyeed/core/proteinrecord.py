@@ -101,7 +101,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="7fc48104cc47e0f9181354c2a50eaca56f0fb2cc"
+        default="a4df8898397203195976414a49067579793d8ab0"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
