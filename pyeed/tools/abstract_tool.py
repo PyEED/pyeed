@@ -20,13 +20,14 @@ class ServiceURL(Enum):
 
 class AbstractTool(BaseModel, ABC):
     """
-    Abstract base class for containers.
+    Abstract base class for tools.
     """
 
     _service_url: str = PrivateAttr()
     _tempdir_path: str = PrivateAttr()
 
     def model_post_init(self, __context) -> None:
+        """Create temporary directory."""
         self._tempdir_path = tempfile.mkdtemp()
 
     def _delete_temp_dir(self):
@@ -35,6 +36,7 @@ class AbstractTool(BaseModel, ABC):
 
     @abstractmethod
     def run_service(self):
+        """Executes the service."""
         pass
 
 

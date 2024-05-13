@@ -17,11 +17,9 @@ nav:
   - 🔎 Examples:
     - Create a sequence network: usecases/usecase1.md
   - ⬇️ Installation:
+    - PyEED Docker Service: installation/docker.md
     - via PIP: installation/via_pip.md
-    - Docker: installation/docker.md
-    - JupyterLab with PyEED: installation/jupyterlab.md
-    # - Local BLAST: installation/setup_local_blast.md
-
+    #- deprecated: installation/jupyterlab.md
 
 theme:
   name: material
