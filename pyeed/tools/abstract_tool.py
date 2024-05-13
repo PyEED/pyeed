@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ServiceURL(Enum):
-    CLUSTALO = "http://localhost:5001/clustalo/align"
+    CLUSTALO = "http://clustalo:5001/align"
 
 
 class AbstractTool(BaseModel, ABC):
