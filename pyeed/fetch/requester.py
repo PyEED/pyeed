@@ -1,10 +1,10 @@
 import asyncio
 import logging
-import aiometer
 from typing import List, NamedTuple
-from rich.progress import Progress, TaskID
-from httpx import AsyncClient, Limits, Response
 
+import aiometer
+from httpx import AsyncClient, Limits, Response
+from rich.progress import Progress, TaskID
 
 LOGGER = logging.getLogger(__name__)
 
@@ -17,7 +17,6 @@ class RequestArgs(NamedTuple):
 
 
 class AsyncRequester:
-
     def __init__(
         self,
         ids: List[str],
@@ -137,8 +136,10 @@ class AsyncRequester:
         batches = []
         for i in range(0, len(self.ids), self.batch_size):
             batch = self.ids[i : i + self.batch_size]
-            batch_string = ",".join(batch)
+            if len(batch) > 1:
+                batch_string = ",".join(batch)
+            else:
+                batch_string = str(batch[0])
             batches.append(batch_string)
-
         self.ids = batches
         return batches

@@ -4,7 +4,6 @@ repo_name: PyEED/pyeed
 site_url: https://pyeed.github.io/pyeed/
 site_author: Max Häußler
 
-
 nav:
   - 🏠 Home: index.md
   - ⚡️ Quick Start:
@@ -15,13 +14,11 @@ nav:
     - Clustering Sequences: quick_start/clustering.md
     - Creating Sequence Networks: quick_start/networks.md
   - 🔎 Examples:
-    - Create a sequence network: usecases/usecase1.md
+    - Basics: usecases/usecase1.md
   - ⬇️ Installation:
+    - PyEED Docker Service: installation/docker.md
     - via PIP: installation/via_pip.md
-    - Docker: installation/docker.md
-    - JupyterLab with PyEED: installation/jupyterlab.md
-    # - Local BLAST: installation/setup_local_blast.md
-
+    #- deprecated: installation/jupyterlab.md
 
 theme:
   name: material

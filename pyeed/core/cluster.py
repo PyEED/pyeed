@@ -8,8 +8,10 @@ from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
+from .sequence import Sequence
 
-class StandardNumbering(
+
+class Cluster(
     sdRDM.DataModel,
     search_mode="unordered",
 ):
@@ -22,24 +24,24 @@ class StandardNumbering(
         default_factory=lambda: str(uuid4()),
     )
 
-    reference_accession_id: Optional[str] = element(
-        description="Standard numbering of the reference sequence",
+    name: Optional[str] = element(
+        description="Name of the cluster.",
         default=None,
-        tag="reference_accession_id",
+        tag="name",
         json_schema_extra=dict(),
     )
 
-    numbered_accession_id: Optional[str] = element(
-        description="Standard numbering of the query sequence",
-        default=None,
-        tag="numbered_accession_id",
+    representative: Optional[Sequence] = element(
+        description="Identifier of the representative sequence of the cluster.",
+        default_factory=Sequence,
+        tag="representative",
         json_schema_extra=dict(),
     )
 
-    numbering: List[str] = element(
-        description="Standard numbering of the aligned sequence",
+    members: List[Sequence] = element(
+        description="Sequences of the cluster.",
         default_factory=ListPlus,
-        tag="numbering",
+        tag="members",
         json_schema_extra=dict(
             multiple=True,
         ),
@@ -63,3 +65,33 @@ class StandardNumbering(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
+
+    def add_to_members(
+        self,
+        sequence_id: Optional[str] = None,
+        sequence: Optional[str] = None,
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> Sequence:
+        """
+        This method adds an object of type 'Sequence' to attribute members
+
+        Args:
+            id (str): Unique identifier of the 'Sequence' object. Defaults to 'None'.
+            sequence_id (): Identifier of the sequence in the source database. Defaults to None
+            sequence (): Molecular sequence.. Defaults to None
+        """
+
+        params = {
+            "sequence_id": sequence_id,
+            "sequence": sequence,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = Sequence(**params)
+
+        self.members.append(obj)
+
+        return self.members[-1]

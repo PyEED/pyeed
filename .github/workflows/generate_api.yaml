@@ -10,3 +10,6 @@ jobs:
         uses: JR-1991/generate-sdrdm-api@main
         with:
           library_name: pyeed
+          schema_path: "./specifications/sequence_record.md"
+          out_dir: "./"
+          branch: "63-terms-and-external-model-handling"

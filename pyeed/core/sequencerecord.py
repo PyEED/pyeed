@@ -1,20 +1,21 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from uuid import uuid4
 
+import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
-from .abstractannotation import AbstractAnnotation
+from .organism import Organism
 
 
-class Site(
-    AbstractAnnotation,
+class SequenceRecord(
+    sdRDM.DataModel,
     search_mode="unordered",
 ):
-    """Position(s) constituting a site within a sequence."""
+    """A molecular sequence and associated annotation data."""
 
     id: Optional[str] = attr(
         name="id",
@@ -23,13 +24,39 @@ class Site(
         default_factory=lambda: str(uuid4()),
     )
 
-    positions: List[int] = element(
-        description="Position of the site(s) within the sequence.",
-        default_factory=ListPlus,
-        tag="positions",
+    uri: Optional[str] = element(
+        description="URI of the sequence.",
+        default=None,
+        tag="uri",
         json_schema_extra=dict(
-            multiple=True,
-            term="http://edamontology.org/data_1016",
+            term="http://edamontology.org/data_1047",
+        ),
+    )
+
+    accession_id: Optional[str] = element(
+        description="Accession ID of the sequence.",
+        default=None,
+        tag="accession_id",
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2091",
+        ),
+    )
+
+    name: Optional[str] = element(
+        description="Arbitrary name of the sequence.",
+        default=None,
+        tag="name",
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2099",
+        ),
+    )
+
+    organism: Optional[Organism] = element(
+        description="The organism from which the sequence was obtained.",
+        default=None,
+        tag="organism",
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2530",
         ),
     )
 

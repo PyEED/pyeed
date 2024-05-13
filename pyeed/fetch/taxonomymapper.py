@@ -3,12 +3,10 @@ import xml.etree.ElementTree as ET
 
 from pyeed.core.organism import Organism
 
-
 LOGGER = logging.getLogger(__name__)
 
 
 class TaxonomyMapper:
-
     def __init__(self):
         pass
 
@@ -24,22 +22,26 @@ class TaxonomyMapper:
         """
 
         root = ET.fromstring(xml_data)
+        status = root.find("status").text if root.find("status") is not None else None
         taxon_info = root.find("taxon")
+        if status == "error":
+            LOGGER.error(f"Error: {root.find('message').text}")
+            return None
+        else:
+            organism = Organism(
+                name=taxon_info.get("scientificName"),
+                taxonomy_id=taxon_info.get("taxId"),
+                domain=self.get_scientific_name_by_rank(root, "superkingdom"),
+                kingdom=self.get_scientific_name_by_rank(root, "kingdom"),
+                phylum=self.get_scientific_name_by_rank(root, "phylum"),
+                tax_class=self.get_scientific_name_by_rank(root, "class"),
+                order=self.get_scientific_name_by_rank(root, "order"),
+                family=self.get_scientific_name_by_rank(root, "family"),
+                genus=self.get_scientific_name_by_rank(root, "genus"),
+                species=taxon_info.get("species"),
+            )
 
-        organism = Organism(
-            name=taxon_info.get("scientificName"),
-            taxonomy_id=taxon_info.get("taxId"),
-            domain=self.get_scientific_name_by_rank(root, "superkingdom"),
-            kingdom=self.get_scientific_name_by_rank(root, "kingdom"),
-            phylum=self.get_scientific_name_by_rank(root, "phylum"),
-            tax_class=self.get_scientific_name_by_rank(root, "class"),
-            order=self.get_scientific_name_by_rank(root, "order"),
-            family=self.get_scientific_name_by_rank(root, "family"),
-            genus=self.get_scientific_name_by_rank(root, "genus"),
-            species=taxon_info.get("species"),
-        )
-
-        return organism
+            return organism
 
     def get_scientific_name_by_rank(self, root: ET, rank):
         """

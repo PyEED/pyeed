@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from uuid import uuid4
 
 from lxml.etree import _Element
@@ -7,14 +7,14 @@ from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
-from .abstractannotation import AbstractAnnotation
+from .alignmentresult import AlignmentResult
 
 
-class Site(
-    AbstractAnnotation,
+class PairwiseAlignmentResult(
+    AlignmentResult,
     search_mode="unordered",
 ):
-    """Position(s) constituting a site within a sequence."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -23,14 +23,39 @@ class Site(
         default_factory=lambda: str(uuid4()),
     )
 
-    positions: List[int] = element(
-        description="Position of the site(s) within the sequence.",
-        default_factory=ListPlus,
-        tag="positions",
-        json_schema_extra=dict(
-            multiple=True,
-            term="http://edamontology.org/data_1016",
-        ),
+    score: Optional[float] = element(
+        description="Alignment score",
+        default=None,
+        tag="score",
+        json_schema_extra=dict(),
+    )
+
+    identity: Optional[float] = element(
+        description="Ratio of identical residues in the alignment",
+        default=None,
+        tag="identity",
+        json_schema_extra=dict(),
+    )
+
+    similarity: Optional[float] = element(
+        description="Ratio of similar residues in the alignment",
+        default=None,
+        tag="similarity",
+        json_schema_extra=dict(),
+    )
+
+    gaps: Optional[int] = element(
+        description="Number of gaps in the alignment",
+        default=None,
+        tag="gaps",
+        json_schema_extra=dict(),
+    )
+
+    mismatches: Optional[int] = element(
+        description="Number of mismatches in the alignment",
+        default=None,
+        tag="mismatches",
+        json_schema_extra=dict(),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")

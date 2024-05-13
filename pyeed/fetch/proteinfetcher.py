@@ -1,23 +1,22 @@
-import json
 import asyncio
+import json
 import logging
-import nest_asyncio
 from typing import List
+
+import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
-from pyeed.fetch.dbsort import SortIDs, DBPattern
-from pyeed.fetch.uniprotmapper import UniprotMapper
+from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
-from pyeed.fetch.taxonomymapper import TaxonomyMapper
 from pyeed.fetch.requester import AsyncRequester
-
+from pyeed.fetch.taxonomymapper import TaxonomyMapper
+from pyeed.fetch.uniprotmapper import UniprotMapper
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ProteinFetcher:
-
     def __init__(self, ids: List[str]):
         self.ids = ids
         # self.ncbi_key = ncbi_key #TODO: Add NCBI key to NCBI requester
@@ -32,7 +31,7 @@ class ProteinFetcher:
             for progress tracking.
 
         Returns:
-            List[ProteinInfo]: A list of ProteinInfo objects containing the fetched protein data.
+            List[ProteinRecord]: A list of ProteinRecord objects containing the fetched protein data.
 
         Raises:
             Exception: If there is an error during the fetching process.
@@ -45,7 +44,6 @@ class ProteinFetcher:
         ) as progress:
             requesters: List[AsyncRequester] = []
             for db_name, db_ids in db_entries.items():
-
                 if db_name == DBPattern.UNIPROT.name:
                     task_id = progress.add_task(
                         f"Requesting sequences from {db_name}...", total=len(db_ids)
@@ -89,7 +87,7 @@ class ProteinFetcher:
                             progress=progress,
                             batch_size=10,
                             rate_limit=2,
-                            n_concurrent=20,
+                            n_concurrent=5,
                         )
                     )
 
@@ -144,6 +142,10 @@ class ProteinFetcher:
             )
 
             taxonomies = await tax_requester.make_request()
+
+            taxonomies = [
+                tax for tax in taxonomies if "status" not in tax and "404" not in tax
+            ]
 
             progress.update(task_id, completed=len(unique_tax_ids))
 
