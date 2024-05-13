@@ -4,6 +4,7 @@ from typing import Dict, List
 import httpx
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
+from pydantic import PrivateAttr
 
 from pyeed.tools.abstract_tool import AbstractTool, ServiceURL
 
@@ -13,7 +14,7 @@ class ClustalOmega(AbstractTool):
     Class for ClustalOmega aligner running as a REST service.
     """
 
-    _service_url = ServiceURL.CLUSTALO.value
+    _service_url = PrivateAttr(ServiceURL.CLUSTALO.value)
 
     def create_file(self, multifasta: List[str]) -> Dict[str, str]:
         """
@@ -41,8 +42,20 @@ class ClustalOmega(AbstractTool):
         return alignment
 
     def run_service(self, data) -> httpx.Response:
+        """Executes the ClustalOmega service."""
         file = self.create_file(data)
-        return httpx.post(self._service_url, files=file, timeout=600)
+        try:
+            return httpx.post(self._service_url, files=file, timeout=600)
+
+        except httpx.ConnectError as connect_error:
+            if connect_error.__context__.args[0].errno == 8:
+                self._service_url = self._service_url.replace("clustalo", "localhost")
+                try:
+                    return httpx.post(self._service_url, files=file, timeout=600)
+                except httpx.ConnectError as connect_error:
+                    raise httpx.ConnectError("PyEED Docker Service is not running.")
+
+            raise httpx.ConnectError("PyEED Docker Service is not running.")
 
     def align(self, sequences: List[str]):
         """
