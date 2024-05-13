@@ -1,47 +1,56 @@
+from typing import Dict, Optional
+from uuid import uuid4
+
 import sdRDM
+from lxml.etree import _Element
+from pydantic import PrivateAttr, model_validator
+from pydantic_xml import attr, element
+from sdRDM.base.listplus import ListPlus
+from sdRDM.tools.utils import elem2dict
 
-from typing import Optional
-from pydantic import Field
-from sdRDM.base.utils import forge_signature, IDGenerator
 
+class Region(
+    sdRDM.DataModel,
+    search_mode="unordered",
+):
+    """Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions."""
 
-@forge_signature
-class Region(sdRDM.DataModel):
-    """Annotation of a region within a sequence 🗺️."""
-
-    id: Optional[str] = Field(
+    id: Optional[str] = attr(
+        name="id",
+        alias="@id",
         description="Unique identifier of the given object.",
-        default_factory=IDGenerator("regionINDEX"),
-        xml="@id",
+        default_factory=lambda: str(uuid4()),
     )
 
-    start: int = Field(
-        ...,
-        description=(
-            "Start position of the annotation. A single start position without an end"
-            " corresponds to a single amino acid"
-        ),
-    )
-
-    end: int = Field(
-        ...,
-        description=(
-            "Optional end position if the annotation contains more than a single amino"
-            " acid"
-        ),
-    )
-
-    note: Optional[str] = Field(
+    start: Optional[int] = element(
+        description="Start position of the site.",
         default=None,
-        description="Information found in 'note' of an ncbi protein sequence entry",
+        tag="start",
+        json_schema_extra=dict(),
     )
 
-    name: Optional[str] = Field(
+    end: Optional[int] = element(
+        description="End position of the site.",
         default=None,
-        description="Name of the annotation",
+        tag="end",
+        json_schema_extra=dict(),
     )
 
-    cross_reference: Optional[str] = Field(
-        default=None,
-        description="Database cross reference",
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="09207e10bb1bfb6e6916b6ef62932c6b08209190"
     )
+
+    _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _parse_raw_xml_data(self):
+        for attr, value in self:
+            if isinstance(value, (ListPlus, list)) and all(
+                isinstance(i, _Element) for i in value
+            ):
+                self._raw_xml_data[attr] = [elem2dict(i) for i in value]
+            elif isinstance(value, _Element):
+                self._raw_xml_data[attr] = elem2dict(value)
+
+        return self

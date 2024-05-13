@@ -1,7 +1,7 @@
 import re
+from collections import defaultdict
 from enum import Enum
 from typing import Dict, List
-from collections import defaultdict
 
 PATTERN_ALL = r".*"
 PDB_PATTERN = r"\bpdb[a-zA-Z0-9]{8}\b|\b[a-zA-Z0-9]{4}\b"

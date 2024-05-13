@@ -1,6 +1,7 @@
 import toml
-from pyEED.core.proteininfo import ProteinInfo
 from sdrdm_database import DBConnector
+
+from pyEED.core.proteininfo import ProteinInfo
 
 # Get the protein sequence from NCBI
 aldolase = ProteinInfo.from_ncbi("NP_001287541.1")

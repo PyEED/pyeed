@@ -1,20 +1,19 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from uuid import uuid4
 
+import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
-from .abstractannotation import AbstractAnnotation
 
-
-class Site(
-    AbstractAnnotation,
+class AbstractAnnotation(
+    sdRDM.DataModel,
     search_mode="unordered",
 ):
-    """Position(s) constituting a site within a sequence."""
+    """"""
 
     id: Optional[str] = attr(
         name="id",
@@ -23,13 +22,30 @@ class Site(
         default_factory=lambda: str(uuid4()),
     )
 
-    positions: List[int] = element(
-        description="Position of the site(s) within the sequence.",
-        default_factory=ListPlus,
-        tag="positions",
+    uri: Optional[str] = element(
+        description="URI of the annotation.",
+        default=None,
+        tag="uri",
         json_schema_extra=dict(
-            multiple=True,
-            term="http://edamontology.org/data_1016",
+            term="http://edamontology.org/data_1047",
+        ),
+    )
+
+    accession_id: Optional[str] = element(
+        description="Accession ID of the annotation.",
+        default=None,
+        tag="accession_id",
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2091",
+        ),
+    )
+
+    name: Optional[str] = element(
+        description="A name of a sequence feature, e.g. the name of a feature",
+        default=None,
+        tag="name",
+        json_schema_extra=dict(
+            term="http://edamontology.org/data_2099",
         ),
     )
 

@@ -1,29 +1,19 @@
 [tool.poetry]
 name = "pyeed"
-version = "0.2.0"
+version = "0.3.0"
 description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [
-    { include = "pyeed/core" },
-    { include = "pyeed/fetch" },
-    { include = "pyeed/cluster" },
-    { include = "pyeed/network" },
-    { include = "pyeed/align" },
-    { include = "pyeed/container" },
-    { include = "pyeed/utility" },
-]
+packages = [{ include = "pyeed" }]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12"
+python = ">=3.10,<3.12"
 biopython = "^1.81"
-tqdm = "^4.66.1"
-sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", branch = "linking-refactor"}
-sqlalchemy = "^2.0.22"
-pymysql = "^1.1.0"
-sdrdm-database = {version = "^0.4.1", extras = ["postgres"]}
-psycopg2 = "^2.9.9"
+sdrdm-database = { extras = [
+    "postgres",
+], git = "https://github.com/JR-1991/sdrdm-database.git", branch = "iterative-linking-tables" }
+psycopg2-binary = "^2.9.9"
 networkx = "^3.2.1"
 plotly = "^5.18.0"
 nbformat = "^5.9.2"
@@ -34,12 +24,26 @@ httpx = "^0.27.0"
 nest-asyncio = "^1.6.0"
 rich = "^13.0.0"
 aiometer = "^0.5.0"
+black = "23.12.1"
+joblib = "^1.4.0"
+python-igraph = "^0.11.5"
+requests = "^2.31.0"
+pandas = "^2.2.2"
+py4cytoscape = {git = "https://github.com/cytoscape/py4cytoscape.git",  branch = "1.10.0"}
+sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", rev = "63-terms-and-external-model-handling"}
+joblib-progress = "^1.0.5"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
 pytest = "^8.0.1"
 python-dotenv = "^1.0.1"
 pytest-mock = "^3.12.0"
+ruff = "^0.4.1"
+mkdocs-jupyter = "^0.24.7"
+jupyter-contrib-nbextensions = "^0.7.0"
+notebook = "^7.1.3"
+ipython = "^8.24.0"
+nbconvert = "^7.16.4"
 
 [build-system]
 requires = ["poetry-core"]
