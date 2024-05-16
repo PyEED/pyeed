@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyeed"
-version = "0.3.0"
+version = "0.3.1"
 description = "Enzyme engineering toolkit"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{ include = "pyeed" }]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.10,<3.13"
 biopython = "^1.81"
 sdrdm-database = { extras = [
     "postgres",
