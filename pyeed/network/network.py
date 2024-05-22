@@ -1,16 +1,18 @@
+import copy
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import networkx as nx
-import plotly.express as px
-import plotly.graph_objects as go
 import py4cytoscape as p4c
 from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
 from pydantic import BaseModel, Field, PrivateAttr
+from requests import RequestException
 
 from pyeed.align.pairwise import PairwiseAligner
 from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
+
+plt.rcParams["figure.dpi"] = 300
 
 
 class SequenceNetwork(BaseModel):
@@ -40,19 +42,9 @@ class SequenceNetwork(BaseModel):
         description="List of sequences to be compared",
     )
 
-    mode: Optional[str] = Field(
-        default="global",
-        description="Alignment mode",
-    )
-
     weight: Optional[str] = Field(
         default="identity",
         description="Attribute of Alignment to weight the edges",
-    )
-
-    dimensions: Optional[int] = Field(
-        default=3,
-        description="Dimension of the network graph",
     )
 
     targets: Optional[List[str]] = Field(
@@ -61,39 +53,26 @@ class SequenceNetwork(BaseModel):
     )
 
     network: Optional[nx.Graph] = Field(
-        default=None,
+        default=nx.Graph(),
         description="Network graph with networkx",
     )
 
+    _full_network: Optional[nx.Graph] = PrivateAttr(
+        default=nx.Graph(),
+    )
+
     _aligner: Optional[PairwiseAligner] = PrivateAttr(
-        default=None,
+        default=PairwiseAligner(),
     )
 
-    _base_url: Optional[str] = PrivateAttr(
-        default="http://127.0.0.1:1234/v1",
+    _cytoscape_url: Optional[str] = PrivateAttr(
+        default="http://cytoscape-desktop:1234/v1",
     )
 
-    def __init__(
-        self,
-        sequences: List[SequenceRecord],
-        weight: str = "identity",
-        dimensions: int = 3,
-        mode="global",
-        base_url: str = "http://127.0.0.1:1234/v1",
-    ):
-        super().__init__()
-        self.weight = weight
-        self.dimensions = dimensions
-        self.mode = mode
-        self.sequences = sequences
-        self.network = nx.Graph()
-        self._aligner = PairwiseAligner(mode=self.mode)
-        self._base_url = base_url
-
+    def model_post_init(self, __context):
         self._create_graph()
 
-    def add_target(self, target: SequenceRecord):
-        # TODO find out what to do with targets
+    def add_to_targets(self, target: SequenceRecord):
         if target.source_id not in self.targets:
             self.targets.append(target.source_id)
 
@@ -106,7 +85,7 @@ class SequenceNetwork(BaseModel):
                 "domain": sequence.organism.domain,
                 "kingdom": sequence.organism.kingdom,
                 "phylum": sequence.organism.phylum,
-                "tax_class": sequence.organism.tax_class,
+                "class": sequence.organism.tax_class,
                 "order": sequence.organism.order,
                 "family": sequence.organism.family,
                 "genus": sequence.organism.genus,
@@ -118,40 +97,17 @@ class SequenceNetwork(BaseModel):
         )
 
     def _create_graph(self):
-        # first we add the nodes to the network
-        # in the same loop we read out the sequences and the key in order to be able to perform the alignment next
+        """Initializes the nx.Graph object and adds nodes and edges based on the sequences."""
+
         alignment_data = {}
+        node_data = []
 
-        if all([isinstance(sequence, ProteinRecord) for sequence in self.sequences]):
-            node_data = []
+        for sequence in self.sequences:
+            id_seq, seq, data = self._process_sequence(sequence)
+            node_data.append((id_seq, data))
+            alignment_data[id_seq] = seq
 
-            for sequence in self.sequences:
-                id_seq, seq, data = self._process_sequence(sequence)
-                node_data.append((id_seq, data))
-                alignment_data[id_seq] = seq
-
-            self.network.add_nodes_from(node_data)
-
-        else:
-            for sequence in self.sequences:
-                id_seq = sequence.id
-                seq = sequence.sequence
-                alignment_data[id_seq] = seq
-
-                self.network.add_node(
-                    id_seq,
-                    name=sequence.name,
-                    sequence=seq,
-                    domain=sequence.organism.domain,
-                    kingdome=sequence.organism.kingdom,
-                    phylum=sequence.organism.phylum,
-                    tax_class=sequence.organism.tax_class,
-                    order=sequence.organism.order,
-                    family=sequence.organism.family,
-                    genus=sequence.organism.genus,
-                    species=sequence.organism.species,
-                    taxonomy_id=sequence.organism.taxonomy_id,
-                )
+        self._full_network.add_nodes_from(node_data)
 
         # create the alignments
         alignments_results = self._aligner.align_multipairwise(alignment_data)
@@ -167,122 +123,89 @@ class SequenceNetwork(BaseModel):
             if edge:
                 edge_data.append(edge)
 
-        self.network.add_edges_from(edge_data)
+        self._full_network.add_edges_from(edge_data)
 
         # Calculate node positions based on dimensions
-        if self.dimensions == 2:
-            return self._2d_position_nodes_and_edges(self.network)
-        elif self.dimensions == 3:
-            return self._3d_position_nodes_and_edges(self.network)
+        self._2d_position_nodes_and_edges(self._full_network)
+
+        self.network = copy.deepcopy(self._full_network)
+        self.calculate_centrality()
+
+    def update_threshhold(self, threshold: float):
+        """Removes or adds edges based on the threshold value."""
+
+        assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
+
+        network = copy.deepcopy(self._full_network)
+        edge_pairs_below_threshold = [
+            (node1, node2)
+            for node1, node2, data in network.edges(data=True)
+            if data["identity"] < threshold
+        ]
+        network.remove_edges_from(edge_pairs_below_threshold)
+        self._2d_position_nodes_and_edges(network)
+
+        self.network = network
+
+    def calculate_centrality(self, mode: str = "betweenness"):
+        """Calculates the centrality of the nodes in the network graph.
+
+
+        Parameters:
+            mode (str, optional): The centrality metric to calculate. Default is "betweenness".
+
+        Returns:
+            dict: A dictionary of node centrality values.
+        """
+        modes = ["betweenness", "closeness", "degree", "eigenvector"]
+
+        if mode == "betweenness":
+            centrality = nx.betweenness_centrality(self.network)
+        elif mode == "closeness":
+            centrality = nx.closeness_centrality(self.network)
+        elif mode == "degree":
+            centrality = nx.degree_centrality(self.network)
+        elif mode == "eigenvector":
+            centrality = nx.eigenvector_centrality(self.network)
         else:
-            if self.dimensions > 3:
-                raise ValueError(
-                    f"Bruuuhh chill, u visiting from {self.dimensions}D cyberspace? Dimensions must be 2 or 3"
-                )
+            raise ValueError(
+                f"Centrality mode {mode} not recognized. Choose from {modes}."
+            )
+
+        nx.set_node_attributes(self.network, centrality, f"centrality_{mode}")
 
     def create_cytoscape_graph(
-        self, collection: str, title: str, threshold: float = 0.8
+        self,
+        layout: str = "force-directed",
+        threshold: float = 0.8,
+        style_name: str = "default",
+        column_name: str = "domain",
     ):
-        # assert that the cytoscape API is running and cytoscape is running in the background
+        try:
+            p4c.cytoscape_ping(base_url=self._cytoscape_url)
+        except RequestException:
+            self._cytoscape_url = "http://localhost:1234/v1"
+            p4c.cytoscape_ping(base_url=self._cytoscape_url)
+
         assert p4c.cytoscape_ping(
-            base_url=self._base_url
+            base_url=self._cytoscape_url
         ), "Cytoscape is not running in the background"
-        assert p4c.cytoscape_version_info(
-            base_url=self._base_url
-        ), "Cytoscape API is not running"
-        # create a degree column for the nodes based on the current choosen threshold
+
+        p4c.layout_network(layout, base_url=self._cytoscape_url)
+
+        # create a degree column for the nodes based on the current chosen threshold
         self.calculate_degree(threshold=threshold)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
-            self.network,
-            collection=collection,
-            title=title + "_" + str(threshold),
-            base_url=self._base_url,
+            self._full_network,
+            collection="SequenceNetwork",
+            base_url=self._cytoscape_url,
         )
 
-        self.hide_under_threshold(threshold)
-        # and yes the layout ignores hidden edges, i did a visual test
-        p4c.layout_network("grid", base_url=self._base_url)
+        self._hide_under_threshold(threshold)
+        p4c.layout_network("grid", base_url=self._cytoscape_url)
 
-    def set_layout(self, layout_name: str = "force-directed"):
-        p4c.layout_network(layout_name, base_url=self._base_url)
-
-    def hide_under_threshold(self, threshold):
-        p4c.unhide_all(base_url=self._base_url)
-
-        hide_list = []
-
-        for u, v, d in self.network.edges(data=True):
-            if d["identity"] < threshold:
-                hide_list.append("{} (interacts with) {}".format(u, v))
-
-        p4c.hide_edges(hide_list, base_url=self._base_url)
-
-    def filter_cytoscape_edges_by_parameter(
-        self, name: str, parameter: str, min_val: float, max_val: float
-    ):
-        # this is a filter for the network in cytoscape
-        # here the nodes and edges not relevant are filtered out
-        p4c.create_column_filter(
-            name,
-            parameter,
-            [min_val, max_val],
-            "BETWEEN",
-            type="edges",
-            apply=True,
-            hide=True,
-            base_url=self._base_url,
-        )
-
-    def calculate_degree(self, threshold: float = 0.8):
-        # Calculate degree of nodes with filtering
-        degree = {}
-        for u, v, d in self.network.edges(data=True):
-            if d["identity"] > threshold:
-                if u not in degree:
-                    degree[u] = 1
-                else:
-                    degree[u] += 1
-                if v not in degree:
-                    degree[v] = 1
-                else:
-                    degree[v] += 1
-
-        nx.set_node_attributes(
-            self.network, degree, "degree_with_threshold_{}".format(threshold)
-        )
-
-    def set_nodes_size(
-        self,
-        column_name: str,
-        min_size: int = 10,
-        max_size: int = 100,
-        style_name: str = "default",
-    ):
-        p4c.set_node_shape_default("ELLIPSE", style_name, base_url=self._base_url)
-        p4c.set_node_size_mapping(
-            **gen_node_size_map(
-                column_name,
-                scheme_c_number_continuous(min_size, max_size),
-                mapping_type="c",
-                style_name=style_name,
-                base_url=self._base_url,
-            )
-        )
-        p4c.set_node_label_mapping(
-            "name", style_name=style_name, base_url=self._base_url
-        )
-        p4c.set_node_font_size_mapping(
-            **gen_node_size_map(
-                column_name,
-                scheme_c_number_continuous(int(min_size / 10), int(max_size / 10)),
-                style_name=style_name,
-                base_url=self._base_url,
-            )
-        )
-
-    def color_nodes(self, column_name: str, style_name: str = "default"):
-        df_nodes = p4c.get_table_columns(table="node", base_url=self._base_url)
+        df_nodes = p4c.get_table_columns(table="node", base_url=self._cytoscape_url)
 
         data_color_names = list(set(df_nodes[column_name]))
 
@@ -296,10 +219,10 @@ class SequenceNetwork(BaseModel):
             "#" + "".join([f"{int(c*255):02x}" for c in color[:3]]) for color in colors
         ]
 
-        if style_name not in p4c.get_visual_style_names(base_url=self._base_url):
-            p4c.create_visual_style(style_name, base_url=self._base_url)
+        if style_name not in p4c.get_visual_style_names(base_url=self._cytoscape_url):
+            p4c.create_visual_style(style_name, base_url=self._cytoscape_url)
 
-        p4c.set_node_color_default("#FFFFFF", style_name, base_url=self._base_url)
+        p4c.set_node_color_default("#FFFFFF", style_name, base_url=self._cytoscape_url)
         p4c.set_node_color_mapping(
             column_name,
             mapping_type="discrete",
@@ -307,33 +230,186 @@ class SequenceNetwork(BaseModel):
             style_name=style_name,
             table_column_values=data_color_names,
             colors=hex_colors,
-            base_url=self._base_url,
+            base_url=self._cytoscape_url,
         )
 
-    def visualize(self):
-        """
-        Visualizes the network graph.
+    def export_cytoscape_graph(self, file_path: str):
+        """Exports the network graph to a Cytoscape-readable file.
 
-        This method visualizes the network graph created by the SequenceNetwork class.
-        It checks the value of the 'dimensions' attribute and calls either the 'visualize_2d_network' or 'visualize_3d_network' method accordingly.
-        If the 'dimensions' attribute is not 2 or 3, it raises a ValueError.
+        Args:
+            file_path (str): The file path to save the network graph.
+
+        """
+        cyt_dict = nx.cytoscape_data(self.network, name="SequenceNetwork")
+        with open(file_path, "w") as file:
+            file.write(str(cyt_dict))
+        print(f"💾 Network exported to {file_path}")
+
+    def _hide_under_threshold(self, threshold):
+        p4c.unhide_all(base_url=self._cytoscape_url)
+
+        hide_list = []
+
+        for u, v, d in self._full_network.edges(data=True):
+            if d["identity"] < threshold:
+                hide_list.append("{} (interacts with) {}".format(u, v))
+
+        p4c.hide_edges(hide_list, base_url=self._cytoscape_url)
+
+    def calculate_degree(self, threshold: float = 0.8):
+        # Calculate degree of nodes with filtering
+        degree = {}
+        for u, v, d in self._full_network.edges(data=True):
+            if d["identity"] > threshold:
+                if u not in degree:
+                    degree[u] = 1
+                else:
+                    degree[u] += 1
+                if v not in degree:
+                    degree[v] = 1
+                else:
+                    degree[v] += 1
+
+        nx.set_node_attributes(
+            self._full_network, degree, "degree_with_threshold_{}".format(threshold)
+        )
+
+    def set_nodes_size(
+        self,
+        column_name: str,
+        min_size: int = 10,
+        max_size: int = 100,
+        style_name: str = "default",
+    ):
+        p4c.set_node_shape_default("ELLIPSE", style_name, base_url=self._cytoscape_url)
+        # p4c.set_node_size_mapping(
+        #     **gen_node_size_map(
+        #         column_name,
+        #         scheme_c_number_continuous(min_size, max_size),
+        #         mapping_type="c",
+        #         style_name=style_name,
+        #         base_url=self._cytoscape_url,
+        #     )
+        # )
+        p4c.set_node_label_mapping(
+            "name", style_name=style_name, base_url=self._cytoscape_url
+        )
+        p4c.set_node_font_size_mapping(
+            **gen_node_size_map(
+                column_name,
+                scheme_c_number_continuous(int(min_size / 10), int(max_size / 10)),
+                style_name=style_name,
+                base_url=self._cytoscape_url,
+            )
+        )
+
+    def visualize(
+        self,
+        color: str = None,
+        size: bool = False,
+        edges: bool = True,
+        labels: bool = False,
+        save_path: str = None,
+        dpi: int = 300,
+    ):
+        """
+        Visualizes the network graph by plotting nodes and optionally edges.
+        For large networks it is recommended to disable the edges for performance.
+
+        Parameters:
+            color (str, optional): The attribute to colorize the nodes. Default is None.
+            size (bool, optional): Whether to size the nodes based on centrality. Default is False.
+            edges (bool, optional): Whether to plot edges. Default is True.
+            labels (bool, optional): Whether to add labels to the nodes. Default is False.
+            save_path (str, optional): The file path to save the plot. Default is None.
+            dpi (int, optional): The resolution of the saved plot. Default is 300.
+
+        Raises:
+            ValueError: If the specified color attribute is not found in the nodes.
 
         Returns:
             None
-
-        Raises:
-            ValueError: If the 'dimensions' attribute is greater than 3.
         """
 
-        if self.dimensions == 2:
-            self.visualize_2d_network()
-        elif self.dimensions == 3:
-            self.visusalize_3d_network()
-        else:
-            if self.dimensions > 3:
-                raise ValueError(
-                    f"Dimensions must be 2 or 3 for visualization, not {self.dimensions}"
+        # plot edges
+        if edges:
+            [
+                plt.plot(
+                    edge["x_pos"],
+                    edge["y_pos"],
+                    color="black",
+                    alpha=0.2,
+                    linewidth=0.1,
+                    zorder=0,
                 )
+                for edge in self.network.edges.values()
+            ]
+
+        # scatter positions
+        node_xs = [node["x_pos"] for node in self.network.nodes.values()]
+        node_ys = [node["y_pos"] for node in self.network.nodes.values()]
+
+        # size nodes based on centrality
+        if size:
+            node_keys = list(self.network.nodes.values())[0].keys()
+            betweenness_key = next(
+                iter([key for key in node_keys if "centrality" in key])
+            )
+            node_sizes = [
+                float((node[betweenness_key] * 300) + 1)
+                for node in self.network.nodes.values()
+            ]
+        else:
+            node_sizes = [20] * len(node_xs)
+
+        # colorize nodes
+        if color:
+            try:
+                color_labels = list(
+                    set([node[color] for node in self.network.nodes.values()])
+                )
+            except KeyError:
+                node_keys = list(self.network.nodes.values())[0].keys()
+                raise ValueError(
+                    f"Color attribute {color} not found in nodes. Possible attributes are {node_keys}"
+                )
+            color_dict = dict(
+                zip(color_labels, self._sample_colorscale(len(color_labels)))
+            )
+
+            color_list = [
+                color_dict[node[color]] for node in self.network.nodes.values()
+            ]
+
+            # add legend
+            markers = [
+                plt.Line2D([0, 0], [0, 0], color=color, marker="o", linestyle="")
+                for color in color_dict.values()
+            ]
+            plt.legend(
+                markers,
+                color_dict.keys(),
+                numpoints=1,
+                fontsize="xx-small",
+                title=color.capitalize(),
+            )
+            plt.xlim(-1.1, 1.4)
+        else:
+            color_list = ["tab:blue"] * len(node_xs)
+
+        # plot nodes
+        plt.scatter(node_xs, node_ys, c=color_list, zorder=1, s=node_sizes)
+
+        # add labels
+        if labels:
+            node_names = list(self.network.nodes)
+            for i, txt in enumerate(node_names):
+                plt.annotate(txt, (node_xs[i], node_ys[i]), fontsize=6)
+
+        plt.axis("off")
+        if save_path:
+            plt.savefig(save_path, dpi=dpi)
+        plt.show()
 
     def _2d_position_nodes_and_edges(self, graph: nx.Graph):
         """Calculates node positions based on weight metric and
@@ -392,189 +468,8 @@ class SequenceNetwork(BaseModel):
 
         return graph
 
-    def visusalize_3d_network(self):
-        """Visualizes a 3D network graph."""
-
-        traces = []
-
-        betweenness = 1
-        bridge_nodes = [
-            node_id
-            for node_id, betw in self.graph.nodes(data="betweenness")
-            if betw > betweenness
-        ]
-        for edge in self.graph.edges:
-            if edge[0] in bridge_nodes or edge[1] in bridge_nodes:
-                traces.append(
-                    go.Scatter3d(
-                        x=self.graph.edges[edge]["x_pos"],
-                        y=self.graph.edges[edge]["y_pos"],
-                        z=self.graph.edges[edge]["z_pos"],
-                        mode="lines",
-                        hoverinfo="none",
-                        line=dict(
-                            width=1,
-                            color="rgba(128, 128, 128, 0.8)",
-                        ),
-                    )
-                )
-
-        color_conditions = set([node[self.color] for node in self.graph.nodes.values()])
-        color_dict = dict(
-            zip(color_conditions, self._sample_colorscale(len(color_conditions)))
-        )
-
-        # Add nodes
-        for key, node in self.graph.nodes.items():
-            size = 6
-            color = color_dict[node[self.color]]
-            symbol = "circle"
-            if key in self.targets:
-                size = 10
-                color = "red"
-                symbol = "cross"
-
-            info = [tuple(n for n in node.values())]
-
-            traces.append(
-                go.Scatter3d(
-                    x=[node["x_pos"]],
-                    y=[node["y_pos"]],
-                    z=[node["z_pos"]],
-                    mode="markers",
-                    marker=dict(
-                        size=size,
-                        color=color,
-                        symbol=symbol,
-                    ),
-                    text=node["name"],
-                    hovertemplate=(
-                        "<b>%{customdata[0]}</b><br>"
-                        "Family Name: %{customdata[1]}<br>"
-                        "Domain: %{customdata[2]}<br>"
-                        "Kingdom: %{customdata[3]}</b><br>"
-                        "Phylum: %{customdata[4]}<br>"
-                        "Class: %{customdata[5]}<br>"
-                        "Order: %{customdata[6]}<br>"
-                        "Family: %{customdata[7]}<br>"
-                        "Genus: %{customdata[8]}<br>"
-                        "Species: %{customdata[9]}<br>"
-                        "EC Number: %{customdata[10]}<br>"
-                        "Mol Weight: %{customdata[11]}<br>"
-                        "Taxonomy ID: %{customdata[12]}"
-                        "<extra></extra>"
-                    ),
-                    customdata=list((info)),
-                )
-            )
-
-        # Plot figure
-        fig = go.Figure(
-            data=traces,
-            layout=go.Layout(
-                plot_bgcolor="white",
-                showlegend=False,
-                hovermode="closest",
-                margin=dict(b=0, l=0, r=0, t=0),
-            ),
-        )
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
-        fig.update_scenes(xaxis_visible=False, yaxis_visible=False, zaxis_visible=False)
-
-        fig.show()
-
-    def visualize_2d_network(self):
-        """Visualizes a 2D network graph."""
-        traces = []
-        betweenness = 1
-        bridge_nodes = [
-            node_id
-            for node_id, betw in self.graph.nodes(data="betweenness")
-            if betw > betweenness
-        ]
-        for edge in self.graph.edges:
-            if edge[0] in bridge_nodes or edge[1] in bridge_nodes:
-                traces.append(
-                    go.Scatter(
-                        x=self.graph.edges[edge]["x_pos"],
-                        y=self.graph.edges[edge]["y_pos"],
-                        mode="lines",
-                        line=dict(
-                            width=1,
-                            color="rgba(128, 128, 128, 0.1)",
-                        ),
-                    )
-                )
-
-        # Add nodes
-        color_conditions = set([node[self.color] for node in self.graph.nodes.values()])
-        color_dict = dict(
-            zip(color_conditions, self._sample_colorscale(len(color_conditions)))
-        )
-
-        for key, node in self.graph.nodes.items():
-            size = 6
-            color = color_dict[node[self.color]]
-            symbol = "circle"
-            if key in self.targets:
-                size = 10
-                color = "red"
-                symbol = "cross"
-
-            info = [tuple(n for n in node.values())]
-            traces.append(
-                go.Scatter(
-                    x=[node["x_pos"]],
-                    y=[node["y_pos"]],
-                    mode="markers",
-                    marker=dict(
-                        size=size,
-                        color=color,
-                        symbol=symbol,
-                    ),
-                    text=node["name"],
-                    hovertemplate=(
-                        "<b>%{customdata[0]}</b><br>"
-                        "Family Name: %{customdata[1]}<br>"
-                        "Domain: %{customdata[2]}<br>"
-                        "Kingdom: %{customdata[3]}</b><br>"
-                        "Phylum: %{customdata[4]}<br>"
-                        "Class: %{customdata[5]}<br>"
-                        "Order: %{customdata[6]}<br>"
-                        "Family: %{customdata[7]}<br>"
-                        "Genus: %{customdata[8]}<br>"
-                        "Species: %{customdata[9]}<br>"
-                        "EC Number: %{customdata[10]}<br>"
-                        "Mol Weight: %{customdata[11]}<br>"
-                        "Taxonomy ID: %{customdata[12]}"
-                        "<extra></extra>"
-                    ),
-                    customdata=list((info)),
-                )
-            )
-
-        # Plot figure
-        fig = go.Figure(
-            data=traces,
-            layout=go.Layout(
-                plot_bgcolor="white",
-                showlegend=False,
-                hovermode="closest",
-                margin=dict(b=0, l=0, r=0, t=0),
-            ),
-        )
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
-
-        fig.show(scale=10)
-
     @staticmethod
-    def _sample_colorscale(size: int) -> List[str]:
-        return px.colors.sample_colorscale("viridis", [i / size for i in range(size)])
-
-    def _get_edges_cytoscape_graph(self, hidden_included=False):
-        return p4c.get_all_edges()
-
-    def _get_edges_visibilities(self):
-        return p4c.get_edge_property(visual_property="EDGE_VISIBLE")
+    def _sample_colorscale(size: int):
+        cmap = plt.get_cmap("viridis")
+        steps = [i / size for i in range(size)]
+        return [cmap(step) for step in steps]
