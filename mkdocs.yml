@@ -9,6 +9,7 @@ nav:
   - ⚡️ Examples:
     - Basics: examples/basics.ipynb
     - Alignments: examples/alignment.ipynb
+    - Networks: examples/network.ipynb
   - 🧰 Tools:
     - quick_start/index.md
     - The Sequence objects: quick_start/basics.md
@@ -32,7 +33,6 @@ theme:
     - navigation.instant.preview
     - navigation.indexes
     - navigation.footer
-
     - content.action.view
     - navigation.tabs
     - navigation.sections
