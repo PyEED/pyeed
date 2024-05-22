@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -5,6 +6,7 @@ import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
+from pymsaviz import MsaViz
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
@@ -127,3 +129,27 @@ class AlignmentResult(
         self.aligned_sequences.append(obj)
 
         return self.aligned_sequences[-1]
+
+    def visualize(self):
+        """Visualizes the alignment result."""
+
+        # create temp multifasta file
+        temp_file = "temp.fasta"
+        with open(temp_file, "w") as f:
+            for seq in self.aligned_sequences:
+                f.write(f">{seq.id}\n{seq.sequence}\n")
+
+        mv = MsaViz(
+            temp_file,
+            color_scheme="Clustal",
+            show_seq_char=False,
+            show_count=True,
+            sort=True,
+            show_consensus=True,
+            consensus_color="grey",
+        )
+        mv.set_plot_params(
+            ticks_interval=50, x_unit_size=0.04, show_consensus_char=False
+        )
+        mv.plotfig()
+        os.remove(temp_file)
