@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pyeed"
-version = "0.3.1"
-description = "Enzyme engineering toolkit"
+version = "0.3.2"
+description = "Toolkit to create, annotate, and analyze sequence data"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
@@ -10,28 +10,21 @@ packages = [{ include = "pyeed" }]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 biopython = "^1.81"
-sdrdm-database = { extras = [
-    "postgres",
-], git = "https://github.com/JR-1991/sdrdm-database.git", branch = "iterative-linking-tables" }
-psycopg2-binary = "^2.9.9"
 networkx = "^3.2.1"
 plotly = "^5.18.0"
 nbformat = "^5.9.2"
 scipy = "^1.11.3"
-docker = "^7.0.0"
 pyhmmer = "^0.10.11"
 httpx = "^0.27.0"
 nest-asyncio = "^1.6.0"
 rich = "^13.0.0"
 aiometer = "^0.5.0"
-black = "23.12.1"
 joblib = "^1.4.0"
-python-igraph = "^0.11.5"
 requests = "^2.31.0"
-pandas = "^2.2.2"
-py4cytoscape = {git = "https://github.com/cytoscape/py4cytoscape.git",  branch = "1.10.0"}
 sdrdm = {git = "https://github.com/JR-1991/software-driven-rdm.git", rev = "63-terms-and-external-model-handling"}
-joblib-progress = "^1.0.5"
+matplotlib = "^3.9.0"
+pymsaviz = "^0.4.2"
+py4cytoscape = "^1.9.0"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
