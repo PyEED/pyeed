@@ -3,42 +3,40 @@ classDiagram
     SequenceRecord <-- ProteinRecord
     SequenceRecord <-- DNARecord
     AbstractAnnotation <-- Site
+    AbstractAnnotation <-- Region
     AlignmentResult <-- PairwiseAlignmentResult
     AlignmentResult <-- ClustalOmegaResult
+    SequenceRecord *-- Site
+    SequenceRecord *-- Region
+    SequenceRecord *-- RegionSet
     SequenceRecord *-- Organism
-    ProteinRecord *-- Site
     ProteinRecord *-- Region
-    DNARecord *-- Site
-    DNARecord *-- Region
-    Cluster *-- Sequence
+    RegionSet *-- Region
     AlignmentResult *-- Sequence
     
     class SequenceRecord {
-        +string uri
-        +string accession_id
         +string name
         +Organism organism
+        +string sequence*
+        +integer seq_length
+        +Site[0..*] sites
+        +Region[0..*] regions
+        +RegionSet[0..*] region_sets
     }
     
     class ProteinRecord {
-        +string sequence*
-        +Region[0..*] regions
-        +Site[0..*] sites
+        +string structure_id
         +Region[0..*] coding_sequence
         +string ec_number
         +float mol_weight
-        +string pdb_uri
     }
     
     class DNARecord {
-        +string sequence*
-        +Region[0..*] regions
-        +Site[0..*] sites
         +float gc_content
     }
     
     class AbstractAnnotation {
-        +string uri
+        +string url
         +string accession_id
         +string name
     }
@@ -50,6 +48,10 @@ classDiagram
     class Region {
         +integer start
         +integer end
+    }
+    
+    class RegionSet {
+        +Region[0..*] regions
     }
     
     class Organism {
@@ -75,12 +77,6 @@ classDiagram
         +float gap_extend
         +float threshold
         +string db_name
-    }
-    
-    class Cluster {
-        +string name
-        +Sequence representative
-        +Sequence[0..*] members
     }
     
     class Sequence {
@@ -123,6 +119,7 @@ classDiagram
         << Enumeration >>
         +ACTIVE_SITE
         +BINDING_SITE
+        +ALLOSTERIC_SITE
         +DOMAIN
         +FAMILY
         +MOTIVE
