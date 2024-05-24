@@ -32,7 +32,7 @@ class TestNetworkGraphBuild:
             "WP_042680787.1",
         ]
         mats = ProteinRecord.get_ids(mat_accessions)
-        # Create a network
+        # Create network
         network = SequenceNetwork(
             sequences=mats,
             weight="identity",

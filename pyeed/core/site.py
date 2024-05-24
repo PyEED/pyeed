@@ -29,13 +29,13 @@ class Site(
         tag="positions",
         json_schema_extra=dict(
             multiple=True,
-            term="http://edamontology.org/data_1016",
+            term="http://semanticscience.org/resource/SIO_000056",
         ),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="34eec88e986aa525aa9515b66d1b4d0aa46e71d3"
+        default="b67f8aac7619d462d1e346822b9153a10996d11c"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

@@ -37,8 +37,7 @@ class SequenceNetwork(BaseModel):
             nx.Graph: lambda g: nx.node_link_data(g),
         }
 
-    sequences: Optional[List[SequenceRecord]] = Field(
-        default=[],
+    sequences: List[SequenceRecord] = Field(
         description="List of sequences to be compared",
     )
 
@@ -47,7 +46,7 @@ class SequenceNetwork(BaseModel):
         description="Attribute of Alignment to weight the edges",
     )
 
-    targets: Optional[List[str]] = Field(
+    targets: List[str] = Field(
         default=[],
         description="List of selected sequences",
     )
@@ -57,11 +56,11 @@ class SequenceNetwork(BaseModel):
         description="Network graph with networkx",
     )
 
-    _full_network: Optional[nx.Graph] = PrivateAttr(
+    _full_network: nx.Graph = PrivateAttr(
         default=nx.Graph(),
     )
 
-    _aligner: Optional[PairwiseAligner] = PrivateAttr(
+    _aligner: PairwiseAligner = PrivateAttr(
         default=PairwiseAligner(),
     )
 
@@ -73,44 +72,35 @@ class SequenceNetwork(BaseModel):
         self._create_graph()
 
     def add_to_targets(self, target: SequenceRecord):
-        if target.source_id not in self.targets:
-            self.targets.append(target.source_id)
-
-    def _process_sequence(self, sequence: ProteinRecord):
-        return (
-            sequence.id,
-            sequence.sequence,
-            {
-                "name": sequence.name,
-                "domain": sequence.organism.domain,
-                "kingdom": sequence.organism.kingdom,
-                "phylum": sequence.organism.phylum,
-                "class": sequence.organism.tax_class,
-                "order": sequence.organism.order,
-                "family": sequence.organism.family,
-                "genus": sequence.organism.genus,
-                "species": sequence.organism.species,
-                "ec_number": sequence.ec_number,
-                "mol_weight": sequence.mol_weight,
-                "taxonomy_id": sequence.organism.taxonomy_id,
-            },
-        )
+        if target.id not in self.targets:
+            self.targets.append(target.id)
 
     def _create_graph(self):
         """Initializes the nx.Graph object and adds nodes and edges based on the sequences."""
 
-        alignment_data = {}
-        node_data = []
+        sequences = {}
 
+        # add nodes to the network
         for sequence in self.sequences:
-            id_seq, seq, data = self._process_sequence(sequence)
-            node_data.append((id_seq, data))
-            alignment_data[id_seq] = seq
+            seq_dict = sequence.to_dict()
+            seq_id = seq_dict.pop("@id")
+            node_dict = seq_dict.pop("organism") if "organism" in seq_dict else {}
+            node_dict["sequence"] = sequence.sequence
+            node_dict["name"] = sequence.name if sequence.name else ""
+            if "ec_number" in seq_dict:
+                node_dict["ec_number"] = seq_dict.pop("ec_number")
+            if "mol_weight" in seq_dict:
+                node_dict["mol_weight"] = seq_dict.pop("mol_weight")
 
-        self._full_network.add_nodes_from(node_data)
+
+
+
+            sequences[seq_id] = sequence.sequence
+            self._full_network.add_node(seq_id, **node_dict)
 
         # create the alignments
-        alignments_results = self._aligner.align_multipairwise(alignment_data)
+        alignments_results = self._aligner.align_multipairwise(sequences)
+
         # create a list for the egdes
         edge_data = []
 
@@ -365,21 +355,25 @@ class SequenceNetwork(BaseModel):
         # colorize nodes
         if color:
             try:
-                color_labels = list(
-                    set([node[color] for node in self.network.nodes.values()])
-                )
+                color_labels = []
+                for node in self.network.nodes.values():
+                    color_labels.append(node[color])
             except KeyError:
-                node_keys = list(self.network.nodes.values())[0].keys()
-                raise ValueError(
-                    f"Color attribute {color} not found in nodes. Possible attributes are {node_keys}"
-                )
+                color_labels.append("n.a.")
+
+            color_labels = list(set(color_labels))
+            colors = self._sample_colorscale(len(set(color_labels)))
+
             color_dict = dict(
-                zip(color_labels, self._sample_colorscale(len(color_labels)))
+                zip(color_labels, colors)
             )
 
-            color_list = [
-                color_dict[node[color]] for node in self.network.nodes.values()
-            ]
+            color_list = []
+            for node in self.network.nodes.values():
+                try:
+                    color_list.append(color_dict[node[color]])
+                except KeyError:
+                    color_list.append(color_dict["n.a."])
 
             # add legend
             markers = [
@@ -397,6 +391,24 @@ class SequenceNetwork(BaseModel):
         else:
             color_list = ["tab:blue"] * len(node_xs)
 
+        if self.targets:
+            for target_id in self.targets:
+                target = self.network.nodes[target_id]
+                plt.scatter(
+                    target["x_pos"],
+                    target["y_pos"],
+                    c="red",
+                    zorder=1,
+                    marker="X",
+                )
+
+                plt.annotate(
+                    target_id,
+                    (target["x_pos"], target["y_pos"]),
+                    fontsize=4,
+                    color="black",
+                )
+
         # plot nodes
         plt.scatter(node_xs, node_ys, c=color_list, zorder=1, s=node_sizes)
 
@@ -404,7 +416,7 @@ class SequenceNetwork(BaseModel):
         if labels:
             node_names = list(self.network.nodes)
             for i, txt in enumerate(node_names):
-                plt.annotate(txt, (node_xs[i], node_ys[i]), fontsize=6)
+                plt.annotate(txt, (node_xs[i], node_ys[i]), fontsize=2)
 
         plt.axis("off")
         if save_path:

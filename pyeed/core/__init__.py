@@ -10,6 +10,7 @@ from .organism import Organism
 from .pairwisealignmentresult import PairwiseAlignmentResult
 from .proteinrecord import ProteinRecord
 from .region import Region
+from .regionset import RegionSet
 from .sequence import Sequence
 from .sequencerecord import SequenceRecord
 from .sequencetype import SequenceType
