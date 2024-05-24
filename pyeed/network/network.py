@@ -83,10 +83,20 @@ class SequenceNetwork(BaseModel):
         # add nodes to the network
         for sequence in self.sequences:
             seq_dict = sequence.to_dict()
-            print(seq_dict)
-            seq_id = seq_dict.pop("id")
+            seq_id = seq_dict.pop("@id")
+            node_dict = seq_dict.pop("organism") if "organism" in seq_dict else {}
+            node_dict["sequence"] = sequence.sequence
+            node_dict["name"] = sequence.name if sequence.name else ""
+            if "ec_number" in seq_dict:
+                node_dict["ec_number"] = seq_dict.pop("ec_number")
+            if "mol_weight" in seq_dict:
+                node_dict["mol_weight"] = seq_dict.pop("mol_weight")
+
+
+
+
             sequences[seq_id] = sequence.sequence
-            self._full_network.add_node(seq_id, **seq_dict)
+            self._full_network.add_node(seq_id, **node_dict)
 
         # create the alignments
         alignments_results = self._aligner.align_multipairwise(sequences)
@@ -345,21 +355,25 @@ class SequenceNetwork(BaseModel):
         # colorize nodes
         if color:
             try:
-                color_labels = list(
-                    set([node[color] for node in self.network.nodes.values()])
-                )
+                color_labels = []
+                for node in self.network.nodes.values():
+                    color_labels.append(node[color])
             except KeyError:
-                node_keys = list(self.network.nodes.values())[0].keys()
-                raise ValueError(
-                    f"Color attribute {color} not found in nodes. Possible attributes are {node_keys}"
-                )
+                color_labels.append("n.a.")
+
+            color_labels = list(set(color_labels))
+            colors = self._sample_colorscale(len(set(color_labels)))
+
             color_dict = dict(
-                zip(color_labels, self._sample_colorscale(len(color_labels)))
+                zip(color_labels, colors)
             )
 
-            color_list = [
-                color_dict[node[color]] for node in self.network.nodes.values()
-            ]
+            color_list = []
+            for node in self.network.nodes.values():
+                try:
+                    color_list.append(color_dict[node[color]])
+                except KeyError:
+                    color_list.append(color_dict["n.a."])
 
             # add legend
             markers = [
@@ -377,6 +391,24 @@ class SequenceNetwork(BaseModel):
         else:
             color_list = ["tab:blue"] * len(node_xs)
 
+        if self.targets:
+            for target_id in self.targets:
+                target = self.network.nodes[target_id]
+                plt.scatter(
+                    target["x_pos"],
+                    target["y_pos"],
+                    c="red",
+                    zorder=1,
+                    marker="X",
+                )
+
+                plt.annotate(
+                    target_id,
+                    (target["x_pos"], target["y_pos"]),
+                    fontsize=4,
+                    color="black",
+                )
+
         # plot nodes
         plt.scatter(node_xs, node_ys, c=color_list, zorder=1, s=node_sizes)
 
@@ -384,7 +416,7 @@ class SequenceNetwork(BaseModel):
         if labels:
             node_names = list(self.network.nodes)
             for i, txt in enumerate(node_names):
-                plt.annotate(txt, (node_xs[i], node_ys[i]), fontsize=6)
+                plt.annotate(txt, (node_xs[i], node_ys[i]), fontsize=2)
 
         plt.axis("off")
         if save_path:
