@@ -21,9 +21,9 @@ class AsyncRequester:
         self,
         ids: List[str],
         url: str,
-        batch_size: int = None,
-        rate_limit: int = None,
-        n_concurrent: int = None,
+        batch_size: int,
+        rate_limit: int,
+        n_concurrent: int,
         progress: Progress = None,
         task_id: TaskID = None,
     ):
