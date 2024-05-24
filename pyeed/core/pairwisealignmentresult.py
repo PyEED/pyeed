@@ -58,11 +58,6 @@ class PairwiseAlignmentResult(
         json_schema_extra=dict(),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="eced817a915618922cb780cdd0025d52b04b159d"
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")

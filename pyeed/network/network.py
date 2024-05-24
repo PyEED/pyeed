@@ -37,8 +37,7 @@ class SequenceNetwork(BaseModel):
             nx.Graph: lambda g: nx.node_link_data(g),
         }
 
-    sequences: Optional[List[SequenceRecord]] = Field(
-        default=[],
+    sequences: List[SequenceRecord] = Field(
         description="List of sequences to be compared",
     )
 
@@ -47,7 +46,7 @@ class SequenceNetwork(BaseModel):
         description="Attribute of Alignment to weight the edges",
     )
 
-    targets: Optional[List[str]] = Field(
+    targets: List[str] = Field(
         default=[],
         description="List of selected sequences",
     )
@@ -57,11 +56,11 @@ class SequenceNetwork(BaseModel):
         description="Network graph with networkx",
     )
 
-    _full_network: Optional[nx.Graph] = PrivateAttr(
+    _full_network: nx.Graph = PrivateAttr(
         default=nx.Graph(),
     )
 
-    _aligner: Optional[PairwiseAligner] = PrivateAttr(
+    _aligner: PairwiseAligner = PrivateAttr(
         default=PairwiseAligner(),
     )
 
@@ -73,44 +72,25 @@ class SequenceNetwork(BaseModel):
         self._create_graph()
 
     def add_to_targets(self, target: SequenceRecord):
-        if target.source_id not in self.targets:
-            self.targets.append(target.source_id)
-
-    def _process_sequence(self, sequence: ProteinRecord):
-        return (
-            sequence.id,
-            sequence.sequence,
-            {
-                "name": sequence.name,
-                "domain": sequence.organism.domain,
-                "kingdom": sequence.organism.kingdom,
-                "phylum": sequence.organism.phylum,
-                "class": sequence.organism.tax_class,
-                "order": sequence.organism.order,
-                "family": sequence.organism.family,
-                "genus": sequence.organism.genus,
-                "species": sequence.organism.species,
-                "ec_number": sequence.ec_number,
-                "mol_weight": sequence.mol_weight,
-                "taxonomy_id": sequence.organism.taxonomy_id,
-            },
-        )
+        if target.id not in self.targets:
+            self.targets.append(target.id)
 
     def _create_graph(self):
         """Initializes the nx.Graph object and adds nodes and edges based on the sequences."""
 
-        alignment_data = {}
-        node_data = []
+        sequences = {}
 
+        # add nodes to the network
         for sequence in self.sequences:
-            id_seq, seq, data = self._process_sequence(sequence)
-            node_data.append((id_seq, data))
-            alignment_data[id_seq] = seq
-
-        self._full_network.add_nodes_from(node_data)
+            seq_dict = sequence.to_dict()
+            print(seq_dict)
+            seq_id = seq_dict.pop("id")
+            sequences[seq_id] = sequence.sequence
+            self._full_network.add_node(seq_id, **seq_dict)
 
         # create the alignments
-        alignments_results = self._aligner.align_multipairwise(alignment_data)
+        alignments_results = self._aligner.align_multipairwise(sequences)
+
         # create a list for the egdes
         edge_data = []
 

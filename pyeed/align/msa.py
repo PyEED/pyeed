@@ -6,15 +6,15 @@ from rich.console import Console
 from rich.status import Status
 
 from pyeed.core.alignmentresult import AlignmentResult
-from pyeed.core.sequencerecord import SequenceRecord
+from pyeed.core.sequence import Sequence
 from pyeed.tools.clustalo import ClustalOmega
 
 
 class MSA(BaseModel):
-    sequences: List[SequenceRecord] = Field(
+    sequences: List[Sequence] = Field(
         ...,
         description="List of sequences to be aligned.",
-        min_items=2,
+        min_length=2,
     )
 
     def clustalo(self) -> AlignmentResult:

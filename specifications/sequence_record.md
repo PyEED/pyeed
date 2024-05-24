@@ -12,6 +12,10 @@ prefixes:
 
 A molecular sequence and associated annotation data.
 
+- id
+  - Type: string
+  - Description: Unique identifier of the sequence.
+  - Term: sio:SIO_000729
 - name
   - Type: string
   - Description: Arbitrary name of the sequence.
@@ -80,7 +84,6 @@ A nucleic acid sequence and associated metadata 🧬
 - name
   - Type: string
   - Description: A name of a sequence feature, e.g. the name of a feature
-
 
 ### Site(_AbstractAnnotation_) (sio:sio:010049)
 

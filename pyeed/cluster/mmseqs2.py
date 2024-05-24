@@ -223,7 +223,7 @@ class MMSeqs2(AbstractContainer):
         command = instance.setup_command(mode)
 
         multifasta = "\n".join(
-            [f">{seq.source_id}\n{seq.sequence}" for seq in sequences]
+            [f">{seq.id}\n{seq.sequence}" for seq in sequences]
         )
 
         result = instance.run_container(command, multifasta)
@@ -255,13 +255,13 @@ class MMSeqs2(AbstractContainer):
             members = []
             cluster = Cluster(
                 representative=next(
-                    filter(lambda x: x.source_id == representative, sequences)
+                    filter(lambda x: x.id == representative, sequences)
                 )
             )
             for item in result["cluster"]:
                 if item[0] == representative:
                     members.append(
-                        next(filter(lambda x: x.source_id == item[1], sequences))
+                        next(filter(lambda x: x.id == item[1], sequences))
                     )
 
             cluster.members = members
