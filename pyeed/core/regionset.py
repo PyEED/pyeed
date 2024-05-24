@@ -33,6 +33,11 @@ class RegionSet(
         ),
     )
 
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="b67f8aac7619d462d1e346822b9153a10996d11c"
+    )
+
     _object_terms: Set[str] = PrivateAttr(
         default={"http://semanticscience.org/resource/SIO_000370"}
     )
