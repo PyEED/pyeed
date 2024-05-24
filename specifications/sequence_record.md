@@ -1,7 +1,7 @@
 ---
 prefixes:
-  - sio: http://semanticscience.org/resource/
-  - edam: http://edamontology.org/
+  sio: http://semanticscience.org/resource/
+  edam: http://edamontology.org/
 ---
 
 # Sequence data model
