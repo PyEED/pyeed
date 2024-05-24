@@ -15,6 +15,7 @@ classDiagram
     AlignmentResult *-- Sequence
     
     class SequenceRecord {
+        +string id
         +string name
         +Organism organism
         +string sequence*

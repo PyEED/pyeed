@@ -27,6 +27,15 @@ class SequenceRecord(
         default_factory=lambda: str(uuid4()),
     )
 
+    id: Optional[str] = element(
+        description="Unique identifier of the sequence.",
+        default=None,
+        tag="id",
+        json_schema_extra=dict(
+            term="http://semanticscience.org/resource/SIO_000729",
+        ),
+    )
+
     name: Optional[str] = element(
         description="Arbitrary name of the sequence.",
         default=None,
@@ -90,11 +99,6 @@ class SequenceRecord(
         json_schema_extra=dict(
             multiple=True,
         ),
-    )
-
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="eced817a915618922cb780cdd0025d52b04b159d"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

@@ -36,11 +36,6 @@ class Sequence(
         json_schema_extra=dict(),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="eced817a915618922cb780cdd0025d52b04b159d"
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
@@ -62,7 +57,7 @@ class Sequence(
         Returns:
             str: Sequence in FASTA format
         """
-        return f">{self.source_id}\n{self.sequence}"
+        return f">{self.id}\n{self.sequence}"
 
     def __str__(self) -> str:
         return self.fasta_string()

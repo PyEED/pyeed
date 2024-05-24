@@ -11,8 +11,8 @@ class TestHMM:
     # HMM can be initialized with a name and an Alignment object
     def test_initialized_with_name_and_alignment(self):
         alignment = Alignment()
-        alignment.add_to_input_sequences(source_id="seq1", sequence="ATCG")
-        alignment.add_to_input_sequences(source_id="seq2", sequence="GCTA")
+        alignment.add_to_input_sequences(id="seq1", sequence="ATCG")
+        alignment.add_to_input_sequences(id="seq2", sequence="GCTA")
 
         hmm = HMM(name="test_hmm", alignment=alignment)
 
