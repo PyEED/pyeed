@@ -10,8 +10,8 @@ from IPython.display import clear_output
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
-from rich.status import Status
 from rich.console import Console
+from rich.status import Status
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
@@ -75,7 +75,7 @@ class ProteinRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="ff1fb2064e9efbdf71ccde1d8f08b9af434150bb"
+        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -145,7 +145,6 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -167,7 +166,6 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -204,7 +202,6 @@ class ProteinRecord(
         """
 
         from pyeed.fetch.blast import BlastProgram
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -278,7 +275,9 @@ class ProteinRecord(
 
         nest_asyncio.apply()
 
-        assert db in NCBIDataBase, f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
+        assert (
+            db in NCBIDataBase
+        ), f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
 
         program = BlastProgram.BLASTP.value
         executor = ThreadPoolExecutor(max_workers=1)
