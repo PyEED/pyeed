@@ -47,8 +47,8 @@ class MSA(BaseModel):
         """
 
         result = AlignmentResult()
-        [result.add_to_sequences(seq.id, seq.sequence) for seq in self.sequences]
-        [result.add_to_aligned_sequences(seq.id, str(seq.seq)) for seq in alignment]
+        [result.add_to_sequences(id=seq.id, sequence=seq.sequence, sequence_id=seq.id) for seq in self.sequences]
+        [result.add_to_aligned_sequences(id=seq.id, sequence=str(seq.seq), sequence_id=seq.id) for seq in alignment]
 
         return result
 
