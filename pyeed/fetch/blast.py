@@ -3,7 +3,7 @@ import io
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, EnumMeta
-from typing import List
+from typing import List, Optional
 
 from Bio.Blast import NCBIWWW, NCBIXML
 from Bio.Blast.Record import Blast as BlastRecord
@@ -96,11 +96,9 @@ class Blast(BaseModel):
     async def async_run(
         self,
         ncbi_db: str,
-        program: str = BlastProgram.BLASTP.value,
-        foreign_executor: ThreadPoolExecutor = None,
+        program: str,
+        foreign_executor: Optional[ThreadPoolExecutor] = None,
     ) -> io.StringIO:
-        assert program in BlastProgram
-        assert ncbi_db in NCBIDataBase
 
         if not foreign_executor:
             executor = ThreadPoolExecutor()

@@ -10,7 +10,8 @@ from IPython.display import clear_output
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
-from rich.status import Console, Status
+from rich.status import Status
+from rich.console import Console
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
@@ -244,7 +245,7 @@ class ProteinRecord(
         self,
         n_hits: int,
         e_value: float = 10.0,
-        database: str = "nr",
+        db: str = "swissprot",
         matrix: str = "BLOSUM62",
         identity: float = 0.0,
         **kwargs,
@@ -255,7 +256,7 @@ class ProteinRecord(
         Args:
             n_hits (int): The number of hits to retrieve.
             e_value (float, optional): The maximum E-value threshold for reporting hits. Defaults to 10.0.
-            database (str, optional): The database to search against. Defaults to "nr".
+            db (str, optional): The database to search against. Defaults to "swissprot".
             matrix (str, optional): The substitution matrix to use. Defaults to "BLOSUM62".
             identity (float, optional): The minimum sequence identity threshold for reporting hits. Defaults to 0.0.
             **kwargs: Additional keyword arguments.
@@ -277,7 +278,7 @@ class ProteinRecord(
 
         nest_asyncio.apply()
 
-        assert database in NCBIDataBase
+        assert db in NCBIDataBase, f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
 
         program = BlastProgram.BLASTP.value
         executor = ThreadPoolExecutor(max_workers=1)
@@ -292,12 +293,12 @@ class ProteinRecord(
         with Status(
             "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
         ):
-            result = asyncio.run(blaster.async_run(database, program, executor))
+            result = asyncio.run(blaster.async_run(db, program, executor))
             clear_output()
 
         accessions = blaster.extract_accession(result)
 
-        return asyncio.run(ProteinFetcher(ids=accessions).fetch(force_terminal=False))
+        return self.get_ids(accessions)
 
     # def blastp(
     #     self,

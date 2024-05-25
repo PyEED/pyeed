@@ -66,7 +66,7 @@ class AsyncRequester:
         url = args.url
 
         LOGGER.debug(f"Sending request to {url}")
-        response = await client.get(url, timeout=30)
+        response = await client.get(url, timeout=120)
 
         LOGGER.debug(f"Received response from {url}. Code: {response.status_code}")
 
