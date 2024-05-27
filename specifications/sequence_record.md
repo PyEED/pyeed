@@ -281,6 +281,8 @@ DOMAIN = "http://semanticscience.org/resource/SIO_001379"
 FAMILY = "http://semanticscience.org/resource/SIO_001380"
 MOTIVE = "http://semanticscience.org/resource/SIO_000131"
 CODING_SEQ = "http://semanticscience.org/resource/SIO_001276"
+ALPHAHELIX = "http://semanticscience.org/resource/SIO_010468"
+BETASTRAND = "http://semanticscience.org/resource/SIO_010469"
 ```
 
 ### SequenceType

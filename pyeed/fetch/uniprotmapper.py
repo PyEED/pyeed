@@ -34,7 +34,7 @@ class UniprotMapper:
             ec_number = None
 
         protein_info = ProteinRecord(
-            accession_id=uniprot_data["accession"],
+            id=uniprot_data["accession"],
             sequence=uniprot_data["sequence"]["sequence"],
             name=uniprot_data["protein"]["recommendedName"]["fullName"]["value"],
             ec_number=ec_number,
@@ -47,8 +47,6 @@ class UniprotMapper:
             for go_annotation in uniprot_data["dbReferences"]
             if go_annotation["type"] == "GO"
         ]
-
-        print(global_go_annotations)
 
         return protein_info
 
