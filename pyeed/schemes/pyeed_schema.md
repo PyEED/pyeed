@@ -125,6 +125,8 @@ classDiagram
         +FAMILY
         +MOTIVE
         +CODING_SEQ
+        +ALPHAHELIX
+        +BETASTRAND
     }
     
     class SequenceType {
