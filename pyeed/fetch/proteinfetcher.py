@@ -9,9 +9,11 @@ from rich.progress import Progress
 
 from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
-from pyeed.fetch.requester import AsyncRequester
+from pyeed.fetch.requester import AsyncRequester, AsyncParamRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
 from pyeed.fetch.uniprotmapper import UniprotMapper
+from pyeed.fetch.pdbmapper import PDBMapper
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class ProteinFetcher:
 
         """
         db_entries = SortIDs.sort(self.ids)
+        param_requester = None
 
         with Progress(
             console=Console(**console_kwargs),
@@ -107,9 +110,74 @@ class ProteinFetcher:
                         )
                     )
 
+                elif db_name == DBPattern.PDB.name:
+                    task_id = progress.add_task(
+                        f"Requesting sequences from {db_name}...", total=len(db_ids)
+                    )
+
+                    query_string = """
+                    query {
+                      entry(entry_id: "SEQUENCE_ID") {
+                        polymer_entities {
+                          rcsb_id
+                          rcsb_polymer_entity_container_identifiers {
+                            reference_sequence_identifiers {
+                              database_accession
+                              database_name
+                            }
+                          }
+                          rcsb_entity_source_organism {
+                            ncbi_taxonomy_id
+                          }
+                          entity_poly {
+                            pdbx_seq_one_letter_code
+                          }
+                          rcsb_polymer_entity_feature {
+                            type
+                            feature_id
+                            feature_positions {
+                              beg_seq_id
+                              end_seq_id
+                            }
+                          }
+                          polymer_entity_instances {
+                            rcsb_id
+                            rcsb_polymer_instance_feature {
+                              name
+                              feature_positions {
+                                beg_seq_id
+                                end_seq_id
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    """
+
+                    query = {"query": query_string}
+
+                    param_requester = AsyncParamRequester(
+                        ids=db_ids,
+                        url = "https://data.rcsb.org/graphql",
+                        params=query,
+                        task_id=task_id,
+                        progress=progress,
+                        batch_size=1,
+                        rate_limit=50,
+                        n_concurrent=20,
+                    )
+
             responses = await asyncio.gather(
                 *[requester.make_request() for requester in requesters]
             )
+
+            if param_requester:
+                pdb_entries = await param_requester.make_request()
+                pdb_entries = [PDBMapper().map_pdb_data(entry) for entry in pdb_entries]
+                pdb_entries = [item for sublist in pdb_entries for item in sublist]
+
+
 
             # map data to objects
             ncbi_responses, uniprot_response = self.identify_data_source(responses)
@@ -121,11 +189,14 @@ class ProteinFetcher:
             ]
 
             uniprot_entries.extend(ncbi_entries)
+            if param_requester:
+                uniprot_entries.extend(pdb_entries)
 
             # get taxonomy data
-            unique_tax_ids = list(
-                set([entry.organism.taxonomy_id for entry in uniprot_entries])
-            )
+            unique_tax_ids = []
+            for entry in uniprot_entries:
+                if entry.organism and entry.organism.taxonomy_id not in unique_tax_ids:
+                    unique_tax_ids.append(entry.organism.taxonomy_id)
 
             task_id = progress.add_task(
                 "Requesting taxonomy data from EBI...", total=len(unique_tax_ids)
@@ -154,6 +225,8 @@ class ProteinFetcher:
 
             for entry in uniprot_entries:
                 for organism in organisms:
+                    if not entry.organism:
+                        continue
                     if entry.organism.taxonomy_id == organism.taxonomy_id:
                         entry.organism = organism
 
@@ -226,3 +299,12 @@ class ProteinFetcher:
                     uniprot_dict[target_id] = (uniprot_response, interpro_response)
 
         return uniprot_dict
+
+if __name__ == "__main__":
+    import asyncio
+    from rich.progress import Progress
+    from rich import print
+
+    ids = ["6VXX", "7NHM", "5L2G"]
+
+    res = asyncio.run(ProteinFetcher(ids).fetch())
