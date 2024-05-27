@@ -76,7 +76,6 @@ class UniprotMapper:
 
         protein_info = ProteinRecord(
             id=uniprot["accession"],
-            accession_id=uniprot["accession"],
             sequence=uniprot["sequence"]["sequence"],
             name=uniprot["protein"]["recommendedName"]["fullName"]["value"],
             ec_number=ec_number,
