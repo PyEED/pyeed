@@ -47,7 +47,7 @@ class StandardNumbering(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
+        default="8a37de9455d136d5661c7cc077ce66512dedfac8"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
