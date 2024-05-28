@@ -22,12 +22,12 @@ class AbstractAnnotation(
         default_factory=lambda: str(uuid4()),
     )
 
-    uri: Optional[str] = element(
+    url: Optional[str] = element(
         description="URI of the annotation.",
         default=None,
-        tag="uri",
+        tag="url",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_1047",
+            term="http://semanticscience.org/resource/SIO_000811",
         ),
     )
 
@@ -36,7 +36,7 @@ class AbstractAnnotation(
         default=None,
         tag="accession_id",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_2091",
+            term="http://semanticscience.org/resource/SIO_000675",
         ),
     )
 
@@ -44,14 +44,12 @@ class AbstractAnnotation(
         description="A name of a sequence feature, e.g. the name of a feature",
         default=None,
         tag="name",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2099",
-        ),
+        json_schema_extra=dict(),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="09207e10bb1bfb6e6916b6ef62932c6b08209190"
+        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

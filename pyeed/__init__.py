@@ -12,6 +12,7 @@ from .core.organism import Organism
 from .core.pairwisealignmentresult import PairwiseAlignmentResult
 from .core.proteinrecord import ProteinRecord
 from .core.region import Region
+from .core.regionset import RegionSet
 from .core.sequence import Sequence
 from .core.sequencerecord import SequenceRecord
 from .core.sequencetype import SequenceType

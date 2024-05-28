@@ -38,7 +38,7 @@ class Sequence(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="09207e10bb1bfb6e6916b6ef62932c6b08209190"
+        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -62,7 +62,7 @@ class Sequence(
         Returns:
             str: Sequence in FASTA format
         """
-        return f">{self.source_id}\n{self.sequence}"
+        return f">{self.id}\n{self.sequence}"
 
     def __str__(self) -> str:
         return self.fasta_string()

@@ -43,13 +43,13 @@ class TestProteinRecord:
         assert protein_record.organism.family == "Hominidae"
         assert protein_record.organism.genus == "Homo"
         assert protein_record.organism.species == "sapiens"
-    
-    
+
+
     # add a region to ProteinInfo object
     def test_add_region_to_protein_info(self):
         protein_record = ProteinRecord(
             name="MyProtein",
-            source_id="ABC123",
+            id="ABC123",
             sequence="MVKLQWERTY",
             organism=Organism(
                 name="Homo sapiens",
@@ -66,7 +66,7 @@ class TestProteinRecord:
         )
 
         region = protein_record.add_to_regions(
-            start=1, 
+            start=1,
             end=10,
             id="SpecialRegion",
         )
@@ -81,7 +81,7 @@ class TestProteinRecord:
     def test_add_site_to_protein_info(self):
         protein_record = ProteinRecord(
             name="MyProtein",
-            source_id="ABC123",
+            id="ABC123",
             sequence="MVKLQWERTY",
             organism=Organism(
                 name="Homo sapiens",

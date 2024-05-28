@@ -1,6 +1,7 @@
 ---
 prefixes:
-  EDAM: http://edamontology.org/
+  sio: http://semanticscience.org/resource/
+  edam: http://edamontology.org/
 ---
 
 # Sequence data model
@@ -11,109 +12,108 @@ prefixes:
 
 A molecular sequence and associated annotation data.
 
-- uri
+- id
   - Type: string
-  - Description: URI of the sequence.
-  - Term: EDAM:data_1047
-- accession_id
-  - Type: string
-  - Description: Accession ID of the sequence.
-  - Term: EDAM:data_2091
+  - Description: Unique identifier of the sequence.
+  - Term: sio:SIO_000729
 - name
   - Type: string
   - Description: Arbitrary name of the sequence.
-  - Term: EDAM:data_2099
+  - Term: sio:SIO_000116
 - organism
   - Type: Organism
   - Description: The organism from which the sequence was obtained.
-  - Term: EDAM:data_2530
-
-### ProteinRecord[_SequenceRecord_] (EDAM:data_2886)
-
-A protein sequence and associated metadata.
-
+  - Term: sio:SIO_010000
 - **sequence**
   - Type: string
-  - Description: Amino acid sequence of the protein.
-  - Term: EDAM:data_2976
-- regions
-  - Type: Region[]
-  - Description: Defines regions within the protein sequence
-  - Term: EDAM:data_1255
-- sites
-  - Type: Site[]
-  - Description: Defines sites within the protein sequence
-  - Term: EDAM:data_1255
-- coding_sequence
-  - Type: Region[]
-  - Description: Defines the coding sequence of the protein
-  - Term: EDAM:topic_3511
-- ec_number
-  - Type: string
-  - Description: An Enzyme Commission (EC) number of an enzyme.
-  - Term: EDAM:data_1011
-- mol_weight
-  - Type: float
-  - Description: Calculated molecular weight of the protein
-- pdb_uri
-  - Type: string
-  - Description: Protein Data Bank (PDB) identifier.
-  - Term: EDAM:data_1047
-
-### DNARecord[_SequenceRecord_] (EDAM:data_2887)
-
-A nucleic acid sequence and associated metadata. 🧬.
-
-- **sequence**
-  - Type: string
-  - Description: Nucleotide sequence.
-  - Term: EDAM:data_3494
-- regions
-  - Type: Region[]
-  - Description: Defines regions within the nucleotide sequence.
-  - Term: EDAM:data_1255
+  - Description: The letter sequence of the macromolecule.
+  - Term: sio:SIO_000030
+- seq_length
+  - Type: integer
+  - Description: Length of the sequence.
+  - Term: sio:SIO_000041
 - sites
   - Type: Site[]
   - Description: Defines sites within the nucleotide sequence.
-  - Term: EDAM:data_1255
+- regions
+  - Type: Region[]
+  - Description: Defines regions within the nucleotide sequence.
+- region_sets
+  - Type: RegionSet[]
+  - Description: Multiple regions forming a higher order structure or feature of a sequence.
+
+### ProteinRecord(_SequenceRecord_) (sio:SIO_010043)
+
+A protein sequence and associated metadata.
+
+- structure_id
+  - Type: string
+  - Description: Protein Data Bank (PDB) identifier.
+  - Term: sio:SIO_000729
+- coding_sequence
+  - Type: Region[]
+  - Description: Defines the coding sequence of the protein
+  - Term: sio:SIO_001390
+- ec_number
+  - Type: string
+  - Description: An Enzyme Commission (EC) number of an enzyme.
+  - Term: edam:data_1011
+- mol_weight
+  - Type: float
+  - Description: Calculated molecular weight of the protein based on the sequence.
+  - Term: edam:data_1505
+
+### DNARecord(_SequenceRecord_) (sio:SIO_010008)
+
+A nucleic acid sequence and associated metadata 🧬
+
 - gc_content
   - Type: float
   - Description: GC content of the sequence.
 
 ### AbstractAnnotation
 
-- uri
+- url
   - Type: string
   - Description: URI of the annotation.
-  - Term: EDAM:data_1047
+  - Term: sio:SIO_000811
 - accession_id
   - Type: string
   - Description: Accession ID of the annotation.
-  - Term: EDAM:data_2091
+  - Term: sio:SIO_000675
 - name
   - Type: string
   - Description: A name of a sequence feature, e.g. the name of a feature
-  - Term: EDAM:data_2099
 
-### Site[_AbstractAnnotation_]
+### Site(_AbstractAnnotation_) (sio:sio:010049)
 
 Position(s) constituting a site within a sequence.
 
 - positions
   - Type: integer[]
   - Description: Position of the site(s) within the sequence.
-  - Term: EDAM:data_1016
+  - Term: sio:SIO_000056
 
-### Region
+### Region(_AbstractAnnotation_) (sio:SIO_000370)
 
 Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions.
 
 - start
   - Type: integer
   - Description: Start position of the site.
+  - Term: sio:SIO_000943
 - end
   - Type: integer
   - Description: End position of the site.
+  - Term: sio:SIO_000953
+
+### RegionSet (sio:SIO_000370)
+
+A set of regions forming a higher order structure. For example, a set of exons in a gene, or a set of secondary structures forming a super-secondary structure.
+
+- regions
+  - Type: Region[]
+  - Description: Regions of the cluster.
 
 ### Organism
 
@@ -122,18 +122,18 @@ Description of an organism 🦠.
 - **taxonomy_id**
   - Type: integer
   - Description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group in the NCBI taxonomy database.
-  - Term: EDAM:data_1179
+  - Term: edam:data_1179
 - name
   - Type: string
   - Description: The name of an organism (or group of organisms).
-  - Term: EDAM:data_2909
+  - Term: edam:data_2909
 - domain
   - Type: string
   - Description: Domain of the organism
 - kingdom
   - Type: string
   - Description: Kingdom of the organism
-  - Term: EDAM:data_1044
+  - Term: edam:data_1044
 - phylum
   - Type: string
   - Description: Phylum of the organism
@@ -146,15 +146,15 @@ Description of an organism 🦠.
 - family
   - Type: string
   - Description: The name of a family of organism.
-  - Term: EDAM:data_2732
+  - Term: edam:data_2732
 - genus
   - Type: string
   - Description: The name of a genus of organism.
-  - Term: EDAM:data_1870
+  - Term: edam:data_1870
 - species
   - Type: string
   - Description: The name of a species (typically a taxonomic group) of organism.
-  - Term: EDAM:data_1045
+  - Term: edam:data_1045
 
 ## Sequence Search
 
@@ -197,20 +197,6 @@ Description of an organism 🦠.
 - db_name
   - Type: string
   - Description: Name of the database to search.
-
-## Clusters
-
-### Cluster
-
-- name
-  - Type: string
-  - Description: Name of the cluster.
-- representative
-  - Type: Sequence
-  - Description: Identifier of the representative sequence of the cluster.
-- members
-  - Type: Sequence[]
-  - Description: Sequences of the cluster.
 
 ## Alignments
 
@@ -290,6 +276,7 @@ Ontology terms for different sections of a sequence.
 ```python
 ACTIVE_SITE = "http://semanticscience.org/resource/SIO_010041"
 BINDING_SITE = "http://semanticscience.org/resource/SIO_010040"
+ALLOSTERIC_SITE = "http://semanticscience.org/resource/SIO_010050"
 DOMAIN = "http://semanticscience.org/resource/SIO_001379"
 FAMILY = "http://semanticscience.org/resource/SIO_001380"
 MOTIVE = "http://semanticscience.org/resource/SIO_000131"

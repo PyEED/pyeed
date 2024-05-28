@@ -6,19 +6,23 @@ site_author: Max Häußler
 
 nav:
   - 🏠 Home: index.md
-  - ⚡️ Quick Start:
+  - ⚡️ Examples:
+    - Basics: examples/basics.ipynb
+    - Alignments: examples/alignment.ipynb
+    - Networks: examples/network.ipynb
+  - 🧰 Tools:
     - quick_start/index.md
     - The Sequence objects: quick_start/basics.md
     - Finding Sequences: quick_start/blast.md
     - Aligning Sequences: quick_start/alignments.md
     - Clustering Sequences: quick_start/clustering.md
     - Creating Sequence Networks: quick_start/networks.md
-  - 🔎 Examples:
-    - Basics: usecases/usecase1.md
   - ⬇️ Installation:
     - PyEED Docker Service: installation/docker.md
     - via PIP: installation/via_pip.md
-    #- deprecated: installation/jupyterlab.md
+
+plugins:
+  - mkdocs-jupyter
 
 theme:
   name: material
@@ -29,7 +33,6 @@ theme:
     - navigation.instant.preview
     - navigation.indexes
     - navigation.footer
-
     - content.action.view
     - navigation.tabs
     - navigation.sections

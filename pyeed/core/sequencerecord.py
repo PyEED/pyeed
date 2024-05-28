@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 import sdRDM
@@ -9,6 +9,9 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 from .organism import Organism
+from .region import Region
+from .regionset import RegionSet
+from .site import Site
 
 
 class SequenceRecord(
@@ -24,21 +27,12 @@ class SequenceRecord(
         default_factory=lambda: str(uuid4()),
     )
 
-    uri: Optional[str] = element(
-        description="URI of the sequence.",
+    id: Optional[str] = element(
+        description="Unique identifier of the sequence.",
         default=None,
-        tag="uri",
+        tag="id",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_1047",
-        ),
-    )
-
-    accession_id: Optional[str] = element(
-        description="Accession ID of the sequence.",
-        default=None,
-        tag="accession_id",
-        json_schema_extra=dict(
-            term="http://edamontology.org/data_2091",
+            term="http://semanticscience.org/resource/SIO_000729",
         ),
     )
 
@@ -47,7 +41,7 @@ class SequenceRecord(
         default=None,
         tag="name",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_2099",
+            term="http://semanticscience.org/resource/SIO_000116",
         ),
     )
 
@@ -56,13 +50,60 @@ class SequenceRecord(
         default=None,
         tag="organism",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_2530",
+            term="http://semanticscience.org/resource/SIO_010000",
+        ),
+    )
+
+    sequence: str = element(
+        description="The letter sequence of the macromolecule.",
+        tag="sequence",
+        json_schema_extra=dict(
+            term="http://semanticscience.org/resource/SIO_000030",
+        ),
+    )
+
+    seq_length: Optional[int] = element(
+        description="Length of the sequence.",
+        default=None,
+        tag="seq_length",
+        json_schema_extra=dict(
+            term="http://semanticscience.org/resource/SIO_000041",
+        ),
+    )
+
+    sites: List[Site] = element(
+        description="Defines sites within the nucleotide sequence.",
+        default_factory=ListPlus,
+        tag="sites",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
+    )
+
+    regions: List[Region] = element(
+        description="Defines regions within the nucleotide sequence.",
+        default_factory=ListPlus,
+        tag="regions",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
+    )
+
+    region_sets: List[RegionSet] = element(
+        description=(
+            "Multiple regions forming a higher order structure or feature of a"
+            " sequence."
+        ),
+        default_factory=ListPlus,
+        tag="region_sets",
+        json_schema_extra=dict(
+            multiple=True,
         ),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="09207e10bb1bfb6e6916b6ef62932c6b08209190"
+        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -78,3 +119,116 @@ class SequenceRecord(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
+
+    def add_to_sites(
+        self,
+        positions: List[int] = ListPlus(),
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> Site:
+        """
+        This method adds an object of type 'Site' to attribute sites
+
+        Args:
+            id (str): Unique identifier of the 'Site' object. Defaults to 'None'.
+            positions (): Position of the site(s) within the sequence.. Defaults to ListPlus()
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
+        """
+
+        params = {
+            "positions": positions,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = Site(**params)
+
+        self.sites.append(obj)
+
+        return self.sites[-1]
+
+    def add_to_regions(
+        self,
+        start: Optional[int] = None,
+        end: Optional[int] = None,
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> Region:
+        """
+        This method adds an object of type 'Region' to attribute regions
+
+        Args:
+            id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
+            start (): Start position of the site.. Defaults to None
+            end (): End position of the site.. Defaults to None
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
+        """
+
+        params = {
+            "start": start,
+            "end": end,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = Region(**params)
+
+        self.regions.append(obj)
+
+        return self.regions[-1]
+
+    def add_to_region_sets(
+        self,
+        regions: List[Region] = ListPlus(),
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> RegionSet:
+        """
+        This method adds an object of type 'RegionSet' to attribute region_sets
+
+        Args:
+            id (str): Unique identifier of the 'RegionSet' object. Defaults to 'None'.
+            regions (): Regions of the cluster.. Defaults to ListPlus()
+        """
+
+        params = {
+            "regions": regions,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = RegionSet(**params)
+
+        self.region_sets.append(obj)
+
+        return self.region_sets[-1]
+
+    def fasta_string(self):
+        """Return the sequence as a fasta formatted string."""
+
+        return f">{self.id}\n{self.sequence}\n"
+
+    def to_fasta(self, path):
+        """Write the sequence to a FASTA file."""
+
+        with open(path, "w") as f:
+            f.write(self.fasta_string())

@@ -10,7 +10,8 @@ from IPython.display import clear_output
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
-from rich.status import Console, Status
+from rich.console import Console
+from rich.status import Status
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
@@ -20,7 +21,6 @@ from pyeed.fetch.proteinfetcher import ProteinFetcher
 from .dnarecord import DNARecord
 from .region import Region
 from .sequencerecord import SequenceRecord
-from .site import Site
 
 
 class ProteinRecord(
@@ -36,31 +36,12 @@ class ProteinRecord(
         default_factory=lambda: str(uuid4()),
     )
 
-    sequence: str = element(
-        description="Amino acid sequence of the protein.",
-        tag="sequence",
+    structure_id: Optional[str] = element(
+        description="Protein Data Bank (PDB) identifier.",
+        default=None,
+        tag="structure_id",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_2976",
-        ),
-    )
-
-    regions: List[Region] = element(
-        description="Defines regions within the protein sequence",
-        default_factory=ListPlus,
-        tag="regions",
-        json_schema_extra=dict(
-            multiple=True,
-            term="http://edamontology.org/data_1255",
-        ),
-    )
-
-    sites: List[Site] = element(
-        description="Defines sites within the protein sequence",
-        default_factory=ListPlus,
-        tag="sites",
-        json_schema_extra=dict(
-            multiple=True,
-            term="http://edamontology.org/data_1255",
+            term="http://semanticscience.org/resource/SIO_000729",
         ),
     )
 
@@ -70,7 +51,7 @@ class ProteinRecord(
         tag="coding_sequence",
         json_schema_extra=dict(
             multiple=True,
-            term="http://edamontology.org/topic_3511",
+            term="http://semanticscience.org/resource/SIO_001390",
         ),
     )
 
@@ -84,24 +65,17 @@ class ProteinRecord(
     )
 
     mol_weight: Optional[float] = element(
-        description="Calculated molecular weight of the protein",
+        description="Calculated molecular weight of the protein based on the sequence.",
         default=None,
         tag="mol_weight",
-        json_schema_extra=dict(),
-    )
-
-    pdb_uri: Optional[str] = element(
-        description="Protein Data Bank (PDB) identifier.",
-        default=None,
-        tag="pdb_uri",
         json_schema_extra=dict(
-            term="http://edamontology.org/data_1047",
+            term="http://edamontology.org/data_1505",
         ),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="09207e10bb1bfb6e6916b6ef62932c6b08209190"
+        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -118,76 +92,13 @@ class ProteinRecord(
 
         return self
 
-    def add_to_regions(
-        self,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
-        id: Optional[str] = None,
-        **kwargs,
-    ) -> Region:
-        """
-        This method adds an object of type 'Region' to attribute regions
-
-        Args:
-            id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
-            start (): Start position of the site.. Defaults to None
-            end (): End position of the site.. Defaults to None
-        """
-
-        params = {
-            "start": start,
-            "end": end,
-        }
-
-        if id is not None:
-            params["id"] = id
-
-        obj = Region(**params)
-
-        self.regions.append(obj)
-
-        return self.regions[-1]
-
-    def add_to_sites(
-        self,
-        positions: List[int] = ListPlus(),
-        uri: Optional[str] = None,
-        accession_id: Optional[str] = None,
-        name: Optional[str] = None,
-        id: Optional[str] = None,
-        **kwargs,
-    ) -> Site:
-        """
-        This method adds an object of type 'Site' to attribute sites
-
-        Args:
-            id (str): Unique identifier of the 'Site' object. Defaults to 'None'.
-            positions (): Position of the site(s) within the sequence.. Defaults to ListPlus()
-            uri (): URI of the annotation.. Defaults to None
-            accession_id (): Accession ID of the annotation.. Defaults to None
-            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
-        """
-
-        params = {
-            "positions": positions,
-            "uri": uri,
-            "accession_id": accession_id,
-            "name": name,
-        }
-
-        if id is not None:
-            params["id"] = id
-
-        obj = Site(**params)
-
-        self.sites.append(obj)
-
-        return self.sites[-1]
-
     def add_to_coding_sequence(
         self,
         start: Optional[int] = None,
         end: Optional[int] = None,
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
         id: Optional[str] = None,
         **kwargs,
     ) -> Region:
@@ -198,11 +109,17 @@ class ProteinRecord(
             id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
             start (): Start position of the site.. Defaults to None
             end (): End position of the site.. Defaults to None
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
         """
 
         params = {
             "start": start,
             "end": end,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
         }
 
         if id is not None:
@@ -228,7 +145,6 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -250,7 +166,6 @@ class ProteinRecord(
 
         import nest_asyncio
 
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -287,7 +202,6 @@ class ProteinRecord(
         """
 
         from pyeed.fetch.blast import BlastProgram
-        from pyeed.fetch.proteinfetcher import ProteinFetcher
 
         nest_asyncio.apply()
 
@@ -328,7 +242,7 @@ class ProteinRecord(
         self,
         n_hits: int,
         e_value: float = 10.0,
-        database: str = "nr",
+        db: str = "swissprot",
         matrix: str = "BLOSUM62",
         identity: float = 0.0,
         **kwargs,
@@ -339,7 +253,7 @@ class ProteinRecord(
         Args:
             n_hits (int): The number of hits to retrieve.
             e_value (float, optional): The maximum E-value threshold for reporting hits. Defaults to 10.0.
-            database (str, optional): The database to search against. Defaults to "nr".
+            db (str, optional): The database to search against. Defaults to "swissprot".
             matrix (str, optional): The substitution matrix to use. Defaults to "BLOSUM62".
             identity (float, optional): The minimum sequence identity threshold for reporting hits. Defaults to 0.0.
             **kwargs: Additional keyword arguments.
@@ -361,7 +275,9 @@ class ProteinRecord(
 
         nest_asyncio.apply()
 
-        assert database in NCBIDataBase
+        assert (
+            db in NCBIDataBase
+        ), f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
 
         program = BlastProgram.BLASTP.value
         executor = ThreadPoolExecutor(max_workers=1)
@@ -376,12 +292,12 @@ class ProteinRecord(
         with Status(
             "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
         ):
-            result = asyncio.run(blaster.async_run(database, program, executor))
+            result = asyncio.run(blaster.async_run(db, program, executor))
             clear_output()
 
         accessions = blaster.extract_accession(result)
 
-        return asyncio.run(ProteinFetcher(ids=accessions).fetch(force_terminal=False))
+        return self.get_ids(accessions)
 
     # def blastp(
     #     self,

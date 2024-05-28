@@ -5,8 +5,10 @@ import logging
 import re
 from typing import TYPE_CHECKING, List
 
-from Bio import SeqFeature, SeqIO
+from Bio import SeqIO
+from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
+from pydantic import ValidationError
 
 from pyeed.core.annotation import Annotation
 from pyeed.core.dnarecord import DNARecord
@@ -44,9 +46,16 @@ class NCBIProteinMapper:
 
         protein_infos = []
         for record in seq_records:
+
             protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
 
-            protein_info.organism = Organism(**self.map_organism(record))
+            try:
+                protein_info.organism = Organism(**self.map_organism(record))
+            except ValidationError as e:
+                LOGGER.error(
+                    f"Error mapping organism for {record.id}: {e.errors()} {e.json()}"
+                )
+                continue
 
             protein_info = self.map_protein(record, protein_info)
 
@@ -67,7 +76,7 @@ class NCBIProteinMapper:
         """
 
         feature = self.get_feature(seq_record, "source")
-        if len(feature) != 1:
+        if len(feature) < 1:
             LOGGER.debug(
                 f"Multiple features ({len(feature)}) of type `source` found for {seq_record.id}: {feature}"
             )
@@ -78,16 +87,19 @@ class NCBIProteinMapper:
                 LOGGER.info(
                     f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
                 )
-                return None
+                return {}
 
-            taxonomy_id = feature.qualifiers["db_xref"][0]
+            try:
+                taxonomy_id = next(feature for feature in feature.qualifiers["db_xref"] if "taxon" in feature)
+                if ":" in taxonomy_id:
+                    taxonomy_id = taxonomy_id.split(":")[1]
+            except StopIteration:
+                taxonomy_id = None
 
-            if ":" in taxonomy_id:
-                taxonomy_id = int(taxonomy_id.split(":")[1])
 
         except KeyError:
             LOGGER.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")
-            return None
+            return {}
 
         try:
             organism_name = feature.qualifiers["organism"]
@@ -95,9 +107,9 @@ class NCBIProteinMapper:
             LOGGER.debug(
                 f"No organism name found for {seq_record.id}: {feature[0].qualifiers}"
             )
-            organism_name = None
+            organism_name = ""
 
-        return {"name": organism_name[0], "taxonomy_id": taxonomy_id}
+        return {"id": taxonomy_id, "name": organism_name[0], "taxonomy_id": taxonomy_id}
 
     def map_protein(self, seq_record: SeqRecord, protein_info: ProteinRecord):
         """Maps protein data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
@@ -259,7 +271,7 @@ class NCBIProteinMapper:
 
         return regions
 
-    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
+    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> List[SeqFeature]:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
             feature

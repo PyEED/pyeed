@@ -16,10 +16,10 @@ To install Docker, follow the instructions for your operating system on the [Doc
 
 1. **Install Docker**: Follow the instructions for your operating system on the [Docker website](https://docs.docker.com/get-docker/).
 
-2. **[Download](https://github.com/PyEED/pyeed/archive/refs/heads/main.zip
+2. **[Download](https://github.com/PyEED/PyEED_JupyterLab/archive/refs/heads/main.zip
 ) the PyEED Docker Service**
 
-3. **Start the Service** by running the following steps:
+4. **Start the Service** by running the following steps:
 === "Windows"
 
     1. Open the command line by pressing ++windows+r++ and type `powershell`.

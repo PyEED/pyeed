@@ -21,9 +21,9 @@ class AsyncRequester:
         self,
         ids: List[str],
         url: str,
-        batch_size: int = None,
-        rate_limit: int = None,
-        n_concurrent: int = None,
+        batch_size: int,
+        rate_limit: int,
+        n_concurrent: int,
         progress: Progress = None,
         task_id: TaskID = None,
     ):
@@ -66,7 +66,7 @@ class AsyncRequester:
         url = args.url
 
         LOGGER.debug(f"Sending request to {url}")
-        response = await client.get(url, timeout=30)
+        response = await client.get(url, timeout=120)
 
         LOGGER.debug(f"Received response from {url}. Code: {response.status_code}")
 
