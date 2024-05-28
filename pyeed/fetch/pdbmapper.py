@@ -100,6 +100,7 @@ class PDBMapper:
                                     end=strand["end_seq_id"]
                                 )
                                 region.add_object_term(Annotation.BETASTRAND.value)
+                                region.add_object_term("http://edamontology.org/topic_3542") # secondary structure
 
                         elif feature["name"] == "helix":
                             for helix in feature["feature_positions"]:
@@ -109,6 +110,8 @@ class PDBMapper:
                                     end=helix["end_seq_id"]
                                 )
                                 region.add_object_term(Annotation.ALPHAHELIX.value)
+                                region.add_object_term("http://edamontology.org/topic_3542") # secondary structure
+
 
                         elif feature["name"] == "binding_site":
                             positions = [site["beg_seq_id"] for site in feature["feature_positions"]]
