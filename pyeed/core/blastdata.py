@@ -90,7 +90,7 @@ class BlastData(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="63f43b11e0d359e1d0a1f541cea25dd484ad0072"
+        default="5ca1d8073b90b91effc0fe9e3aaa578caf05980f"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
