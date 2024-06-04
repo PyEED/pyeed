@@ -103,7 +103,7 @@ class SequenceRecord(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="168d235e6e92241f60cd348daf3f00fc28812a44"
+        default="5ca1d8073b90b91effc0fe9e3aaa578caf05980f"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
