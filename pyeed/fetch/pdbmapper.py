@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 import json
-import re
-from typing import List, Dict, Optional, TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, List
 
-from pyeed.core import Organism
-from pyeed.core.ontology import Ontology
-from pyeed.core.region import Region
-from pyeed.core import Annotation
+from pyeed.core import Annotation, Organism
 
 if TYPE_CHECKING:
     from pyeed.core import ProteinRecord
@@ -17,6 +12,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(logging.StreamHandler())
+
 
 class PDBMapper:
     def __init__(self):
@@ -30,7 +26,7 @@ class PDBMapper:
         pdb_entries = json.loads(pdb_data)
         entries = pdb_entries["data"]["entry"]["polymer_entities"]
         try:
-            assert(len(entries) > 0), f"No entries found in the PDB data {pdb_data}"
+            assert len(entries) > 0, f"No entries found in the PDB data {pdb_data}"
         except TypeError:
             return []
         for entry in entries:
@@ -39,8 +35,12 @@ class PDBMapper:
             seq_organism = entry["rcsb_entity_source_organism"]
             try:
                 seq_id = next(
-                    (identifier["database_accession"] for identifier in seq_info["reference_sequence_identifiers"] if "database_accession" in identifier),
-                    None
+                    (
+                        identifier["database_accession"]
+                        for identifier in seq_info["reference_sequence_identifiers"]
+                        if "database_accession" in identifier
+                    ),
+                    None,
                 )
             except TypeError:
                 continue
@@ -49,8 +49,12 @@ class PDBMapper:
 
             try:
                 tax_id = next(
-                    (identifier["ncbi_taxonomy_id"] for identifier in seq_organism if "ncbi_taxonomy_id" in identifier),
-                    None
+                    (
+                        identifier["ncbi_taxonomy_id"]
+                        for identifier in seq_organism
+                        if "ncbi_taxonomy_id" in identifier
+                    ),
+                    None,
                 )
             except TypeError:
                 tax_id = None
@@ -65,11 +69,11 @@ class PDBMapper:
             else:
                 organism = None
 
-
             prot_record = ProteinRecord(
                 id=seq_id,
                 sequence=sequence,
-                organism=organism
+                organism=organism,
+                structure_id=structure_id,
             )
 
             if entry["rcsb_polymer_entity_feature"]:
@@ -84,11 +88,11 @@ class PDBMapper:
                             )
                             region.add_object_term(Annotation.FAMILY.value)
 
-
-
             try:
                 for instance in entry["polymer_entity_instances"]:
-                    polymer_instances = instance.get("rcsb_polymer_instance_feature", None)
+                    polymer_instances = instance.get(
+                        "rcsb_polymer_instance_feature", None
+                    )
                     if not polymer_instances:
                         continue
                     for feature in instance["rcsb_polymer_instance_feature"]:
@@ -97,30 +101,34 @@ class PDBMapper:
                                 region = prot_record.add_to_regions(
                                     name=feature["name"],
                                     start=strand["beg_seq_id"],
-                                    end=strand["end_seq_id"]
+                                    end=strand["end_seq_id"],
                                 )
                                 region.add_object_term(Annotation.BETASTRAND.value)
-                                region.add_object_term("http://edamontology.org/topic_3542") # secondary structure
+                                region.add_object_term(
+                                    "http://edamontology.org/topic_3542"
+                                )  # secondary structure
 
                         elif feature["name"] == "helix":
                             for helix in feature["feature_positions"]:
                                 region = prot_record.add_to_regions(
                                     name=feature["name"],
                                     start=helix["beg_seq_id"],
-                                    end=helix["end_seq_id"]
+                                    end=helix["end_seq_id"],
                                 )
                                 region.add_object_term(Annotation.ALPHAHELIX.value)
-                                region.add_object_term("http://edamontology.org/topic_3542") # secondary structure
-
+                                region.add_object_term(
+                                    "http://edamontology.org/topic_3542"
+                                )  # secondary structure
 
                         elif feature["name"] == "binding_site":
-                            positions = [site["beg_seq_id"] for site in feature["feature_positions"]]
+                            positions = [
+                                site["beg_seq_id"]
+                                for site in feature["feature_positions"]
+                            ]
                             site = prot_record.add_to_sites(
-                                name=feature["name"],
-                                positions=positions
+                                name=feature["name"], positions=positions
                             )
                             site.add_object_term(Annotation.BINDING_SITE.value)
-
 
             except KeyError:
                 pass
