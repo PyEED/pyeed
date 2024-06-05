@@ -33,6 +33,11 @@ class Site(
         ),
     )
 
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="c4dc30f3647be7da5ea591f8946893ffad69d647"
+    )
+
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")

@@ -6,11 +6,9 @@ from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
-from sdRDM.base.utils import forge_signature
 from sdRDM.tools.utils import elem2dict
 
 
-@forge_signature
 class NumberedSequence(
     sdRDM.DataModel,
     search_mode="unordered",
@@ -38,6 +36,11 @@ class NumberedSequence(
         json_schema_extra=dict(
             multiple=True,
         ),
+    )
+
+    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
+    _commit: Optional[str] = PrivateAttr(
+        default="c4dc30f3647be7da5ea591f8946893ffad69d647"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
