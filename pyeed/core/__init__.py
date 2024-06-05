@@ -5,6 +5,7 @@ from .blastdata import BlastData
 from .clustalomegaresult import ClustalOmegaResult
 from .cluster import Cluster
 from .dnarecord import DNARecord
+from .numberedsequence import NumberedSequence
 from .ontology import Ontology
 from .organism import Organism
 from .pairwisealignmentresult import PairwiseAlignmentResult

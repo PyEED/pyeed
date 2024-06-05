@@ -13,6 +13,8 @@ classDiagram
     ProteinRecord *-- Region
     RegionSet *-- Region
     AlignmentResult *-- Sequence
+    AlignmentResult *-- StandardNumbering
+    StandardNumbering *-- NumberedSequence
     
     class SequenceRecord {
         +string id
@@ -89,6 +91,7 @@ classDiagram
         +string consensus
         +Sequence[0..*] sequences
         +Sequence[0..*] aligned_sequences
+        +StandardNumbering standard_numbering
     }
     
     class PairwiseAlignmentResult {
@@ -100,8 +103,12 @@ classDiagram
     }
     
     class StandardNumbering {
-        +str reference_accession_id
-        +str numbered_accession_id
+        +str reference_id
+        +NumberedSequence[0..*] numberd_sequences
+    }
+    
+    class NumberedSequence {
+        +string numbered_id
         +string[0..*] numbering
     }
     

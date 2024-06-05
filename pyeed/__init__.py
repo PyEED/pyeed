@@ -7,6 +7,7 @@ from .core.blastdata import BlastData
 from .core.clustalomegaresult import ClustalOmegaResult
 from .core.cluster import Cluster
 from .core.dnarecord import DNARecord
+from .core.numberedsequence import NumberedSequence
 from .core.ontology import Ontology
 from .core.organism import Organism
 from .core.pairwisealignmentresult import PairwiseAlignmentResult
