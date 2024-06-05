@@ -47,11 +47,6 @@ class AbstractAnnotation(
         json_schema_extra=dict(),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="5ca1d8073b90b91effc0fe9e3aaa578caf05980f"
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")

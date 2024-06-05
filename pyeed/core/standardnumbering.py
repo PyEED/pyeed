@@ -8,6 +8,8 @@ from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
+from .numberedsequence import NumberedSequence
+
 
 class StandardNumbering(
     sdRDM.DataModel,
@@ -22,32 +24,20 @@ class StandardNumbering(
         default_factory=lambda: str(uuid4()),
     )
 
-    reference_accession_id: Optional[str] = element(
+    reference_id: Optional[str] = element(
         description="Standard numbering of the reference sequence",
         default=None,
-        tag="reference_accession_id",
+        tag="reference_id",
         json_schema_extra=dict(),
     )
 
-    numbered_accession_id: Optional[str] = element(
-        description="Standard numbering of the query sequence",
-        default=None,
-        tag="numbered_accession_id",
-        json_schema_extra=dict(),
-    )
-
-    numbering: List[str] = element(
-        description="Standard numbering of the aligned sequence",
+    numberd_sequences: List[NumberedSequence] = element(
+        description="Numbered sequence of the aligned sequence",
         default_factory=ListPlus,
-        tag="numbering",
+        tag="numberd_sequences",
         json_schema_extra=dict(
             multiple=True,
         ),
-    )
-
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="5ca1d8073b90b91effc0fe9e3aaa578caf05980f"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -63,3 +53,33 @@ class StandardNumbering(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
+
+    def add_to_numberd_sequences(
+        self,
+        numbered_id: Optional[str] = None,
+        numbering: List[str] = ListPlus(),
+        id: Optional[str] = None,
+        **kwargs,
+    ) -> NumberedSequence:
+        """
+        This method adds an object of type 'NumberedSequence' to attribute numberd_sequences
+
+        Args:
+            id (str): Unique identifier of the 'NumberedSequence' object. Defaults to 'None'.
+            numbered_id (): Identifier of the numbered sequence. Defaults to None
+            numbering (): Standard numbering of the aligned sequence. Defaults to ListPlus()
+        """
+
+        params = {
+            "numbered_id": numbered_id,
+            "numbering": numbering,
+        }
+
+        if id is not None:
+            params["id"] = id
+
+        obj = NumberedSequence(**params)
+
+        self.numberd_sequences.append(obj)
+
+        return self.numberd_sequences[-1]
