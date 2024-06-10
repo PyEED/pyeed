@@ -1,8 +1,9 @@
 import asyncio
 import logging
-from typing import List, NamedTuple, Optional, Dict
+from typing import Dict, List, NamedTuple, Optional
 
 import aiometer
+import tenacity
 from httpx import AsyncClient, Limits, Response
 from rich.progress import Progress, TaskID
 
@@ -51,6 +52,10 @@ class AsyncRequester:
         self.progress = Progress(disable=True)
         self.task_id = self.progress.add_task("Requesting data...", total=len(self.ids))
 
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(1),
+        stop=tenacity.stop_after_attempt(3),
+    )
     async def send_request(self, args: RequestArgs) -> str:
         """
         Sends an asynchronous HTTP GET request to the specified URL using the provided
@@ -84,6 +89,10 @@ class AsyncRequester:
 
         return response.text
 
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(0.5),
+        stop=tenacity.stop_after_attempt(3),
+    )
     async def make_request(self) -> List[str]:
         """
         Makes asynchronous HTTP GET requests to the specified URL using the provided
@@ -102,7 +111,7 @@ class AsyncRequester:
 
         async def update_progress(response: Response):
             if self.progress:
-                self.progress.update(self.task_id, advance=self.batch_size) # type: ignore
+                self.progress.update(self.task_id, advance=self.batch_size)  # type: ignore
 
         async with AsyncClient(
             event_hooks={"response": [update_progress]},
@@ -144,6 +153,7 @@ class AsyncRequester:
             batches.append(batch_string)
         self.ids = batches
         return batches
+
 
 class AsyncParamRequester:
     """Updated Requester utilizing parameters as dict for the request"""
@@ -209,24 +219,24 @@ class AsyncParamRequester:
 
         if response.status_code == 429:
             LOGGER.warning("Rate limit exceeded. Waiting for 1 second...")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
             return await self.send_request(args)
 
         return response.text
 
     async def make_request(self) -> List[str]:
+        """Handles the asynchronous HTTP GET and configures rate limits and progress bar."""
 
         all_responses = []
 
         async def update_progress(response: Response):
             if self.progress:
-                self.progress.update(self.task_id, advance=self.batch_size) # type: ignore
+                self.progress.update(self.task_id, advance=self.batch_size)  # type: ignore
 
         async with AsyncClient(
             event_hooks={"response": [update_progress]},
-            limits=Limits(max_connections=self.n_concurrent),
+            limits=Limits(max_connections=self.n_concurrent, keepalive_expiry=30),
         ) as client:
-
             tasks = []
             for id in self.ids:
                 params = self.params.copy()
