@@ -1,17 +1,16 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 from uuid import uuid4
 
+import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
-from .abstractannotation import AbstractAnnotation
-
 
 class Region(
-    AbstractAnnotation,
+    sdRDM.DataModel,
     search_mode="unordered",
 ):
     """Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions."""
@@ -43,7 +42,11 @@ class Region(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="ad73396d3a347dd8d413a3cbe77883edb2777380"
+        default="6cb7b2b9f86383fe9659fc93e0802306fd288462"
+    )
+
+    _object_terms: Set[str] = PrivateAttr(
+        default={"http://semanticscience.org/resource/SIO_000370"}
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
