@@ -1,0 +1,21 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/Q2FN14> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.3886e+04 ;
+    ns1:SIO_000030 "MSRNITIEMLNQIPVQDQQIELVERKCLGHPDSIADGIAEAVSRALCNTYIDQFGGVLHHNTDQGEIVAGESMPKFGGGKIIKPIFVLLDGRATKEFNGEKIAADTVALKAAKDYLRTILPELNLDQHLIMDCRLGTGSTDLRDVFKPEAGQIPRANDTSFGVSYAPFSDIEKCIREISSYIDTTLRPKYPVYGTDIKIMGLRQGNTIKLTICCAMVDRYVSSLSDYVNYREKLAEEALKVAKTCTDKKVEVSVNTADCDIECSLFLTVTGTSAEMGDDGSVGRGNRANGLITPHRPMSMEATSGKNPINHIGKIYNLLSNELAHTCVEKVDGIAEIQVRLLSQIGSPIDQPLVASAQIIPKPSFTVKDIERDVYEIIDSGLENITSVTERVIRGELKTF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007796.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/abe325ca-bbb5-4d2e-bb75-a07256f33119> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007796.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/abe325ca-bbb5-4d2e-bb75-a07256f33119> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 323259 ;
+    ns2:data_1870 "Methanospirillum" ;
+    ns2:data_2732 "Methanospirillaceae" ;
+    ns2:data_2909 "Methanospirillum hungatei JF-1" .
+

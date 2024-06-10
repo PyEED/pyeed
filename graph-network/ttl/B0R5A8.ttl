@@ -1,0 +1,21 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/B0R5A8> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.4115e+04 ;
+    ns1:SIO_000030 "MTDRNIQVQSLDRSAVEDDAVEIVERKGLGHPDSICDGIAEHVCETLAREYRDRVGHVLHFNTDETQLVAGDAAPAFGGGNVIDPIYILVVGRATSHYVEADGTEHHIPVESIALEAAREYLRETLPHLDLETDVIVDVKLGEGSGDLQDVFTDDDDGPAVPMANDTSFGVGHAPLTETERIVLEAERSLNGPYAEHTPAVGEDVKVMGKREDDHIDLTIAAALVDAHVPDMDAYIAQVEAIREHVFDLATEHTDREVTVHVNTADDYESGSIYLTTTGTSAEQGDDGSVGRGNRANGLITPNRAMSMEATSGKNPVNHIGKIYNLLSTQIAEAVVAEVDGIRDLRVRLLSQIGRPIDEPHVADVEVVTEDGTAVADVDAEIERIVDAQLASVTDLTRRVIDGERTTF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_010364.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e68a4bba-3b91-4fa5-a9b9-18a275c4baec> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_010364.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e68a4bba-3b91-4fa5-a9b9-18a275c4baec> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 478009 ;
+    ns2:data_1870 "Halobacterium" ;
+    ns2:data_2732 "Halobacteriaceae" ;
+    ns2:data_2909 "Halobacterium salinarum R1" .
+

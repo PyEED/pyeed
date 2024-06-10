@@ -1,0 +1,21 @@
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/A2BIZ8> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.5109e+04 ;
+    ns2:SIO_000030 "MPRNIVVESVKLQPVEEQSVELVERKGLGHPDTIADAAAEISSQYLSRYYIEKYGTILHHNLDKVLVVGGQAAPRFGGGEVLQPIYIIVSGRATTEVRLPDGKTERIPIGTIILRAVKEWIREKFRFLDPESHIIVDYKVGQGSADLVGIYELGKDSVPLANDTSVGVGFAPFSTLEQLVLETERLLNSKEFKEKNPEVGEDIKVMGLRRGRKIELTIAAAIISSLVQDLDHYLSVKEAIKEAVLDLASRIAPDYDVEVYVNTADKPDKGIVYITVTGTSAEHGDDGMTGRGNRSYGLITPLRPMSLEAAAGKNPVSHVGKIYNVMALNIARRIYDNVSGIREVYVKLLSQIGRPINDPLIANIKVVSEKPGEPLPSNALREIEAIVEEELDKYQELTKLFVEGKITIF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008818.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a08d4dc9-67da-4e41-aa99-66d9ce608fb1> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008818.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a08d4dc9-67da-4e41-aa99-66d9ce608fb1> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 415426 ;
+    ns1:data_1870 "Hyperthermus" ;
+    ns1:data_2732 "Pyrodictiaceae" ;
+    ns1:data_2909 "Hyperthermus butylicus DSM 5456" .
+

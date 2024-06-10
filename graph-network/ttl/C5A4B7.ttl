@@ -1,0 +1,21 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/C5A4B7> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.4529e+04 ;
+    ns1:SIO_000030 "MVEKVRNIVVEELVRTPVEMQEVELVERKGIGHPDSIADGIAEAVSRALSREYLKRYGIILHHNTDQVEVVGGRAYPQFGGGEVIKPIYILLSGRAVELVDREEFPVHQVAIKAAKDYLKKAVRHLDIENHVVIDSRIGQGSVDLVGVFNKAKENPIPLANDTSFGVGYAPLSETERIVLETEKLLNSEEFKKKCPAVGEDIKVMGLRKGDEIDLTIAAAIVDSEVSNPDDYMAVKEEIYEAAKGVVEEHTQRPTKIFVNTADDPKNGIYYITVTGTSAEAGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVSHVGKIYNLLSMLIANDIAEQVEGVQEVYVRILSQIGKPIDEPLVASIQIIPKKGYSIDVLQKPAYEIADAWLADVTKIQKMILDDKLNVF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012804.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/47d72045-33b1-4226-bb62-8c5ee7d2b20e> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/47d72045-33b1-4226-bb62-8c5ee7d2b20e> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 593117 ;
+    ns2:data_1870 "Thermococcus" ;
+    ns2:data_2732 "Thermococcaceae" ;
+    ns2:data_2909 "Thermococcus gammatolerans EJ3" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012804.1> a <https://github.com/PyEED/pyeed/Region> .
+

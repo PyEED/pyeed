@@ -1,0 +1,20 @@
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NQE45598.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns1:data_1011 "2.5.1.6" ;
+    ns2:SIO_000030 "MNEPVVRNISVEFVSKKAVGDQEIEMVERKGLGHPDSLCDGIADAVSVALCKEYMKKCGMILHHNTDKVQLVAGRSCPDYGGGEVISPIYIMLGGRATGNFGGEEIPTEIVAITATKEYLRKTVRNLDVESHVVVESRLGKGSSDLLSVFGSNTKAVPMANDTSFGVAHAPFSETESIAFNVENEVMAKYRDKERAVGEDMKVMALREKDKITITICDAFVSKYVDDYEHYEAAKRGLREFASDVAETYTNKDVITLVNTADTPESVYITVTGTSAEMGDDGAVGRGNRCNGLITPNRSISMEAAAGKNPVNHTGKIYNLLAGKIANEIVDSVDGVREVDIKILSEIGRRIDDPKVATAQIITNSGVNRGAMEKKVERVIDEWLSNITDITEMVIREELKTF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/QBUM01000194.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/5459477b-3c38-4637-ac61-556c86a400d3> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/5459477b-3c38-4637-ac61-556c86a400d3> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 2081358 ;
+    ns1:data_2909 "ANME-1 cluster archaeon GoMg2" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/QBUM01000194.1> a <https://github.com/PyEED/pyeed/Region> ;
+    ns2:SIO_000943 5805 ;
+    ns2:SIO_000953 7013 .
+

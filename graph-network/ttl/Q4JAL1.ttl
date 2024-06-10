@@ -1,0 +1,21 @@
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/Q4JAL1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.4089e+04 ;
+    ns2:SIO_000030 "MAKNINVQQSHWANPDKLEVELAERKGVGHPDYIADSASEEASRKLSLYYLKAFGTILHHNLDKTLVVGGQATPKYKGGDVVQPIYVIVSGRATTEVKTPSGVENIPIGTIIIESVKDWIKENFRYLDVEKHVVVDYKIGKGSTDLVGLFEANKQVPLSNDTSFGVGFAPYSTLENLVLSTERLLNSKEIRSKIPEIGEDIKVMGLRKGKEIELTVAMATISQLIDDLNHYLQVKEEAKQKILDLASKLAPEYSVKVNINTGDKIDKGIVYLTVTGTSAEHGDDGMTGRGNRATGLITPMRPMSLEATAGKNPVNHVGKLYNVLANLIAQKVHKDVKGINGVQVEILGQIGRPINDPLIANVQLAAENITTEIKREVEGITDELLSSVTKLSELILESKTMLF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP046615.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/88945964-a981-4796-9307-dcce42986a79> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/88945964-a981-4796-9307-dcce42986a79> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 330779 ;
+    ns1:data_1870 "Sulfolobus" ;
+    ns1:data_2732 "Sulfolobaceae" ;
+    ns1:data_2909 "Sulfolobus acidocaldarius DSM 639" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP046615.1> a <https://github.com/PyEED/pyeed/Region> .
+
