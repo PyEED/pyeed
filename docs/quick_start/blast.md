@@ -1,34 +1,23 @@
 # Using BLAST
 
 ## Using NCBI BLAST
-NCBI offers a web interface for blasting. With PyEED this can be programmatically accessed. A BLAST search can be initiated by calling the `ncbi_blast()` method on a `ProteinInfo` object. The method returns the found sequences as a list of `ProteinInfo` objects.
+NCBI offers a web interface for blasting. With PyEED this can be programmatically accessed. A BLAST search can be initiated by calling the `ncbi_blast()` method on a `ProteinRecord` object. The method returns the found sequences as a list of `ProteinRecord` objects. As additional parameters, the `ncbi_blast()` method accepts the following arguments:
+
+- n_hits (int): The number of hits to return.
+- e_value (float): The e-value threshold for the search.
+- db (str): The database to search in. The default is `swissprot`.
+- matrix (str): The matrix to use for the search. The default is `BLOSUM62`.
+- identity (float): The minimum identity percentage for the search. The default is `0.0`.
 
 ``` py
-from pyEED.core import ProteinInfo
+from pyeed.core import ProteinRecord
 
 # Create a ProteinInfo object
-protein = ProteinInfo.get_id("UCS38941.1")
+protein = ProteinRecord.get_id("UCS38941.1")
 
 # Perform a BLAST search
-blast_results = protein.ncbi_blastp()
+blast_results = protein.ncbi_blast()
 ```
 !!! info "NCBI BLAST performance"
 
     Due to server-side limitations of NCBI, BLAST searches might be slowed down or even be blocked, if multiple searches are performed in a short time.
-
-
-
-
-## Using BLAST with a local database
-
-Building a local BLAST database is a good way to speed up BLAST searches. PyEED allows BLAST searches against local databases. The `blastp()` method can be called on a `ProteinInfo` object. The method returns the found sequences as a list of `ProteinInfo` objects.
-
-``` py
-
-    blast_results = protein.blastp(
-        db_path="/PATH/TO/LOCAL/BLAST/DB",
-        n_hits=200,
-        e_value=0.001,
-        word_size=3,
-    )
-```

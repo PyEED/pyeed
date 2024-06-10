@@ -7,17 +7,20 @@ A sequence object can be created by passing a sequence string to the constructor
 === "Protein"
 
     ``` py
-    from pyeed.core import ProteinInfo
+    from pyeed.core import ProteinRecord
 
-    protein = ProteinInfo(sequence="MTEITAAMVKELREDKAVQLLREKGLGK")
+    protein = ProteinRecord(
+        name="My Protein",
+        sequence="MTEITAAMVKELREDKAVQLLREKGLGK"
+    )
     ```
 
 === "DNA"
 
     ``` py
-    from pyeed.core import DNAInfo
+    from pyeed.core import DNARecord
 
-    dna = DNAInfo(sequence="ATGCGTACGTCGATCGATCGATCGATCGATCGATCGATCGATCGTAGTC")
+    dna = DNARecord(sequence="ATGCGTACGTCGATCGATCGATCGATCGATCGATCGATCGATCGTAGTC")
     ```
 
 
@@ -28,27 +31,13 @@ Besides adding sequence information manually, PyEED also allows searching for se
 === "Protein"
 
     ``` py
-    protein = ProteinInfo.get_id("UCS38941.1")
+    protein = ProteinRecord.get_id("UCS38941.1")
     ```
 
 === "DNA"
 
     ``` py
-    dna = DNAInfo.get_id("NC_000913.3")
-    ```
-
-Alternatively, the sequence can be initiated from a sequence string, triggering a BLAST search in the NCBI database. If the sequence is found, the sequence object is filled with the corresponding information.
-
-=== "Protein"
-
-    ``` py
-    # Not yet implemented
-    ```
-
-=== "DNA"
-
-    ``` py
-    # Not yet implemented
+    # Not implemented
     ```
 
 ## ⬇️ Save a sequence
@@ -57,12 +46,6 @@ Alternatively, the sequence can be initiated from a sequence string, triggering 
 
 The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML` file format. Therefore, the respective method can be used.
 The file path is passed as an argument to the method.
-
-=== "FASTA"
-
-    ``` py
-    protein.to_fasta("protein.fasta")
-    ```
 
 === "JSON"
 
@@ -82,8 +65,14 @@ The file path is passed as an argument to the method.
     protein.to_xml("protein.xml")
     ```
 
+=== "FASTA"
+
+    ``` py
+    protein.to_fasta("protein.fasta")
+    ```
+
 ### To database
-Alternatively, sequence data can be stored in a `PostgreSQL` database. Therefore, the `to_db()` method can be used.
+Alternatively, sequence data can be stored in a graph database. Therefore, the `to_db()` method can be used.
 
 ```py
 # Feature is currently implemented
