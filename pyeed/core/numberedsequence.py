@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 import sdRDM
@@ -9,7 +9,7 @@ from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
 
-class Sequence(
+class NumberedSequence(
     sdRDM.DataModel,
     search_mode="unordered",
 ):
@@ -22,18 +22,20 @@ class Sequence(
         default_factory=lambda: str(uuid4()),
     )
 
-    sequence_id: Optional[str] = element(
-        description="Identifier of the sequence in the source database",
+    numbered_id: Optional[str] = element(
+        description="Identifier of the numbered sequence",
         default=None,
-        tag="sequence_id",
+        tag="numbered_id",
         json_schema_extra=dict(),
     )
 
-    sequence: Optional[str] = element(
-        description="Molecular sequence.",
-        default=None,
-        tag="sequence",
-        json_schema_extra=dict(),
+    numbering: List[str] = element(
+        description="Standard numbering of the aligned sequence",
+        default_factory=ListPlus,
+        tag="numbering",
+        json_schema_extra=dict(
+            multiple=True,
+        ),
     )
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
@@ -54,15 +56,3 @@ class Sequence(
                 self._raw_xml_data[attr] = elem2dict(value)
 
         return self
-
-    def fasta_string(self) -> str:
-        """
-        This method returns the sequence in FASTA format
-
-        Returns:
-            str: Sequence in FASTA format
-        """
-        return f">{self.id}\n{self.sequence}"
-
-    def __str__(self) -> str:
-        return self.fasta_string()

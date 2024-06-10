@@ -14,9 +14,9 @@ nav:
     - quick_start/index.md
     - The Sequence objects: quick_start/basics.md
     - Finding Sequences: quick_start/blast.md
-    - Aligning Sequences: quick_start/alignments.md
-    - Clustering Sequences: quick_start/clustering.md
-    - Creating Sequence Networks: quick_start/networks.md
+    #- Aligning Sequences: quick_start/alignments.md
+    #- Clustering Sequences: quick_start/clustering.md
+    #- Creating Sequence Networks: quick_start/networks.md
   - ⬇️ Installation:
     - PyEED Docker Service: installation/docker.md
     - via PIP: installation/via_pip.md
