@@ -1,11 +1,5 @@
 ```mermaid
 classDiagram
-    SequenceRecord <-- ProteinRecord
-    SequenceRecord <-- DNARecord
-    AbstractAnnotation <-- Site
-    AbstractAnnotation <-- Region
-    AlignmentResult <-- PairwiseAlignmentResult
-    AlignmentResult <-- ClustalOmegaResult
     SequenceRecord *-- Site
     SequenceRecord *-- Region
     SequenceRecord *-- RegionSet
@@ -73,9 +67,9 @@ classDiagram
     class BlastData {
         +float identity
         +float evalue
-        +int n_hits
+        +integer n_hits
         +string substitution_matrix
-        +int word_size
+        +integer word_size
         +float gap_open
         +float gap_extend
         +float threshold
@@ -98,12 +92,12 @@ classDiagram
         +float score
         +float identity
         +float similarity
-        +int gaps
-        +int mismatches
+        +integer gaps
+        +integer mismatches
     }
     
     class StandardNumbering {
-        +str reference_id
+        +string reference_id
         +NumberedSequence[0..*] numberd_sequences
     }
     
