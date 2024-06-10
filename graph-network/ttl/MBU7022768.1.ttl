@@ -1,0 +1,20 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/MBU7022768.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns1:SIO_000030 "MNITVETLSRLPLEEQDIEIVERKGIGHPDSICDGIAESVSRSLSRCYIEECGRILHHNTDQVELVGGKSNPFFGGGEILQPMYLLLSGRATMHFNDGEQRSVPTHRIAIQAAREYLEDNLPNCDVDSHVVIDSRMGEGSVDLKENFEEDQVVPRANDTSFGVCFAPLTETEKLVYNAERFLNSADFKKKFPMLGEDIKIMGLRTKNEIQLMVAAAFISSRVDTRQEYERLKEEINEEIIEEFSEQFSRKLKVDINTADTGHSAYLTVTGTSSEMGDDGSVGRGNRVTGLITPYRPMSMEAAAGKNPVSHVGKIYNLLARRIAEEVAELEGVAEVQIYLLSQIGHPINDPAEACARLVTKSHTSARELEPEIKEIMSRNIKSVTQITNLVVEGSLDVF" ;
+    ns1:SIO_000116 "methionine adenosyltransferase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JACVGX010000021.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/caf56546-ea75-424f-9818-3d2a61260256> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JACVGX010000021.1> a <https://github.com/PyEED/pyeed/Region> ;
+    ns1:SIO_000943 6241 ;
+    ns1:SIO_000953 7437 .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/caf56546-ea75-424f-9818-3d2a61260256> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 2747605 ;
+    ns2:data_2909 "Theionarchaea archaeon" .
+

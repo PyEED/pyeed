@@ -1,0 +1,21 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/Q9HM12> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.4402e+04 ;
+    ns1:SIO_000030 "MERNISVEELHQIPTPKKEVEIVERKGIGHPDSVADGIAEAVSRSLSKYYIEHYGRILHHNTDQVEVVGGQSAPKYGGGLVLEPTYILLSGRATTKVGNDRVPFKSITIKAARDYLREHFRHLDVDADVMIDSRIGQGSVDLVEVYDTKKLEANDTSFGVGFAPLSETETMVLNTEKYLNGELKKKMPMVGYDIKVMGFRQKDTINLTVAAAMVDKYIHDADEYFNIKDELKQLVLDNAVEYTDKEVKVYINTADIKEDGKAVGYLTVTGMSMENGDDGSVGRGNRVNGLITPYRAMSMEAAAGKNPVTHVGKLYNVLSNKIANDIVKEEGNDIAEVLVRIVSQIGRPIDDPHVASVQVIYEGNVDHSKHKNNIRNLVDDRLAHISDLTMEFVEGKIPVF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_002578.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/d1bea0c8-b95c-4549-926b-97bf4af1fb40> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_002578.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/d1bea0c8-b95c-4549-926b-97bf4af1fb40> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 273075 ;
+    ns2:data_1870 "Thermoplasma" ;
+    ns2:data_2732 "Thermoplasmataceae" ;
+    ns2:data_2909 "Thermoplasma acidophilum DSM 1728" .
+

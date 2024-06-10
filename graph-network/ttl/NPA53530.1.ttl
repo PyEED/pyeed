@@ -1,0 +1,20 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NPA53530.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns1:SIO_000030 "MANISIGSLDFPKVSEQPVEIVERKGTGHPDTICDALAEELSIALSEMYRKECGAIMHHNVDKALLIGGIADPKFGGGEMISPIEVYLTGRAINELNGKRLPVEELAIETAHKWLKENIPNLDVSKHIIIIPKLKPGSKDLVELFERFQLKGEIPLANDTSFGTGYAPFDDTETIVYELERALNNKEFKKEHPYVGEDIKVMGVRNYDNIRITIAMAFVDKYVKDVKDYLEKKEIVQKYAHDLAQKLTTRKVDIFINTADDPQNESVYITVTGTSAEAGDDGQVGRGNRVNGLITPYRPMSLEAAAGKNPVSHIGKIYNTAAMDMAERIVAEFEEVEETYVYLVSQIGKPITEPQVCDIKLRTNKDIKSLEEAVRKIAEEELEKLPETWKKFLQRHFRLY" ;
+    ns1:SIO_000116 "methionine adenosyltransferase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADDV010000058.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/2b0a822a-b4ba-4f19-8871-ff6702ec9f10> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/2b0a822a-b4ba-4f19-8871-ff6702ec9f10> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 2202151 ;
+    ns2:data_2909 "Aquificota bacterium" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADDV010000058.1> a <https://github.com/PyEED/pyeed/Region> ;
+    ns1:SIO_000943 8990 ;
+    ns1:SIO_000953 10192 .
+

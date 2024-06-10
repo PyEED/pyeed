@@ -1,0 +1,21 @@
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/A1RSD7> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.4432e+04 ;
+    ns2:SIO_000030 "MIVIEKVDKTPVVKRLVEIVERKGQGHPDYIADGISEWVSRYLSRYYLEHFGIILHHNVDKTLVVGGQAAPRFGGGEVLQPIYILVSGRATYEVRTKDGVIKVPLGTLVMQAARDWIKQHFRFLDPDTHVVIDYKIGQGSADLVGIYDLGVKSVPLANDTSVGVGYAPLTPLEQLVYKTERLLNSRDFKAKYPEVGEDVKVMGVRVGKEVKLTVAAAMISKLVKDKSHYLSVKEDVKKAVEDLASKVAPEYNIEVVVNAADKPEHGIFYLTVTGTSAEHGDDGMTGRGNRANGLITPMRSMSLEAAAGKNPVSHVGKIYNVVAQRIADKVYNQVKDIIEVYVEIVSQIGKPINEPKILNVEIIKSGELTGEVRNEVEAIAREEIEKITQITDYILRGEVSLY" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008701.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/aa1d4a0b-d74a-4103-a0bf-fd8a43f57ef0> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008701.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/aa1d4a0b-d74a-4103-a0bf-fd8a43f57ef0> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 384616 ;
+    ns1:data_1870 "Pyrobaculum" ;
+    ns1:data_2732 "Thermoproteaceae" ;
+    ns1:data_2909 "Pyrobaculum islandicum DSM 4184" .
+

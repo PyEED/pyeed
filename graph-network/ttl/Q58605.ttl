@@ -1,0 +1,21 @@
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/Q58605> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.5252e+04 ;
+    ns1:SIO_000030 "MRNIIVKKLDVEPIEERPTEIVERKGLGHPDSICDGIAESVSRALCKMYMEKFGTILHHNTDQVELVGGHAYPKFGGGVMVSPIYILLSGRATMEILDKEKNEVIKLPVGTTAVKAAKEYLKKVLRNVDVDKDVIIDCRIGQGSMDLVDVFERQKNEVPLANDTSFGVGYAPLSTTERLVLETERFLNSDELKNEIPAVGEDIKVMGLREGKKITLTIAMAVVDRYVKNIEEYKEVIEKVRKKVEDLAKKIADGYEVEIHINTADDYERESVYLTVTGTSAEMGDDGSVGRGNRVNGLITPFRPMSMEAASGKNPVNHVGKIYNILANLIANDIAKLEGVKECYVRILSQIGKPINEPKALDIEIITEDSYDIKDIEPKAKEIANKWLDNIMEVQKMIVEGKVTTF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000909.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/46a465f8-e9c3-43eb-8f04-1b3487171ac2> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/46a465f8-e9c3-43eb-8f04-1b3487171ac2> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 243232 ;
+    ns2:data_1870 "Methanocaldococcus" ;
+    ns2:data_2732 "Methanocaldococcaceae" ;
+    ns2:data_2909 "Methanocaldococcus jannaschii DSM 2661" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000909.1> a <https://github.com/PyEED/pyeed/Region> .
+

@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <!-- Roots -->
+    <xs:element name="SequenceRecord" type="SequenceRecordType"/>
+    <xs:element name="ProteinRecord" type="ProteinRecordType"/>
+    <xs:element name="DNARecord" type="DNARecordType"/>
+    <xs:element name="AbstractAnnotation" type="AbstractAnnotationType"/>
+    <xs:element name="Site" type="SiteType"/>
+    <xs:element name="Region" type="RegionType"/>
+    <xs:element name="RegionSet" type="RegionSetType"/>
+    <xs:element name="Organism" type="OrganismType"/>
+    <xs:element name="BlastData" type="BlastDataType"/>
+    <xs:element name="Sequence" type="SequenceType"/>
+    <xs:element name="AlignmentResult" type="AlignmentResultType"/>
+    <xs:element name="PairwiseAlignmentResult" type="PairwiseAlignmentResultType"/>
+    <xs:element name="StandardNumbering" type="StandardNumberingType"/>
+    <xs:element name="NumberedSequence" type="NumberedSequenceType"/>
+    <xs:element name="ClustalOmegaResult" type="ClustalOmegaResultType"/>
+
+    <!-- SequenceRecord Definition -->
+    <xs:complexType name="SequenceRecordType">
+        <xs:sequence>
+            <xs:element name="sequence" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        The letter sequence of the macromolecule.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Unique identifier of the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Arbitrary name of the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="organism" type="OrganismType">
+                <xs:annotation>
+                    <xs:documentation>
+                        The organism from which the sequence was obtained.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="seq_length" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        Length of the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="sites">
+                <xs:annotation>
+                    <xs:documentation>
+                        Defines sites within the nucleotide sequence.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Site" type="SiteType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="regions">
+                <xs:annotation>
+                    <xs:documentation>
+                        Defines regions within the nucleotide sequence.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Region" type="RegionType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="region_sets">
+                <xs:annotation>
+                    <xs:documentation>
+                        Multiple regions forming a higher order structure or feature of a sequence.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="RegionSet" type="RegionSetType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ProteinRecord Definition -->
+    <xs:complexType name="ProteinRecordType">
+        <xs:sequence>
+            <xs:element name="structure_id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Protein Data Bank (PDB) identifier.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="coding_sequence">
+                <xs:annotation>
+                    <xs:documentation>
+                        Defines the coding sequence of the protein
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Region" type="RegionType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="ec_number" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        An Enzyme Commission (EC) number of an enzyme.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="mol_weight" type="xs:float">
+                <xs:annotation>
+                    <xs:documentation>
+                        Calculated molecular weight of the protein based on the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- DNARecord Definition -->
+    <xs:complexType name="DNARecordType">
+        <xs:sequence>
+            <xs:element name="gc_content" type="xs:float">
+                <xs:annotation>
+                    <xs:documentation>
+                        GC content of the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- AbstractAnnotation Definition -->
+    <xs:complexType name="AbstractAnnotationType">
+        <xs:sequence>
+            <xs:element name="url" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        URI of the annotation.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="accession_id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Accession ID of the annotation.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        A name of a sequence feature, e.g. the name of a feature
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Site Definition -->
+    <xs:complexType name="SiteType">
+        <xs:sequence>
+            <xs:element name="positions" type="xs:integer"  maxOccurs="unbounded">
+                <xs:annotation>
+                    <xs:documentation>
+                        Position of the site(s) within the sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Region Definition -->
+    <xs:complexType name="RegionType">
+        <xs:sequence>
+            <xs:element name="start" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        Start position of the site.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="end" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        End position of the site.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- RegionSet Definition -->
+    <xs:complexType name="RegionSetType">
+        <xs:sequence>
+            <xs:element name="regions">
+                <xs:annotation>
+                    <xs:documentation>
+                        Regions of the cluster.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Region" type="RegionType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Organism Definition -->
+    <xs:complexType name="OrganismType">
+        <xs:sequence>
+            <xs:element name="taxonomy_id" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        A stable unique identifier for each taxon (for a species, a family, an order, or any other group in the NCBI taxonomy database.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        The name of an organism (or group of organisms).
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="domain" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Domain of the organism
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="kingdom" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Kingdom of the organism
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="phylum" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Phylum of the organism
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="tax_class" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Class of the organism
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="order" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Order of the organism
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="family" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        The name of a family of organism.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="genus" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        The name of a genus of organism.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="species" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        The name of a species (typically a taxonomic group) of organism.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- BlastData Definition -->
+    <xs:complexType name="BlastDataType">
+        <xs:sequence>
+            <xs:element name="identity" type="xs:float" default="0.0">
+                <xs:annotation>
+                    <xs:documentation>
+                        Minimum identity to safe hits.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="evalue" type="xs:float" default="10.0">
+                <xs:annotation>
+                    <xs:documentation>
+                        Expectation value (E) to safe hits.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="n_hits" type="xs:integer" default="100">
+                <xs:annotation>
+                    <xs:documentation>
+                        Number of hits to return.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="substitution_matrix" type="xs:string" default="""blosum62""">
+                <xs:annotation>
+                    <xs:documentation>
+                        Substitution matrix to use.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="word_size" type="xs:integer" default="3">
+                <xs:annotation>
+                    <xs:documentation>
+                        Word size of the initial match.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="gap_open" type="xs:float" default="11.0">
+                <xs:annotation>
+                    <xs:documentation>
+                        Gap open penalty.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="gap_extend" type="xs:float" default="1.0">
+                <xs:annotation>
+                    <xs:documentation>
+                        Gap extend penalty.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="threshold" type="xs:float" default="11">
+                <xs:annotation>
+                    <xs:documentation>
+                        Minimum score to add a word to the BLAST lookup table.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="db_name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Name of the database to search.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Sequence Definition -->
+    <xs:complexType name="SequenceType">
+        <xs:sequence>
+            <xs:element name="sequence_id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Identifier of the sequence in the source database
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="sequence" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Molecular sequence.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- AlignmentResult Definition -->
+    <xs:complexType name="AlignmentResultType">
+        <xs:sequence>
+            <xs:element name="consensus" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Consensus sequence of the alignment.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="sequences">
+                <xs:annotation>
+                    <xs:documentation>
+                        Sequences of the alignment.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Sequence" type="SequenceType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="aligned_sequences">
+                <xs:annotation>
+                    <xs:documentation>
+                        Aligned sequences as a result of the alignment.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Sequence" type="SequenceType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="standard_numbering" type="StandardNumberingType">
+                <xs:annotation>
+                    <xs:documentation>
+                        Standard numbering of the aligned sequences.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- PairwiseAlignmentResult Definition -->
+    <xs:complexType name="PairwiseAlignmentResultType">
+        <xs:sequence>
+            <xs:element name="score" type="xs:float">
+                <xs:annotation>
+                    <xs:documentation>
+                        Alignment score
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="identity" type="xs:float">
+                <xs:annotation>
+                    <xs:documentation>
+                        Ratio of identical residues in the alignment
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="similarity" type="xs:float">
+                <xs:annotation>
+                    <xs:documentation>
+                        Ratio of similar residues in the alignment
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="gaps" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        Number of gaps in the alignment
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="mismatches" type="xs:integer">
+                <xs:annotation>
+                    <xs:documentation>
+                        Number of mismatches in the alignment
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- StandardNumbering Definition -->
+    <xs:complexType name="StandardNumberingType">
+        <xs:sequence>
+            <xs:element name="reference_id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Standard numbering of the reference sequence
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="numberd_sequences">
+                <xs:annotation>
+                    <xs:documentation>
+                        Numbered sequence of the aligned sequence
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="NumberedSequence" type="NumberedSequenceType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- NumberedSequence Definition -->
+    <xs:complexType name="NumberedSequenceType">
+        <xs:sequence>
+            <xs:element name="numbered_id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Identifier of the numbered sequence
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="numbering" type="xs:string"  maxOccurs="unbounded">
+                <xs:annotation>
+                    <xs:documentation>
+                        Standard numbering of the aligned sequence
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ClustalOmegaResult Definition -->
+    <xs:complexType name="ClustalOmegaResultType">
+        <xs:sequence>
+            <xs:element name="version" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Version of the Clustal Omega software
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Enum Ontology Definition -->
+    <xs:simpleType name="OntologyType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="https://www.evidenceontology.org/term/"/>
+            <xs:enumeration value="https://amigo.geneontology.org/amigo/term/"/>
+            <xs:enumeration value="http://semanticscience.org/resource/"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <!-- Enum Annotation Definition -->
+    <xs:simpleType name="AnnotationType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010041"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010050"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010468"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010469"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010040"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_001276"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_001379"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_001380"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_000131"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <!-- Enum SequenceType Definition -->
+    <xs:simpleType name="SequenceTypeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010018"/>
+            <xs:enumeration value="http://semanticscience.org/resource/SIO_010015"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

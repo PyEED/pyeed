@@ -1,0 +1,11 @@
+[meta]
+name = "pyeed"
+description = "Python Enzyme Engineering Database"
+paths = ["../specifications/sequence_record.md"]
+
+[generate]
+shex = { out = "graph-network/schemes/pyeed.shex" }
+json-schema = { out = "graph-network/schemes/pyeed.json", root = "SequenceRecord" }
+xml-schema = { out = "graph-network/schemes/pyeed.xsd" }
+python-dataclass = { out = "graph-network/python/pyeed/models.py" }
+mk-docs = { out = "graph-network/docs/model.md" }
