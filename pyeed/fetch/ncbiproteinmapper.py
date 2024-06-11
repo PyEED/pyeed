@@ -46,10 +46,13 @@ class NCBIProteinMapper:
 
         protein_infos = []
         for record in seq_records:
-
             protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
 
             try:
+                # print(str(record.seq))
+                # print(protein_info.sequence)
+                # print(self.map_organism(record))
+                # print(protein_info)
                 protein_info.organism = Organism(**self.map_organism(record))
             except ValidationError as e:
                 LOGGER.error(
@@ -90,12 +93,15 @@ class NCBIProteinMapper:
                 return {}
 
             try:
-                taxonomy_id = next(feature for feature in feature.qualifiers["db_xref"] if "taxon" in feature)
+                taxonomy_id = next(
+                    feature
+                    for feature in feature.qualifiers["db_xref"]
+                    if "taxon" in feature
+                )
                 if ":" in taxonomy_id:
                     taxonomy_id = taxonomy_id.split(":")[1]
             except StopIteration:
                 taxonomy_id = None
-
 
         except KeyError:
             LOGGER.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")

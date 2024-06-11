@@ -33,11 +33,6 @@ class RegionSet(
         ),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="6cb7b2b9f86383fe9659fc93e0802306fd288462"
-    )
-
     _object_terms: Set[str] = PrivateAttr(
         default={"http://semanticscience.org/resource/SIO_000370"}
     )
@@ -60,6 +55,9 @@ class RegionSet(
         self,
         start: Optional[int] = None,
         end: Optional[int] = None,
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
         id: Optional[str] = None,
         **kwargs,
     ) -> Region:
@@ -70,11 +68,17 @@ class RegionSet(
             id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
             start (): Start position of the site.. Defaults to None
             end (): End position of the site.. Defaults to None
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
         """
 
         params = {
             "start": start,
             "end": end,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
         }
 
         if id is not None:

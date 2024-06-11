@@ -1,11 +1,10 @@
 import asyncio
 import warnings
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 import nest_asyncio
-import sdRDM
 from Bio.Blast import NCBIXML
 from IPython.display import clear_output
 from lxml.etree import _Element
@@ -21,10 +20,11 @@ from pyeed.fetch.proteinfetcher import ProteinFetcher
 
 from .dnarecord import DNARecord
 from .region import Region
+from .sequencerecord import SequenceRecord
 
 
 class ProteinRecord(
-    sdRDM.DataModel,
+    SequenceRecord,
     search_mode="unordered",
 ):
     """A protein sequence and associated metadata."""
@@ -73,15 +73,6 @@ class ProteinRecord(
         ),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="6cb7b2b9f86383fe9659fc93e0802306fd288462"
-    )
-
-    _object_terms: Set[str] = PrivateAttr(
-        default={"http://semanticscience.org/resource/SIO_010043"}
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
@@ -100,6 +91,9 @@ class ProteinRecord(
         self,
         start: Optional[int] = None,
         end: Optional[int] = None,
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
         id: Optional[str] = None,
         **kwargs,
     ) -> Region:
@@ -110,11 +104,17 @@ class ProteinRecord(
             id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
             start (): Start position of the site.. Defaults to None
             end (): End position of the site.. Defaults to None
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
         """
 
         params = {
             "start": start,
             "end": end,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
         }
 
         if id is not None:
