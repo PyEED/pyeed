@@ -1,16 +1,17 @@
 from typing import Dict, Optional
 from uuid import uuid4
 
-import sdRDM
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
+from .alignmentresult import AlignmentResult
+
 
 class PairwiseAlignmentResult(
-    sdRDM.DataModel,
+    AlignmentResult,
     search_mode="unordered",
 ):
     """"""
@@ -55,11 +56,6 @@ class PairwiseAlignmentResult(
         default=None,
         tag="mismatches",
         json_schema_extra=dict(),
-    )
-
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="6cb7b2b9f86383fe9659fc93e0802306fd288462"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

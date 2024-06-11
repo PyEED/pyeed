@@ -42,7 +42,7 @@ A molecular sequence and associated annotation data.
   - Type: RegionSet[]
   - Description: Multiple regions forming a higher order structure or feature of a sequence.
 
-### ProteinRecord (sio:SIO_010043) [SequenceRecord]
+### ProteinRecord(_SequenceRecord_) (sio:SIO_010043)
 
 A protein sequence and associated metadata.
 
@@ -63,7 +63,7 @@ A protein sequence and associated metadata.
   - Description: Calculated molecular weight of the protein based on the sequence.
   - Term: edam:data_1505
 
-### DNARecord (sio:SIO_010008) [SequenceRecord]
+### DNARecord(_SequenceRecord_) (sio:SIO_010008)
 
 A nucleic acid sequence and associated metadata 🧬
 
@@ -85,7 +85,7 @@ A nucleic acid sequence and associated metadata 🧬
   - Type: string
   - Description: A name of a sequence feature, e.g. the name of a feature
 
-### Site (sio:sio:010049) [AbstractAnnotation]
+### Site(_AbstractAnnotation_) (sio:sio:010049)
 
 Position(s) constituting a site within a sequence.
 
@@ -94,7 +94,7 @@ Position(s) constituting a site within a sequence.
   - Description: Position of the site(s) within the sequence.
   - Term: sio:SIO_000056
 
-### Region (sio:SIO_000370) [AbstractAnnotation]
+### Region(_AbstractAnnotation_) (sio:SIO_000370)
 
 Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions.
 
@@ -169,7 +169,7 @@ Description of an organism 🦠.
   - Description: Expectation value (E) to safe hits.
   - Default: 10.0
 - n_hits
-  - Type: integer
+  - Type: int
   - Description: Number of hits to return.
   - Default: 100
 - substitution_matrix
@@ -177,7 +177,7 @@ Description of an organism 🦠.
   - Description: Substitution matrix to use.
   - Default: "BLOSUM62"
 - word_size
-  - Type: integer
+  - Type: int
   - Description: Word size of the initial match.
   - Default: 3
   - Inclusivminimum: 2
@@ -224,7 +224,7 @@ Description of an organism 🦠.
   - Type: StandardNumbering
   - Description: Standard numbering of the aligned sequences.
 
-### PairwiseAlignmentResult [AlignmentResult]
+### PairwiseAlignmentResult(_AlignmentResult_)
 
 - score
   - Type: float
@@ -236,16 +236,16 @@ Description of an organism 🦠.
   - Type: float
   - Description: Ratio of similar residues in the alignment
 - gaps
-  - Type: integer
+  - Type: int
   - Description: Number of gaps in the alignment
 - mismatches
-  - Type: integer
+  - Type: int
   - Description: Number of mismatches in the alignment
 
 ### StandardNumbering
 
 - reference_id
-  - Type: string
+  - Type: str
   - Description: Standard numbering of the reference sequence
 - numberd_sequences
   - Type: NumberedSequence[]
@@ -260,7 +260,7 @@ Description of an organism 🦠.
   - Type: string[]
   - Description: Standard numbering of the aligned sequence
 
-### ClustalOmegaResult [AlignmentResult]
+### ClustalOmegaResult(_AlignmentResult_)
 
 - version
   - Type: string

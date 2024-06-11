@@ -101,11 +101,6 @@ class SequenceRecord(
         ),
     )
 
-    _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
-    _commit: Optional[str] = PrivateAttr(
-        default="6cb7b2b9f86383fe9659fc93e0802306fd288462"
-    )
-
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
@@ -123,6 +118,9 @@ class SequenceRecord(
     def add_to_sites(
         self,
         positions: List[int] = ListPlus(),
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
         id: Optional[str] = None,
         **kwargs,
     ) -> Site:
@@ -132,10 +130,16 @@ class SequenceRecord(
         Args:
             id (str): Unique identifier of the 'Site' object. Defaults to 'None'.
             positions (): Position of the site(s) within the sequence.. Defaults to ListPlus()
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
         """
 
         params = {
             "positions": positions,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
         }
 
         if id is not None:
@@ -151,6 +155,9 @@ class SequenceRecord(
         self,
         start: Optional[int] = None,
         end: Optional[int] = None,
+        url: Optional[str] = None,
+        accession_id: Optional[str] = None,
+        name: Optional[str] = None,
         id: Optional[str] = None,
         **kwargs,
     ) -> Region:
@@ -161,11 +168,17 @@ class SequenceRecord(
             id (str): Unique identifier of the 'Region' object. Defaults to 'None'.
             start (): Start position of the site.. Defaults to None
             end (): End position of the site.. Defaults to None
+            url (): URI of the annotation.. Defaults to None
+            accession_id (): Accession ID of the annotation.. Defaults to None
+            name (): A name of a sequence feature, e.g. the name of a feature. Defaults to None
         """
 
         params = {
             "start": start,
             "end": end,
+            "url": url,
+            "accession_id": accession_id,
+            "name": name,
         }
 
         if id is not None:
