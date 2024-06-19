@@ -220,6 +220,9 @@ Description of an organism 🦠.
 - aligned_sequences
   - Type: Sequence[]
   - Description: Aligned sequences as a result of the alignment.
+- standard_numbering
+  - Type: StandardNumbering
+  - Description: Standard numbering of the aligned sequences.
 
 ### PairwiseAlignmentResult(_AlignmentResult_)
 
@@ -241,12 +244,18 @@ Description of an organism 🦠.
 
 ### StandardNumbering
 
-- reference_accession_id
+- reference_id
   - Type: str
   - Description: Standard numbering of the reference sequence
-- numbered_accession_id
-  - Type: str
-  - Description: Standard numbering of the query sequence
+- numberd_sequences
+  - Type: NumberedSequence[]
+  - Description: Numbered sequence of the aligned sequence
+
+### NumberedSequence
+
+- numbered_id
+  - Type: string
+  - Description: Identifier of the numbered sequence
 - numbering
   - Type: string[]
   - Description: Standard numbering of the aligned sequence
@@ -281,6 +290,8 @@ DOMAIN = "http://semanticscience.org/resource/SIO_001379"
 FAMILY = "http://semanticscience.org/resource/SIO_001380"
 MOTIVE = "http://semanticscience.org/resource/SIO_000131"
 CODING_SEQ = "http://semanticscience.org/resource/SIO_001276"
+ALPHAHELIX = "http://semanticscience.org/resource/SIO_010468"
+BETASTRAND = "http://semanticscience.org/resource/SIO_010469"
 ```
 
 ### SequenceType
