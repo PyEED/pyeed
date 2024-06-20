@@ -10,9 +10,11 @@ from pymsaviz import MsaViz
 from sdRDM.base.listplus import ListPlus
 from sdRDM.tools.utils import elem2dict
 
+from pyeed.core.numberedsequence import NumberedSequence
+
+from .numberedsequence import NumberedSequence
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
-from pyeed.core.numberedsequence import NumberedSequence
 
 
 class AlignmentResult(
@@ -62,7 +64,7 @@ class AlignmentResult(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="c4dc30f3647be7da5ea591f8946893ffad69d647"
+        default="3f935fa6eb05f78811ec5ad8ed5ce3b9ce5e7207"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -163,9 +165,7 @@ class AlignmentResult(
         mv.plotfig()
         os.remove(temp_file)
 
-
     @staticmethod
-    #do we get correct results 
     def _get_numbering_string(reference: str, query: str) -> List[str]:
         """
         Assigns pairwise numbering to the reference and query sequences.
@@ -198,7 +198,6 @@ class AlignmentResult(
         print(numbering)
         return numbering
 
-
     def apply_standard_numbering(
         self,
         reference: Sequence,
@@ -220,25 +219,26 @@ class AlignmentResult(
                 "Sequences must be aligned first. Run the align() method first."
             )
 
-        if reference not in self.aligned_sequences: 
+        if reference not in self.aligned_sequences:
             raise ValueError(
-                "Reference Sequence is not part of the aligned sequences. Please choose a new reference sequence!"
+                "Reference Sequence is not part of the aligned sequences. Please choose"
+                " a new reference sequence!"
             )
 
         numbered_sequence = []
         for aligned_sequence in self.aligned_sequences:
-    
+
             numbering = self._get_numbering_string(
-                reference=reference.sequence, query=aligned_sequence.sequence #type:ignore
+                reference=reference.sequence,
+                query=aligned_sequence.sequence,  # type:ignore
             )
 
-            numbered_sequence.append(NumberedSequence(
-                numbered_id = aligned_sequence.sequence_id,
-                numbering = numbering
+            numbered_sequence.append(
+                NumberedSequence(
+                    numbered_id=aligned_sequence.sequence_id, numbering=numbering
                 )
             )
 
         self.standard_numbering = StandardNumbering(
-            reference_id=reference.sequence_id,
-            numbered_sequences=numbered_sequence
-            )
+            reference_id=reference.sequence_id, numbered_sequences=numbered_sequence
+        )

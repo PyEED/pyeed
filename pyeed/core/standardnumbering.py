@@ -31,10 +31,10 @@ class StandardNumbering(
         json_schema_extra=dict(),
     )
 
-    numbered_sequences: List[NumberedSequence] = element(
+    numberd_sequences: List[NumberedSequence] = element(
         description="Numbered sequence of the aligned sequence",
         default_factory=ListPlus,
-        tag="numbered_sequences",
+        tag="numberd_sequences",
         json_schema_extra=dict(
             multiple=True,
         ),
@@ -42,7 +42,7 @@ class StandardNumbering(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="c4dc30f3647be7da5ea591f8946893ffad69d647"
+        default="3f935fa6eb05f78811ec5ad8ed5ce3b9ce5e7207"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
@@ -59,7 +59,7 @@ class StandardNumbering(
 
         return self
 
-    def add_to_numbered_sequences(
+    def add_to_numberd_sequences(
         self,
         numbered_id: Optional[str] = None,
         numbering: List[str] = ListPlus(),
@@ -85,9 +85,6 @@ class StandardNumbering(
 
         obj = NumberedSequence(**params)
 
-        self.numbered_sequences.append(obj)
+        self.numberd_sequences.append(obj)
 
-        return self.numbered_sequences[-1]
-
-
-    
+        return self.numberd_sequences[-1]
