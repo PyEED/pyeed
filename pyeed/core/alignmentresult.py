@@ -12,6 +12,7 @@ from sdRDM.tools.utils import elem2dict
 
 from .sequence import Sequence
 from .standardnumbering import StandardNumbering
+from pyeed.core.numberedsequence import NumberedSequence
 
 
 class AlignmentResult(
@@ -161,3 +162,83 @@ class AlignmentResult(
         )
         mv.plotfig()
         os.remove(temp_file)
+
+
+    @staticmethod
+    #do we get correct results 
+    def _get_numbering_string(reference: str, query: str) -> List[str]:
+        """
+        Assigns pairwise numbering to the reference and query sequences.
+
+        Args:
+            reference (str): The reference sequence.
+            query (str): The query sequence.
+
+        Returns:
+            List[str]: A list of pairwise numbering.
+        """
+
+        numbering = []
+        reference_counter = 0
+        query_counter = 1
+
+        for ref_pos, que_pos in zip(reference, query):
+
+            if ref_pos == "-":
+                numbering.append(f"{reference_counter}.{query_counter}")
+                query_counter += 1
+            else:
+                reference_counter += 1
+                if que_pos != "-":
+                    numbering.append(f"{reference_counter}.{query_counter}")
+                    query_counter += 1
+                else:
+                    numbering.append(str(reference_counter))
+
+        print(numbering)
+        return numbering
+
+
+    def apply_standard_numbering(
+        self,
+        reference: Sequence,
+    ):
+        """
+        Apply standard numbering to the aligned sequences.
+
+        Args:
+            reference (Sequence, optional): The reference sequence to use for numbering.
+            If not provided, the first aligned sequence will be used as the reference.
+            Defaults to None.
+
+        Raises:
+            ValueError: If the sequences are not aligned.
+
+        """
+        if not self.aligned_sequences:
+            raise ValueError(
+                "Sequences must be aligned first. Run the align() method first."
+            )
+
+        if reference not in self.aligned_sequences: 
+            raise ValueError(
+                "Reference Sequence is not part of the aligned sequences. Please choose a new reference sequence!"
+            )
+
+        numbered_sequence = []
+        for aligned_sequence in self.aligned_sequences:
+    
+            numbering = self._get_numbering_string(
+                reference=reference.sequence, query=aligned_sequence.sequence #type:ignore
+            )
+
+            numbered_sequence.append(NumberedSequence(
+                numbered_id = aligned_sequence.sequence_id,
+                numbering = numbering
+                )
+            )
+
+        self.standard_numbering = StandardNumbering(
+            reference_id=reference.sequence_id,
+            numbered_sequences=numbered_sequence
+            )

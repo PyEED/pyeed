@@ -31,10 +31,10 @@ class StandardNumbering(
         json_schema_extra=dict(),
     )
 
-    numberd_sequences: List[NumberedSequence] = element(
+    numbered_sequences: List[NumberedSequence] = element(
         description="Numbered sequence of the aligned sequence",
         default_factory=ListPlus,
-        tag="numberd_sequences",
+        tag="numbered_sequences",
         json_schema_extra=dict(
             multiple=True,
         ),
@@ -59,7 +59,7 @@ class StandardNumbering(
 
         return self
 
-    def add_to_numberd_sequences(
+    def add_to_numbered_sequences(
         self,
         numbered_id: Optional[str] = None,
         numbering: List[str] = ListPlus(),
@@ -85,6 +85,9 @@ class StandardNumbering(
 
         obj = NumberedSequence(**params)
 
-        self.numberd_sequences.append(obj)
+        self.numbered_sequences.append(obj)
 
-        return self.numberd_sequences[-1]
+        return self.numbered_sequences[-1]
+
+
+    
