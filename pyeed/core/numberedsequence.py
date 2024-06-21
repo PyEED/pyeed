@@ -40,7 +40,7 @@ class NumberedSequence(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="3f48fd300e8d9af8dc391aa672f618d314088bdc"
+        default="d35ae359eb65d7f00cd257e87e23bdb1be5209f1"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)
