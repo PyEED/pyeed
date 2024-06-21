@@ -9,9 +9,9 @@
     ns1:SIO_000030 "MKRTINVVSLDQTPIEEQQIELVERKCIGHPDSIADGVAEAVSRALCREYEDRCDGVLHHNTDQGEVVAGASIPSFGGGKIVRPIYLLLTGRATKQFEGHVIPTDAISIEAARIYLAETLPTLNMERDIIVDCRMGDGSTDLRDVFKPSGSSPIPRANDTSFGVGHAPFSEVEEIILAMNQEIADTLRPKHPMIGYDIKIMGLRNGDQMTFTIASAMVDRYCSSMDDYVNMTALMQEELQAVARKHTSRKVEVAVNTADDIKNNSIFLTVNGTSAEMGDDGSVGRGNRINGLITPNRPMSMEAASGKNPINHIGKIYNLLATGIAQEACMKVDGITEMYVRLLSQIGKPIDQPLVASVQIIPEKGSDFTALSRDVEEIVNERLADITSITKRVIKGELKTF" ;
     ns1:SIO_000116 "methionine adenosyltransferase" ;
     ns1:SIO_001390 () ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/bad0e437-fc8a-4c76-9574-be2362b5f01d> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ab758229-bbb9-4c58-95eb-5c0c87c6ccf5> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/bad0e437-fc8a-4c76-9574-be2362b5f01d> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ab758229-bbb9-4c58-95eb-5c0c87c6ccf5> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 156457 ;
     ns2:data_1870 "Methanocalculus" ;
     ns2:data_2732 "Methanocalculaceae" ;

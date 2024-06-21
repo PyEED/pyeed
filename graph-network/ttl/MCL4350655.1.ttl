@@ -8,13 +8,13 @@
     ns1:SIO_000030 "MQRNISIEAIKQLTTPDRDVELVERKGIGHPDSVCDGLAEAVSRDLSKYYIKHYGKILHHNTDQVELVGGQSAPKFGGGAVLDPIYILLSGRATTKVGDERIPVKAVAVKAAKEYLKTNFKHLDHEGDIMMDSRIGHGSVDLVEVYDTSKHRANDTSFGVGFAPFTTTETLVKATEKYINGKLKEKLPAIGYDVKVMGYRQKDTINLTIAAAYVDKYVKDSREYFAIKDEFQKLLEDNASKLTDEKVNIFINTADMDGKKVTSHYLTVTGLSLENGDDGSVGRGNRVNGIITPYKPMSMEAAAGKNPVTHVGKLYNVLSNRIADRIVKEEGGDVKEVFVRIVSQIGRSIDDPHVASIQVIYADNVDASKHKSNINAIADYDLEHIFDLTQMFVDQKLDVF" ;
     ns1:SIO_000116 "methionine adenosyltransferase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAMCTS010000033.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/d2d7213e-e17c-4884-84a5-78d69e9fd54c> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/18f558d6-4dcc-46b9-b893-a2fcdad149a9> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/18f558d6-4dcc-46b9-b893-a2fcdad149a9> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 2806419 ;
+    ns2:data_2909 "Candidatus Thermoplasmatota archaeon" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAMCTS010000033.1> a <https://github.com/PyEED/pyeed/Region> ;
     ns1:SIO_000943 47509 ;
     ns1:SIO_000953 48711 .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/d2d7213e-e17c-4884-84a5-78d69e9fd54c> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 2806419 ;
-    ns2:data_2909 "Candidatus Thermoplasmatota archaeon" .
 

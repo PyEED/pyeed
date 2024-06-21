@@ -9,11 +9,11 @@
     ns1:SIO_000030 "MTDRNIQVQSLDRSAVEDDAVEIVERKGLGHPDSICDGIAEHVCETLAREYRDRVGHVLHFNTDETQLVAGDAAPAFGGGNVIDPIYILVVGRATSHYVEADGTEHHIPVESIALEAAREYLRETLPHLDLETDVIVDVKLGEGSGDLQDVFTDDDDGPAVPMANDTSFGVGHAPLTETERIVLEAERSLNGPYAEHTPAVGEDVKVMGKREDDHIDLTIAAALVDAHVPDMDAYIAQVEAIREHVFDLATEHTDREVTVHVNTADDYESGSIYLTTTGTSAEQGDDGSVGRGNRANGLITPNRAMSMEATSGKNPVNHIGKIYNLLSTQIAEAVVAEVDGIRDLRVRLLSQIGRPIDEPHVADVEVVTEDGTAVADVDAEIERIVDAQLASVTDLTRRVIDGERTTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_010364.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e5979664-3a8d-4a4c-aaff-9fae574902e9> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e68a4bba-3b91-4fa5-a9b9-18a275c4baec> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_010364.1> a <https://github.com/PyEED/pyeed/Region> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e5979664-3a8d-4a4c-aaff-9fae574902e9> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e68a4bba-3b91-4fa5-a9b9-18a275c4baec> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 478009 ;
     ns2:data_1870 "Halobacterium" ;
     ns2:data_2732 "Halobacteriaceae" ;

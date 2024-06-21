@@ -9,13 +9,13 @@
     ns2:SIO_000030 "MTERNIHVQPASGLAVEDQDIEVVERKGIGHPDTICDGIAETVSRALAQTYIDRFGTVLHYNTDETQLVAGTAAPAYGGGEVLEPIYILVVGRATKKFDGERIPAESIALRAARDYLDEQFPHLDLGSDVIVDVQFGEGSGDLQTVFGEEAAIPMANDTSYGVGHAPLTETEQIVRNTEQKLTGEYAESNPVVGQDVKVMGKREGDHIDVTVAVAMVDEHVPDLDAYKTAVSDVRAFVTDLAEEYTDRDVTVHVNTADDYDAESIYLTTTGTSAEQGDDGSVGRGNRANGLITPNRPMSMEATSGKNPVNHIGKIYNLLSTEIAQSVANEVDGIRQVQMRLLSQIGSPIDEPHVADATVVTEDGVAVGDVEADIQATIDDELADVTDITRQVIEGDLSTF" ;
     ns2:SIO_000116 "S-adenosylmethionine synthase" ;
     ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP039138.1> ) ;
-    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/875e1a3c-e191-4016-b971-af67baaf7278> .
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a9a2eb34-b172-4f01-bbce-cef1e6215859> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/875e1a3c-e191-4016-b971-af67baaf7278> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP039138.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a9a2eb34-b172-4f01-bbce-cef1e6215859> a <https://github.com/PyEED/pyeed/Organism> ;
     ns1:data_1179 272569 ;
     ns1:data_1870 "Haloarcula" ;
     ns1:data_2732 "Haloarculaceae" ;
     ns1:data_2909 "Haloarcula marismortui ATCC 43049" .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP039138.1> a <https://github.com/PyEED/pyeed/Region> .
 

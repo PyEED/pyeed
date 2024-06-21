@@ -1,20 +1,20 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/TMJ11138.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns1:SIO_000030 "MRSITVEVLSGKPVSEHEVEIVERKGQGHPDSICDAIMERVSIELSREYQRQFGTILHHNIDKGFLVAGNAEIRLGGGRVTEPMRLIFGDRATSGMDGKQIPIDEIAISTAKRWIREHLRFVDPDEHVRYDVQIKPGSPELVDIFNRAVPSANDTSAAVGYAPLTETERLVLQTERHMNSAAFKQQFPEAGEDIKVMGCRRGDELNLTAAVAFVDRFIDSETTYFKRKHQMHEAAEEFVRAEAKTLHKITVALNTLDIPGRGLGGMYLSVTGTSAESGDSGQIGRGNKVNGVIALNRPMGTEAAAGKNPVSHVGKIYTIMTHQVADCIYREVSGIREVYVWMLSQIGTAIDHPKIAAAQIILAKRTRQDVARRRVQEILERELINITNLTRELAEGKYPVV" ;
-    ns1:SIO_000116 "methionine adenosyltransferase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/VBAI01000076.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/51869d7f-36a8-499a-bc77-115ae03b3205> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns2:SIO_000030 "MRSITVEVLSGKPVSEHEVEIVERKGQGHPDSICDAIMERVSIELSREYQRQFGTILHHNIDKGFLVAGNAEIRLGGGRVTEPMRLIFGDRATSGMDGKQIPIDEIAISTAKRWIREHLRFVDPDEHVRYDVQIKPGSPELVDIFNRAVPSANDTSAAVGYAPLTETERLVLQTERHMNSAAFKQQFPEAGEDIKVMGCRRGDELNLTAAVAFVDRFIDSETTYFKRKHQMHEAAEEFVRAEAKTLHKITVALNTLDIPGRGLGGMYLSVTGTSAESGDSGQIGRGNKVNGVIALNRPMGTEAAAGKNPVSHVGKIYTIMTHQVADCIYREVSGIREVYVWMLSQIGTAIDHPKIAAAQIILAKRTRQDVARRRVQEILERELINITNLTRELAEGKYPVV" ;
+    ns2:SIO_000116 "methionine adenosyltransferase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/VBAI01000076.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/37362b1b-9d9e-4f0b-9c7e-6a68b1c99b4f> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/51869d7f-36a8-499a-bc77-115ae03b3205> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 2569760 ;
-    ns2:data_2909 "Terrabacteria group bacterium ANGP1" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/37362b1b-9d9e-4f0b-9c7e-6a68b1c99b4f> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 2569760 ;
+    ns1:data_2909 "Terrabacteria group bacterium ANGP1" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/VBAI01000076.1> a <https://github.com/PyEED/pyeed/Region> ;
-    ns1:SIO_000943 6853 ;
-    ns1:SIO_000953 8058 .
+    ns2:SIO_000943 6853 ;
+    ns2:SIO_000953 8058 .
 

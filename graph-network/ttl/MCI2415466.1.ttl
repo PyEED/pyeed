@@ -1,22 +1,22 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/MCI2415466.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns1:SIO_000030 "MKNINIQPARIANMDNLEVELVERKGVGHPDYIADSASEEASRKLSLYYLKEFNTILHHNLDKTLVVGGQASPTFKGGEVLHPIYVIVAGRATTEVKTEKGVENVPVGTIILDAVKEWIRNNFRYLDADKHVIVDYKIGKGSADLVGIFEKSKTKPLSNDTSFGVGFAPYSTLENLVFQTERFLNSKGLKLELPEVGEDVKVMGLRRGKEIYLTIAMATISQLIDDAQHYLSVKEQVKEKVLDLAKKLAPDFDVKVFVNTGDKPENGIYYLTVTGTSAEHGDDGMTGRGNRGVGLITPMRPMSLEATAGKNPVNHVGKIYNVLANLIAKKVVEETHVLNAQVEVLGQIGRPIDDPLIVNVEVNPGNERISDDLKNEINGVVEEYLNSMQKITELILDGKVMLF" ;
-    ns1:SIO_000116 "methionine adenosyltransferase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JALBWU010000011.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/5080a672-5de5-4846-ac76-91ef6e32a65c> .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/5080a672-5de5-4846-ac76-91ef6e32a65c> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 2811097 ;
-    ns2:data_1870 "Candidatus Aramenus" ;
-    ns2:data_2732 "Sulfolobaceae" ;
-    ns2:data_2909 "Candidatus Aramenus sp." .
+    ns1:data_1011 "2.5.1.6" ;
+    ns2:SIO_000030 "MKNINIQPARIANMDNLEVELVERKGVGHPDYIADSASEEASRKLSLYYLKEFNTILHHNLDKTLVVGGQASPTFKGGEVLHPIYVIVAGRATTEVKTEKGVENVPVGTIILDAVKEWIRNNFRYLDADKHVIVDYKIGKGSADLVGIFEKSKTKPLSNDTSFGVGFAPYSTLENLVFQTERFLNSKGLKLELPEVGEDVKVMGLRRGKEIYLTIAMATISQLIDDAQHYLSVKEQVKEKVLDLAKKLAPDFDVKVFVNTGDKPENGIYYLTVTGTSAEHGDDGMTGRGNRGVGLITPMRPMSLEATAGKNPVNHVGKIYNVLANLIAKKVVEETHVLNAQVEVLGQIGRPIDDPLIVNVEVNPGNERISDDLKNEINGVVEEYLNSMQKITELILDGKVMLF" ;
+    ns2:SIO_000116 "methionine adenosyltransferase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JALBWU010000011.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a9c9c779-6008-4e53-93c3-ec0169dc771b> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JALBWU010000011.1> a <https://github.com/PyEED/pyeed/Region> ;
-    ns1:SIO_000943 9007 ;
-    ns1:SIO_000953 10218 .
+    ns2:SIO_000943 9007 ;
+    ns2:SIO_000953 10218 .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a9c9c779-6008-4e53-93c3-ec0169dc771b> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 2811097 ;
+    ns1:data_1870 "Candidatus Aramenus" ;
+    ns1:data_2732 "Sulfolobaceae" ;
+    ns1:data_2909 "Candidatus Aramenus sp." .
 

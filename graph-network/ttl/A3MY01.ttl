@@ -1,19 +1,19 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/A3MY01> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns2:data_1505 4.4404e+04 ;
-    ns1:SIO_000030 "MIVVEKVDKIPTAKRLVEIVERKGQGHPDYIADGISEWVSRYLSRYYLEHFGVILHHNVDKTLVVGGQAAPKFGGGEVIQPIYIIVSGRATSEVKTKDGTVKIPLGTIVIQAARDWLKSHFRFLDPDVHTIIDYRIGQGSADLVGIYDLGVRGVPLANDTSVGVGYAPLTPLEELVYKTERLLNSRDFKSKYPEVGEDVKVMGVRVGKEVKLTVACAMISRLVKDKSHYISVKEDVKRAIEDLAAKIMPDYNVEVTVNAADKPEYDIFYLTVTGTSAEHGDDGMTGRGNKANGLITPMRSMSLEAAAGKNPVSHVGKIYNVVAQRIADRIYKEVKDVVEVYVEVVSQIGKPINEPKILNVEILSSGELTGELRREAEAIAKEEMDRITQVTELILRGEVSLY" ;
-    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns1:SIO_001390 () ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/7324800e-f8ca-4690-abc9-72a2d45f990b> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.4404e+04 ;
+    ns2:SIO_000030 "MIVVEKVDKIPTAKRLVEIVERKGQGHPDYIADGISEWVSRYLSRYYLEHFGVILHHNVDKTLVVGGQAAPKFGGGEVIQPIYIIVSGRATSEVKTKDGTVKIPLGTIVIQAARDWLKSHFRFLDPDVHTIIDYRIGQGSADLVGIYDLGVRGVPLANDTSVGVGYAPLTPLEELVYKTERLLNSRDFKSKYPEVGEDVKVMGVRVGKEVKLTVACAMISRLVKDKSHYISVKEDVKRAIEDLAAKIMPDYNVEVTVNAADKPEYDIFYLTVTGTSAEHGDDGMTGRGNKANGLITPMRSMSLEAAAGKNPVSHVGKIYNVVAQRIADRIYKEVKDVVEVYVEVVSQIGKPINEPKILNVEILSSGELTGELRREAEAIAKEEMDRITQVTELILRGEVSLY" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 () ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6450b8c4-093b-4373-bc41-5110c58a33ee> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/7324800e-f8ca-4690-abc9-72a2d45f990b> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 410359 ;
-    ns2:data_1870 "Pyrobaculum" ;
-    ns2:data_2732 "Thermoproteaceae" ;
-    ns2:data_2909 "Pyrobaculum calidifontis JCM 11548" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6450b8c4-093b-4373-bc41-5110c58a33ee> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 410359 ;
+    ns1:data_1870 "Pyrobaculum" ;
+    ns1:data_2732 "Thermoproteaceae" ;
+    ns1:data_2909 "Pyrobaculum calidifontis JCM 11548" .
 

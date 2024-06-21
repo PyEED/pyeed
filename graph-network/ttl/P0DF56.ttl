@@ -8,13 +8,13 @@
     ns1:SIO_000030 "MDLKITNGFYDPSHLSYEVVERKGLGHPDTLADGIAEQIEIDYSLYCLDKFGVIPHHNFDKIIIRGGHSVQDFGGSDFIEPIKIIFLGRASKKCFNSSIPLFKIQKKAATKYLNRILPNLDVENYVEFETLTSDFTTKTNWFSPEAIEDLPEYLDVPKANDTATMISYWPLTISEELALMIEGYFYKLDKNELPTPRFTKMGGDIKVMVVRNDLEYSIRINFPLISKFFNNDIESQLYVDKHVEKIKKYIEQKYKNISFSIDYHYYLTTTGSCIDFGEEGAVGRGNKTHGIISSFRPNTMEAPAGKNCTYFVGKVWGFLSDTIAKEIYEAFNTPCQIIMQLNIGSKLYRPTHLFIQTEESVDQERVLEIVNRHLNNGKQNTNLILSTQHFIPKTNVYDG" ;
     ns1:SIO_000116 "Uncharacterized protein SpyM3_0382" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_004070.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/03f33076-14ce-4ebf-b22e-25f749bd8a49> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f421f7f3-ce40-495d-821e-b48e25a8f5a0> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/03f33076-14ce-4ebf-b22e-25f749bd8a49> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_004070.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f421f7f3-ce40-495d-821e-b48e25a8f5a0> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 198466 ;
     ns2:data_1870 "Streptococcus" ;
     ns2:data_2732 "Streptococcaceae" ;
     ns2:data_2909 "Streptococcus pyogenes MGAS315" .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_004070.1> a <https://github.com/PyEED/pyeed/Region> .
 

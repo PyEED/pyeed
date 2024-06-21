@@ -1,21 +1,21 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/O27429> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns2:data_1505 4.3757e+04 ;
-    ns1:SIO_000030 "MRNIIVEPLNQTPIEDQKVEIVERKGIGHPDSISDGIAESVSRALCNAYLDRFGAIMHHNTDEVQITAGESAPQFGGGEVIKPMEILLTGRGIAEVDGEKIGLDRIAISAAKEYLRENILNLDVETCAVVECKIGHGSGDLRDVFARKGRAPLSNDTSFGVGFAPFSETERIVMEAENLLNSPEFKKKHPAVGEDIKVMGLRENDNITLTVACAMVDRYVSDLEEYLEVKNVVRDEVFKIASKLTDRNLEVFVNTADRCEDDEPSVYITVTGTSAEMGDDGSVGRGNRANGLITPNRPMSMEATSGKNPINHVGKIYNLLSNQMAGDIVESVEGVKQVHIMILSQIGKPIDHPKAATAQVILEDGYTMDEVTGKVSGVMDAWLEDIPSITEMLVKGQLRTF" ;
-    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000916.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a7835ef2-1ddc-4a07-b49b-743267dbe806> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.3757e+04 ;
+    ns2:SIO_000030 "MRNIIVEPLNQTPIEDQKVEIVERKGIGHPDSISDGIAESVSRALCNAYLDRFGAIMHHNTDEVQITAGESAPQFGGGEVIKPMEILLTGRGIAEVDGEKIGLDRIAISAAKEYLRENILNLDVETCAVVECKIGHGSGDLRDVFARKGRAPLSNDTSFGVGFAPFSETERIVMEAENLLNSPEFKKKHPAVGEDIKVMGLRENDNITLTVACAMVDRYVSDLEEYLEVKNVVRDEVFKIASKLTDRNLEVFVNTADRCEDDEPSVYITVTGTSAEMGDDGSVGRGNRANGLITPNRPMSMEATSGKNPINHVGKIYNLLSNQMAGDIVESVEGVKQVHIMILSQIGKPIDHPKAATAQVILEDGYTMDEVTGKVSGVMDAWLEDIPSITEMLVKGQLRTF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000916.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/b031f78b-ae2d-47bd-8fd5-b08748b64c86> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000916.1> a <https://github.com/PyEED/pyeed/Region> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a7835ef2-1ddc-4a07-b49b-743267dbe806> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 187420 ;
-    ns2:data_1870 "Methanothermobacter" ;
-    ns2:data_2732 "Methanobacteriaceae" ;
-    ns2:data_2909 "Methanothermobacter thermautotrophicus str. Delta H" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/b031f78b-ae2d-47bd-8fd5-b08748b64c86> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 187420 ;
+    ns1:data_1870 "Methanothermobacter" ;
+    ns1:data_2732 "Methanobacteriaceae" ;
+    ns1:data_2909 "Methanothermobacter thermautotrophicus str. Delta H" .
 

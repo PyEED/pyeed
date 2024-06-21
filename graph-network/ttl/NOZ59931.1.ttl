@@ -1,20 +1,20 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NOZ59931.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns1:SIO_000030 "MPRNIFVEQVVRTPVEEQRVELVERKGIGHPDSLADGIADAVSRALCREYLEEFSCVMHHNTDQVEVVGGQADVKFGGGEVIKPIYILLSGRATTQVDDRVVPVHKIAIKAAKEYLAGSIRNLDVESDVIIDSRIGQGSVDLVDVFRRSREVPLANDTSFGVGFAPLSDAERLCYQTERYLNSEEFKRRFPESGEDIKVMGLREGDRIALTISMAMIAKHVPDMDHYISVVQQVKEEVEKLASRITEREVEVFLNTGDDYERKAVYLTVTGTSSEMGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVNHVGKIYNLLAPRIAEQITREVAGVREVYVRLLSQIGRPIDQPKAASVQLILEEGVSLSAVEGDISGIVDENLANITKITDMFIKGELTTF" ;
-    ns1:SIO_000116 "methionine adenosyltransferase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADFX010000127.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f3d098b7-4389-428f-b36d-67f3f5e24aa1> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns2:SIO_000030 "MPRNIFVEQVVRTPVEEQRVELVERKGIGHPDSLADGIADAVSRALCREYLEEFSCVMHHNTDQVEVVGGQADVKFGGGEVIKPIYILLSGRATTQVDDRVVPVHKIAIKAAKEYLAGSIRNLDVESDVIIDSRIGQGSVDLVDVFRRSREVPLANDTSFGVGFAPLSDAERLCYQTERYLNSEEFKRRFPESGEDIKVMGLREGDRIALTISMAMIAKHVPDMDHYISVVQQVKEEVEKLASRITEREVEVFLNTGDDYERKAVYLTVTGTSSEMGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVNHVGKIYNLLAPRIAEQITREVAGVREVYVRLLSQIGRPIDQPKAASVQLILEEGVSLSAVEGDISGIVDENLANITKITDMFIKGELTTF" ;
+    ns2:SIO_000116 "methionine adenosyltransferase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADFX010000127.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6ea8a35b-b402-4e73-9c84-43e8816c7067> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6ea8a35b-b402-4e73-9c84-43e8816c7067> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 2026739 ;
+    ns1:data_2909 "Euryarchaeota archaeon" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADFX010000127.1> a <https://github.com/PyEED/pyeed/Region> ;
-    ns1:SIO_000943 3223 ;
-    ns1:SIO_000953 4425 .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f3d098b7-4389-428f-b36d-67f3f5e24aa1> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 2026739 ;
-    ns2:data_2909 "Euryarchaeota archaeon" .
+    ns2:SIO_000943 3223 ;
+    ns2:SIO_000953 4425 .
 

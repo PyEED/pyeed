@@ -9,13 +9,13 @@
     ns1:SIO_000030 "MRNIKIEKAVQRPIEQNEIEVVERKGIGHPDSISDGIAEAVSRVLSQTYKEKAGHVLHHNTDEVQITAGESDPKFGGGQIIKPIQILLTGRAANEFTLPSGETKKIGVDTIAIEAAKKFLQDTIINLDVEYGTVVECKIGQGSADLRDVFQRPNTIPSSNDTSFGVGYAPFSQTENLVLKTEELLNSKDFKKQYPFVGEDIKVMGLREKEDITLTIAAAFVSKYVDDVDAYLNMKDELKNIVNDLAAKETDLSVKTLINTADDETKKDESGYYLTVTGTSAEMGDDGSVGRGNRANGLITPNRPMSMEATSGKNPINHVGKIYNLLSNEITREVVSDVEGVKSIDMIILSQIGKPIDQPRTATAHIQTEEGYSINDVEEDVTRIINKWLENITDIKEFMLEGKLRTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007681.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/67898a7c-2757-430c-844e-e3249f54e57a> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/b5fedf1e-f226-496e-a856-d02843920882> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/67898a7c-2757-430c-844e-e3249f54e57a> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007681.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/b5fedf1e-f226-496e-a856-d02843920882> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 339860 ;
     ns2:data_1870 "Methanosphaera" ;
     ns2:data_2732 "Methanobacteriaceae" ;
     ns2:data_2909 "Methanosphaera stadtmanae DSM 3091" .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007681.1> a <https://github.com/PyEED/pyeed/Region> .
 

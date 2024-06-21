@@ -1,19 +1,19 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/A0B742> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns2:data_1505 4.4179e+04 ;
-    ns1:SIO_000030 "MTRNIRVEELTQRPVEKQKIEVVERKGLGHPDSVADGIAEEISRALCKEYIERFGRVLHHNTDKIQIVAGRSRPAFGGGEVIQPQYILLTGRATRVCGDVEVPVDAIALRTARNHLKRALRNLDLDTHVIIDCKIGTGSADLCDIFDRDASTVPSANDTSYGVGYAPLSETERIVYSTEQELLSLRSRIPAIGEDIKVMGLREDDTIYLTIACAMVDRYIDDLDHYVETKKEIVEEISAKAQSMTRRRVDVQMNVGDNIATGSVYITVTGTSAEMGDDGAVGRGNRANGLITPNRPMSLEATSGKNPINHVGKIYNLLSNLIAKEIAEEVDGVEEVYVKILSQIGKPISQPHIASVQLVLKEGVRLSSAHARAREITDRWLEDIPRVQQMIFHGELQTY" ;
-    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns1:SIO_001390 () ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/66629a7e-64ca-473e-9f5c-041d7a7627d4> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.4179e+04 ;
+    ns2:SIO_000030 "MTRNIRVEELTQRPVEKQKIEVVERKGLGHPDSVADGIAEEISRALCKEYIERFGRVLHHNTDKIQIVAGRSRPAFGGGEVIQPQYILLTGRATRVCGDVEVPVDAIALRTARNHLKRALRNLDLDTHVIIDCKIGTGSADLCDIFDRDASTVPSANDTSYGVGYAPLSETERIVYSTEQELLSLRSRIPAIGEDIKVMGLREDDTIYLTIACAMVDRYIDDLDHYVETKKEIVEEISAKAQSMTRRRVDVQMNVGDNIATGSVYITVTGTSAEMGDDGAVGRGNRANGLITPNRPMSLEATSGKNPINHVGKIYNLLSNLIAKEIAEEVDGVEEVYVKILSQIGKPISQPHIASVQLVLKEGVRLSSAHARAREITDRWLEDIPRVQQMIFHGELQTY" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 () ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f7fe0832-92ab-4b56-b726-72214e27aaac> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/66629a7e-64ca-473e-9f5c-041d7a7627d4> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 349307 ;
-    ns2:data_1870 "Methanothrix" ;
-    ns2:data_2732 "Methanotrichaceae" ;
-    ns2:data_2909 "Methanothrix thermoacetophila PT" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/f7fe0832-92ab-4b56-b726-72214e27aaac> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 349307 ;
+    ns1:data_1870 "Methanothrix" ;
+    ns1:data_2732 "Methanotrichaceae" ;
+    ns1:data_2909 "Methanothrix thermoacetophila PT" .
 

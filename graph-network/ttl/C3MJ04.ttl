@@ -1,21 +1,21 @@
-@prefix ns1: <http://edamontology.org/> .
-@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/C3MJ04> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns1:data_1011 "2.5.1.6" ;
-    ns1:data_1505 4.4684e+04 ;
-    ns2:SIO_000030 "MRNINVQLNPLSDIEKLQVELVERKGLGHPDYIADAVAEEASRKLSLYYLKKYGVILHHNLDKTLVVGGQATPRFKGGDVIQPIYIVVAGRATTEVKTESGIEQIPVGTIIIESVKEWIRNNFRYLDAEKHLIVDYKIGKGSTDLVGIFEAGKRVPLSNDTSFGVGFAPFTKLEKLVYETERHLNSKQFKAKLPEVGEDIKVMGLRRGNEVDLTIAMATISELIEDVNHYINVKEQAKNEILDLASKIAPDYDVRIYVNTGDKIDKNILYLTVTGTSAEHGDDGMTGRGNRGVGLITPMRPMSLEATAGKNPVNHVGKLYNVLANLIANKIAQEVKDVKFSQVQVLGQIGRPIDDPLIANVDVITYDGKLNDETKNEISGIVDEMLSSFNKLTELILEGKATLF" ;
-    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012589.1> ) ;
-    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e17f91ef-389a-41e5-9be7-a5f354c0f271> .
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.4684e+04 ;
+    ns1:SIO_000030 "MRNINVQLNPLSDIEKLQVELVERKGLGHPDYIADAVAEEASRKLSLYYLKKYGVILHHNLDKTLVVGGQATPRFKGGDVIQPIYIVVAGRATTEVKTESGIEQIPVGTIIIESVKEWIRNNFRYLDAEKHLIVDYKIGKGSTDLVGIFEAGKRVPLSNDTSFGVGFAPFTKLEKLVYETERHLNSKQFKAKLPEVGEDIKVMGLRRGNEVDLTIAMATISELIEDVNHYINVKEQAKNEILDLASKIAPDYDVRIYVNTGDKIDKNILYLTVTGTSAEHGDDGMTGRGNRGVGLITPMRPMSLEATAGKNPVNHVGKLYNVLANLIANKIAQEVKDVKFSQVQVLGQIGRPIDDPLIANVDVITYDGKLNDETKNEISGIVDEMLSSFNKLTELILEGKATLF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012589.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3515ca61-a739-47cb-b666-df48a0528b61> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3515ca61-a739-47cb-b666-df48a0528b61> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 429572 ;
+    ns2:data_1870 "Sulfolobus" ;
+    ns2:data_2732 "Sulfolobaceae" ;
+    ns2:data_2909 "Sulfolobus islandicus L.S.2.15" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012589.1> a <https://github.com/PyEED/pyeed/Region> .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e17f91ef-389a-41e5-9be7-a5f354c0f271> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns1:data_1179 429572 ;
-    ns1:data_1870 "Sulfolobus" ;
-    ns1:data_2732 "Sulfolobaceae" ;
-    ns1:data_2909 "Sulfolobus islandicus L.S.2.15" .
 

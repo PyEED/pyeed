@@ -9,13 +9,13 @@
     ns1:SIO_000030 "MARNIKVEELLQTPIEKQRIELVERKGIGHPDSISDGLAEAVSRALCREYISKCGTVLHHNTDETQIVAGRSSPKFGGGEVLQPIYMLLVGRATKEFEGVELATESVALQAARNYLRKTMVNMDLERDVIMDCKLGTGSSDLRDVFKRDRVPVANDTSFGVGHAPFSELENIVYNTERRLLTDLKSRMPAIGEDMKVMGLRDGEDIALTICSGMIGKYIDDLDSYINMTQEMKIYVEELATHYTERDVNVYINTGDNLKTSCVFLTVTGTSAEMGDDGSVGRGNRCNGLITPNRPMSMEATSGKNPINHIGKIYNLLSTQMARDIVKQVPEVQDVYIRLLSQIAKPIDQPLVASAQIIPKEGTSFEKVKSEAEVVIDDWLSNVTKITEMVIRGELNTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_003552.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ce5a03e8-9ca6-469a-bf98-2a3ccd850691> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/39d60305-3d85-489f-b588-45a1217fb0f4> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_003552.1> a <https://github.com/PyEED/pyeed/Region> .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ce5a03e8-9ca6-469a-bf98-2a3ccd850691> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/39d60305-3d85-489f-b588-45a1217fb0f4> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 188937 ;
     ns2:data_1870 "Methanosarcina" ;
     ns2:data_2732 "Methanosarcinaceae" ;
     ns2:data_2909 "Methanosarcina acetivorans C2A" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_003552.1> a <https://github.com/PyEED/pyeed/Region> .
 
