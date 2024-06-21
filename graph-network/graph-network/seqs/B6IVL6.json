@@ -1,0 +1,162 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "B6IVL6",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_011420.2",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "mol_weight": 41978.0,
+  "name": "mat",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "9b81af3f-e926-4e76-af17-90e36f75d1a7",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Rhodospirillaceae",
+    "genus": "Rhodospirillum",
+    "name": "Rhodospirillum centenum SW",
+    "order": "Rhodospirillales",
+    "phylum": "Pseudomonadota",
+    "tax_class": "Alphaproteobacteria",
+    "taxonomy_id": 414684
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "46d1db50-ef82-4756-acdd-ae63f7ed3d34",
+      "@type": [
+        "Region"
+      ],
+      "end": 387,
+      "name": "S-adenosylmethionine synthetase",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "81b250a9-afa9-45ed-9133-ed1664bd2652",
+      "@type": [
+        "Region"
+      ],
+      "end": 103,
+      "name": "S-adenosylmethionine synthetase, N-terminal",
+      "start": 5
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "78629a3d-3630-43fc-bc3e-b6ab7a8da00f",
+      "@type": [
+        "Region"
+      ],
+      "end": 232,
+      "name": "S-adenosylmethionine synthetase, central domain",
+      "start": 117
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "e97535df-9a5f-403e-bbe6-39b2476a669c",
+      "@type": [
+        "Region"
+      ],
+      "end": 376,
+      "name": "S-adenosylmethionine synthetase, C-terminal",
+      "start": 234
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "239c9110-2ae8-4442-afd6-6ed37204781c",
+      "@type": [
+        "Region"
+      ],
+      "end": 128,
+      "name": "S-adenosylmethionine synthetase, conserved site",
+      "start": 118
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "51ff9df1-b701-446c-a1d7-5738473e574a",
+      "@type": [
+        "Region"
+      ],
+      "end": 112,
+      "name": "S-adenosylmethionine synthetase superfamily",
+      "start": 5
+    }
+  ],
+  "sequence": "MAKSNYVFTSESVAEGHPDKVCDRISDAVVDLFLTHDPYARVACETLATTNRVVIAGEVRGPKAALDQVETVARHAVKDIGYEQDGFHWEKFEFTCHLHQQSADIAMGVDAGTDKDEGAGDQGIMFGYACDETPALMPAPLFYSHSILKSLSEARHSGALSWLGPDAKSQVSLQYVDGRPVRATSVVVSTQHSESVPQEEIREAVRRHVLDVLPDGWMCPEDTFYVNPTGRFVIGGPDGDAGLTGRKIIVDTYGGAAPHGGGAFSGKDPTKVDRSAAYAARYLAKNVVAAGLARKCTIQLSYAIGVSYPLSVYIDTAGTGQVDEDKLSDVLRQLMNLSPRGIREHLKLNRPIYARTAAYGHFGREPDADGGFSWEKTDLVDALRRAF",
+  "sites": []
+}

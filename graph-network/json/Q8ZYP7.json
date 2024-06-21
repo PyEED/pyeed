@@ -1,0 +1,100 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "Q8ZYP7",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [],
+  "ec_number": "2.5.1.6",
+  "mol_weight": 44258.0,
+  "name": "S-adenosylmethionine synthase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "16395108-a6a3-474f-8565-622dccdc1b9d",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "family": "Thermoproteaceae",
+    "genus": "Pyrobaculum",
+    "name": "Pyrobaculum aerophilum str. IM2",
+    "order": "Thermoproteales",
+    "phylum": "Thermoproteota",
+    "tax_class": "Thermoprotei",
+    "taxonomy_id": 178306
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "a994be71-03a4-45a1-bcd1-8c44ee347ce1",
+      "@type": [
+        "Region"
+      ],
+      "end": 402,
+      "name": "S-adenosylmethionine synthetase, archaea",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "e62af26d-4f76-4308-9ba2-da2a82397d8f",
+      "@type": [
+        "Region"
+      ],
+      "end": 402,
+      "name": "S-adenosylmethionine synthase",
+      "start": 2
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "b56c13e4-9ba1-4120-967c-7a9c3e1fc417",
+      "@type": [
+        "Region"
+      ],
+      "end": 262,
+      "name": "S-adenosylmethionine synthetase, domain 3",
+      "start": 142
+    }
+  ],
+  "sequence": "MIVVGKVDKTPVAKRLVEIVERKGQGHPDYIADGVAEWVSKYLSKYYLERFGVILHHNVDKTLVVGGQASPRFGGGEILQPIYILVSGRATYEVRTKEGVVKIPLGPIVMQAARDWIKNHFRYLDPDVHVVIDYRIGQGSADLVGIYDLGVRGIPLANDTSVGVGYAPLTPLEELVYKTERLLNSRDFKAKYPEVGEDVKVMGVRVGKEVKLTIATAMISRLVKDKSHYLSVKDDVKKAVEDLASKIAPEYSVEVTINAADKPEHGIFYLTVTGTSAEHGDDGMTGRGNRANGLITPMRSMSLEAAAGKNPVSHVGKIYNVVAQKIADRIYKEVKDVIEVYVEIVSQIGKPINEPKILNIEIIKDGELTGEVKNEVEAIAKEELGRITQVTDLILRGEVSLY",
+  "sites": []
+}

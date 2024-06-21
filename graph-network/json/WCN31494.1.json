@@ -1,0 +1,82 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "WCN31494.1",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "CP116886.1",
+      "@type": [
+        "Region"
+      ],
+      "end": 464823,
+      "start": 463606
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "name": "methionine adenosyltransferase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "6ec0b35c-4bf6-4aaf-82f9-69a5be9dce1c",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "family": "Thermococcaceae",
+    "genus": "Thermococcus",
+    "name": "Thermococcus kodakarensis",
+    "order": "Thermococcales",
+    "phylum": "Euryarchaeota",
+    "tax_class": "Thermococci",
+    "taxonomy_id": 311400
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "MetK2",
+      "@type": [
+        "Region"
+      ],
+      "end": 405,
+      "start": 5
+    }
+  ],
+  "sequence": "MAGKVRNIVVEELVRTPVEMQKVELVERKGIGHPDSIADGIAEAVSRALSREYVKRYGIILHHNTDQVEVVGGRAYPQFGGGEVIKPIYILLSGRAVEMVDREFFPVHEIALKAAKDYLRKAVRHLDLEHHVIIDSRIGQGSVDLVGVFNKAKKNPIPLANDTSFGVGYAPLSETEKIVLETEKYLNSDEFKKKYPAVGEDIKVMGLRKGDEIDLTIAAAIVDSEVDNPDDYMAVKEAIYEAAKGIVESHTERPTNIYVNTADDPKEGIYYITVTGTSAEAGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVSHVGKIYNILSMLIANDIAEQVEGVEEVYVRILSQIGKPIDEPLVASVQIIPKKGYSIDVLQKPAYEIADEWLANITKIQKMILEDKVNVF",
+  "sites": []
+}

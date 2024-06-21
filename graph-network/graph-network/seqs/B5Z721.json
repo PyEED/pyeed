@@ -1,0 +1,146 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "B5Z721",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_011333.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.7",
+  "mol_weight": 45665.0,
+  "name": "cvt",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "26746002-ca26-4967-995f-778d9d021558",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Helicobacteraceae",
+    "genus": "Helicobacter",
+    "name": "Helicobacter pylori G27",
+    "order": "Campylobacterales",
+    "phylum": "Campylobacterota",
+    "tax_class": "Epsilonproteobacteria",
+    "taxonomy_id": 563041
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "ce00fae1-9894-4e3d-ba1f-b88e72f10fd9",
+      "@type": [
+        "Region"
+      ],
+      "end": 408,
+      "name": "Enolpyruvate transferase domain",
+      "start": 9
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "f0bda8c3-061e-4f41-b268-fc3e7ffd23e8",
+      "@type": [
+        "Region"
+      ],
+      "end": 419,
+      "name": "UDP-N-acetylglucosamine 1-carboxyvinyltransferase",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "bc9683d9-8e0f-4a63-a4b7-c131a40eadc9",
+      "@type": [
+        "Region"
+      ],
+      "end": 419,
+      "name": "RNA 3'-terminal phosphate cyclase/enolpyruvate transferase, alpha/beta",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "375bf027-32c3-4c11-972f-da108f3a7c78",
+      "@type": [
+        "Region"
+      ],
+      "end": 416,
+      "name": "Enolpyruvate transferase domain superfamily",
+      "start": 5
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "7211391a-8ce7-4457-b53f-cc0ed2f0604b",
+      "@type": [
+        "Region"
+      ],
+      "end": 421,
+      "name": "UDP-N-acetylglucosamine 1-carboxyvinyltransferase MurA subfamily",
+      "start": 2
+    }
+  ],
+  "sequence": "MDFLEIVGQVPLKGGVEISGAKNSALPILAATLLSQQEVKIKSLPQVVDIKAMALLLQNLGASLEWLDPNTLQICAKSLHHTEATYDLVRKMRASILVLGPLLARFKECLVSLPGGCAIGARPVDLHLKAMQQLGAEIKIEQGYIHAKAPKGLKGNDILFDKISVTGTENALMAASLAKGITRIINAAKEPEIAQLCAFLQSGGVEIEGVGSSELKIRGVESDALNLKDIQIIPDRIEAGTYLCVGAITNSQLKINRIIPNHLQAITDKLIEIGFSLDIQENSIEIYPAKQRQAFEITTKEYPGFPTDMQAQFMALATQCLGTSVIEETLFENRFMHASELQRLGASISLKTNVATISGSTELTGSDVMATDLRASSALILAALVAKGVSRVHRIYHLDRGYERLENKINALGAKVVRLKEK",
+  "sites": []
+}

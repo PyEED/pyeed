@@ -1,21 +1,21 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/O67275> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns2:data_1505 4.504e+04 ;
-    ns1:SIO_000030 "MKNIVVTPMTFEPVYEQDAEIVERKGIGHPDTICDYLAEELSVALSKLYIERFGAIMHHNVDKALLVGGEANPVFGGGEVISPIEIYLVGRALKEYKGVTIPAEELAIEVAREWLKDNIRNLDPDTHVIIKPRIKPGSKDLVDLFLRFQQKGEVPLANDTSFGVGFAPLDDLERIVFETEQLLNSPSFKENHPYVGEDIKVMGVRIKDKVRITIACAFVSKYVENIQDYLEKKEHVRRIVEEMAQGLTQRQVEVFINTADDPERESVYITVTGTSAEQGDDGQVGRGNRVNGLITPYRPMSLEAAAGKNPVSHIGKIYNVVANVIADRVVSEIEEVEEAYCYLVSQIGKPINEPQVCDVKVRTKKDLKSLEEEIKRIAQEELEKMPETWKKFLNREYAVA" ;
-    ns1:SIO_000116 "Probable S-adenosylmethionine synthase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000918.1> <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000918.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/602efcd0-25b6-446d-ab89-d887b0a32a0a> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.504e+04 ;
+    ns2:SIO_000030 "MKNIVVTPMTFEPVYEQDAEIVERKGIGHPDTICDYLAEELSVALSKLYIERFGAIMHHNVDKALLVGGEANPVFGGGEVISPIEIYLVGRALKEYKGVTIPAEELAIEVAREWLKDNIRNLDPDTHVIIKPRIKPGSKDLVDLFLRFQQKGEVPLANDTSFGVGFAPLDDLERIVFETEQLLNSPSFKENHPYVGEDIKVMGVRIKDKVRITIACAFVSKYVENIQDYLEKKEHVRRIVEEMAQGLTQRQVEVFINTADDPERESVYITVTGTSAEQGDDGQVGRGNRVNGLITPYRPMSLEAAAGKNPVSHIGKIYNVVANVIADRVVSEIEEVEEAYCYLVSQIGKPINEPQVCDVKVRTKKDLKSLEEEIKRIAQEELEKMPETWKKFLNREYAVA" ;
+    ns2:SIO_000116 "Probable S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000918.1> <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000918.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ae28197a-3eb1-4d1b-a069-8d3f97eaca77> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/602efcd0-25b6-446d-ab89-d887b0a32a0a> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 224324 ;
-    ns2:data_1870 "Aquifex" ;
-    ns2:data_2732 "Aquificaceae" ;
-    ns2:data_2909 "Aquifex aeolicus VF5" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/ae28197a-3eb1-4d1b-a069-8d3f97eaca77> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 224324 ;
+    ns1:data_1870 "Aquifex" ;
+    ns1:data_2732 "Aquificaceae" ;
+    ns1:data_2909 "Aquifex aeolicus VF5" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000918.1> a <https://github.com/PyEED/pyeed/Region> .
 

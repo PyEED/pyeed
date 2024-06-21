@@ -1,0 +1,175 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "Q8G3H4",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_004307.2",
+      "@type": [
+        "Region"
+      ]
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_004307.2",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "mol_weight": 43775.0,
+  "name": "mat",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "3d45aa70-6100-4638-ac80-a6aa0b09d42b",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Bifidobacteriaceae",
+    "genus": "Bifidobacterium",
+    "name": "Bifidobacterium longum NCC2705",
+    "order": "Bifidobacteriales",
+    "phylum": "Actinomycetota",
+    "tax_class": "Actinomycetes",
+    "taxonomy_id": 206672
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "f0d83d06-03c5-408f-a9dd-9947d2b6b5df",
+      "@type": [
+        "Region"
+      ],
+      "end": 404,
+      "name": "S-adenosylmethionine synthetase",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "02421516-543e-4ecf-9de2-b20ac08358f2",
+      "@type": [
+        "Region"
+      ],
+      "end": 103,
+      "name": "S-adenosylmethionine synthetase, N-terminal",
+      "start": 7
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "053c354a-124e-4792-a9cb-a07609edc0b4",
+      "@type": [
+        "Region"
+      ],
+      "end": 250,
+      "name": "S-adenosylmethionine synthetase, central domain",
+      "start": 129
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "37dd6ab6-c20a-4c0a-aa76-9ab1b2b415aa",
+      "@type": [
+        "Region"
+      ],
+      "end": 392,
+      "name": "S-adenosylmethionine synthetase, C-terminal",
+      "start": 252
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "6c4ff408-75d1-417f-82bb-1fa72c97bc94",
+      "@type": [
+        "Region"
+      ],
+      "end": 140,
+      "name": "S-adenosylmethionine synthetase, conserved site",
+      "start": 130
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "e0703c75-7973-425a-a326-2009a4da9a0e",
+      "@type": [
+        "Region"
+      ],
+      "end": 110,
+      "name": "S-adenosylmethionine synthetase superfamily",
+      "start": 6
+    }
+  ],
+  "sequence": "MTEEHRLISAESVTEGHPDKVCDQISDAILDDLLAQDSSSHVAVETSAATGVFLVFGEVTSEGYCDVQSKVRETLRNIGYTSSEVGLDADSCGVVVAITEQSAEINQGVARLTGDQETAASREERYEAQGAGDQGVMFGYATDETPTLMPLPIYLAHRLAFHLTEVRKSGEVPHLRPDGKTQVTIEYDDDDKPVRLDTVLISTQHDPEVTQDWLAVELKKHVIDPVLDEVLGSKVPHDNYRQLVNPTGSFILGGPAADAGLTGRKIIVDTYGGAAHHGGGAFSGKDPSKVDRSAAYATRWVAKNIVAAGLAHKVEIQIAYAIGVADPVSVNVETFGTEQGVTRGQIAAAVRKVFDLRPAAIIDELDLKRPIYLKTAAYGHFGRTDVEFPWEKTDKVEELKAAIAAE",
+  "sites": []
+}

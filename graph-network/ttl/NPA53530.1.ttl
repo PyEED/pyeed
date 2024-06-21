@@ -8,9 +8,9 @@
     ns1:SIO_000030 "MANISIGSLDFPKVSEQPVEIVERKGTGHPDTICDALAEELSIALSEMYRKECGAIMHHNVDKALLIGGIADPKFGGGEMISPIEVYLTGRAINELNGKRLPVEELAIETAHKWLKENIPNLDVSKHIIIIPKLKPGSKDLVELFERFQLKGEIPLANDTSFGTGYAPFDDTETIVYELERALNNKEFKKEHPYVGEDIKVMGVRNYDNIRITIAMAFVDKYVKDVKDYLEKKEIVQKYAHDLAQKLTTRKVDIFINTADDPQNESVYITVTGTSAEAGDDGQVGRGNRVNGLITPYRPMSLEAAAGKNPVSHIGKIYNTAAMDMAERIVAEFEEVEETYVYLVSQIGKPITEPQVCDIKLRTNKDIKSLEEAVRKIAEEELEKLPETWKKFLQRHFRLY" ;
     ns1:SIO_000116 "methionine adenosyltransferase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/JAADDV010000058.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/2b0a822a-b4ba-4f19-8871-ff6702ec9f10> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/183ac8a9-e08e-4548-8c48-c811aa3dff7e> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/2b0a822a-b4ba-4f19-8871-ff6702ec9f10> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/183ac8a9-e08e-4548-8c48-c811aa3dff7e> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 2202151 ;
     ns2:data_2909 "Aquificota bacterium" .
 

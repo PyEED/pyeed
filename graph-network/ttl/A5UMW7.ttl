@@ -9,9 +9,9 @@
     ns1:SIO_000030 "MRNIIVKELNQTYIEDIDIEIVERKGIGHPDSISDGIGETVSEALCKMYMDELGGVLHHNTDEVQITAGESNPVFGGGKILKPIDILLTGRGVSEYDGIKFPLDRVAIEAAKNFLDDTIINLDVELDTVVECKIGHGSGDLVDVFKREGAPSSNDTSFGVGYAPFSETETLVKATEELLNSKPFKAKHPAVGEDIKVMGLREGEKITLTIGCAMVSKFVANREEYIAVREELKDIVSDLATKYTNREVEVFVNTADNDDATDESGYYLTVTGTSAEMGDDGSVGRGNRANGLITPCRPMSMEASSGKNPINHVGKIYNILSNEIAKDVVENVEGIKQMNVMILSQIGKPIDQPKAASTQVILEDGVKLEDVDKKVEQIVDRWLEDISIITENVVQGKTRTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NZ_CP117965.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/77883cec-9f1b-43f2-8002-305bbd84b1ab> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/1ab8ae6f-f9f4-4f6d-b179-30888e386310> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/77883cec-9f1b-43f2-8002-305bbd84b1ab> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/1ab8ae6f-f9f4-4f6d-b179-30888e386310> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 420247 ;
     ns2:data_1870 "Methanobrevibacter" ;
     ns2:data_2732 "Methanobacteriaceae" ;

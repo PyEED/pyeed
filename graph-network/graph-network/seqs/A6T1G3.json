@@ -1,0 +1,146 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "A6T1G3",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_009659.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.19",
+  "mol_weight": 48053.0,
+  "name": "cvt",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "a6cc2966-67f1-4de1-8f12-850c35fb7a4c",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Oxalobacteraceae",
+    "genus": "Janthinobacterium",
+    "name": "Janthinobacterium sp. Marseille",
+    "order": "Burkholderiales",
+    "phylum": "Pseudomonadota",
+    "tax_class": "Betaproteobacteria",
+    "taxonomy_id": 375286
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "a0cbb23b-af33-4363-aa88-aeec9ca31acb",
+      "@type": [
+        "Region"
+      ],
+      "end": 431,
+      "name": "Enolpyruvate transferase domain",
+      "start": 16
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "447803d5-d9c3-45bf-a089-1e5af966370f",
+      "@type": [
+        "Region"
+      ],
+      "end": 439,
+      "name": "3-phosphoshikimate 1-carboxyvinyltransferase",
+      "start": 7
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "700a9157-e2f8-41d7-a921-b731f77ea57d",
+      "@type": [
+        "Region"
+      ],
+      "end": 434,
+      "name": "RNA 3'-terminal phosphate cyclase/enolpyruvate transferase, alpha/beta",
+      "start": 12
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "bd8bb724-ef10-4751-b305-cf1a1b83a28b",
+      "@type": [
+        "Region"
+      ],
+      "end": 107,
+      "name": "3-phosphoshikimate 1-carboxyvinyltransferase, conserved site",
+      "start": 93
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "fd8e05a0-5e2f-46dd-86f3-60b7db2d21d7",
+      "@type": [
+        "Region"
+      ],
+      "end": 229,
+      "name": "Enolpyruvate transferase domain superfamily",
+      "start": 24
+    }
+  ],
+  "sequence": "MKHYPHYLDLKPAMHAKGVVRLPGSKSISNRTLLLAALAQGTTHIRDLLASDDTHVMLMALQKLGVKWEQIGESQDYIVHGVDGSFPVHQADLFMGNAGTAIRPLTAALAVTGGDYTLHGVSRMHERPIGDLVDALNAIGTHIEYTGEPGYPPLHIQRGRIHAHEMSVRGNVSSQFLTALLMAAPLMTREQDVIINVIGDLISKPYIEITLNLIQRFGVEVQRNGWQSFTIKAGQRYISPGNIHVEGDASSASYFLAAGAIAGGPVRVEGVGRDSIQGDVRFVEALEQMGATVRMGDNWIEAESNGVLRAIDADFNHIPDAAMTIAVAALYADGPSILRNIGSWRVKETDRISAMATELRKLGAIVEEGEDYLKVTPPAEILSAAIDTYDDHRMAMCFSLATLDGAARRGNKERINDPQCVAKTFPEYFEAFAKVTEESLF",
+  "sites": []
+}

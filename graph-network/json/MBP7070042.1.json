@@ -1,0 +1,66 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "MBP7070042.1",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "JAGOLL010000011.1",
+      "@type": [
+        "Region"
+      ],
+      "end": 6126,
+      "start": 4936
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "name": "methionine adenosyltransferase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "13020060-0a1b-40c9-86d2-4bae34a27115",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "family": "Methanotrichaceae",
+    "genus": "Methanothrix",
+    "name": "Methanothrix sp.",
+    "order": "Methanotrichales",
+    "phylum": "Euryarchaeota",
+    "tax_class": "Methanomicrobia",
+    "taxonomy_id": 90426
+  },
+  "region_sets": [],
+  "regions": [],
+  "sequence": "MKRNIKVERLNQRPLEQQEIELVERKGIGHPDSVADGLAESISRALCQEYLDRFGAVLHHNTDKTQIVAGRSRPAFGGGEVICPLYILLTGRATRVFKEEEIPVDTIAIKAARKLLSESLSNLDVNNHIILDAKIGMGSSDLRDVFGRKVPSANDTSFGVGYAPLSETENIVYNTEREMMRMMKEYPAIGEDIKVMGMRHGDAINLTIACAMVDRHVSNLKEYSDIKREIVEHLVEHARQFTARKVTAQMNVADSIEDGSVYITVTGTSAEMGDDGAVGRGNRANGMITPNRPMSLEATCGKNPINHVGKIYNLLSTEAARQIAAEVQGIDEVYIKILSQIGKPIDEPHIASIQIVPKNGVDMKSLEAGATEILDGWLANIPKLQQMLFRGEISTY",
+  "sites": []
+}

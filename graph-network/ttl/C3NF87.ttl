@@ -9,9 +9,9 @@
     ns2:SIO_000030 "MRNINVQLNPLSDIEKLQVELVERKGLGHPDYIADAVAEEASRKLSLYYLKKYGVILHHNLDKTLVVGGQATPRFKGGDVIQPIYIVVAGRATTEVKTESGIEQIPVGTIIIESVKEWIRNNFRYLDAEKHLIVDYKIGKGSTDLVGIFEAGKRVPLSNDTSFGVGFAPFTKLEKLVYETERHLNSKQFKAKLPEVGEDIKVMGLRRGNEVDLTIAMATISELIEDVNHYINVKEQAKNKILDLASKIAPDYDVRIYVNTGDKIDKNILYLTVTGTSAEHGDDGMTGRGNRGVGLITPMRPMSLEATAGKNPVNHVGKLYNVLANLIANKIAQEVKDVKFSQVQVLGQIGRPIDDPLIANVDVITYDGKLNDETKNEISGIVDEMLSSFNKLTELILEGKATLF" ;
     ns2:SIO_000116 "S-adenosylmethionine synthase" ;
     ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_012623.1> ) ;
-    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/38e0c707-c9fa-422a-9499-9e270a6d9cb2> .
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/91f120a6-3ba9-49cf-a15c-ba2344290fb2> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/38e0c707-c9fa-422a-9499-9e270a6d9cb2> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/91f120a6-3ba9-49cf-a15c-ba2344290fb2> a <https://github.com/PyEED/pyeed/Organism> ;
     ns1:data_1179 419942 ;
     ns1:data_1870 "Sulfolobus" ;
     ns1:data_2732 "Sulfolobaceae" ;

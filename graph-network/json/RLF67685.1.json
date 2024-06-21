@@ -1,0 +1,79 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "RLF67685.1",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "QMTU01000021.1",
+      "@type": [
+        "Region"
+      ],
+      "end": 5128,
+      "start": 3923
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "name": "methionine adenosyltransferase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "9c9a7633-7bac-47ff-80ab-53307d8a5538",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "name": "Thermoplasmata archaeon",
+    "phylum": "Candidatus Thermoplasmatota",
+    "tax_class": "Thermoplasmata",
+    "taxonomy_id": 1906666
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "AdoMet_Synthase",
+      "@type": [
+        "Region"
+      ],
+      "end": 397,
+      "start": 1
+    }
+  ],
+  "sequence": "MKNIVIERIEQTPVEKRETEMVERKGLGHPDSVADGIAEAISRELCREYLKRYGVILHHNTDQVEVVGGEAEPRFGGGEVLRPVLIFISGRATYKVGNDIIPIHDIAINAAKEYLRRNFRNLDAEHHVEYISRIGQGSVDLRRVFEEKEKEYPRANDTSFGVGFAPFTDTERIVLETERYILTELYKEYKEIGEDVKVMGVRNKDIIHVTIAQAFVSKYVPDPDHYINIKEEIREKIADRLSKLTDREVRVYINTADDPARDIYYITVTGLSMEAGDDGSVGRGNRVNGLITPYRPMSMEAAAGKNPVNHVGKLYNILSFKIAERIYESLGGDVEEVYVRIVSQIGRPINDPLTANVQLLMSKNKEIPDNYIEEIRGIVEDMLDNINKLTTDLINGKVRVF",
+  "sites": []
+}

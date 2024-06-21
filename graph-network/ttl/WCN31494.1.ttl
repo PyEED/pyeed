@@ -8,15 +8,15 @@
     ns1:SIO_000030 "MAGKVRNIVVEELVRTPVEMQKVELVERKGIGHPDSIADGIAEAVSRALSREYVKRYGIILHHNTDQVEVVGGRAYPQFGGGEVIKPIYILLSGRAVEMVDREFFPVHEIALKAAKDYLRKAVRHLDLEHHVIIDSRIGQGSVDLVGVFNKAKKNPIPLANDTSFGVGYAPLSETEKIVLETEKYLNSDEFKKKYPAVGEDIKVMGLRKGDEIDLTIAAAIVDSEVDNPDDYMAVKEAIYEAAKGIVESHTERPTNIYVNTADDPKEGIYYITVTGTSAEAGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVSHVGKIYNILSMLIANDIAEQVEGVEEVYVRILSQIGKPIDEPLVASVQIIPKKGYSIDVLQKPAYEIADEWLANITKIQKMILEDKVNVF" ;
     ns1:SIO_000116 "methionine adenosyltransferase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/CP116886.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/aa379440-1824-4031-b989-50c3e85b1fbf> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6ec0b35c-4bf6-4aaf-82f9-69a5be9dce1c> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/CP116886.1> a <https://github.com/PyEED/pyeed/Region> ;
-    ns1:SIO_000943 463606 ;
-    ns1:SIO_000953 464823 .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/aa379440-1824-4031-b989-50c3e85b1fbf> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/6ec0b35c-4bf6-4aaf-82f9-69a5be9dce1c> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 311400 ;
     ns2:data_1870 "Thermococcus" ;
     ns2:data_2732 "Thermococcaceae" ;
     ns2:data_2909 "Thermococcus kodakarensis" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/CP116886.1> a <https://github.com/PyEED/pyeed/Region> ;
+    ns1:SIO_000943 463606 ;
+    ns1:SIO_000953 464823 .
 

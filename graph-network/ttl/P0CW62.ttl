@@ -9,9 +9,9 @@
     ns1:SIO_000030 "MANIVVKRLERTPIDEIPVEIVERKGIGHPDSICDGIAESVSVALCKMYKEKMGVVLHHNTDQVELVGGYAYLELGGGCMVSPIYILLSGRATMEVLDKETGKIIKLPVNTTAVNAARDYLKKALRNMDLEKDVVVDCRIGQGSVDLVEVFDRKRTEIPHANDTSFGVGHAPLSTTEKIVLETEKLLNSDALKAEIPAVGEDIKVMGLREGKKITLTIAMAAVDKYVNSCADYVNVKELAKAKVEENAKKYLDGHELEVCINTADDDEDCIFLTVTGTSAEMGDDGSVGRGNRANGLITPFRPMSMEATSGKNPITHIGKIYNILSNIIAEDVAKIEGVRECQIRILSQIGKPVTEPKILDIEMIPENGFELEELSPKAKEVAQKWLDNISEVTERIVSGNVTTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 () ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a3d36756-df9f-4293-a6bc-51b0092db1f5> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/453a5e04-8dcf-423e-af9d-af1b248fff3d> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a3d36756-df9f-4293-a6bc-51b0092db1f5> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/453a5e04-8dcf-423e-af9d-af1b248fff3d> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 39152 ;
     ns2:data_1870 "Methanococcus" ;
     ns2:data_2732 "Methanococcaceae" ;

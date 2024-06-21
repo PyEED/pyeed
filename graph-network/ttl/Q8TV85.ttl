@@ -9,9 +9,9 @@
     ns1:SIO_000030 "MVRNIVVETMKRSPFTETEVEIVERKGVGHPDSLADGIAESVSRALCREYIERFGRILHHNTDEVQIVAGESRPEFGGGEVIRPIYILVTGRATAYVGDEEIPVGTIALEAATEYLEETVRHLDTEKHVVIEPKIGHGSADLRDVFERGEEVPLANDTSFGVGYAPLTTTERLVYETERKINSPKLKKDLPEVGEDVKVMALREDNKIELTVAAAMVSQRIDDIDHYISVVEELRDRVADLAAEIASDHDVEVHVNTADDYERESVYLTVTGTSAEQGDDGSVGRGNRVNGLITPFRPMSMEAAAGKNPVNHVGKLYNVLAHQMAREIYEETSADEVYVRLLSQIGHPIDDPKAVDVHLVGDVSEEDERVARRVADELLENITELTERIVEGEIEVF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 () ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3515d2db-d9b9-45cf-bcab-a652e9d33c80> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3ebaec21-40b1-438a-90c6-2ccddaea5e87> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3515d2db-d9b9-45cf-bcab-a652e9d33c80> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3ebaec21-40b1-438a-90c6-2ccddaea5e87> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 190192 ;
     ns2:data_1870 "Methanopyrus" ;
     ns2:data_2732 "Methanopyraceae" ;

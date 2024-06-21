@@ -1,0 +1,274 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "P47994",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_012121.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "7.4.2.8",
+  "mol_weight": 96056.0,
+  "name": "cvt",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "28fd09c9-f6ad-451e-8c07-8f4be2f9eb10",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Staphylococcaceae",
+    "genus": "Staphylococcus",
+    "name": "Staphylococcus carnosus subsp. carnosus TM300",
+    "order": "Bacillales",
+    "phylum": "Bacillota",
+    "tax_class": "Bacilli",
+    "taxonomy_id": 396513
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "f2cc1667-2c74-4297-9680-f3757196580f",
+      "@type": [
+        "Region"
+      ],
+      "end": 832,
+      "name": "Protein translocase subunit SecA",
+      "start": 3
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "efa37d34-cac1-4761-bdcb-91dfadb26946",
+      "@type": [
+        "Region"
+      ],
+      "end": 581,
+      "name": "Helicase, C-terminal domain-like",
+      "start": 420
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "230f39c5-c41b-47b0-a0ea-4900fdb6fbdf",
+      "@type": [
+        "Region"
+      ],
+      "end": 842,
+      "name": "SEC-C motif",
+      "start": 824
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "73d6889d-0373-4d6f-b097-9161b4163704",
+      "@type": [
+        "Region"
+      ],
+      "end": 388,
+      "name": "SecA DEAD-like, N-terminal",
+      "start": 4
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "fcfecef3-3b51-4b09-9e73-98d918bf713d",
+      "@type": [
+        "Region"
+      ],
+      "end": 780,
+      "name": "SecA Wing/Scaffold",
+      "start": 574
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "b822859e-c312-4caf-8b3b-5e8999543a30",
+      "@type": [
+        "Region"
+      ],
+      "end": 344,
+      "name": "SecA, preprotein cross-linking domain",
+      "start": 232
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "762e3ad0-c8f3-4f5a-b1bf-2bcc388376ce",
+      "@type": [
+        "Region"
+      ],
+      "end": 251,
+      "name": "Helicase superfamily 1/2, ATP-binding domain",
+      "start": 93
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "4740882f-51b8-4e3e-a7e4-9658fd556ae0",
+      "@type": [
+        "Region"
+      ],
+      "end": 576,
+      "name": "SecA motor DEAD",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "c5224bd2-2313-47e0-8c4b-d6988187dee2",
+      "@type": [
+        "Region"
+      ],
+      "end": 501,
+      "name": "SecA conserved site",
+      "start": 486
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "7049dfcc-9244-4b20-b941-17411d0732f7",
+      "@type": [
+        "Region"
+      ],
+      "end": 402,
+      "name": "P-loop containing nucleoside triphosphate hydrolase",
+      "start": 10
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "f0a9288b-483c-4010-91c5-9ef5dc07f586",
+      "@type": [
+        "Region"
+      ],
+      "end": 832,
+      "name": "SecA, Wing/Scaffold superfamily",
+      "start": 577
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "68e041bc-bf09-4d6e-9bc7-d5228b009220",
+      "@type": [
+        "Region"
+      ],
+      "end": 354,
+      "name": "SecA, preprotein cross-linking domain superfamily",
+      "start": 231
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "3ce10645-60b8-4d75-8340-b515e1356651",
+      "@type": [
+        "Region"
+      ],
+      "end": 546,
+      "name": "SecA, C-terminal helicase domain",
+      "start": 403
+    }
+  ],
+  "sequence": "MGFLTKIVDGNKREIKRLSKQADKVISLEEEMSILTDEEIRNKTKAFQERLQAEEDVSKQDKILEEILPEAFALVREGAKRVFNMTPYPVQIMGGIAIHNGDISEMRTGEGKTLTATMPTYLNALAGRGVHVITVNEYLASSQSEEMAELYNFLGLSVGLNLNSLSTEQKREAYNADITYSTNNELGFDYLRDNMVNYSEERVMRPLHFAIIDEVDSILIDEARTPLIISGEAEKSTSLYTQANVFAKMLKAEDDYNYDEKTKSVQLTDQGADKAERMFKLDNLYDLKNVDIITHINTALRANYTLQRDVDYMVVDGEVLIVDQFTGRTMPGRRFSEGLHQAIEAKEGVQIQNESKTMASITFQNYFRMYNKLAGMTGTAKTEEEEFRNIYNMTVTQIPTNRPVQREDRPDLIFISQKGKFDAVVEDVVEKHKKGQPILLGTVAVETSEYISQLLKKRGVRHDVLNAKNHEREAEIVSTAGQKGAVTIATNMAGRGTDIKLGEGVEELGGLAVIGTERHESRRIDDQLRGRSGRQGDRGESRFYLSLQDELMVRFGSERLQKMMGRLGMDDSTPIESKMVSRAVESAQKRVEGNNFDARKRILEYDEVLRKQREIIYGERNNIIDSESSSELVITMIRSTLDRAISYYVNEELEEIDYAPFINFVEDVFLHEGEVKEDEIKGKDREDIFDTVWAKIEKAYEAQKANIPDQFNEFERMILLRSIDGRWTDHIDTMDQLRQGIHLRSYGQQNPLRDYQNEGHQLFDTMMVNIEEDVSKYILKSIITVDDDIERDKAKEYQGQHVSAEDGKEKVKPQPVVKDNHIGRNDPCPCGSGKKYKNCCGK",
+  "sites": []
+}

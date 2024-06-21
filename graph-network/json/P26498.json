@@ -1,0 +1,114 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "P26498",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_014408.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "mol_weight": 43738.0,
+  "name": "S-adenosylmethionine synthase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "79d33746-e497-4d9f-8176-19d274fc113f",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "family": "Methanobacteriaceae",
+    "genus": "Methanothermobacter",
+    "name": "Methanothermobacter marburgensis str. Marburg",
+    "order": "Methanobacteriales",
+    "phylum": "Euryarchaeota",
+    "tax_class": "Methanobacteria",
+    "taxonomy_id": 79929
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "3b4ff772-f84d-40e2-bced-98c6ebeb75c4",
+      "@type": [
+        "Region"
+      ],
+      "end": 401,
+      "name": "S-adenosylmethionine synthetase, archaea",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "ba29b47a-b223-43d0-8204-26dbaa0c9282",
+      "@type": [
+        "Region"
+      ],
+      "end": 400,
+      "name": "S-adenosylmethionine synthase",
+      "start": 1
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "09616cb8-e2bc-4d7a-8ac1-3d2e1b857f24",
+      "@type": [
+        "Region"
+      ],
+      "end": 259,
+      "name": "S-adenosylmethionine synthetase, domain 3",
+      "start": 140
+    }
+  ],
+  "sequence": "MRNIIVEPLNQTPIEDQKVEIVERKGIGHPDSISDGIAESVSRALCNAYLDRFGAIMHHNTDEVQITAGESAPQFGGGEVIKPIEILLTGRGIAEVDGEKIGLDRIAISAAKEYLRDNIINLDVETCTVVECKIGHGSGDLRDVFARKGRAPLSNDTSFGVGFAPFSETERIVMEAENLLNSPEFKKKYPAVGEDIKVMGLRENDNITLTVACAMVDRYVSDLEEYLEIKNVVKDEVFKLASGITERNLEVFVNTADRCEDDEPSVYITVTGTSAEMGDDGSVGRGNRANGLITPNRPMSMEATSGKNPINHVGKIYNLLSNQMAADIVESIEGVKQVHIMILSQIGKPIDHPKAATAQVILEDGYTMDDITGKVSGVMDAWLEDIPSITEMLVKGQLRTF",
+  "sites": []
+}

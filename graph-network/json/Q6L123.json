@@ -1,0 +1,130 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "Q6L123",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NZ_FWYE01000001.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "ec_number": "2.5.1.6",
+  "mol_weight": 44464.0,
+  "name": "S-adenosylmethionine synthase",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "6f02303a-f825-48a6-b37e-a1d657241a4c",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Archaea",
+    "family": "Picrophilaceae",
+    "genus": "Picrophilus",
+    "name": "Picrophilus oshimae DSM 9789",
+    "order": "Thermoplasmatales",
+    "phylum": "Candidatus Thermoplasmatota",
+    "tax_class": "Thermoplasmata",
+    "taxonomy_id": 1122961
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "37b84820-4b97-4582-8f6d-5b53f8dae5f4",
+      "@type": [
+        "Region"
+      ],
+      "end": 402,
+      "name": "S-adenosylmethionine synthetase, archaea",
+      "start": 6
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "3f4f8225-680e-4622-a3e9-8053d4b0421d",
+      "@type": [
+        "Region"
+      ],
+      "end": 402,
+      "name": "S-adenosylmethionine synthase",
+      "start": 7
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "69ab29b6-0036-4315-a747-e95a61de57df",
+      "@type": [
+        "Region"
+      ],
+      "end": 278,
+      "name": "S-adenosylmethionine synthetase, domain 2",
+      "start": 158
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "d0e62640-eadc-464a-b99c-eca6adb463e1",
+      "@type": [
+        "Region"
+      ],
+      "end": 401,
+      "name": "S-adenosylmethionine synthetase, domain 3",
+      "start": 279
+    }
+  ],
+  "sequence": "METLKTRNIQVEAIKQSPTASREVEIVERKGIGHPDSVADGIAEAVSRSLSKYYIKNYGRILHHNTDQVEVVGGQSDPRFGGGVVLEPSYILISGRATSTVNGERIPVKSIAIKAAKDYLREHFRDLEIDSDVMIDSRIGNGSIDLRGLYDTRKFKANDTSFGVGFAPFTDTETIVKATEKYINGDLKKSLPQIGYDIKVMGFRKNRTINLTVAAAYVDKYVKDPDEYYSVKEELVNKITDNALKYTNNDVQVFVNTGDIKDDKVYYLTVTGLSMENGDDGSVGRGNRVNGLITPYRPMSMEAAAGKNPVTHVGKLYNVLSNIIANDIVKEEGGDIKEVLVRIVSQIGRPVDEPHVASIQVIYEDNVDPSKHKNNITAIADDRIAHISDLTNMFVDGKLDVF",
+  "sites": []
+}

@@ -9,13 +9,13 @@
     ns1:SIO_000030 "MSRNITIEMLNQIPVQDQQIELVERKCLGHPDSIADGIAEAVSRALCNTYIDQFGGVLHHNTDQGEIVAGESMPKFGGGKIIKPIFVLLDGRATKEFNGEKIAADTVALKAAKDYLRTILPELNLDQHLIMDCRLGTGSTDLRDVFKPEAGQIPRANDTSFGVSYAPFSDIEKCIREISSYIDTTLRPKYPVYGTDIKIMGLRQGNTIKLTICCAMVDRYVSSLSDYVNYREKLAEEALKVAKTCTDKKVEVSVNTADCDIECSLFLTVTGTSAEMGDDGSVGRGNRANGLITPHRPMSMEATSGKNPINHIGKIYNLLSNELAHTCVEKVDGIAEIQVRLLSQIGSPIDQPLVASAQIIPKPSFTVKDIERDVYEIIDSGLENITSVTERVIRGELKTF" ;
     ns1:SIO_000116 "S-adenosylmethionine synthase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007796.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/abe325ca-bbb5-4d2e-bb75-a07256f33119> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/709cc234-f943-4325-9ed5-aa71193d2350> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007796.1> a <https://github.com/PyEED/pyeed/Region> .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/abe325ca-bbb5-4d2e-bb75-a07256f33119> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/709cc234-f943-4325-9ed5-aa71193d2350> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 323259 ;
     ns2:data_1870 "Methanospirillum" ;
     ns2:data_2732 "Methanospirillaceae" ;
     ns2:data_2909 "Methanospirillum hungatei JF-1" .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_007796.1> a <https://github.com/PyEED/pyeed/Region> .
 

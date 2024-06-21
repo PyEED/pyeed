@@ -12,10 +12,6 @@ prefixes:
 
 A molecular sequence and associated annotation data.
 
-- id
-  - Type: string
-  - Description: Unique identifier of the sequence.
-  - Term: sio:SIO_000729
 - name
   - Type: string
   - Description: Arbitrary name of the sequence.
@@ -38,9 +34,6 @@ A molecular sequence and associated annotation data.
 - regions
   - Type: Region[]
   - Description: Defines regions within the nucleotide sequence.
-- region_sets
-  - Type: RegionSet[]
-  - Description: Multiple regions forming a higher order structure or feature of a sequence.
 
 ### ProteinRecord(_SequenceRecord_) (sio:SIO_010043)
 
@@ -60,7 +53,7 @@ A protein sequence and associated metadata.
   - Term: edam:data_1011
 - mol_weight
   - Type: float
-  - Description: Calculated molecular weight of the protein based on the sequence.
+  - Description: The calculated molecular weight of the protein, based on the sequence.
   - Term: edam:data_1505
 
 ### DNARecord(_SequenceRecord_) (sio:SIO_010008)
@@ -145,7 +138,7 @@ Description of an organism 🦠.
   - Description: Order of the organism
 - family
   - Type: string
-  - Description: The name of a family of organism.
+  - Description: The name of a family of organisms.
   - Term: edam:data_2732
 - genus
   - Type: string
@@ -153,7 +146,7 @@ Description of an organism 🦠.
   - Term: edam:data_1870
 - species
   - Type: string
-  - Description: The name of a species (typically a taxonomic group) of organism.
+  - Description: The name of a species (typically a taxonomic group) of organisms.
   - Term: edam:data_1045
 
 ## Sequence Search
@@ -188,7 +181,7 @@ Description of an organism 🦠.
   - Default: 11.0
 - gap_extend
   - Type: float
-  - Description: Gap extend penalty.
+  - Description: Gap extension penalty.
   - Default: 1.0
 - threshold
   - Type: float

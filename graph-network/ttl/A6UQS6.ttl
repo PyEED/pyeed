@@ -1,21 +1,21 @@
-@prefix ns1: <http://edamontology.org/> .
-@prefix ns2: <http://semanticscience.org/resource/> .
+@prefix ns1: <http://semanticscience.org/resource/> .
+@prefix ns2: <http://edamontology.org/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/A6UQS6> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns1:data_1011 "2.5.1.6" ;
-    ns1:data_1505 4.4207e+04 ;
-    ns2:SIO_000030 "MANIVVKKLERTPIDETPVEIVERKGIGHPDSICDGIAESVSVALCKMYKEKLGVVLHHNTDQVELVGGYAYPKLGGGCMINPIYVLLSGRATAEVLDKETGKIVKLPVNTTAVNAAREYLKKALRNIDLEKDVVVDCRIGQGSVDLVEVFDRKRSEIPHANDTSFGVGHAPLSTTEKIVLETEKLLNSAELKAIVPGVGEDIKVMGLREGKKITLTIAMAVVDKYADSLEEYEKVKEMAHKKVVENAQKYLNGHELEVFINTADDEECIFLTVTGTSAEMGDDGSVGRGNRANGLITPFRPMSMEATSGKNPINHIGKIYNILSNIIASDVAELEEVKECQIRILSQIGKPITEPKILSIEVIPENGFTLDDVTKKATEVAEKWLDNIQNVTEKIVEGKVTTF" ;
-    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_009634.1> ) ;
-    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/4dface1f-5ffe-469a-93fb-5d061a0fe276> .
-
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/4dface1f-5ffe-469a-93fb-5d061a0fe276> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns1:data_1179 406327 ;
-    ns1:data_1870 "Methanococcus" ;
-    ns1:data_2732 "Methanococcaceae" ;
-    ns1:data_2909 "Methanococcus vannielii SB" .
+    ns2:data_1011 "2.5.1.6" ;
+    ns2:data_1505 4.4207e+04 ;
+    ns1:SIO_000030 "MANIVVKKLERTPIDETPVEIVERKGIGHPDSICDGIAESVSVALCKMYKEKLGVVLHHNTDQVELVGGYAYPKLGGGCMINPIYVLLSGRATAEVLDKETGKIVKLPVNTTAVNAAREYLKKALRNIDLEKDVVVDCRIGQGSVDLVEVFDRKRSEIPHANDTSFGVGHAPLSTTEKIVLETEKLLNSAELKAIVPGVGEDIKVMGLREGKKITLTIAMAVVDKYADSLEEYEKVKEMAHKKVVENAQKYLNGHELEVFINTADDEECIFLTVTGTSAEMGDDGSVGRGNRANGLITPFRPMSMEATSGKNPINHIGKIYNILSNIIASDVAELEEVKECQIRILSQIGKPITEPKILSIEVIPENGFTLDDVTKKATEVAEKWLDNIQNVTEKIVEGKVTTF" ;
+    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_009634.1> ) ;
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e8ed2c52-c5f4-4dab-8fb8-2d882735909b> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_009634.1> a <https://github.com/PyEED/pyeed/Region> .
+
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/e8ed2c52-c5f4-4dab-8fb8-2d882735909b> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns2:data_1179 406327 ;
+    ns2:data_1870 "Methanococcus" ;
+    ns2:data_2732 "Methanococcaceae" ;
+    ns2:data_2909 "Methanococcus vannielii SB" .
 

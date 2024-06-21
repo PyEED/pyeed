@@ -8,9 +8,9 @@
     ns1:SIO_000030 "MKNIVIERIEQTPVEKRETEMVERKGLGHPDSVADGIAEAISRELCREYLKRYGVILHHNTDQVEVVGGEAEPRFGGGEVLRPVLIFISGRATYKVGNDIIPIHDIAINAAKEYLRRNFRNLDAEHHVEYISRIGQGSVDLRRVFEEKEKEYPRANDTSFGVGFAPFTDTERIVLETERYILTELYKEYKEIGEDVKVMGVRNKDIIHVTIAQAFVSKYVPDPDHYINIKEEIREKIADRLSKLTDREVRVYINTADDPARDIYYITVTGLSMEAGDDGSVGRGNRVNGLITPYRPMSMEAAAGKNPVNHVGKLYNILSFKIAERIYESLGGDVEEVYVRIVSQIGRPINDPLTANVQLLMSKNKEIPDNYIEEIRGIVEDMLDNINKLTTDLINGKVRVF" ;
     ns1:SIO_000116 "methionine adenosyltransferase" ;
     ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/QMTU01000021.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/0c9ec9e1-aed2-4462-b79c-c390c8d260cf> .
+    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/9c9a7633-7bac-47ff-80ab-53307d8a5538> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/0c9ec9e1-aed2-4462-b79c-c390c8d260cf> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/9c9a7633-7bac-47ff-80ab-53307d8a5538> a <https://github.com/PyEED/pyeed/Organism> ;
     ns2:data_1179 1906666 ;
     ns2:data_2909 "Thermoplasmata archaeon" .
 

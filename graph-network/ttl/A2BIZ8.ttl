@@ -9,11 +9,11 @@
     ns2:SIO_000030 "MPRNIVVESVKLQPVEEQSVELVERKGLGHPDTIADAAAEISSQYLSRYYIEKYGTILHHNLDKVLVVGGQAAPRFGGGEVLQPIYIIVSGRATTEVRLPDGKTERIPIGTIILRAVKEWIREKFRFLDPESHIIVDYKVGQGSADLVGIYELGKDSVPLANDTSVGVGFAPFSTLEQLVLETERLLNSKEFKEKNPEVGEDIKVMGLRRGRKIELTIAAAIISSLVQDLDHYLSVKEAIKEAVLDLASRIAPDYDVEVYVNTADKPDKGIVYITVTGTSAEHGDDGMTGRGNRSYGLITPLRPMSLEAAAGKNPVSHVGKIYNVMALNIARRIYDNVSGIREVYVKLLSQIGRPINDPLIANIKVVSEKPGEPLPSNALREIEAIVEEELDKYQELTKLFVEGKITIF" ;
     ns2:SIO_000116 "S-adenosylmethionine synthase" ;
     ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008818.1> ) ;
-    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a08d4dc9-67da-4e41-aa99-66d9ce608fb1> .
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/fb5aa768-5dc7-4fbd-b2e9-d9398d6186d5> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_008818.1> a <https://github.com/PyEED/pyeed/Region> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/a08d4dc9-67da-4e41-aa99-66d9ce608fb1> a <https://github.com/PyEED/pyeed/Organism> ;
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/fb5aa768-5dc7-4fbd-b2e9-d9398d6186d5> a <https://github.com/PyEED/pyeed/Organism> ;
     ns1:data_1179 415426 ;
     ns1:data_1870 "Hyperthermus" ;
     ns1:data_2732 "Pyrodictiaceae" ;

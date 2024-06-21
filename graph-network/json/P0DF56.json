@@ -1,0 +1,113 @@
+{
+  "@context": {
+    "ProteinRecord": "https://github.com/PyEED/pyeed/ProteinRecord",
+    "coding_sequence": {
+      "@container": "@list",
+      "@id": "http://semanticscience.org/resource/SIO_001390"
+    },
+    "ec_number": "http://edamontology.org/data_1011",
+    "mol_weight": "http://edamontology.org/data_1505",
+    "name": "http://semanticscience.org/resource/SIO_000116",
+    "organism": "http://semanticscience.org/resource/SIO_010000",
+    "seq_length": "http://semanticscience.org/resource/SIO_000041",
+    "sequence": "http://semanticscience.org/resource/SIO_000030",
+    "structure_id": "http://semanticscience.org/resource/SIO_000729"
+  },
+  "@id": "P0DF56",
+  "@type": [
+    "ProteinRecord"
+  ],
+  "coding_sequence": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "NC_004070.1",
+      "@type": [
+        "Region"
+      ]
+    }
+  ],
+  "mol_weight": 45771.0,
+  "name": "Uncharacterized protein SpyM3_0382",
+  "organism": {
+    "@context": {
+      "Organism": "https://github.com/PyEED/pyeed/Organism",
+      "family": "http://edamontology.org/data_2732",
+      "genus": "http://edamontology.org/data_1870",
+      "kingdom": "http://edamontology.org/data_1044",
+      "name": "http://edamontology.org/data_2909",
+      "species": "http://edamontology.org/data_1045",
+      "taxonomy_id": "http://edamontology.org/data_1179"
+    },
+    "@id": "03f33076-14ce-4ebf-b22e-25f749bd8a49",
+    "@type": [
+      "Organism"
+    ],
+    "domain": "Bacteria",
+    "family": "Streptococcaceae",
+    "genus": "Streptococcus",
+    "name": "Streptococcus pyogenes MGAS315",
+    "order": "Lactobacillales",
+    "phylum": "Bacillota",
+    "tax_class": "Bacilli",
+    "taxonomy_id": 198466
+  },
+  "region_sets": [],
+  "regions": [
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "04032e75-648f-429e-ace5-7dd50d626523",
+      "@type": [
+        "Region"
+      ],
+      "end": 388,
+      "name": "S-adenosylmethionine synthase",
+      "start": 16
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "93195074-8f3d-43bd-b4c0-25b8a5a239b1",
+      "@type": [
+        "Region"
+      ],
+      "end": 276,
+      "name": "S-adenosylmethionine synthetase, domain 2",
+      "start": 160
+    },
+    {
+      "@context": {
+        "Region": "https://github.com/PyEED/pyeed/Region",
+        "accession_id": "http://semanticscience.org/resource/SIO_000675",
+        "end": "http://semanticscience.org/resource/SIO_000953",
+        "start": "http://semanticscience.org/resource/SIO_000943",
+        "url": "http://semanticscience.org/resource/SIO_000811"
+      },
+      "@id": "ac7db860-9c9d-41fc-bba1-9ff46cdf1247",
+      "@type": [
+        "Region"
+      ],
+      "end": 389,
+      "name": "S-adenosylmethionine synthetase, domain 3",
+      "start": 277
+    }
+  ],
+  "sequence": "MDLKITNGFYDPSHLSYEVVERKGLGHPDTLADGIAEQIEIDYSLYCLDKFGVIPHHNFDKIIIRGGHSVQDFGGSDFIEPIKIIFLGRASKKCFNSSIPLFKIQKKAATKYLNRILPNLDVENYVEFETLTSDFTTKTNWFSPEAIEDLPEYLDVPKANDTATMISYWPLTISEELALMIEGYFYKLDKNELPTPRFTKMGGDIKVMVVRNDLEYSIRINFPLISKFFNNDIESQLYVDKHVEKIKKYIEQKYKNISFSIDYHYYLTTTGSCIDFGEEGAVGRGNKTHGIISSFRPNTMEAPAGKNCTYFVGKVWGFLSDTIAKEIYEAFNTPCQIIMQLNIGSKLYRPTHLFIQTEESVDQERVLEIVNRHLNNGKQNTNLILSTQHFIPKTNVYDG",
+  "sites": []
+}

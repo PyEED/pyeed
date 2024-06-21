@@ -1,21 +1,21 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/PLJ76955.1> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns1:SIO_000030 "MAQKNIVVEKSTYIPPDLLPVEIVERKGTGHPDFIADSISEAASRELSKYYLEKFGRILHHNLDKVLVVGGQSSPRFGGGEVLQPIYILVSGRATTDVVEADGTRVPVPVGPLVLKATREWIKTNIRYLDPDHHVIVDYRIGKGSVDLVDIYQRAQSYPGANDTSMGIGYAPLSETEKLVFETERLLNSPKVKKEVPAVGEDIKVMGVRKGDTIHLTIAAAIVSRHVRSTEEYLDVKKEIRKLVLEKASEITERKVEVYVNTGDDPSKGDRGGLYLVVTGTSAEHGDDGATGRGNRANGLITPFRPMSLEATAGKNPISHIGKLYNIVAFNASQEIAQLDHIREVYIKLISQIGKPINEPLLAYIAINADEAAISRVKHQAEEILADHLDGINRLWEKVLRGEVTLF" ;
-    ns1:SIO_000116 "S-adenosylmethionine synthetase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NDWX01000016.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3e7f81a7-5950-44d8-a085-ea98559e39b7> .
+    ns2:SIO_000030 "MAQKNIVVEKSTYIPPDLLPVEIVERKGTGHPDFIADSISEAASRELSKYYLEKFGRILHHNLDKVLVVGGQSSPRFGGGEVLQPIYILVSGRATTDVVEADGTRVPVPVGPLVLKATREWIKTNIRYLDPDHHVIVDYRIGKGSVDLVDIYQRAQSYPGANDTSMGIGYAPLSETEKLVFETERLLNSPKVKKEVPAVGEDIKVMGVRKGDTIHLTIAAAIVSRHVRSTEEYLDVKKEIRKLVLEKASEITERKVEVYVNTGDDPSKGDRGGLYLVVTGTSAEHGDDGATGRGNRANGLITPFRPMSLEATAGKNPISHIGKLYNIVAFNASQEIAQLDHIREVYIKLISQIGKPINEPLLAYIAINADEAAISRVKHQAEEILADHLDGINRLWEKVLRGEVTLF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthetase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NDWX01000016.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/75c670e4-fe7e-4f4d-bc75-055250e0c31e> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/3e7f81a7-5950-44d8-a085-ea98559e39b7> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 1980981 ;
-    ns2:data_1870 "Thermofilum" ;
-    ns2:data_2732 "Thermofilaceae" ;
-    ns2:data_2909 "Thermofilum sp. NZ13" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/75c670e4-fe7e-4f4d-bc75-055250e0c31e> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 1980981 ;
+    ns1:data_1870 "Thermofilum" ;
+    ns1:data_2732 "Thermofilaceae" ;
+    ns1:data_2909 "Thermofilum sp. NZ13" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NDWX01000016.1> a <https://github.com/PyEED/pyeed/Region> ;
-    ns1:SIO_000943 3936 ;
-    ns1:SIO_000953 5159 .
+    ns2:SIO_000943 3936 ;
+    ns2:SIO_000953 5159 .
 

@@ -1,21 +1,21 @@
-@prefix ns1: <http://semanticscience.org/resource/> .
-@prefix ns2: <http://edamontology.org/> .
+@prefix ns1: <http://edamontology.org/> .
+@prefix ns2: <http://semanticscience.org/resource/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/Q9V1P7> a <https://github.com/PyEED/pyeed/ProteinRecord> ;
-    ns2:data_1011 "2.5.1.6" ;
-    ns2:data_1505 4.4189e+04 ;
-    ns1:SIO_000030 "MARNIVVEEIVRTPVEKQKVELVERKGIGHPDSIADGIAESISRALSREYMKRYGVILHHNTDQVEVVGGRAYPRFGGGEVVKPIYILLSGRAVELVDQELFPVHEVAIKAAKEYLKKNIRHLDVENHVVIDSRIGQGSVDLVSVFNKAKENPIPLANDTSFGVGFAPLTETERLVYETERLLNGEKFKKELPAVGEDIKVMGLRRGDEIDLTIAAAIVDSEVSGPKEYLEVKEKIAEAVEELAKDITSRKVNIYVNTADDPDSGIFYITVTGTSAEAGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVSHVGKIYNILAMFIANDIAKTLPVEEVYVRILSQIGKPIDQPLVASIQVIPKQGHSVKEFEKDAYSIADEWLANITKIQKMILEDKISVF" ;
-    ns1:SIO_000116 "S-adenosylmethionine synthase" ;
-    ns1:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000868.1> ) ;
-    ns1:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/9228de1c-e376-4bb9-bec6-a37e063b9f85> .
+    ns1:data_1011 "2.5.1.6" ;
+    ns1:data_1505 4.4189e+04 ;
+    ns2:SIO_000030 "MARNIVVEEIVRTPVEKQKVELVERKGIGHPDSIADGIAESISRALSREYMKRYGVILHHNTDQVEVVGGRAYPRFGGGEVVKPIYILLSGRAVELVDQELFPVHEVAIKAAKEYLKKNIRHLDVENHVVIDSRIGQGSVDLVSVFNKAKENPIPLANDTSFGVGFAPLTETERLVYETERLLNGEKFKKELPAVGEDIKVMGLRRGDEIDLTIAAAIVDSEVSGPKEYLEVKEKIAEAVEELAKDITSRKVNIYVNTADDPDSGIFYITVTGTSAEAGDDGSVGRGNRVNGLITPNRHMSMEAAAGKNPVSHVGKIYNILAMFIANDIAKTLPVEEVYVRILSQIGKPIDQPLVASIQVIPKQGHSVKEFEKDAYSIADEWLANITKIQKMILEDKISVF" ;
+    ns2:SIO_000116 "S-adenosylmethionine synthase" ;
+    ns2:SIO_001390 ( <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000868.1> ) ;
+    ns2:SIO_010000 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/88db17cb-ee24-4c99-aaf1-39e73df0baa4> .
 
-<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/9228de1c-e376-4bb9-bec6-a37e063b9f85> a <https://github.com/PyEED/pyeed/Organism> ;
-    ns2:data_1179 272844 ;
-    ns2:data_1870 "Pyrococcus" ;
-    ns2:data_2732 "Thermococcaceae" ;
-    ns2:data_2909 "Pyrococcus abyssi GE5" .
+<file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/88db17cb-ee24-4c99-aaf1-39e73df0baa4> a <https://github.com/PyEED/pyeed/Organism> ;
+    ns1:data_1179 272844 ;
+    ns1:data_1870 "Pyrococcus" ;
+    ns1:data_2732 "Thermococcaceae" ;
+    ns1:data_2909 "Pyrococcus abyssi GE5" .
 
 <file:///Users/max/Documents/GitHub/pyeed/graph-network/graph-network/NC_000868.1> a <https://github.com/PyEED/pyeed/Region> .
 
