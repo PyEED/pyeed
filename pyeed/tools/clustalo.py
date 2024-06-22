@@ -48,7 +48,7 @@ class ClustalOmega(AbstractTool):
             return httpx.post(self._service_url, files=file, timeout=600)
 
         except httpx.ConnectError as connect_error:
-            if connect_error.__context__.args[0].errno == 8:
+            if connect_error.__context__.args[0].errno == 8 or connect_error.__context__.args[0].errno == -3:
                 self._service_url = self._service_url.replace("clustalo", "localhost")
                 try:
                     return httpx.post(self._service_url, files=file, timeout=600)
