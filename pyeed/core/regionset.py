@@ -35,7 +35,7 @@ class RegionSet(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="ad73396d3a347dd8d413a3cbe77883edb2777380"
+        default="8da75aca636c58440eb994fddf740e25eb3e0d87"
     )
 
     _object_terms: Set[str] = PrivateAttr(
