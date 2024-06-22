@@ -144,18 +144,24 @@ class SequenceNetwork(BaseModel):
         self.network = copy.deepcopy(self._full_network)
         self.calculate_centrality()
 
-    def update_threshhold(self, threshold: float):
+    def update_threshhold(self, threshold: float, threshold_settings_hide: str = 'UNDER_THRESHOLD'):
         """Removes or adds edges based on the threshold value."""
 
         if self.weight == 'identity':
             assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
 
+        edge_pairs_below_threshold = []
         network = copy.deepcopy(self._full_network)
-        edge_pairs_below_threshold = [
-            (node1, node2)
-            for node1, node2, data in network.edges(data=True)
-            if data[self.weight] < threshold
-        ]
+
+
+        for node1, node2, data in network.edges(data=True):
+            if threshold_settings_hide == 'UNDER_THRESHOLD':
+                if data[self.weight] < threshold:
+                    edge_pairs_below_threshold.append((node1, node2))
+            elif threshold_settings_hide == 'ABOVE_THRESHOLD':
+                if data[self.weight] > threshold:
+                    edge_pairs_below_threshold.append((node1, node2))
+        
         network.remove_edges_from(edge_pairs_below_threshold)
         self._2d_position_nodes_and_edges(network)
 
