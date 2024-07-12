@@ -27,6 +27,7 @@ pymsaviz = "^0.4.2"
 py4cytoscape = "^1.9.0"
 tenacity = "^8.3.0"
 neo4j = "^5.20.0"
+bio = "^1.7.1"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"
