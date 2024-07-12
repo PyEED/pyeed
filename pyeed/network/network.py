@@ -147,7 +147,7 @@ class SequenceNetwork(BaseModel):
         self.network = copy.deepcopy(self._full_network)
         self.calculate_centrality()
 
-    def update_threshhold(self, threshold: float, threshold_settings_hide: str = 'UNDER_THRESHOLD'):
+    def update_threshhold(self, threshold: float, threshold_mode: str = 'UNDER_THRESHOLD'):
         """Removes or adds edges based on the threshold value."""
 
         if self.weight == 'identity':
@@ -158,10 +158,10 @@ class SequenceNetwork(BaseModel):
 
 
         for node1, node2, data in network.edges(data=True):
-            if threshold_settings_hide == 'UNDER_THRESHOLD':
+            if threshold_mode == 'UNDER_THRESHOLD':
                 if data[self.weight] < threshold:
                     edge_pairs_below_threshold.append((node1, node2))
-            elif threshold_settings_hide == 'ABOVE_THRESHOLD':
+            elif threshold_mode == 'ABOVE_THRESHOLD':
                 if data[self.weight] > threshold:
                     edge_pairs_below_threshold.append((node1, node2))
         
@@ -203,7 +203,7 @@ class SequenceNetwork(BaseModel):
         threshold: float = 0.8,
         style_name: str = "default",
         column_name: str = "genus",
-        threshold_settings_hide: str = 'UNDER_THRESHOLD',
+        threshold_mode: str = 'UNDER_THRESHOLD',
     ):
         try:
             p4c.cytoscape_ping(base_url=self._cytoscape_url)
@@ -218,7 +218,7 @@ class SequenceNetwork(BaseModel):
         # p4c.layout_network(layout, base_url=self._cytoscape_url, network="SequenceNetwork")
 
         # create a degree column for the nodes based on the current chosen threshold
-        self.calculate_degree(threshold=threshold, threshold_settings_hide=threshold_settings_hide)
+        self.calculate_degree(threshold=threshold, threshold_mode=threshold_mode)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
             self._full_network,
@@ -227,7 +227,7 @@ class SequenceNetwork(BaseModel):
             title="SequenceNetwork",
         )
 
-        self.hide_threshold(threshold, threshold_settings_hide=threshold_settings_hide)
+        self.hide_threshold(threshold, threshold_mode=threshold_mode)
         p4c.set_layout_properties('force-directed', {'defaultSpringLength': 70, 'defaultSpringCoefficient': 2})
         p4c.layout_network(layout, base_url=self._cytoscape_url, network="SequenceNetwork")
 
@@ -271,27 +271,27 @@ class SequenceNetwork(BaseModel):
             file.write(str(cyt_dict))
         print(f"💾 Network exported to {file_path}")
 
-    def hide_threshold(self, threshold, threshold_settings_hide: str = 'UNDER_THRESHOLD'):
+    def hide_threshold(self, threshold, threshold_mode: str = 'UNDER_THRESHOLD'):
         p4c.unhide_all(base_url=self._cytoscape_url)
 
         hide_list = []
 
 
         for u, v, d in self._full_network.edges(data=True):
-            if threshold_settings_hide == 'UNDER_THRESHOLD':
+            if threshold_mode == 'UNDER_THRESHOLD':
                 if d[self.weight] < threshold:
                     hide_list.append("{} (interacts with) {}".format(u, v))
-            elif threshold_settings_hide == 'ABOVE_THRESHOLD':
+            elif threshold_mode == 'ABOVE_THRESHOLD':
                 if d[self.weight] > threshold:
                     hide_list.append("{} (interacts with) {}".format(u, v))
 
         p4c.hide_edges(hide_list, base_url=self._cytoscape_url)
 
-    def calculate_degree(self, threshold: float = 0.8, threshold_settings_hide: str = 'UNDER_THRESHOLD'):
+    def calculate_degree(self, threshold: float = 0.8, threshold_mode: str = 'UNDER_THRESHOLD'):
         # Calculate degree of nodes with filtering
         degree = {}
         for u, v, d in self._full_network.edges(data=True):
-            if threshold_settings_hide == 'UNDER_THRESHOLD':
+            if threshold_mode == 'UNDER_THRESHOLD':
                 if d[self.weight] > threshold:
                     if u not in degree:
                         degree[u] = 1
@@ -301,7 +301,7 @@ class SequenceNetwork(BaseModel):
                         degree[v] = 1
                     else:
                         degree[v] += 1
-            elif threshold_settings_hide == 'ABOVE_THRESHOLD':
+            elif threshold_mode == 'ABOVE_THRESHOLD':
                 if d[self.weight] <= threshold:
                     if u not in degree:
                         degree[u] = 1
