@@ -51,7 +51,7 @@ class SequenceNetwork(BaseModel):
         description="List of selected sequences",
     )
 
-    data_Edge: Optional[dict] = Field(
+    edge_data: Optional[dict] = Field(
         default=None,
         description="Dictionary with edge data",
     )
@@ -86,9 +86,12 @@ class SequenceNetwork(BaseModel):
             self.targets.append(target.id)
 
     def _create_graph(self):
-        """Initializes the nx.Graph object and adds nodes and edges based on the sequences."""
-        # optional data frame for the edges, one could add here special parameters for the edges
-        # the type of data_Edge is dic with the key id and then a nested dic, key id and then the data dic
+        """
+        Initializes the nx.Graph object and adds nodes and edges based on the sequences.
+
+        Parameters:
+        edge_data: optional data frame for the edges, one could add here special parameters for the edges, the type is a dic the first entry is the key id and then a nested dic with the key id and then the data dic (has to all combines for the edges)
+        """
 
         sequences = {}
 
@@ -96,7 +99,7 @@ class SequenceNetwork(BaseModel):
         for sequence in self.sequences:
             seq_dict = sequence.to_dict()
             seq_id = seq_dict.pop("@id")
-            if self.naming_dict != None:
+            if self.naming_dict is not None:
                 seq_id = seq_id.split('.')[0]
                 if seq_id in self.naming_dict:
                     seq_id = self.naming_dict[seq_id]
@@ -130,8 +133,8 @@ class SequenceNetwork(BaseModel):
                 {key: value for key, value in alignment_result.items()},
             )
             # here we could add the data from the data_Edge
-            if self.data_Edge != None:
-                for key, data_item in self.data_Edge[edge[0]][edge[1]].items():
+            if self.edge_data is not None:
+                for key, data_item in self.edge_data[edge[0]][edge[1]].items():
                     edge[2][key] = data_item
             if edge:
                 edge_data.append(edge)
