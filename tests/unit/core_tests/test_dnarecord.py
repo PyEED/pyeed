@@ -16,3 +16,26 @@ class TestDNARecord:
 
         assert dna_record is not None
 
+    def test_instantiation_from_ncbi_list(self):
+        dna_records = DNARecord.get_ids(['AF397067.1', 'AF397068.1'])
+
+        LOGGER.info(f"DNA Records: {dna_records}")
+
+        assert dna_records is not None
+
+    def test_fields(self):
+        dna_record = DNARecord(
+            name='Test',
+            id='AA',
+            sequence='ATCG',
+            organism=Organism(name='Test', taxonomy_id='1')
+
+        )
+
+        assert dna_record.id == 'AA'
+        assert dna_record.name == 'Test'
+        assert dna_record.sequence == 'ATCG'
+        assert dna_record.organism.name == 'Test'
+        assert dna_record.organism.taxonomy_id == 1
+
+
