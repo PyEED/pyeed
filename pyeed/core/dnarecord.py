@@ -1,14 +1,18 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Optional, List
 from uuid import uuid4
 
 from lxml.etree import _Element
 from pydantic import PrivateAttr, model_validator
 from pydantic_xml import attr, element
+from rich.status import Status
+from rich.console import Console
 from sdRDM.base.listplus import ListPlus
 from IPython.display import clear_output
 from sdRDM.tools.utils import elem2dict
 import asyncio
 
+from pyeed.fetch.blast import Blast, BlastProgram
 from pyeed.fetch.dnafetcher import DNAFetcher
 
 
@@ -95,10 +99,73 @@ class DNARecord(
             DNAFetcher(ids=accession_ids).fetch(force_terminal=False)
         )
     
+    def ncbi_blast(
+        self,
+        n_hits: int,
+        e_value: float = 10.0,
+        db: str = "swissprot",
+        identity: float = 0.0,
+        **kwargs,
+    ) -> List["DNARecord"]:
+        """
+        Runs a BLAST search using the NCBI BLAST service to find similar dna sequences.
+
+        Args:
+            n_hits (int): The number of hits to retrieve.
+            e_value (float, optional): The maximum E-value threshold for reporting hits. Defaults to 10.0.
+            db (str, optional): The database to search against. Defaults to "nt".
+            match/mismatch (int, optional): Match/mismatch score. Defaults to 1/-2.
+            gap_cost (int, optional): Cost to open a gap. Default is 0 and means linear
+            identity (float, optional): The minimum sequence identity threshold for reporting hits. Defaults to 0.0.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            List[DNARecord]: A list of DNARecord objects representing the similar dna sequences found.
+
+        Raises:
+            AssertionError: If the specified database is not supported.
+
+        Example:
+            dna_info = DNARecord()
+            similar_proteins = dna_info.ncbi_blast(n_hits=10, e_value=0.001, database="nt")
+        """
+
+        import nest_asyncio
+
+        from pyeed.fetch.blast import NCBIDataBase
+
+        nest_asyncio.apply()
+
+        assert (
+            db in NCBIDataBase
+        ), f"Database needs to be one of {NCBIDataBase.__members__.keys()}"
+
+        program = BlastProgram.BLASTN.value
+        executor = ThreadPoolExecutor(max_workers=1)
+        blaster = Blast(
+            query=self.sequence,
+            n_hits=n_hits,
+            evalue=e_value,
+            matrix="BLOSUM62",
+            identity=identity,
+        )
+
+        with Status(
+            "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
+        ):
+            result = asyncio.run(blaster.async_run(db, program, executor))
+            clear_output()
+
+        accessions = blaster.extract_accession(result)
+
+        return self.get_ids(accessions)
+
 
 if __name__ == "__main__":
     dna_record = DNARecord.get_id('AF188200.1')
 
     print(f"DNA Record: {dna_record}")
 
-    
+    print('Running blast...')
+    similar_dna_records = dna_record.ncbi_blast(n_hits=10, e_value=0.001, db="nt")
+    print(similar_dna_records)

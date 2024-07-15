@@ -38,6 +38,7 @@ class NCBIDataBase(BaseEnum):
     UNIPROTKB = "swissprot"
     PDB = "pdb"
     REFSEQ = "refseq_protein"
+    NT = "nt"
 
 
 class SubstitutionMatrix(BaseEnum):

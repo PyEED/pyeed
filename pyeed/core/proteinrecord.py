@@ -338,7 +338,7 @@ class ProteinRecord(
         if not self.coding_sequence_ref:
             return
 
-        return DNARecord.from_ncbi(self.coding_sequence_ref.id)
+        return DNARecord.get_id(self.coding_sequence_ref.id)
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinRecord"]:
         # blast_record = NCBIXML.read(result_handle)
