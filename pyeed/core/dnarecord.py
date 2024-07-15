@@ -146,15 +146,16 @@ class DNARecord(
             query=self.sequence,
             n_hits=n_hits,
             evalue=e_value,
-            matrix="BLOSUM62",
             identity=identity,
         )
 
         with Status(
             "Running BLAST", console=Console(force_terminal=False, force_jupyter=True)
         ):
-            result = asyncio.run(blaster.async_run(db, program, executor))
-            clear_output()
+             result = asyncio.run(blaster.async_run(db, program, executor))
+             clear_output()
+
+        result = blaster.run(program, db)
 
         accessions = blaster.extract_accession(result)
 
@@ -167,5 +168,5 @@ if __name__ == "__main__":
     print(f"DNA Record: {dna_record}")
 
     print('Running blast...')
-    similar_dna_records = dna_record.ncbi_blast(n_hits=10, e_value=0.001, db="nt")
+    similar_dna_records = dna_record.ncbi_blast(n_hits=10, db="nt")
     print(similar_dna_records)

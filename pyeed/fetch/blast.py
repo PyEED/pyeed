@@ -85,14 +85,30 @@ class Blast(BaseModel):
             ncbi_db in NCBIDataBase
         ), f"Invalid database: {ncbi_db}, valid databases: {NCBIDataBase}"
 
-        return NCBIWWW.qblast(
-            program,
-            ncbi_db,
-            self.query,
-            expect=self.evalue,
-            matrix_name=self.matrix,
-            hitlist_size=self.n_hits,
-        )
+        if program == BlastProgram.BLASTP.value:
+
+            return NCBIWWW.qblast(
+                program,
+                ncbi_db,
+                self.query,
+                expect=self.evalue,
+                matrix_name=self.matrix,
+                hitlist_size=self.n_hits,
+            )
+        
+        elif program == BlastProgram.BLASTN.value:
+
+            print('Program: ', program)
+            print('Database: ', ncbi_db)
+            print('Query: ', self.query)
+
+            return NCBIWWW.qblast(
+                program,
+                ncbi_db,
+                self.query,
+                expect=self.evalue,
+                hitlist_size=self.n_hits,
+            )
 
     async def async_run(
         self,
@@ -147,12 +163,9 @@ if __name__ == "__main__":
         with Status("Running BLAST"):
             result = await blast_task
 
-        parsed_result = blast.parse(result)
-        print(parsed_result)
-
         executor.shutdown()
 
-        return parsed_result
+        return result
 
     results = asyncio.run(main())
 
