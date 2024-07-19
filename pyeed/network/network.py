@@ -56,11 +56,6 @@ class SequenceNetwork(BaseModel):
         description="Dictionary with edge data",
     )
 
-    naming_dict: Optional[dict] = Field(
-        default=None,
-        description="Dictionary with the names of the nodes",
-    )
-
     network: Optional[nx.Graph] = Field(
         default=nx.Graph(),
         description="Network graph with networkx",
@@ -78,14 +73,11 @@ class SequenceNetwork(BaseModel):
         default="http://cytoscape:1234/v1",
     )
 
-    def model_post_init(self, __context):
-        self._create_graph()
-
     def add_to_targets(self, target: SequenceRecord):
         if target.id not in self.targets:
             self.targets.append(target.id)
 
-    def _create_graph(self):
+    def create_graph(self, naming_dict = None):
         """
         Initializes the nx.Graph object and adds nodes and edges based on the sequences.
 
@@ -99,10 +91,10 @@ class SequenceNetwork(BaseModel):
         for sequence in self.sequences:
             seq_dict = sequence.to_dict()
             seq_id = seq_dict.pop("@id")
-            if self.naming_dict is not None:
+            if naming_dict is not None:
                 seq_id = seq_id.split('.')[0]
-                if seq_id in self.naming_dict:
-                    seq_id = self.naming_dict[seq_id]
+                if seq_id in naming_dict:
+                    seq_id = naming_dict[seq_id]
                 else:
                     print(f"Sequence {seq_id} not found in the naming_dict")
                     continue
