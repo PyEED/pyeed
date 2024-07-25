@@ -98,14 +98,10 @@ class Blast(BaseModel):
         
         elif program == BlastProgram.BLASTN.value:
 
-            print('Program: ', program)
-            print('Database: ', ncbi_db)
-            print('Query: ', self.query)
-
             return NCBIWWW.qblast(
-                program,
-                ncbi_db,
-                self.query,
+                program=program,
+                database=ncbi_db,
+                sequence=self.query,
                 expect=self.evalue,
                 hitlist_size=self.n_hits,
             )

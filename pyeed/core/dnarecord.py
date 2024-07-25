@@ -103,7 +103,7 @@ class DNARecord(
         self,
         n_hits: int,
         e_value: float = 10.0,
-        db: str = "swissprot",
+        db: str = "nt",
         identity: float = 0.0,
         **kwargs,
     ) -> List["DNARecord"]:
@@ -156,6 +156,7 @@ class DNARecord(
              result = asyncio.run(blaster.async_run(db, program, executor))
              clear_output()
         
+        # result = blaster.run(program, db)
 
 
         accessions = blaster.extract_accession(result)
