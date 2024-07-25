@@ -335,10 +335,15 @@ class ProteinRecord(
     #     return protein_infos
 
     def get_dna(self):
-        if not self.coding_sequence_ref:
-            return
+        try:
+            if not self.coding_sequence:
+                return
 
-        return DNARecord.from_ncbi(self.coding_sequence_ref.id)
+            return DNARecord.get_id(self.coding_sequence[0].id)
+
+        except Exception as e:
+            print('The DNA sequence could not be retrieved. The error is: ', e)
+            return
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinRecord"]:
         # blast_record = NCBIXML.read(result_handle)
