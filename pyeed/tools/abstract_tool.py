@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ServiceURL(Enum):
     CLUSTALO = "http://clustalo:5001/align"
+    BLAST_LOCAL = "http://blast_docker:6001/run_blast"
 
 
 class AbstractTool(BaseModel, ABC):
