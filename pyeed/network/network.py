@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, PrivateAttr
 from requests import RequestException
 
 from pyeed.align.pairwise import PairwiseAligner
-from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
 
 plt.rcParams["figure.dpi"] = 300
@@ -77,7 +76,7 @@ class SequenceNetwork(BaseModel):
         if target.id not in self.targets:
             self.targets.append(target.id)
 
-    def create_graph(self, naming_dict = None):
+    def create_graph(self, naming_dict=None):
         """
         Initializes the nx.Graph object and adds nodes and edges based on the sequences.
 
@@ -92,7 +91,7 @@ class SequenceNetwork(BaseModel):
             seq_dict = sequence.to_dict()
             seq_id = seq_dict.pop("@id")
             if naming_dict is not None:
-                seq_id = seq_id.split('.')[0]
+                seq_id = seq_id.split(".")[0]
                 if seq_id in naming_dict:
                     seq_id = naming_dict[seq_id]
                 else:
@@ -105,9 +104,6 @@ class SequenceNetwork(BaseModel):
                 node_dict["ec_number"] = seq_dict.pop("ec_number")
             if "mol_weight" in seq_dict:
                 node_dict["mol_weight"] = seq_dict.pop("mol_weight")
-
-
-
 
             sequences[seq_id] = sequence.sequence
             self._full_network.add_node(seq_id, **node_dict)
@@ -139,24 +135,25 @@ class SequenceNetwork(BaseModel):
         self.network = copy.deepcopy(self._full_network)
         self.calculate_centrality()
 
-    def update_threshhold(self, threshold: float, threshold_mode: str = 'UNDER_THRESHOLD'):
+    def update_threshhold(
+        self, threshold: float, threshold_mode: str = "UNDER_THRESHOLD"
+    ):
         """Removes or adds edges based on the threshold value."""
 
-        if self.weight == 'identity':
+        if self.weight == "identity":
             assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
 
         edge_pairs_below_threshold = []
         network = copy.deepcopy(self._full_network)
 
-
         for node1, node2, data in network.edges(data=True):
-            if threshold_mode == 'UNDER_THRESHOLD':
+            if threshold_mode == "UNDER_THRESHOLD":
                 if data[self.weight] < threshold:
                     edge_pairs_below_threshold.append((node1, node2))
-            elif threshold_mode == 'ABOVE_THRESHOLD':
+            elif threshold_mode == "ABOVE_THRESHOLD":
                 if data[self.weight] > threshold:
                     edge_pairs_below_threshold.append((node1, node2))
-        
+
         network.remove_edges_from(edge_pairs_below_threshold)
         self._2d_position_nodes_and_edges(network)
 
@@ -195,7 +192,7 @@ class SequenceNetwork(BaseModel):
         threshold: float = 0.8,
         style_name: str = "default",
         column_name: str = "genus",
-        threshold_mode: str = 'UNDER_THRESHOLD',
+        threshold_mode: str = "UNDER_THRESHOLD",
     ):
         try:
             p4c.cytoscape_ping(base_url=self._cytoscape_url)
@@ -220,8 +217,12 @@ class SequenceNetwork(BaseModel):
         )
 
         self.hide_threshold(threshold, threshold_mode=threshold_mode)
-        p4c.set_layout_properties('force-directed', {'defaultSpringLength': 70, 'defaultSpringCoefficient': 2})
-        p4c.layout_network(layout, base_url=self._cytoscape_url, network="SequenceNetwork")
+        p4c.set_layout_properties(
+            "force-directed", {"defaultSpringLength": 70, "defaultSpringCoefficient": 2}
+        )
+        p4c.layout_network(
+            layout, base_url=self._cytoscape_url, network="SequenceNetwork"
+        )
 
         df_nodes = p4c.get_table_columns(table="node", base_url=self._cytoscape_url)
 
@@ -263,27 +264,28 @@ class SequenceNetwork(BaseModel):
             file.write(str(cyt_dict))
         print(f"💾 Network exported to {file_path}")
 
-    def hide_threshold(self, threshold, threshold_mode: str = 'UNDER_THRESHOLD'):
+    def hide_threshold(self, threshold, threshold_mode: str = "UNDER_THRESHOLD"):
         p4c.unhide_all(base_url=self._cytoscape_url)
 
         hide_list = []
 
-
         for u, v, d in self._full_network.edges(data=True):
-            if threshold_mode == 'UNDER_THRESHOLD':
+            if threshold_mode == "UNDER_THRESHOLD":
                 if d[self.weight] < threshold:
                     hide_list.append("{} (interacts with) {}".format(u, v))
-            elif threshold_mode == 'ABOVE_THRESHOLD':
+            elif threshold_mode == "ABOVE_THRESHOLD":
                 if d[self.weight] > threshold:
                     hide_list.append("{} (interacts with) {}".format(u, v))
 
         p4c.hide_edges(hide_list, base_url=self._cytoscape_url)
 
-    def calculate_degree(self, threshold: float = 0.8, threshold_mode: str = 'UNDER_THRESHOLD'):
+    def calculate_degree(
+        self, threshold: float = 0.8, threshold_mode: str = "UNDER_THRESHOLD"
+    ):
         # Calculate degree of nodes with filtering
         degree = {}
         for u, v, d in self._full_network.edges(data=True):
-            if threshold_mode == 'UNDER_THRESHOLD':
+            if threshold_mode == "UNDER_THRESHOLD":
                 if d[self.weight] > threshold:
                     if u not in degree:
                         degree[u] = 1
@@ -293,7 +295,7 @@ class SequenceNetwork(BaseModel):
                         degree[v] = 1
                     else:
                         degree[v] += 1
-            elif threshold_mode == 'ABOVE_THRESHOLD':
+            elif threshold_mode == "ABOVE_THRESHOLD":
                 if d[self.weight] <= threshold:
                     if u not in degree:
                         degree[u] = 1
@@ -408,9 +410,7 @@ class SequenceNetwork(BaseModel):
             color_labels = list(set(color_labels))
             colors = self._sample_colorscale(len(set(color_labels)))
 
-            color_dict = dict(
-                zip(color_labels, colors)
-            )
+            color_dict = dict(zip(color_labels, colors))
 
             color_list = []
             for node in self.network.nodes.values():
