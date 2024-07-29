@@ -1,3 +1,6 @@
+import pandas as pd
+import networkx as nx
+
 from pyeed.core import ProteinRecord
 from pyeed.network import SequenceNetwork
 
@@ -21,8 +24,8 @@ class TestNetworkGraphBuild:
         network = SequenceNetwork(
             sequences=mats,
             weight="identity",
-            dimensions=2,
         )
+        network.create_graph()
 
     def test_graph_build(self):
         mat_accessions = [
@@ -37,4 +40,38 @@ class TestNetworkGraphBuild:
             sequences=mats,
             weight="identity",
         )
+
+        network.create_graph()
+
         assert len(list(network.network.nodes)) == len(mats)
+
+    def test_graph_naming_dic(self):
+        mat_accessions = [
+            "MBP1912539.1",
+            "SEV92896.1",
+            "MBO8174569.1",
+            "WP_042680787.1",
+        ]
+
+        naming_dic = {
+            "MBP1912539": "MAT1",
+            "SEV92896": "MAT2",
+            "MBO8174569": "MAT3",
+            "WP_042680787": "MAT4",
+        }
+
+        mats = ProteinRecord.get_ids(mat_accessions)
+        # Create network
+        network = SequenceNetwork(
+            sequences=mats,
+            weight="identity",
+            naming_dict=naming_dic,
+        )
+
+        network.create_graph(naming_dict=naming_dic)
+
+        # convert networkx to pandas
+        data = dict(network.network.nodes(data=True))
+
+        assert len(list(network.network.nodes)) == len(mats)
+        assert 'MAT1' in list(data.keys())
