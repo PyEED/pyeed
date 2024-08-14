@@ -73,7 +73,7 @@ class SequenceNetwork(BaseModel):
     )
 
     def post_init(self):
-        self.create_graph()
+        self._create_graph()
 
     def add_to_targets(self, target: SequenceRecord):
         if target.id not in self.targets:
