@@ -297,6 +297,16 @@ class ProteinRecord(
 
         return self.get_ids(accessions)
 
+    def ncbi_blast_local(self, db: str, n_hits: int = 10, evalue: float = 0.005) -> List["ProteinRecord"]:
+
+
+        from pyeed.tools.blastp import BlastP
+
+        blaster = BlastP()
+        ids = blaster.blastp(self.sequence, db, evalue=evalue, n_hits=n_hits, outfmt="6")
+        return self.get_ids(ids)
+
+
     # def blastp(
     #     self,
     #     db_path: str,
