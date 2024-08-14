@@ -65,7 +65,6 @@ class BlastP(AbstractTool):
     def run_service(self, data) -> httpx.Response:
         # here we run the actual search
         try:
-            print(data)
             return httpx.post(self._service_url, timeout=6000, json=data, headers = {'Content-Type': 'application/json'})
 
         except httpx.ConnectError as connect_error:
