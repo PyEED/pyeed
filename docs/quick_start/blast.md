@@ -9,15 +9,36 @@ NCBI offers a web interface for blasting. With PyEED this can be programmaticall
 - matrix (str): The matrix to use for the search. The default is `BLOSUM62`.
 - identity (float): The minimum identity percentage for the search. The default is `0.0`.
 
-``` py
-from pyeed.core import ProteinRecord
 
-# Create a ProteinInfo object
-protein = ProteinRecord.get_id("UCS38941.1")
 
-# Perform a BLAST search
-blast_results = protein.ncbi_blast()
-```
-!!! info "NCBI BLAST performance"
+=== "Protein"
 
-    Due to server-side limitations of NCBI, BLAST searches might be slowed down or even be blocked, if multiple searches are performed in a short time.
+    ``` py
+    from pyeed.core import ProteinRecord
+
+    # Create a ProteinInfo object
+    protein = ProteinRecord.get_id("UCS38941.1")
+
+    # Perform a BLAST search
+    blast_results = protein.ncbi_blast()
+    ```
+    !!! info "NCBI BLAST performance"
+
+        Due to server-side limitations of NCBI, BLAST searches might be slowed down or even be blocked, if multiple searches are performed in a short time.
+
+=== "DNA"
+
+    ``` py 
+    from pyeed.core import DNARecord
+
+    # Create a dna record object
+    dna_record = DNARecord.get_id('AF188200.1')
+
+    # Perform the blast search
+    similar_dna_records = dna_record.ncbi_blast(n_hits=100, db="nt")
+
+    ```
+    !!! info "NCBI BLAST performance"
+
+            Due to server-side limitations of NCBI, BLAST searches might be slowed down or even be blocked, if multiple searches are performed in a short time.
+

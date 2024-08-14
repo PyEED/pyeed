@@ -55,7 +55,7 @@ class ClustalOmega(AbstractTool):
                     return httpx.post(self._service_url, files=file, timeout=600)
                 except httpx.ConnectError as connect_error:
                     raise httpx.ConnectError("PyEED Docker Service is not running.")
-
+            print(connect_error)
             raise httpx.ConnectError("PyEED Docker Service is not running.")
 
     def align(self, sequences: List[str]):

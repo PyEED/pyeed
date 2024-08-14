@@ -1,3 +1,6 @@
+import pandas as pd
+import networkx as nx
+
 from pyeed.core import ProteinRecord
 from pyeed.network import SequenceNetwork
 
@@ -21,7 +24,6 @@ class TestNetworkGraphBuild:
         network = SequenceNetwork(
             sequences=mats,
             weight="identity",
-            dimensions=2,
         )
 
     def test_graph_build(self):
@@ -37,4 +39,5 @@ class TestNetworkGraphBuild:
             sequences=mats,
             weight="identity",
         )
+
         assert len(list(network.network.nodes)) == len(mats)
