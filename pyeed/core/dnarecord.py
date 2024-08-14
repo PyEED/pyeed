@@ -11,6 +11,7 @@ from sdRDM.base.listplus import ListPlus
 from IPython.display import clear_output
 from sdRDM.tools.utils import elem2dict
 import asyncio
+import warnings
 
 from pyeed.fetch.blast import Blast, BlastProgram
 from pyeed.fetch.dnafetcher import DNAFetcher
