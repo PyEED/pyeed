@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class ServiceURL(Enum):
     CLUSTALO = "http://clustalo:5001/align"
     BLAST_LOCAL = "http://blast_docker:6001/run_blast"
+    MMSEQS_LOCAL = "http://mmseqs_docker:8000/"
 
 
 class AbstractTool(BaseModel, ABC):

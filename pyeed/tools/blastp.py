@@ -31,7 +31,7 @@ class BlastP(AbstractTool):
 
             raise httpx.ConnectError("Blast Docker Service is not running.")
         
-    def extact_ids_from_blast_string(self, response) -> Dict[str, Any]:
+    def extact_ids_from_blast_string(self, response):
         # here we extract the result from the written output file
         # the file is out.out as specified in FASTAPI for our BLASTP service
         data = response.json()
