@@ -297,13 +297,26 @@ class ProteinRecord(
 
         return self.get_ids(accessions)
 
-    def ncbi_blast_local(self, db: str, n_hits: int = 10, evalue: float = 0.005) -> List["ProteinRecord"]:
+    def ncbi_blast_local(self, db: str, evalue: float = 0.005, num_threads = None) -> List["ProteinRecord"]:
+        """
+        This method runs a local BLAST search using the NCBI BLAST service to find similar protein sequences.
+        The database has to be downloaded and installed locally. The blastp command is used to run the search.
+        The docker container has to be running in order to use this method.
 
+        Args:
+            db (str): The database to search against.
+            evalue (float, optional): The maximum E-value threshold for reporting hits. Defaults to 0.005.
+            num_threads (int, optional): The number of threads to use for the search. Defaults to all available cores.
+        """
+        # check if num_threads is None
+        import os
+        if num_threads is None:
+            num_threads = os.cpu_count()
 
         from pyeed.tools.blastp import BlastP
 
         blaster = BlastP()
-        ids = blaster.blastp(self.sequence, db, evalue=evalue, n_hits=n_hits, outfmt="6")
+        ids = blaster.blastp(self.sequence, db, evalue=str(evalue), outfmt="6", num_threads=str(num_threads))
         return self.get_ids(ids)
 
 

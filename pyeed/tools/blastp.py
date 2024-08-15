@@ -45,17 +45,21 @@ class BlastP(AbstractTool):
 
     
         
-    def blastp(self, query: str, db: str, evalue: str, outfmt: str):
+    def blastp(self, query: str, db: str, evalue: str, outfmt: str, num_threads: str):
         # here we run the actual search
         data = {
             "query": query,
             "db": db,
             "evalue": evalue,
             "outfmt": outfmt,
-            "tool": "blastp"
+            "tool": "blastp",
+            "num_threads": num_threads
         }
 
         result = self.run_service(data)
+
+        if result.status_code == 500:
+            raise httpx.HTTPStatusError("Error in running BLASTP service. The error message is: " + result.text)
         # now we need to extract the result from the written output file
         # before that we need to ensure that the service is already finished
         return self.extact_ids_from_blast_string(result)
@@ -97,13 +101,6 @@ if __name__ == "__main__":
 
     mats = ProteinRecord.get_ids(mat_accessions)
 
-    blastp = BlastP()
+    ids = mats[0].ncbi_blast_local(db = '/blast/blastdb/nr/nr', evalue=0.005, num_threads=50)
 
-    # Check if the service is running
-    # response = blastp.check_running_service()
-    # print('Status:', response.status_code)
-
-    print(mats[0].sequence)
-
-    ids = blastp.blastp(query=mats[0].sequence, db='/blast/blastdb/nr/nr', evalue="0.001", outfmt="6")
     print(ids)
