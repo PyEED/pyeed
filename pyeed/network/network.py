@@ -11,7 +11,6 @@ from requests import RequestException
 import plotly.graph_objects as go
 
 from pyeed.align.pairwise import PairwiseAligner
-from pyeed.core.proteinrecord import ProteinRecord
 from pyeed.core.sequencerecord import SequenceRecord
 
 plt.rcParams["figure.dpi"] = 300
@@ -93,9 +92,6 @@ class SequenceNetwork(BaseModel):
                 node_dict["ec_number"] = seq_dict.pop("ec_number")
             if "mol_weight" in seq_dict:
                 node_dict["mol_weight"] = seq_dict.pop("mol_weight")
-
-
-
 
             sequences[seq_id] = sequence.sequence
             self._full_network.add_node(seq_id, **node_dict)
@@ -366,9 +362,7 @@ class SequenceNetwork(BaseModel):
             color_labels = list(set(color_labels))
             colors = self._sample_colorscale(len(set(color_labels)))
 
-            color_dict = dict(
-                zip(color_labels, colors)
-            )
+            color_dict = dict(zip(color_labels, colors))
 
             color_list = []
             for node in self.network.nodes.values():
