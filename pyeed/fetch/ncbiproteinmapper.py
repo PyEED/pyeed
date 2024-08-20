@@ -46,7 +46,6 @@ class NCBIProteinMapper:
 
         protein_infos = []
         for record in seq_records:
-
             protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
 
             try:
@@ -87,15 +86,17 @@ class NCBIProteinMapper:
                 LOGGER.info(
                     f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
                 )
-                return {}
 
             try:
-                taxonomy_id = next(feature for feature in feature.qualifiers["db_xref"] if "taxon" in feature)
+                taxonomy_id = next(
+                    feature
+                    for feature in feature.qualifiers["db_xref"]
+                    if "taxon" in feature
+                )
                 if ":" in taxonomy_id:
                     taxonomy_id = taxonomy_id.split(":")[1]
             except StopIteration:
                 taxonomy_id = None
-
 
         except KeyError:
             LOGGER.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")
