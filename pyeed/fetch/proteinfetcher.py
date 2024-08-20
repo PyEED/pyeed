@@ -9,11 +9,10 @@ from rich.progress import Progress
 
 from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
-from pyeed.fetch.requester import AsyncRequester, AsyncParamRequester
+from pyeed.fetch.pdbmapper import PDBMapper
+from pyeed.fetch.requester import AsyncParamRequester, AsyncRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
 from pyeed.fetch.uniprotmapper import UniprotMapper
-from pyeed.fetch.pdbmapper import PDBMapper
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -159,7 +158,7 @@ class ProteinFetcher:
 
                     param_requester = AsyncParamRequester(
                         ids=db_ids,
-                        url = "https://data.rcsb.org/graphql",
+                        url="https://data.rcsb.org/graphql",
                         params=query,
                         task_id=task_id,
                         progress=progress,
@@ -176,8 +175,6 @@ class ProteinFetcher:
                 pdb_entries = await param_requester.make_request()
                 pdb_entries = [PDBMapper().map_pdb_data(entry) for entry in pdb_entries]
                 pdb_entries = [item for sublist in pdb_entries for item in sublist]
-
-
 
             # map data to objects
             ncbi_responses, uniprot_response = self.identify_data_source(responses)
@@ -300,10 +297,11 @@ class ProteinFetcher:
 
         return uniprot_dict
 
+
 if __name__ == "__main__":
     import asyncio
+
     from rich.progress import Progress
-    from rich import print
 
     ids = ["6VXX", "7NHM", "5L2G"]
 
