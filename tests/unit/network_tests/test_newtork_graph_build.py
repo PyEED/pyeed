@@ -1,3 +1,5 @@
+import json
+import pytest
 import pandas as pd
 import networkx as nx
 
@@ -35,9 +37,57 @@ class TestNetworkGraphBuild:
         ]
         mats = ProteinRecord.get_ids(mat_accessions)
         # Create network
+        network = SequenceNetwork(sequences=mats)
+
+        assert len(list(network.network.nodes)) == len(mats)
+
+    def test_graph_save(self):
+        mat_accessions = [
+            "MBP1912539.1",
+            "SEV92896.1",
+            "MBO8174569.1",
+            "WP_042680787.1",
+        ]
+        mats = ProteinRecord.get_ids(mat_accessions)
+        # Create network
         network = SequenceNetwork(
             sequences=mats,
             weight="identity",
         )
 
-        assert len(list(network.network.nodes)) == len(mats)
+        # this is the data as a string, here one could write this to a file
+        data_string = network.model_dump_json()
+        # to read in the data again
+        data_json = json.loads(data_string)
+        # to load it into a Sequence Network object
+        network2 = SequenceNetwork(**data_json)
+                
+        assert len(data_json['network']['nodes']) == len(mats)
+        assert network2.network.number_of_nodes() == network.network.number_of_nodes()
+        assert network2.network.number_of_edges() == network.network.number_of_edges()
+
+    def test_graph_network_input_interger(self):
+        mat_accessions = [
+            "MBP1912539.1",
+            "SEV92896.1",
+            "MBO8174569.1",
+            "WP_042680787.1",
+        ]
+        mats = ProteinRecord.get_ids(mat_accessions)
+        # Create network
+        network = SequenceNetwork(
+            sequences=mats,
+            weight="identity",
+        )
+
+        # this is the data as a string, here one could write this to a file
+        data_string = network.model_dump_json()
+        # to read in the data again
+        data_json = json.loads(data_string)
+
+        data_json['network'] = 1
+
+        # expecte an error
+        with pytest.raises(ValueError):
+            network2 = SequenceNetwork(**data_json)
+

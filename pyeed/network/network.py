@@ -1,11 +1,12 @@
 import copy
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.readwrite import json_graph
 import py4cytoscape as p4c
 from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer, field_validator
 from requests import RequestException
 
 from pyeed.align.pairwise import PairwiseAligner
@@ -56,7 +57,7 @@ class SequenceNetwork(BaseModel):
     )
 
     network: Optional[nx.Graph] = Field(
-        default=nx.Graph(),
+        default=None,
         description="Network graph with networkx",
     )
 
@@ -72,13 +73,25 @@ class SequenceNetwork(BaseModel):
         default="http://cytoscape:1234/v1",
     )
 
-    def post_init(self):
-        self._create_graph()
+    def model_post_init(self, __context):
+        if self.network is None:
+            self._create_graph()
 
     def add_to_targets(self, target: SequenceRecord):
         if target.id not in self.targets:
             self.targets.append(target.id)
 
+    # custom method for serialization to save the network as a json
+    @field_serializer("network")
+    def serialize_network(self, G: nx.Graph):
+        return json_graph.node_link_data(G)
+    
+    @field_validator("network", mode="before")
+    @classmethod
+    def parse_network(cls, G: Any):
+        assert isinstance(G, dict), "Network has to be a dictionary"
+        return json_graph.node_link_graph(G)
+    
     def _create_graph(self):
         """
         Initializes the nx.Graph object and adds nodes and edges based on the sequences.
