@@ -11,17 +11,17 @@ from Bio.SeqRecord import SeqRecord
 from pydantic import ValidationError
 
 from pyeed.core.annotation import Annotation
-from pyeed.core.dnarecord import DNARecord
 from pyeed.core.organism import Organism
 from pyeed.core.region import Region
 
 if TYPE_CHECKING:
-    from pyeed.core.proteinrecord import ProteinRecord
+    from pyeed.core.dnarecord import DNARecord
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-class NCBIProteinMapper:
+class NCBIDNAMapper:
     def __init__(self):
         pass
 
@@ -31,42 +31,45 @@ class NCBIProteinMapper:
         """
         records = []
         for response in responses:
-            records.extend(SeqIO.parse(io.StringIO(response), "gb"))
+            LOGGER.debug(f"Converting response to SeqRecord: {response[0]}")
+            records.extend(SeqIO.parse(io.StringIO(response[0]), "gb"))
 
         return records
 
-    def map(self, responses: List[str]) -> List[ProteinRecord]:
+    def map(self, responses: List[str]) -> List[DNARecord]:
         """
-        Maps the fetched data to an instance of the `ProteinInfo` class.
+        Maps the fetched data to an instance of the `DNARecord` class.
         """
 
-        from pyeed.core.proteinrecord import ProteinRecord
+        from pyeed.core.dnarecord import DNARecord
 
         seq_records = self._to_seq_records(responses)
 
-        protein_infos = []
+        dna_infos = []
         for record in seq_records:
-            protein_info = ProteinRecord(id=record.id, sequence=str(record.seq))
+
+            dna_info = DNARecord(id=record.id, sequence=str(record.seq))
 
             try:
-                protein_info.organism = Organism(**self.map_organism(record))
+                dna_info.organism = Organism(**self.map_organism(record))
             except ValidationError as e:
                 LOGGER.error(
                     f"Error mapping organism for {record.id}: {e.errors()} {e.json()}"
                 )
                 continue
 
-            protein_info = self.map_protein(record, protein_info)
 
-            protein_info = self.map_regions(record, protein_info)
+            dna_info = self.map_general_infos(record, dna_info)
 
-            protein_info = self.map_sites(record, protein_info)
+            dna_info = self.map_regions(record, dna_info)
 
-            protein_info = self.map_cds(record, protein_info)
+            dna_info = self.map_sites(record, dna_info)
 
-            protein_infos.append(protein_info)
+            # dna_info = self.map_cds(record, dna_info)
 
-        return protein_infos
+            dna_infos.append(dna_info)
+
+        return dna_infos
 
     def map_organism(self, seq_record: SeqRecord) -> dict:
         """
@@ -86,17 +89,15 @@ class NCBIProteinMapper:
                 LOGGER.info(
                     f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
                 )
+                return {}
 
             try:
-                taxonomy_id = next(
-                    feature
-                    for feature in feature.qualifiers["db_xref"]
-                    if "taxon" in feature
-                )
+                taxonomy_id = next(feature for feature in feature.qualifiers["db_xref"] if "taxon" in feature)
                 if ":" in taxonomy_id:
                     taxonomy_id = taxonomy_id.split(":")[1]
             except StopIteration:
                 taxonomy_id = None
+
 
         except KeyError:
             LOGGER.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")
@@ -112,100 +113,71 @@ class NCBIProteinMapper:
 
         return {"id": taxonomy_id, "name": organism_name[0], "taxonomy_id": taxonomy_id}
 
-    def map_protein(self, seq_record: SeqRecord, protein_info: ProteinRecord):
-        """Maps protein data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
 
-        protein = self.get_feature(seq_record, "Protein")
-        if len(protein) == 0:
-            LOGGER.debug(
-                f"No protein feature found for {seq_record.id}: {seq_record.features}"
-            )
+    def map_general_infos(self, seq_record: SeqRecord, dna_info: DNARecord):
+        """
+        Maps general information from a `Bio.SeqRecord` to a `DNARecord` object.
+        """
 
-            return protein_info
 
-        if len(protein) > 1:
-            LOGGER.debug(
-                f"Multiple features ({len(protein)}) of type `Protein` found for {seq_record.id}"
-            )
+        dna_info.name = seq_record.name
+        dna_info.seq_length = len(seq_record.seq)
+        # GC-content=(A+T+G+C)(G+C)​×100
+        dna_info.gc_content = ((seq_record.seq.count("G") + seq_record.seq.count("C")) / dna_info.seq_length) * 100
 
-        protein = protein[0]
-        try:
-            protein_info.name = protein.qualifiers["product"][0]
-        except KeyError:
-            LOGGER.debug(
-                f"No protein name found for {seq_record.id}: {protein.qualifiers}"
-            )
+        return dna_info
+
+    def map_sites(self, seq_record: SeqRecord, dna_info: DNARecord):
+        """
+        Maps site data from a `Bio.SeqRecord` to a `DNARecord` object.
+        """
+
+        sites = self.get_feature(seq_record, "variation")
+        for site in sites:
             try:
-                protein_info.name = protein.qualifiers["name"][0]
+                dna_info.sites.append(
+                    Region(
+                        id=site.qualifiers["note"][0],
+                        start=int(site.location.start),
+                        end=int(site.location.end),
+                    )
+                )
             except KeyError:
                 LOGGER.debug(
-                    f"No protein name found for {seq_record.id}: {protein.qualifiers}"
+                    f"Error mapping site for {seq_record.id}: {site.qualifiers}"
                 )
-                protein_info.name = None
 
-        try:
-            protein_info.mol_weight = protein.qualifiers["calculated_mol_wt"][0]
-        except KeyError:
-            LOGGER.debug(
-                f"No molecular weight found for {seq_record.id}: {protein.qualifiers}"
-            )
-            protein_info.mol_weight = None
+        return dna_info
 
-        try:
-            protein_info.ec_number = protein.qualifiers["EC_number"][0]
-        except KeyError:
-            LOGGER.debug(
-                f"No EC number found for {seq_record.id}: {protein.qualifiers}"
-            )
-            protein_info.ec_number = None
 
-        return protein_info
+    def map_regions(self, seq_record: SeqRecord, dna_info: DNARecord):
+        """Maps region data from a `Bio.SeqRecord` to a `DNARecord` object."""
 
-    def map_regions(self, seq_record: SeqRecord, protein_info: ProteinRecord):
-        """Maps region data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
-
-        regions = self.get_feature(seq_record, "region")
+        regions = self.get_feature(seq_record, "gene")
         for region in regions:
             try:
+
                 if "db_xref" not in region.qualifiers:
                     db_xref = None
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
 
-                protein_info.regions.append(
+                dna_info.regions.append(
                     Region(
-                        id=region.qualifiers["region_name"][0],
+                        id=region.qualifiers["gene"][0],
                         start=int(region.location.start),
                         end=int(region.location.end),
-                        note=region.qualifiers["note"][0],
                         cross_reference=db_xref,
                     )
                 )
+
             except KeyError:
                 LOGGER.debug(
-                    f"Incomplete region data found for {seq_record.id}: {region.qualifiers}, skipping region"
+                    f"Error mapping region for {seq_record.id}: {region.qualifiers}"
                 )
 
-        return protein_info
+        return dna_info
 
-    def map_sites(self, seq_record: SeqRecord, protein_info: ProteinRecord):
-        """Maps site data from a `Bio.SeqRecord` to a `ProteinInfo` object."""
-
-        sites = self.get_feature(seq_record, "site")
-        for site in sites:
-            try:
-                protein_info.add_to_sites(
-                    name=site.qualifiers["site_type"][0],
-                    id=site.qualifiers["site_type"][0].lower(),
-                    positions=[int(part.start) for part in site.location.parts],
-                    cross_ref=site.qualifiers["db_xref"][0],
-                )
-            except KeyError:
-                LOGGER.debug(
-                    f"Incomplete site data found for {seq_record.id}: {site.qualifiers}, skipping site"
-                )
-
-        return protein_info
 
     def map_cds(self, seq_record: SeqRecord, protein_record: ProteinRecord):
         """Maps coding sequence data from a `Bio.SeqRecord` to a `ProteinRecord` object."""

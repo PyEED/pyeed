@@ -108,7 +108,7 @@ class Organism(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-        default="b926bfec3aa1ec45a5614cf6ac4a546252dd384c"
+        default="72d2203f2e3ce4b319b29fa0d2f146b5eead7b00"
     )
 
     _raw_xml_data: Dict = PrivateAttr(default_factory=dict)

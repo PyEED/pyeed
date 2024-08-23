@@ -1,12 +1,13 @@
 import copy
 from os import name
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.readwrite import json_graph
 import py4cytoscape as p4c
 from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer, field_validator
 from requests import RequestException
 import plotly.graph_objects as go
 
@@ -52,8 +53,13 @@ class SequenceNetwork(BaseModel):
         description="List of selected sequences",
     )
 
+    edge_data: Optional[dict] = Field(
+        default=None,
+        description="Dictionary with edge data",
+    )
+
     network: Optional[nx.Graph] = Field(
-        default=nx.Graph(),
+        default=None,
         description="Network graph with networkx",
     )
 
@@ -66,18 +72,35 @@ class SequenceNetwork(BaseModel):
     )
 
     _cytoscape_url: Optional[str] = PrivateAttr(
-        default="http://cytoscape-desktop:1234/v1",
+        default="http://cytoscape:1234/v1",
     )
 
     def model_post_init(self, __context):
-        self._create_graph()
+        if self.network is None:
+            self._create_graph()
 
     def add_to_targets(self, target: SequenceRecord):
         if target.id not in self.targets:
             self.targets.append(target.id)
 
+    # custom method for serialization to save the network as a json
+    @field_serializer("network")
+    def serialize_network(self, G: nx.Graph):
+        return json_graph.node_link_data(G)
+    
+    @field_validator("network", mode="before")
+    @classmethod
+    def parse_network(cls, G: Any):
+        assert isinstance(G, dict), "Network has to be a dictionary"
+        return json_graph.node_link_graph(G)
+    
     def _create_graph(self):
-        """Initializes the nx.Graph object and adds nodes and edges based on the sequences."""
+        """
+        Initializes the nx.Graph object and adds nodes and edges based on the sequences.
+
+        Parameters:
+        edge_data: optional data frame for the edges, one could add here special parameters for the edges, the type is a dic the first entry is the key id and then a nested dic with the key id and then the data dic (has to all combines for the edges)
+        """
 
         sequences = {}
 
@@ -108,6 +131,10 @@ class SequenceNetwork(BaseModel):
                 alignment_result["sequences"][1]["id"],
                 {key: value for key, value in alignment_result.items()},
             )
+            # here we could add the data from the data_Edge
+            if self.edge_data is not None:
+                for key, data_item in self.edge_data[edge[0]][edge[1]].items():
+                    edge[2][key] = data_item
             if edge:
                 edge_data.append(edge)
 
@@ -119,17 +146,25 @@ class SequenceNetwork(BaseModel):
         self.network = copy.deepcopy(self._full_network)
         self.calculate_centrality()
 
-    def update_threshhold(self, threshold: float):
+    def update_threshhold(
+        self, threshold: float, threshold_mode: str = "UNDER_THRESHOLD"
+    ):
         """Removes or adds edges based on the threshold value."""
 
-        assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
+        if self.weight == "identity":
+            assert 0 <= threshold <= 1, "Threshold must be between 0 and 1"
 
+        edge_pairs_below_threshold = []
         network = copy.deepcopy(self._full_network)
-        edge_pairs_below_threshold = [
-            (node1, node2)
-            for node1, node2, data in network.edges(data=True)
-            if data["identity"] < threshold
-        ]
+
+        for node1, node2, data in network.edges(data=True):
+            if threshold_mode == "UNDER_THRESHOLD":
+                if data[self.weight] < threshold:
+                    edge_pairs_below_threshold.append((node1, node2))
+            elif threshold_mode == "ABOVE_THRESHOLD":
+                if data[self.weight] > threshold:
+                    edge_pairs_below_threshold.append((node1, node2))
+
         network.remove_edges_from(edge_pairs_below_threshold)
         self._2d_position_nodes_and_edges(network)
 
@@ -167,7 +202,8 @@ class SequenceNetwork(BaseModel):
         layout: str = "force-directed",
         threshold: float = 0.8,
         style_name: str = "default",
-        column_name: str = "domain",
+        column_name: str = "genus",
+        threshold_mode: str = "UNDER_THRESHOLD",
     ):
         try:
             p4c.cytoscape_ping(base_url=self._cytoscape_url)
@@ -179,19 +215,25 @@ class SequenceNetwork(BaseModel):
             base_url=self._cytoscape_url
         ), "Cytoscape is not running in the background"
 
-        p4c.layout_network(layout, base_url=self._cytoscape_url)
+        # p4c.layout_network(layout, base_url=self._cytoscape_url, network="SequenceNetwork")
 
         # create a degree column for the nodes based on the current chosen threshold
-        self.calculate_degree(threshold=threshold)
+        self.calculate_degree(threshold=threshold, threshold_mode=threshold_mode)
         # filter the the edges by the threshold
         p4c.create_network_from_networkx(
             self._full_network,
             collection="SequenceNetwork",
             base_url=self._cytoscape_url,
+            title="SequenceNetwork",
         )
 
-        self._hide_under_threshold(threshold)
-        p4c.layout_network("grid", base_url=self._cytoscape_url)
+        self.hide_threshold(threshold, threshold_mode=threshold_mode)
+        p4c.set_layout_properties(
+            "force-directed", {"defaultSpringLength": 70, "defaultSpringCoefficient": 2}
+        )
+        p4c.layout_network(
+            layout, base_url=self._cytoscape_url, network="SequenceNetwork"
+        )
 
         df_nodes = p4c.get_table_columns(table="node", base_url=self._cytoscape_url)
 
@@ -233,30 +275,47 @@ class SequenceNetwork(BaseModel):
             file.write(str(cyt_dict))
         print(f"💾 Network exported to {file_path}")
 
-    def _hide_under_threshold(self, threshold):
+    def hide_threshold(self, threshold, threshold_mode: str = "UNDER_THRESHOLD"):
         p4c.unhide_all(base_url=self._cytoscape_url)
 
         hide_list = []
 
         for u, v, d in self._full_network.edges(data=True):
-            if d["identity"] < threshold:
-                hide_list.append("{} (interacts with) {}".format(u, v))
+            if threshold_mode == "UNDER_THRESHOLD":
+                if d[self.weight] < threshold:
+                    hide_list.append("{} (interacts with) {}".format(u, v))
+            elif threshold_mode == "ABOVE_THRESHOLD":
+                if d[self.weight] > threshold:
+                    hide_list.append("{} (interacts with) {}".format(u, v))
 
         p4c.hide_edges(hide_list, base_url=self._cytoscape_url)
 
-    def calculate_degree(self, threshold: float = 0.8):
+    def calculate_degree(
+        self, threshold: float = 0.8, threshold_mode: str = "UNDER_THRESHOLD"
+    ):
         # Calculate degree of nodes with filtering
         degree = {}
         for u, v, d in self._full_network.edges(data=True):
-            if d["identity"] > threshold:
-                if u not in degree:
-                    degree[u] = 1
-                else:
-                    degree[u] += 1
-                if v not in degree:
-                    degree[v] = 1
-                else:
-                    degree[v] += 1
+            if threshold_mode == "UNDER_THRESHOLD":
+                if d[self.weight] > threshold:
+                    if u not in degree:
+                        degree[u] = 1
+                    else:
+                        degree[u] += 1
+                    if v not in degree:
+                        degree[v] = 1
+                    else:
+                        degree[v] += 1
+            elif threshold_mode == "ABOVE_THRESHOLD":
+                if d[self.weight] <= threshold:
+                    if u not in degree:
+                        degree[u] = 1
+                    else:
+                        degree[u] += 1
+                    if v not in degree:
+                        degree[v] = 1
+                    else:
+                        degree[v] += 1
 
         nx.set_node_attributes(
             self._full_network, degree, "degree_with_threshold_{}".format(threshold)

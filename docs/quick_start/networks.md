@@ -1,82 +1,64 @@
 # Creating Sequence Networks
 
-A `SequenceNetwork` is created using a list of `PairwiseAlignment` objects, and a list of `AbstractSequences`. Additionally, the way the network is constructed is influenced by the `weight` and `threshold` attributes. The `weight` determines which attribute of the `PairwiseAlignment` object is used to calculate the distance between the sequences of the network. The `threshold` determines the minimum value of the `weight` attribute for an edge to be created. Furthermore, a `color` can be determined based on the attributes of an `AbstractSequence` object in which the nodes of the network will be colored.
+A `SequenceNetwork` object can be created using a list of ProteinRecord objects. Those sequences are then used to create a alignment, based on this alignment each ProteinRecord objects represents a node. The edges can than be created based on a weight, e.g. 'identity', but custom weights can be introduced.
+With the threshold mode and the threshold value, a threshold is then set to for example hide all edges with an identity score below 0.8.
+The final network can be visualized and also loaded into cytoscape for further settings. Moreover it also can be used in maplotlib to plot, if intrested in custom styles.
 
 ## Visualization
 
-=== "2D"
-
-    ```py
-    from pyeed.core import ProteinInfo, Alignment
-    from pyeed.aligners import PairwiseAligner
-    from pyeed.network import SequenceNetwork
-
-    # Accessions from different methionine adenyltransferases
+``` py
     mat_accessions = [
         "MBP1912539.1",
         "SEV92896.1",
         "MBO8174569.1",
         "WP_042680787.1",
-        "NPA47376.1",
-        "WP_167889085.1",
-        "WP_048165429.1",
-        "ACS90033.1",
     ]
-    mats = ProteinInfo.get_ids(mat_accessions)
-
-    # Create pairwise alignments between all sequences
-    alignments = Alignment.from_sequences(mats, aligner=PairwiseAligner)
-
-    # Create a network
+    mats = ProteinRecord.get_ids(mat_accessions)
+    # Create network
     network = SequenceNetwork(
         sequences=mats,
-        pairwise_alignments=alignments,
         weight="identity",
-        threshold=0.9,
-        dimensions=2,
-        color="taxonomy_id",
     )
 
-    # Visualize the network
+    network.create_graph()
     network.visualize()
-    ```
+```
 
-=== "3D"
+Exporting the network in cytoscape is done the following way:
+``` py
+    import py4cytoscape as p4c
 
-    ```py
-    from pyeed.core import ProteinInfo, Alignment
-    from pyeed.aligners import PairwiseAligner
-    from pyeed.network import SequenceNetwork
-
-    # Accessions from different methionine adenyltransferases
-    mat_accessions = [
-        "MBP1912539.1",
-        "SEV92896.1",
-        "MBO8174569.1",
-        "WP_042680787.1",
-        "NPA47376.1",
-        "WP_167889085.1",
-        "WP_048165429.1",
-        "ACS90033.1",
-    ]
-    mats = ProteinInfo.get_ids(mat_accessions)
-
-    # Create pairwise alignments between all sequences
-    alignments = Alignment.from_sequences(mats, aligner=PairwiseAligner)
-
-    # Create a network
-    network = SequenceNetwork(
-        sequences=mats,
-        pairwise_alignments=alignments,
-        weight="identity",
-        threshold=0.9,
-        dimensions=3,
-        color="taxonomy_id",
+    # transfer the network to cytoscape
+    netowork.create_cytoscape_graph(
+        threshold=0.75,
+        column_name="class",
     )
 
-    # Visualize the network
-    network.visualize()
-    ```
+    # plot the network
+    p4c.notebook_export_show_image()
+``` 
+
+The networkx object on which SequenceNetwork is based on can be extracted using the following command.
+
+``` py
+    graph_network = network.network
+```
+
+This then could be used to plot using matplotlib.
+
+``` py
+
+    import networkx as nx
+    import matplotlib.pyplot as plt
+
+    # Plotting of the network
+    pos = nx.spring_layout(graph_network, weight='identity', iterations=100, seed=18)
+    plt.figure(figsize=(19,9))
+    nx.draw_networkx(graph_network, pos=pos, with_labels=True, node_color=c, node_size=s,
+                    font_color='Black',font_size='6', font_weight='bold', edge_color='grey', alpha=0.5, width=1)
+    plt.axis('off')
+    plt.show()
+``` 
 
 ## Network Analysis
 

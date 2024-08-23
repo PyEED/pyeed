@@ -37,14 +37,14 @@ Besides adding sequence information manually, PyEED also allows searching for se
 === "DNA"
 
     ``` py
-    # Not implemented
+    dna_record = DNARecord.get_id('AF188200.1')
     ```
 
 ## ⬇️ Save a sequence
 
 ### To file
 
-The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML` file format. Therefore, the respective method can be used.
+The sequence can be stored in a `FASTA`, `JSON`, `YAML`, or `XML` file format. Therefore, the respective method can be used. The methods below are written for protein, but can be used the same for `dna_record`
 The file path is passed as an argument to the method.
 
 === "JSON"
