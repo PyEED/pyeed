@@ -40,7 +40,6 @@ class NumberedSequence(
 
     _repo: Optional[str] = PrivateAttr(default="https://github.com/PyEED/pyeed")
     _commit: Optional[str] = PrivateAttr(
-
         default="72d2203f2e3ce4b319b29fa0d2f146b5eead7b00"
     )
 

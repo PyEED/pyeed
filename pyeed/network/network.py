@@ -1,4 +1,5 @@
 import copy
+from os import name
 from typing import List, Optional, Any
 
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import py4cytoscape as p4c
 from py4cytoscape import gen_node_size_map, scheme_c_number_continuous
 from pydantic import BaseModel, Field, PrivateAttr, field_serializer, field_validator
 from requests import RequestException
+import plotly.graph_objects as go
 
 from pyeed.align.pairwise import PairwiseAligner
 from pyeed.core.sequencerecord import SequenceRecord
@@ -476,12 +478,143 @@ class SequenceNetwork(BaseModel):
             plt.savefig(save_path, dpi=dpi)
         plt.show()
 
+
+
+    def visualize_2d_network(
+        self,
+        color: Optional[List[str]] = None,
+        size: bool = False,
+        edges: bool = True,
+        edge_color: str = "grey",
+        save_path: Optional[str] = None
+    ) -> None:
+        """
+        Visualizes a 2D network graph using Plotly by plotting nodes and optionally edges.
+        For large networks, it is recommended to disable the edges for performance.
+
+        Parameters:
+            color (List[str], optional): List of colors to colorize the nodes. Default is None, where nodes are colored blue.
+            size (bool, optional): Whether to size the nodes based on centrality. Default is False.
+            edges (bool, optional): Whether to plot edges. Default is True.
+            edge_color (str, optional): Color of the edges. Default is grey.
+            save_path (str, optional): File path to save the plot. If None, the plot is shown directly.
+
+        Raises:
+            ValueError: If the specified color list length does not match the number of nodes.
+
+        Returns:
+            None
+        """
+
+        # Initialize traces list
+        traces = []
+
+        # Plot edges if enabled
+        if edges:
+            for edge in self.network.edges:
+                x_values = [self.network.nodes[edge[0]]["x_pos"], self.network.nodes[edge[1]]["x_pos"]]
+                y_values = [self.network.nodes[edge[0]]["y_pos"], self.network.nodes[edge[1]]["y_pos"]]
+                traces.append(
+                    go.Scatter(
+                        x=x_values,
+                        y=y_values,
+                        mode="lines",
+                        line=dict(width=0.7, color=edge_color),  # Correctly define the line dictionary
+                        opacity=0.5  # Set opacity at the correct level in the Scatter object
+                    )
+                )
+
+        # Set node colors
+        if color and len(color) != len(self.network.nodes):
+            raise ValueError("Length of the color list must match the number of nodes.")
+        color_list = color if color else ["blue"] * len(self.network.nodes)
+
+        # Calculate node sizes if centrality is enabled
+        node_sizes = []
+        if size:
+            centrality = nx.degree_centrality(self.network)
+            max_size = 20  # Maximum size for the largest node
+            node_sizes = [6 + (centrality[node] * max_size) for node in self.network.nodes]
+        else:
+            node_sizes = [6] * len(self.network.nodes)
+
+        # Plot nodes and handle annotations
+        annotations = []
+        for counter, (key, node) in enumerate(self.network.nodes(data=True)):
+            # Node properties
+            node_size = node_sizes[counter]
+            node_color = color_list[counter]
+            symbol = "circle"
+            label = node.get("label", key)
+            name = node.get("name", key)
+
+            # Highlight targets differently
+            if key in self.targets:
+                node_size = 15
+                node_color = "black"
+                symbol = "cross"
+
+            # Add node trace
+            traces.append(
+                go.Scatter(
+                    x=[node["x_pos"]],
+                    y=[node["y_pos"]],
+                    mode="markers",
+                    marker=dict(
+                        size=node_size,
+                        color=node_color,
+                        symbol=symbol,
+                    ),
+                    hovertemplate="<b>ID: %{customdata[0]}</b><extra></extra>",
+                    customdata=[[key]],  # Pass node ID as custom data
+                )
+            )
+
+            # Add node annotation
+            annotations.append(
+                dict(
+                    x=node["x_pos"],
+                    y=node["y_pos"],
+                    text=label,
+                    showarrow=False,
+                    xanchor='center',
+                    yanchor='middle',
+                    font=dict(
+                        size=10,
+                        color=node_color
+                    )
+                )
+            )
+
+        # Create the figure
+        fig = go.Figure(
+            data=traces,
+            layout=go.Layout(
+                plot_bgcolor="white",
+                showlegend=False,
+                hovermode="closest",
+                margin=dict(b=0, l=0, r=0, t=0)
+                #annotations=annotations,  # Add annotations to layout
+            ),
+        )
+
+        # Hide axis lines and ticks
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+
+        # Show or save the plot
+        if save_path:
+            fig.write_image(save_path)
+        else:
+            fig.show(scale=10)
+
+
     def _2d_position_nodes_and_edges(self, graph: nx.Graph):
         """Calculates node positions based on weight metric and
         adds position information of nodes and edges to the respective
         entry in the graph."""
 
-        positions = nx.spring_layout(graph, weight=self.weight, dim=2, seed=42)
+        positions = nx.spring_layout(graph, weight=self.weight, iterations=400, dim=2, seed=42)
 
         # Add node position as coordinates
         for node in graph.nodes():
