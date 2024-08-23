@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import json
 import logging
 from typing import List
@@ -245,15 +246,18 @@ class ProteinFetcher:
             a dictionary of UniProt responses sorted by database pattern.
 
         """
-        uniprot = {}
+        uniprot = defaultdict(list)
         ncbi = None
         for response in responses:
             if response[0].startswith("LOCUS"):
                 ncbi = response
             elif response[0].startswith("{"):
-                uniprot[DBPattern.INTERPRO.name] = [
-                    json.loads(entry) for entry in response
-                ]
+                for entry in response:
+                    try:
+                        uniprot[DBPattern.INTERPRO.name].append(json.loads(entry))
+                    except json.decoder.JSONDecodeError:
+                        LOGGER.warning(f"Response could not be mapped to mapper: {entry}")
+
             elif response[0].startswith("["):
                 uniprot[DBPattern.UNIPROT.name] = [
                     json.loads(entry)[0] for entry in response
