@@ -21,13 +21,14 @@ rich = "^13.0.0"
 aiometer = "^0.5.0"
 joblib = "^1.4.0"
 requests = "^2.31.0"
-sdrdm = { git = "https://github.com/JR-1991/software-driven-rdm.git" }
 matplotlib = "^3.9.0"
 pymsaviz = "^0.4.2"
 py4cytoscape = "^1.9.0"
 tenacity = "^8.3.0"
-neo4j = "^5.20.0"
+neo4j = "5.19.*"
 bio = "^1.7.1"
+loguru = "^0.7.2"
+neomodel = "^5.3.3"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"

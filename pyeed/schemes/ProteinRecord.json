@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "ProteinRecord",
+  "type": "object",
+  "properties": {
+    "id": {
+      "title": "id",
+      "description": "Unique identifier of the sequence.",
+      "term": "sio:SIO_000729",
+      "type": "string"
+    },
+    "name": {
+      "title": "name",
+      "description": "Arbitrary name of the sequence.",
+      "term": "sio:SIO_000116",
+      "type": "string"
+    },
+    "organism": {
+      "term": "sio:SIO_010000",
+      "$ref": "#/definitions/Organism"
+    },
+    "sequence": {
+      "title": "sequence",
+      "description": "The letter sequence of the macromolecule.",
+      "term": "sio:SIO_000030",
+      "type": "string"
+    },
+    "embedding": {
+      "title": "embedding",
+      "description": "1D embedding vector of the protein sequence.",
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "seq_length": {
+      "title": "seq_length",
+      "description": "Length of the sequence.",
+      "term": "sio:SIO_000041",
+      "type": "integer"
+    },
+    "nucleotide_id": {
+      "title": "nucleotide_id",
+      "description": "Identifier of the nucleotide sequence.",
+      "type": "string"
+    },
+    "locus_tag": {
+      "title": "locus_tag",
+      "description": "Locus tag of the protein within the nucleotide sequence.",
+      "type": "string"
+    },
+    "sites": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Site"
+      }
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Region"
+      }
+    },
+    "structure_ids": {
+      "title": "structure_ids",
+      "description": "Identifiers of the structures of the protein.",
+      "term": "sio:SIO_000729",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ec_number": {
+      "title": "ec_number",
+      "description": "An Enzyme Commission (EC) number of an enzyme.",
+      "term": "edam:data_1011",
+      "type": "string"
+    },
+    "mol_weight": {
+      "title": "mol_weight",
+      "description": "Calculated molecular weight of the protein based on the sequence.",
+      "term": "edam:data_1505",
+      "type": "number"
+    },
+    "annotations": {
+      "title": "annotations",
+      "$ref": "#/definitions/Annotation"
+    },
+    "go_terms": {
+      "title": "go_terms",
+      "description": "Gene Ontology terms associated with the protein.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "description": "A protein sequence and associated metadata.",
+  "term": "sio:SIO_010043",
+  "definitions": {
+    "Organism": {
+      "title": "Organism",
+      "type": "object",
+      "properties": {
+        "taxonomy_id": {
+          "title": "taxonomy_id",
+          "description": "A stable unique identifier for each taxon for a species, a family, an order, or any other group in the NCBI taxonomy database.",
+          "term": "edam:data_1179",
+          "type": "integer"
+        },
+        "name": {
+          "title": "name",
+          "description": "The name of an organism (or group of organisms).",
+          "term": "edam:data_2909",
+          "type": "string"
+        },
+        "domain": {
+          "title": "domain",
+          "description": "Domain of the organism",
+          "type": "string"
+        },
+        "kingdom": {
+          "title": "kingdom",
+          "description": "Kingdom of the organism",
+          "term": "edam:data_1044",
+          "type": "string"
+        },
+        "phylum": {
+          "title": "phylum",
+          "description": "Phylum of the organism",
+          "type": "string"
+        },
+        "tax_class": {
+          "title": "tax_class",
+          "description": "Class of the organism",
+          "type": "string"
+        },
+        "order": {
+          "title": "order",
+          "description": "Order of the organism",
+          "type": "string"
+        },
+        "family": {
+          "title": "family",
+          "description": "The name of a family of organism.",
+          "term": "edam:data_2732",
+          "type": "string"
+        },
+        "genus": {
+          "title": "genus",
+          "description": "The name of a genus of organism.",
+          "term": "edam:data_1870",
+          "type": "string"
+        },
+        "species": {
+          "title": "species",
+          "description": "The name of a species (typically a taxonomic group) of organism.",
+          "term": "edam:data_1045",
+          "type": "string"
+        }
+      },
+      "description": "Description of an organism 🦠."
+    },
+    "Site": {
+      "title": "Site",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "name",
+          "description": "Name of the site.",
+          "type": "string"
+        },
+        "annotation": {
+          "title": "annotation",
+          "$ref": "#/definitions/Annotation"
+        },
+        "positions": {
+          "title": "positions",
+          "description": "Position of the site(s) within the sequence.",
+          "term": "sio:SIO_000056",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "description": "Position(s) constituting a site within a sequence.",
+      "term": "sio:sio:010049"
+    },
+    "Annotation": {
+      "title": "Annotation",
+      "type": "string",
+      "enum": [
+        "http://semanticscience.org/resource/SIO_010041",
+        "http://semanticscience.org/resource/SIO_010050",
+        "http://semanticscience.org/resource/SIO_010468",
+        "http://semanticscience.org/resource/SIO_010469",
+        "http://semanticscience.org/resource/SIO_010040",
+        "http://semanticscience.org/resource/SIO_001276",
+        "http://semanticscience.org/resource/SIO_010018",
+        "http://semanticscience.org/resource/SIO_001379",
+        "http://semanticscience.org/resource/SIO_001380",
+        "http://semanticscience.org/resource/SIO_000131",
+        "http://semanticscience.org/resource/SIO_010015"
+      ]
+    },
+    "Region": {
+      "title": "Region",
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "id",
+          "description": "Unique identifier of the site.",
+          "type": "string"
+        },
+        "name": {
+          "title": "name",
+          "description": "Name of the site.",
+          "type": "string"
+        },
+        "annotation": {
+          "title": "annotation",
+          "$ref": "#/definitions/Annotation"
+        },
+        "start": {
+          "title": "start",
+          "description": "Start position of the site.",
+          "term": "sio:SIO_000943",
+          "type": "integer"
+        },
+        "end": {
+          "title": "end",
+          "description": "End position of the site.",
+          "term": "sio:SIO_000953",
+          "type": "integer"
+        }
+      },
+      "description": "Regional annotation of a feature within a sequence."
+    }
+  }
+}

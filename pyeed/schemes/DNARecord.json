@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "DNARecord",
+  "type": "object",
+  "properties": {
+    "id": {
+      "title": "id",
+      "description": "Unique identifier of the sequence.",
+      "term": "sio:SIO_000729",
+      "type": "string"
+    },
+    "name": {
+      "title": "name",
+      "description": "Arbitrary name of the sequence.",
+      "term": "sio:SIO_000116",
+      "type": "string"
+    },
+    "organism": {
+      "term": "sio:SIO_010000",
+      "$ref": "#/definitions/Organism"
+    },
+    "sequence": {
+      "title": "sequence",
+      "description": "The letter sequence of the macromolecule.",
+      "term": "sio:SIO_000030",
+      "type": "string"
+    },
+    "seq_length": {
+      "title": "seq_length",
+      "description": "Length of the sequence.",
+      "term": "sio:SIO_000041",
+      "type": "integer"
+    },
+    "embedding": {
+      "title": "embedding",
+      "description": "1D embedding vector of the protein sequence.",
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "sites": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Site"
+      }
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Region"
+      }
+    },
+    "region_sets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionSet"
+      }
+    },
+    "gc_content": {
+      "title": "gc_content",
+      "description": "GC content of the sequence.",
+      "type": "number"
+    }
+  },
+  "description": "A nucleic acid sequence and associated metadata 🧬",
+  "term": "sio:SIO_010008",
+  "definitions": {
+    "Region": {
+      "title": "Region",
+      "type": "object",
+      "properties": {
+        "start": {
+          "title": "start",
+          "description": "Start position of the site.",
+          "term": "sio:SIO_000943",
+          "type": "integer"
+        },
+        "end": {
+          "title": "end",
+          "description": "End position of the site.",
+          "term": "sio:SIO_000953",
+          "type": "integer"
+        }
+      },
+      "description": "Regional annotation of a feature within a sequence."
+    },
+    "Site": {
+      "title": "Site",
+      "type": "object",
+      "properties": {
+        "positions": {
+          "title": "positions",
+          "description": "Position of the site(s) within the sequence.",
+          "term": "sio:SIO_000056",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "description": "Position(s) constituting a site within a sequence."
+    },
+    "Organism": {
+      "title": "Organism",
+      "type": "object",
+      "properties": {
+        "taxonomy_id": {
+          "title": "taxonomy_id",
+          "description": "A stable unique identifier for each taxon (for a species, a family, an order, or any other group in the NCBI taxonomy database.",
+          "term": "edam:data_1179",
+          "type": "integer"
+        },
+        "name": {
+          "title": "name",
+          "description": "The name of an organism (or group of organisms).",
+          "term": "edam:data_2909",
+          "type": "string"
+        },
+        "domain": {
+          "title": "domain",
+          "description": "Domain of the organism",
+          "type": "string"
+        },
+        "kingdom": {
+          "title": "kingdom",
+          "description": "Kingdom of the organism",
+          "term": "edam:data_1044",
+          "type": "string"
+        },
+        "phylum": {
+          "title": "phylum",
+          "description": "Phylum of the organism",
+          "type": "string"
+        },
+        "tax_class": {
+          "title": "tax_class",
+          "description": "Class of the organism",
+          "type": "string"
+        },
+        "order": {
+          "title": "order",
+          "description": "Order of the organism",
+          "type": "string"
+        },
+        "family": {
+          "title": "family",
+          "description": "The name of a family of organism.",
+          "term": "edam:data_2732",
+          "type": "string"
+        },
+        "genus": {
+          "title": "genus",
+          "description": "The name of a genus of organism.",
+          "term": "edam:data_1870",
+          "type": "string"
+        },
+        "species": {
+          "title": "species",
+          "description": "The name of a species (typically a taxonomic group) of organism.",
+          "term": "edam:data_1045",
+          "type": "string"
+        }
+      },
+      "description": "Description of an organism 🦠."
+    },
+    "RegionSet": {
+      "title": "RegionSet",
+      "type": "object",
+      "properties": {
+        "regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Region"
+          }
+        }
+      },
+      "description": "A set of regions forming a higher order structure. For example, a set of exons in a gene, or a set of secondary structures forming a super-secondary structure.",
+      "term": "sio:SIO_000370"
+    }
+  }
+}

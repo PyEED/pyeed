@@ -7,6 +7,7 @@ import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
+from pyeed.dbconnect import DatabaseConnector
 from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
 from pyeed.fetch.pdbmapper import PDBMapper
@@ -17,10 +18,36 @@ from pyeed.fetch.uniprotmapper import UniprotMapper
 LOGGER = logging.getLogger(__name__)
 
 
-class ProteinFetcher:
-    def __init__(self, ids: List[str]):
+class UniprotFetcher:
+    def __init__(
+        self,
+        ids: List[str],
+        db: DatabaseConnector,
+    ):
         self.ids = ids
-        # self.ncbi_key = ncbi_key #TODO: Add NCBI key to NCBI requester
+        self.db = db
+        nest_asyncio.apply()
+
+    async def fetch(self, **console_kwargs):
+        with Progress(console=Console(**console_kwargs)) as progress:
+            task_id = progress.add_task(
+                "Requesting sequences from UniProt...", total=len(self.ids)
+            )
+            requester = AsyncRequester(
+                ids=self.ids,
+                url="https://www.ebi.ac.uk/proteins/api/proteins?format=json&accession=",
+                task_id=task_id,
+                progress=progress,
+                batch_size=1,
+                rate_limit=5,
+                n_concurrent=20,
+            )
+
+
+class ProteinFetcher:
+    def __init__(self, ids: List[str], db: DatabaseConnector):
+        self.ids = ids
+        self.db = db
         nest_asyncio.apply()
 
     async def fetch(self, **console_kwargs):
@@ -36,15 +63,15 @@ class ProteinFetcher:
 
         Raises:
             Exception: If there is an error during the fetching process.
-
         """
+
         db_entries = SortIDs.sort(self.ids)
         param_requester = None
 
         with Progress(
             console=Console(**console_kwargs),
         ) as progress:
-            requesters: List[AsyncRequester] = []
+            requesters = []
             for db_name, db_ids in db_entries.items():
                 if db_name == DBPattern.UNIPROT.name:
                     task_id = progress.add_task(
