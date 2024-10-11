@@ -1,47 +1,47 @@
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
-from pyeed.model import Annotation, Organism, ProteinRecord, Site
+from pyeed.model import Annotation, Organism, Protein, Site
 
 T = TypeVar("T")
 
 
-class PrimaryDBResponseMapper(Generic[T]):
+class PrimaryDBtoPyeed(Generic[T]):
     @abstractmethod
-    async def transform(self, data: dict) -> Any:
+    async def add(self, data: dict):
         pass
 
 
-class UniprotMapper(PrimaryDBResponseMapper[ProteinRecord]):
-    async def transform(self, data: dict) -> ProteinRecord:
+class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
+    async def add(self, data: dict):
         # Organism information
-        organism = Organism(
-            taxonomy_id=data["organism"]["taxonomy"],
-        )
-        print(organism)
+        taxonomy_id = data["organism"]["taxonomy"]
+
+        organism = Organism(taxonomy_id=taxonomy_id).save()
 
         try:
             ec_number = data["protein"]["recommendedName"]["ecNumber"][0]["value"]
         except KeyError:
             ec_number = None
 
-        sites = self.map_sites(data)
-
-        protein_info = ProteinRecord(
-            id=data["accession"],
+        protein = Protein(
+            accession_id=data["accession"],
             sequence=data["sequence"]["sequence"],
-            name=data["protein"]["recommendedName"]["fullName"]["value"],
-            ec_number=ec_number,
-            mol_weight=data["sequence"]["mass"],
-            organism=organism,
-            sites=sites,
         )
+        protein.mol_weight = float(data["sequence"]["mass"])
+        protein.ec_number = ec_number
+        protein.name = data["protein"]["recommendedName"]["fullName"]["value"]
+        protein.seq_length = len(protein.sequence)
 
-        return protein_info
+        protein.save()
 
-    def map_sites(self, data: dict) -> list[Site]:
-        sites = []
+        protein.organism.connect(organism)
+        organism.protein.connect(protein)
+
+        self.add_sites(data, protein)
+
+    def add_sites(self, data: dict, protein: Protein):
         ligand_dict = defaultdict(list)
         for feature in data["features"]:
             if feature["type"] == "BINDING":
@@ -50,12 +50,10 @@ class UniprotMapper(PrimaryDBResponseMapper[ProteinRecord]):
                 ligand_dict[feature["ligand"]["name"]].append(int(feature["begin"]))
 
         for ligand, positions in ligand_dict.items():
-            sites.append(
-                Site(
-                    name=ligand,
-                    positions=positions,
-                    annotation=Annotation.BINDING_SITE,
-                )
-            )
+            site = Site(
+                name=ligand,
+                positions=positions,
+                annotation=Annotation.BINDING_SITE.value,
+            ).save()
 
-        return sites
+            protein.sites.connect(site)

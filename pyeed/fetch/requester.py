@@ -3,11 +3,10 @@ from typing import Any, Dict, Generic, List, NamedTuple, Optional, TypeVar
 import aiometer
 import tenacity
 from httpx import AsyncClient, Limits, Response
-from loguru import logger as LOGGER
+from loguru import logger
 from rich.progress import Progress, TaskID
 
-from pyeed.dbconnect import DatabaseConnector
-from pyeed.fetch.mapper import PrimaryDBResponseMapper
+from pyeed.fetch.mapper import PrimaryDBtoPyeed
 
 T = TypeVar("T")
 
@@ -28,8 +27,7 @@ class PrimaryDBRequester(Generic[T]):
         rate_limit: int,
         n_concurrent: int,
         batch_size: int,
-        data_mapper: "PrimaryDBResponseMapper[T]",
-        db: DatabaseConnector,
+        data_mapper: "PrimaryDBtoPyeed[T]",
         progress: Optional[Progress] = None,
         task_id: Optional[TaskID] = None,
         params_template: Optional[Dict[str, str]] = None,
@@ -99,13 +97,13 @@ class PrimaryDBRequester(Generic[T]):
         url = args.url
         params = args.params
 
-        LOGGER.debug(f"Sending request to {url}")
+        logger.debug(f"Sending request to {url}")
         response = await client.get(url, params=params, timeout=120)
 
-        LOGGER.debug(f"Received response from {url}. Code: {response.status_code}")
+        logger.debug(f"Received response from {url}. Code: {response.status_code}")
 
         if response.status_code != 200:
-            LOGGER.warning(
+            logger.warning(
                 f"Request to {url} failed with status code {response.status_code}"
             )
             return None  # Early return if the request failed
@@ -119,11 +117,11 @@ class PrimaryDBRequester(Generic[T]):
             elif isinstance(response_json, dict):
                 response_dict = response_json
             else:
-                LOGGER.warning(f"Unexpected response format from {url}")
+                logger.warning(f"Unexpected response format from {url}")
                 return None  # Return None if response format is unexpected
 
         except ValueError as e:
-            LOGGER.error(f"Failed to parse JSON response from {url}: {str(e)}")
+            logger.error(f"Failed to parse JSON response from {url}: {str(e)}")
             return None  # Return None if JSON parsing fails
 
         return response_dict
@@ -148,11 +146,11 @@ class PrimaryDBRequester(Generic[T]):
             event_hooks={"response": [update_progress]},
             limits=Limits(max_connections=self.n_concurrent),
         ) as client:
-            LOGGER.debug(f"Creating {len(self.ids)} tasks")
+            logger.debug(f"Creating {len(self.ids)} tasks")
 
             tasks = [self.build_request_args(client, id) for id in self.ids]
 
-            LOGGER.debug(f"Sending {len(self.ids)} requests")
+            logger.debug(f"Sending {len(self.ids)} requests")
             async with aiometer.amap(
                 self.send_request,
                 tasks,
@@ -161,7 +159,7 @@ class PrimaryDBRequester(Generic[T]):
             ) as responses:
                 async for res in responses:
                     if res is not None:
-                        data = await self.data_mapper.transform(res)
+                        data = await self.data_mapper.add(res)
 
                         all_responses.append(data)
 
@@ -171,7 +169,7 @@ class PrimaryDBRequester(Generic[T]):
 if __name__ == "__main__":
     import asyncio
 
-    from pyeed.fetch.mapper import UniprotMapper
+    from pyeed.fetch.mapper import UniprottoPyeed
 
     requester = PrimaryDBRequester(
         ids=["P12345", "P67890", "P54321"],
@@ -179,7 +177,7 @@ if __name__ == "__main__":
         rate_limit=10,
         n_concurrent=5,
         batch_size=1,
-        data_mapper=UniprotMapper(),
+        data_mapper=UniprottoPyeed(),
         db=None,
         progress=None,
         task_id=None,
@@ -189,6 +187,3 @@ if __name__ == "__main__":
 
     responses = asyncio.run(requester.make_request())
     seq = responses[0]
-
-    with open("seq.json", "w") as f:
-        f.write(seq.model_dump_json())

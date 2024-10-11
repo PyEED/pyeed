@@ -1,6 +1,6 @@
 import asyncio
 import json
-import logging
+from logging import Logger
 from typing import List
 
 import nest_asyncio
@@ -15,17 +15,13 @@ from pyeed.fetch.requester import AsyncParamRequester, AsyncRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
 from pyeed.fetch.uniprotmapper import UniprotMapper
 
-LOGGER = logging.getLogger(__name__)
-
 
 class UniprotFetcher:
     def __init__(
         self,
         ids: List[str],
-        db: DatabaseConnector,
     ):
         self.ids = ids
-        self.db = db
         nest_asyncio.apply()
 
     async def fetch(self, **console_kwargs):
@@ -283,7 +279,7 @@ class ProteinFetcher:
                     json.loads(entry)[0] for entry in response
                 ]
             else:
-                LOGGER.warning(f"Response could not be mapped to mapper: {response[0]}")
+                Logger.warning(f"Response could not be mapped to mapper: {response[0]}")
 
         if not ncbi:
             ncbi = []

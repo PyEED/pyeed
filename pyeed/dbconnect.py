@@ -1,7 +1,7 @@
 import subprocess
 
 from neo4j import Driver, GraphDatabase
-from neomodel import config
+from neomodel import db as neomodel_db
 
 from pyeed.model import Protein
 
@@ -13,7 +13,8 @@ class DatabaseConnector:
         """
         self._uri = uri
         self.driver = self._get_driver(uri, user, password)
-        config.DRIVER = self.driver  # Set the self-managed driver for neomodel
+        neomodel_db.set_connection(driver=self.driver)  # patch db for neomodel
+
         if not self._constraints_exist():
             print(
                 "Pyeed Graph Object Mapping constraints not defined. Use _install_labels() to set up model constraints."
@@ -155,11 +156,3 @@ class DatabaseConnector:
 
         # Insert the new content after the second '//'
         return f"{scheme}//{to_insert}{rest}"
-
-
-# Example Usage
-if __name__ == "__main__":
-    db = DatabaseConnector("bolt://127.0.0.1:7687", None, None)
-    # db._remove_db_constraints(None, None)
-    # db._initialize_db_constraints(None, None)
-    db.close()
