@@ -3,7 +3,7 @@ import nest_asyncio
 from pyeed.dbconnect import DatabaseConnector
 
 
-class pyeed:
+class Pyeed:
     def __init__(
         self,
         uri: str,
@@ -11,7 +11,6 @@ class pyeed:
         password: str | None = None,
     ):
         self.db = DatabaseConnector(uri, user, password)
-        _with_db: bool = True
 
     def fetch_from_primary_db(self, ids: list[str]):
         """
