@@ -26,17 +26,21 @@ class Pyeed:
         if isinstance(ids, str):
             ids = [ids]
 
+        params_template = {
+            "format": "json",
+        }
+
         requester = PrimaryDBRequester(
             ids=ids,
-            url="https://www.ebi.ac.uk/proteins/api/proteins?format=json&accession=",
+            ids_attr_name="accession",
+            url="https://www.ebi.ac.uk/proteins/api/proteins",
             rate_limit=10,
             n_concurrent=5,
             batch_size=1,
             data_mapper=UniprotToPyeed(),
             progress=None,
             task_id=None,
-            params_template=None,
-            use_params=False,
+            request_params=params_template,
         )
 
         asyncio.run(requester.make_request())
@@ -47,3 +51,4 @@ if __name__ == "__main__":
     eedb.db._wipe_database()
 
     eedb.fetch_from_primary_db(["P12345", "P67890", "P05062"])
+    print(eedb.db.stats())

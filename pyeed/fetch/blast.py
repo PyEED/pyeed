@@ -86,7 +86,6 @@ class Blast(BaseModel):
         ), f"Invalid database: {ncbi_db}, valid databases: {NCBIDataBase}"
 
         if program == BlastProgram.BLASTP.value:
-
             return NCBIWWW.qblast(
                 program,
                 ncbi_db,
@@ -95,9 +94,8 @@ class Blast(BaseModel):
                 matrix_name=self.matrix,
                 hitlist_size=self.n_hits,
             )
-        
-        elif program == BlastProgram.BLASTN.value:
 
+        elif program == BlastProgram.BLASTN.value:
             return NCBIWWW.qblast(
                 program=program,
                 database=ncbi_db,
@@ -112,7 +110,6 @@ class Blast(BaseModel):
         program: str,
         foreign_executor: Optional[ThreadPoolExecutor] = None,
     ) -> io.StringIO:
-
         if not foreign_executor:
             executor = ThreadPoolExecutor()
         else:

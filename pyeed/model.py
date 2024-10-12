@@ -163,6 +163,16 @@ class Region(StrictStructuredNode):
     )
 
 
+class GOAnnotation(StrictStructuredNode):
+    go_id = StringProperty(unique_index=True, required=True)
+    name = StringProperty()
+    definition = StringProperty()
+
+    # Relationships
+    proteins = RelationshipTo("Protein", "ASSOCIATED_WITH")
+    dnas = RelationshipTo("DNA", "ASSOCIATED_WITH")
+
+
 class Protein(StrictStructuredNode):
     accession_id = StringProperty(unique_index=True, required=True)
     sequence = StringProperty(required=True)
@@ -183,6 +193,7 @@ class Protein(StrictStructuredNode):
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
     sites = RelationshipTo("Site", "HAS_SITE")
     regions = RelationshipTo("Region", "HAS_REGION")
+    go_annotations = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
 
 
 class DNA(StrictStructuredNode):
@@ -201,37 +212,4 @@ class DNA(StrictStructuredNode):
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
     sites = RelationshipTo("Site", "HAS_SITE")
     regions = RelationshipTo("Region", "HAS_REGION")
-
-
-if __name__ == "__main__":
-    # Create an instance of the Protein class
-    from neomodel import config, db
-
-    config.DATABASE_URL = "bolt://neo4j:none@localhost:7687"
-
-    results, meta = db.cypher_query("RETURN 'Hello World' as message")
-    print(results, meta)
-
-    organism = Organism(taxonomy_id=960, name="ecol").save()
-
-    prot = Protein(
-        accession_id="P12345",
-        sequence="MSEQ1234",
-        name="Protein A",
-        mol_weight=123.45,
-    ).save()
-
-    prot.organism.connect(organism)
-
-    prot.add_to_regions(
-        region_id="R123",
-        annotation="Region",
-        start=1,
-        end=10,
-    )
-    prot.add_to_regions(
-        region_id="R124",
-        annotation="Region",
-        start=11,
-        end=20,
-    )
+    go_annotations = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")

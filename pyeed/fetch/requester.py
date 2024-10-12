@@ -1,8 +1,14 @@
-from typing import Any, Dict, Generic, List, NamedTuple, Optional, TypeVar
+from typing import Any, Coroutine, Generic, NamedTuple, TypeVar
 
 import aiometer
 import tenacity
-from httpx import AsyncClient, Limits, Response
+from httpx import (
+    AsyncClient,
+    Limits,
+    RequestError,
+    Response,
+    TimeoutException,
+)
 from loguru import logger
 from rich.progress import Progress, TaskID
 
@@ -11,29 +17,37 @@ from pyeed.fetch.mapper import PrimaryDBtoPyeed
 T = TypeVar("T")
 
 
-class RequestArgs(NamedTuple):
-    """Holds the arguments for an HTTP GET request."""
+class RequestPayload(NamedTuple):
+    """Holds the request client, URL, and parameters for an HTTP GET request."""
 
     client: AsyncClient
     url: str
-    params: Optional[Dict[str, str]] = None
+    params: dict[str, str]
 
 
 class PrimaryDBRequester(Generic[T]):
+    """
+    Orchestrates the asynchronous HTTP GET requests to a primary sequence database.
+    Mapper classes are injected to map the responses to the pyeed graph object model and
+    save them to the database.
+    """
+
     def __init__(
         self,
-        ids: List[str],
+        ids: list[str],
+        ids_attr_name: str,
         url: str,
         rate_limit: int,
         n_concurrent: int,
         batch_size: int,
         data_mapper: "PrimaryDBtoPyeed[T]",
-        progress: Optional[Progress] = None,
-        task_id: Optional[TaskID] = None,
-        params_template: Optional[Dict[str, str]] = None,
-        use_params: bool = False,
+        timeout: int = 120,
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+        request_params: dict[str, str] = {},
     ):
         self.ids = ids
+        self.ids_attr_name = ids_attr_name
         self.url = url
         self.batch_size = batch_size
         self.rate_limit = rate_limit
@@ -41,9 +55,8 @@ class PrimaryDBRequester(Generic[T]):
         self.progress = progress
         self.task_id = task_id
         self.data_mapper = data_mapper
-        self.database_connector = db
-        self.params_template = params_template
-        self.use_params = use_params
+        self.timeout = timeout
+        self.request_params = request_params
 
         if self.batch_size > 1:
             self.ids = self.make_batches()
@@ -61,10 +74,10 @@ class PrimaryDBRequester(Generic[T]):
 
     def make_batches(self) -> list[str]:
         """
-        Creates batches of IDs for making HTTP requests.
+        Groups the IDs into batches of the specified batch size.
 
         Returns:
-            List[str]: The list of batches, where each batch is a comma-separated
+            list[str]: The list of batches, where each batch is a comma-separated
             string of IDs.
         """
         batches = []
@@ -74,21 +87,31 @@ class PrimaryDBRequester(Generic[T]):
             batches.append(batch_string)
         return batches
 
-    def build_request_args(self, client: AsyncClient, id: str) -> RequestArgs:
-        if self.use_params and self.params_template:
-            params = self.params_template.copy()
-            for key, value in params.items():
-                params[key] = value.replace("SEQUENCE_ID", id)
-            return RequestArgs(client, self.url, params=params)
-        else:
-            url = f"{self.url}{id}"
-            return RequestArgs(client, url)
+    def build_request_payload(self, client: AsyncClient, id_: str) -> RequestPayload:
+        """Combines the client, URL, and parameters into a RequestPayload object.
+        Adds the id with the key specified by ids_attr_name to the request parameters.
+
+        Args:
+            client (AsyncClient): AsyncClient object for making HTTP requests
+            id_ (str): ID to be added to the request parameters
+
+        Returns:
+            RequestPayload: RequestPayload object with the client, URL, and parameters
+        """
+        params = self.request_params.copy()
+        params[self.ids_attr_name] = id_
+
+        return RequestPayload(client, self.url, params=params)
 
     @tenacity.retry(
-        wait=tenacity.wait_fixed(1),  # Wait 1 second between retries
-        stop=tenacity.stop_after_attempt(1),  # Retry up to 3 times
+        wait=tenacity.wait_fixed(1),
+        stop=tenacity.stop_after_attempt(3),
+        retry=tenacity.retry_if_exception_type((RequestError, TimeoutException)),
     )
-    async def send_request(self, args: RequestArgs) -> Optional[Dict[str, Any]]:
+    async def send_request(
+        self,
+        args: RequestPayload,
+    ) -> Coroutine[None, None, Response]:
         """
         Sends an asynchronous HTTP GET request to the specified URL using the provided
         AsyncClient.
@@ -97,93 +120,87 @@ class PrimaryDBRequester(Generic[T]):
         url = args.url
         params = args.params
 
-        logger.debug(f"Sending request to {url}")
-        response = await client.get(url, params=params, timeout=120)
+        logger.debug(f"Sending request to {url} with parameters: {params}")
+        return client.get(url, params=params, timeout=self.timeout)
 
-        logger.debug(f"Received response from {url}. Code: {response.status_code}")
-
-        if response.status_code != 200:
-            logger.warning(
-                f"Request to {url} failed with status code {response.status_code}"
-            )
-            return None  # Early return if the request failed
-
-        try:
-            response_json = response.json()
-
-            # Check if the response is a list and has elements
-            if isinstance(response_json, list) and response_json:
-                response_dict = response_json[0]
-            elif isinstance(response_json, dict):
-                response_dict = response_json
-            else:
-                logger.warning(f"Unexpected response format from {url}")
-                return None  # Return None if response format is unexpected
-
-        except ValueError as e:
-            logger.error(f"Failed to parse JSON response from {url}: {str(e)}")
-            return None  # Return None if JSON parsing fails
-
-        return response_dict
-
-        # Use data mapper if provided
-
-    async def make_request(self) -> List[T]:
+    async def make_request(self):
         """
         Makes asynchronous HTTP GET requests to the specified URL using the provided
-        AsyncClient.
-
-        Returns:
-            List[Any]: The list of transformed data from the responses.
+        AsyncClient, handling rate limiting and concurrency.
         """
-        all_responses: list[T] = []
 
-        async def update_progress(response: Response):
+        def update_progress():
             if self.progress and self.task_id:
                 self.progress.update(self.task_id, advance=1)  # type: ignore
 
         async with AsyncClient(
-            event_hooks={"response": [update_progress]},
             limits=Limits(max_connections=self.n_concurrent),
         ) as client:
-            logger.debug(f"Creating {len(self.ids)} tasks")
+            # Build the list of request arguments (this prepares the coroutine tasks)
+            requests = [self.build_request_payload(client, id) for id in self.ids]
 
-            tasks = [self.build_request_args(client, id) for id in self.ids]
+            logger.debug(
+                f"Sending {len(self.ids)} requests in batches of {self.batch_size}"
+            )
 
-            logger.debug(f"Sending {len(self.ids)} requests")
+            # Using aiometer to handle rate-limiting and concurrency
             async with aiometer.amap(
                 self.send_request,
-                tasks,
+                requests,
                 max_per_second=self.rate_limit,
                 max_at_once=self.n_concurrent,
-            ) as responses:
-                async for res in responses:
-                    if res is not None:
-                        data = await self.data_mapper.add(res)
+            ) as response_coroutines:
+                async for response_coroutine in response_coroutines:
+                    res = await response_coroutine
+                    sanitized_response = self.sanitize_response(res)
+                    [self.map_and_add_to_db(entry) for entry in sanitized_response]
 
-                        all_responses.append(data)
+                    update_progress()
 
-        return all_responses
+    def sanitize_response(self, response: Response) -> list[dict[str, Any]]:
+        """
+        Sanitizes the response from the HTTP GET request by checking the status code
+        and formatting the JSON response as a list of dictionaries.
 
+        Returns:
+            Optional[List[Dict[str, Any]]]: The JSON response as a list of dictionaries,
+            or None if the response is invalid.
+        """
+        if response.status_code != 200:
+            logger.warning(
+                f"Request to {response.url} failed with status code {response.status_code}"
+            )
+            return []
 
-if __name__ == "__main__":
-    import asyncio
+        try:
+            response_json = response.json()
+            if not response_json:
+                logger.warning(f"Empty response from {response.url}")
+                return []
 
-    from pyeed.fetch.mapper import UniprottoPyeed
+            # If the response is a dictionary, wrap it in a list
+            if isinstance(response_json, dict):
+                response_json = [response_json]
 
-    requester = PrimaryDBRequester(
-        ids=["P12345", "P67890", "P54321"],
-        url="https://www.ebi.ac.uk/proteins/api/proteins?format=json&accession=",
-        rate_limit=10,
-        n_concurrent=5,
-        batch_size=1,
-        data_mapper=UniprottoPyeed(),
-        db=None,
-        progress=None,
-        task_id=None,
-        params_template=None,
-        use_params=False,
-    )
+            # Ensure the response is a list of dictionaries
+            if not isinstance(response_json, list) or not all(
+                isinstance(item, dict) for item in response_json
+            ):
+                logger.warning(f"Unexpected response format from {response.url}")
+                return []
 
-    responses = asyncio.run(requester.make_request())
-    seq = responses[0]
+        except ValueError as e:
+            logger.warning(f"Failed to parse JSON response from {response.url}: {e}")
+            return []
+
+        return response_json
+
+    def map_and_add_to_db(self, response: dict[str, Any] | None):
+        """
+        Handles the response from the HTTP GET request by passing it to the data mapper.
+        This adds the mapped data to the database.
+        """
+
+        if response is None:
+            return None
+        self.data_mapper.add_to_db(response)

@@ -49,6 +49,22 @@ class DatabaseConnector:
         # Here you can add logic to store protein_record using Neomodel models
         pass
 
+    def stats(self) -> dict:
+        """
+        Returns the number of nodes and relationships in the database.
+        """
+        node_count_query = "MATCH (n) RETURN count(n) AS node_count"
+        relationship_count_query = (
+            "MATCH ()-[r]->() RETURN count(r) AS relationship_count"
+        )
+
+        node_count = self.execute_read(node_count_query)[0]["node_count"]
+        relationship_count = self.execute_read(relationship_count_query)[0][
+            "relationship_count"
+        ]
+
+        return {"nodes": node_count, "relationships": relationship_count}
+
     def _initialize_db_constraints(
         self,
         user: str | None,

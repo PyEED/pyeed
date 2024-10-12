@@ -9,15 +9,14 @@ T = TypeVar("T")
 
 class PrimaryDBtoPyeed(Generic[T]):
     @abstractmethod
-    async def add(self, data: dict):
+    def add_to_db(self, data: dict):
         pass
 
 
 class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
-    async def add(self, data: dict):
+    def add_to_db(self, data: dict):
         # Organism information
         taxonomy_id = data["organism"]["taxonomy"]
-
         organism = Organism(taxonomy_id=taxonomy_id).save()
 
         try:
@@ -28,12 +27,11 @@ class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
         protein = Protein(
             accession_id=data["accession"],
             sequence=data["sequence"]["sequence"],
+            mol_weight=float(data["sequence"]["mass"]),
+            ec_number=ec_number,
+            name=data["protein"]["recommendedName"]["fullName"]["value"],
         )
-        protein.mol_weight = float(data["sequence"]["mass"])
-        protein.ec_number = ec_number
-        protein.name = data["protein"]["recommendedName"]["fullName"]["value"]
         protein.seq_length = len(protein.sequence)
-
         protein.save()
 
         protein.organism.connect(organism)
@@ -45,9 +43,8 @@ class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
         ligand_dict = defaultdict(list)
         for feature in data["features"]:
             if feature["type"] == "BINDING":
-                if not feature["begin"] == feature["end"]:
-                    continue
-                ligand_dict[feature["ligand"]["name"]].append(int(feature["begin"]))
+                for position in range(int(feature["begin"]), int(feature["end"]) + 1):
+                    ligand_dict[feature["ligand"]["name"]].append(position)
 
         for ligand, positions in ligand_dict.items():
             site = Site(

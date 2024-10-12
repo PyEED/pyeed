@@ -13,31 +13,6 @@ from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
 from pyeed.fetch.pdbmapper import PDBMapper
 from pyeed.fetch.requester import AsyncParamRequester, AsyncRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
-from pyeed.fetch.uniprotmapper import UniprotMapper
-
-
-class UniprotFetcher:
-    def __init__(
-        self,
-        ids: List[str],
-    ):
-        self.ids = ids
-        nest_asyncio.apply()
-
-    async def fetch(self, **console_kwargs):
-        with Progress(console=Console(**console_kwargs)) as progress:
-            task_id = progress.add_task(
-                "Requesting sequences from UniProt...", total=len(self.ids)
-            )
-            requester = AsyncRequester(
-                ids=self.ids,
-                url="https://www.ebi.ac.uk/proteins/api/proteins?format=json&accession=",
-                task_id=task_id,
-                progress=progress,
-                batch_size=1,
-                rate_limit=5,
-                n_concurrent=20,
-            )
 
 
 class ProteinFetcher:
