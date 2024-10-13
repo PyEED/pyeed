@@ -9,12 +9,15 @@ from neomodel import (
     StringProperty,
     StructuredNode,
     UniqueIdProperty,
+    UniqueProperty,
     VectorIndex,
 )
 
 
 class StrictStructuredNode(StructuredNode):
     """A StructuredNode subclass that raises an error if an invalid property is provided."""
+
+    __abstract_node__ = True
 
     def __init__(self, *args, **kwargs):
         # Get the defined properties of the model
@@ -103,6 +106,18 @@ class StrictStructuredNode(StructuredNode):
 
         return super().save(*args, **kwargs)
 
+    @classmethod
+    def get_or_save(cls, **kwargs):
+        """Attempts to save the node first, and if it already exists (due to unique constraint), retrieves it."""
+        try:
+            # Attempt to create and save a new node
+            instance = cls(**kwargs)
+            instance.save()
+            return instance
+        except UniqueProperty:
+            # If a unique constraint error occurs, retrieve the existing node
+            return cls.nodes.get(**kwargs)
+
 
 class Annotation(Enum):
     ACTIVE_SITE = "active site"
@@ -134,16 +149,6 @@ class Organism(StrictStructuredNode):
     protein = RelationshipFrom("Protein", "ORIGINATES_FROM")
     dna = RelationshipFrom("DNA", "ORIGINATES_FROM")
 
-    @classmethod
-    def add_or_skip(cls, **kwargs):
-        """Add an organism if it does not already exist."""
-        taxonomy_id = kwargs.get("taxonomy_id")
-        organism = cls.nodes.get_or_none(taxonomy_id=taxonomy_id)
-        if organism is None:
-            organism = cls(**kwargs).save()
-
-        return organism
-
 
 class Site(StrictStructuredNode):
     site_id = UniqueIdProperty()
@@ -165,12 +170,12 @@ class Region(StrictStructuredNode):
 
 class GOAnnotation(StrictStructuredNode):
     go_id = StringProperty(unique_index=True, required=True)
-    name = StringProperty()
+    term = StringProperty()
     definition = StringProperty()
 
-    # Relationships
-    proteins = RelationshipTo("Protein", "ASSOCIATED_WITH")
-    dnas = RelationshipTo("DNA", "ASSOCIATED_WITH")
+    @property
+    def name(self):
+        return self.term
 
 
 class Protein(StrictStructuredNode):
@@ -191,9 +196,9 @@ class Protein(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    sites = RelationshipTo("Site", "HAS_SITE")
-    regions = RelationshipTo("Region", "HAS_REGION")
-    go_annotations = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    site = RelationshipTo("Site", "HAS_SITE")
+    region = RelationshipTo("Region", "HAS_REGION")
+    go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
 
 
 class DNA(StrictStructuredNode):
@@ -210,6 +215,6 @@ class DNA(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    sites = RelationshipTo("Site", "HAS_SITE")
-    regions = RelationshipTo("Region", "HAS_REGION")
-    go_annotations = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    site = RelationshipTo("Site", "HAS_SITE")
+    region = RelationshipTo("Region", "HAS_REGION")
+    go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")

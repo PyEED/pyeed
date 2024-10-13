@@ -7,11 +7,11 @@ import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
+from pyeed.adapter.primary_db_adapter import AsyncParamRequester, AsyncRequester
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
 from pyeed.fetch.pdbmapper import PDBMapper
-from pyeed.fetch.requester import AsyncParamRequester, AsyncRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
 
 

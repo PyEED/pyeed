@@ -12,7 +12,7 @@ from httpx import (
 from loguru import logger
 from rich.progress import Progress, TaskID
 
-from pyeed.fetch.mapper import PrimaryDBtoPyeed
+from pyeed.adapter.uniprot_mapper import PrimaryDBtoPyeed
 
 T = TypeVar("T")
 
@@ -25,7 +25,7 @@ class RequestPayload(NamedTuple):
     params: dict[str, str]
 
 
-class PrimaryDBRequester(Generic[T]):
+class PrimaryDBAdapter(Generic[T]):
     """
     Orchestrates the asynchronous HTTP GET requests to a primary sequence database.
     Mapper classes are injected to map the responses to the pyeed graph object model and

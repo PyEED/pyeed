@@ -6,7 +6,7 @@ import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
-from pyeed.fetch.requester import AsyncRequester
+from pyeed.adapter.primary_db_adapter import AsyncRequester
 
 from .ncbidnamapper import NCBIDNAMapper
 

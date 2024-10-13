@@ -138,6 +138,17 @@ class DatabaseConnector:
         except subprocess.CalledProcessError as e:
             print(f"Failed to remove labels: {str(e)}")
 
+    def generate_model_diagram(
+        self,
+        models_path: str = "pyeed/model.py",
+    ):
+        subprocess.run(
+            [
+                "neomodel_generate_diagram",
+                models_path,
+            ]
+        )
+
     def _wipe_database(self):
         """
         Deletes all nodes and relationships in the database.
