@@ -1,10 +1,13 @@
 import asyncio
 
 import nest_asyncio
+from loguru import logger
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
 from pyeed.dbconnect import DatabaseConnector
+from pyeed.embedding import free_memory, get_batch_embeddings
+from pyeed.model import Protein
 
 
 class Pyeed:
@@ -44,6 +47,27 @@ class Pyeed:
         )
 
         asyncio.run(adapter.make_request())
+
+    def calculate_sequence_embeddings(self):
+        """
+        Calculates embeddings for all sequences in the database that do not have embeddings.
+        """
+
+        proteins = Protein.nodes.filter(embedding__isnull=True)
+        logger.debug(f"Found {len(proteins)} proteins without embeddings.")
+        accessions = [protein.accession_id for protein in proteins]
+        sequences = [protein.sequence for protein in proteins]
+
+        logger.debug(f"Calculating embeddings for {len(sequences)} sequences.")
+        embeddings = get_batch_embeddings(sequences)
+
+        for i, protein in enumerate(proteins):
+            if not protein.accession_id == accessions[i]:
+                raise ValueError("Protein accessions do not match.")
+            protein.embedding = embeddings[i].tolist()
+            protein.save()
+
+        free_memory()
 
 
 if __name__ == "__main__":

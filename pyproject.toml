@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyeed"
-version = "0.4.0"
+version = "0.4.1"
 description = "Toolkit to create, annotate, and analyze sequence data"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
@@ -28,6 +28,10 @@ bio = "^1.7.1"
 loguru = "^0.7.2"
 neomodel = "^5.3.3"
 shapely = "^2.0.6"
+torch = "^2.4.1"
+transformers = "^4.45.2"
+scikit-learn = "^1.5.2"
+numpy = "^2.1.2"
 
 [tool.poetry.group.dev.dependencies]
 mkdocs-material = "^9.5.9"

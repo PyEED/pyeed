@@ -52,7 +52,13 @@ class StrictStructuredNode(StructuredNode):
 
     def save(self, *args, **kwargs):
         """Validates the properties and then saves the node."""
+        allowed_properties = self.__class__._class_properties()
+
+        # Only validate properties defined in the model schema
         for field, prop in self.__dict__.items():
+            if field not in allowed_properties:
+                continue  # Skip non-class properties (like internal Neo4j fields)
+
             if prop is None or callable(prop):
                 continue
 
