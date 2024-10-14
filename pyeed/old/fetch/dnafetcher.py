@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from typing import List
 
@@ -7,7 +6,7 @@ import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
-from pyeed.fetch.requester import AsyncRequester, AsyncParamRequester
+from pyeed.adapter.primary_db_adapter import AsyncRequester
 
 from .ncbidnamapper import NCBIDNAMapper
 
@@ -41,10 +40,10 @@ class DNAFetcher:
             console=Console(**console_kwargs),
         ) as progress:
             requesters: List[AsyncRequester] = []
-            
-            # 
+
+            #
             task_id = progress.add_task(
-                f"Requesting sequences from NCBI...", total=len(self.ids)
+                "Requesting sequences from NCBI...", total=len(self.ids)
             )
             requesters.append(
                 AsyncRequester(
@@ -58,12 +57,10 @@ class DNAFetcher:
                 )
             )
 
-
             responses = await asyncio.gather(
                 *[requester.make_request() for requester in requesters]
             )
 
-            
             # in case of multiple databases, identify the source of the data
             ncbi_responses, uniprot_response = self.identify_data_source(responses)
 
@@ -71,7 +68,6 @@ class DNAFetcher:
             ncbi_entries = NCBIDNAMapper().map(responses=ncbi_responses)
 
             return ncbi_entries
-
 
     def identify_data_source(self, responses: List[str]) -> tuple:
         """
@@ -87,6 +83,3 @@ class DNAFetcher:
                 uniprot_response.append(response)
 
         return ncbi_responses, uniprot_response
-            
-
-

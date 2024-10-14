@@ -8,11 +8,69 @@ prefixes:
 
 ## Macromolecules
 
-### SequenceRecord
+### ProteinRecord (sio:SIO_010043)
 
-A molecular sequence and associated annotation data.
+A protein sequence and associated metadata.
 
-- id
+- **id**
+  - Type: string
+  - Description: Unique identifier of the sequence.
+  - Term: sio:SIO_000729
+- name
+  - Type: string
+  - Description: Arbitrary name of the sequence.
+  - Term: sio:SIO_000116
+- organism
+  - Type: Organism
+  - Description: The organism from which the sequence was obtained.
+  - Term: sio:SIO_010000
+- **sequence**
+  - Type: string
+  - Description: The letter sequence of the macromolecule.
+  - Term: sio:SIO_000030
+- embedding
+  - Type: float[]
+  - Description: 1D embedding vector of the protein sequence.
+- seq_length
+  - Type: integer
+  - Description: Length of the sequence.
+  - Term: sio:SIO_000041
+- nucleotide_id
+  - Type: string
+  - Description: Identifier of the nucleotide sequence.
+- locus_tag
+  - Type: string
+  - Description: Locus tag of the protein within the nucleotide sequence.
+- sites
+  - Type: Site[]
+  - Description: Defines sites within the nucleotide sequence.
+- regions
+  - Type: Region[]
+  - Description: Defines regions within the nucleotide sequence.
+- structure_ids
+  - Type: string[]
+  - Description: Identifiers of the structures of the protein.
+  - Term: sio:SIO_000729
+- ec_number
+  - Type: string
+  - Description: An Enzyme Commission (EC) number of an enzyme.
+  - Term: edam:data_1011
+- mol_weight
+  - Type: float
+  - Description: Calculated molecular weight of the protein based on the sequence.
+  - Term: edam:data_1505
+- annotations
+  - Type: Annotation[]
+  - Description: Annotations of the protein sequence.
+- go_terms
+  - Type: string[]
+  - Description: Gene Ontology terms associated with the protein.
+
+### DNARecord (sio:SIO_010008)
+
+A nucleic acid sequence and associated metadata 🧬
+
+- **id**
   - Type: string
   - Description: Unique identifier of the sequence.
   - Term: sio:SIO_000729
@@ -32,88 +90,61 @@ A molecular sequence and associated annotation data.
   - Type: integer
   - Description: Length of the sequence.
   - Term: sio:SIO_000041
+- embedding
+  - Type: float[]
+  - Description: 1D embedding vector of the protein sequence.
 - sites
   - Type: Site[]
   - Description: Defines sites within the nucleotide sequence.
 - regions
   - Type: Region[]
   - Description: Defines regions within the nucleotide sequence.
-- region_sets
-  - Type: RegionSet[]
-  - Description: Multiple regions forming a higher order structure or feature of a sequence.
-
-### ProteinRecord(_SequenceRecord_) (sio:SIO_010043)
-
-A protein sequence and associated metadata.
-
-- structure_id
-  - Type: string
-  - Description: Protein Data Bank (PDB) identifier.
-  - Term: sio:SIO_000729
-- coding_sequence
-  - Type: Region[]
-  - Description: Defines the coding sequence of the protein
-  - Term: sio:SIO_001390
-- ec_number
-  - Type: string
-  - Description: An Enzyme Commission (EC) number of an enzyme.
-  - Term: edam:data_1011
-- mol_weight
-  - Type: float
-  - Description: Calculated molecular weight of the protein based on the sequence.
-  - Term: edam:data_1505
-
-### DNARecord(_SequenceRecord_) (sio:SIO_010008)
-
-A nucleic acid sequence and associated metadata 🧬
-
 - gc_content
   - Type: float
   - Description: GC content of the sequence.
+- annotations
+  - Type: Annotation[]
+  - Description: Annotations of the DNA sequence.
+- go_terms
+  - Type: string[]
+  - Description: Gene Ontology terms associated with the DNA.
 
-### AbstractAnnotation
-
-- url
-  - Type: string
-  - Description: URI of the annotation.
-  - Term: sio:SIO_000811
-- accession_id
-  - Type: string
-  - Description: Accession ID of the annotation.
-  - Term: sio:SIO_000675
-- name
-  - Type: string
-  - Description: A name of a sequence feature, e.g. the name of a feature
-
-### Site(_AbstractAnnotation_) (sio:sio:010049)
+### Site (sio:sio:010049)
 
 Position(s) constituting a site within a sequence.
 
-- positions
+- name
+  - Type: string
+  - Description: Name of the site.
+- **annotation**
+  - Type: Annotation
+  - Description: Annotation of the site.
+- **positions**
   - Type: integer[]
   - Description: Position of the site(s) within the sequence.
   - Term: sio:SIO_000056
 
-### Region(_AbstractAnnotation_) (sio:SIO_000370)
+### Region ( _AbstractAnnotation_ ) (sio:SIO_000370)
 
-Regional annotation of a feature within a sequence. The direction of the region is defined by the start and end positions.
+Regional annotation of a feature within a sequence.
 
-- start
+- **id**
+  - Type: string
+  - Description: Unique identifier of the site.
+- name
+  - Type: string
+  - Description: Name of the site.
+- **annotation**
+  - Type: Annotation
+  - Description: Annotation of the site.
+- **start**
   - Type: integer
   - Description: Start position of the site.
   - Term: sio:SIO_000943
-- end
+- **end**
   - Type: integer
   - Description: End position of the site.
   - Term: sio:SIO_000953
-
-### RegionSet (sio:SIO_000370)
-
-A set of regions forming a higher order structure. For example, a set of exons in a gene, or a set of secondary structures forming a super-secondary structure.
-
-- regions
-  - Type: Region[]
-  - Description: Regions of the cluster.
 
 ### Organism
 
@@ -121,7 +152,7 @@ Description of an organism 🦠.
 
 - **taxonomy_id**
   - Type: integer
-  - Description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group in the NCBI taxonomy database.
+  - Description: A stable unique identifier for each taxon for a species, a family, an order, or any other group in the NCBI taxonomy database.
   - Term: edam:data_1179
 - name
   - Type: string
@@ -169,7 +200,7 @@ Description of an organism 🦠.
   - Description: Expectation value (E) to safe hits.
   - Default: 10.0
 - n_hits
-  - Type: int
+  - Type: integer
   - Description: Number of hits to return.
   - Default: 100
 - substitution_matrix
@@ -177,7 +208,7 @@ Description of an organism 🦠.
   - Description: Substitution matrix to use.
   - Default: "BLOSUM62"
 - word_size
-  - Type: int
+  - Type: integer
   - Description: Word size of the initial match.
   - Default: 3
   - Inclusivminimum: 2
@@ -224,7 +255,7 @@ Description of an organism 🦠.
   - Type: StandardNumbering
   - Description: Standard numbering of the aligned sequences.
 
-### PairwiseAlignmentResult(_AlignmentResult_)
+### PairwiseAlignmentResult (_AlignmentResult_)
 
 - score
   - Type: float
@@ -236,16 +267,16 @@ Description of an organism 🦠.
   - Type: float
   - Description: Ratio of similar residues in the alignment
 - gaps
-  - Type: int
+  - Type: integer
   - Description: Number of gaps in the alignment
 - mismatches
-  - Type: int
+  - Type: integer
   - Description: Number of mismatches in the alignment
 
 ### StandardNumbering
 
 - reference_id
-  - Type: str
+  - Type: string
   - Description: Standard numbering of the reference sequence
 - numberd_sequences
   - Type: NumberedSequence[]
@@ -260,23 +291,7 @@ Description of an organism 🦠.
   - Type: string[]
   - Description: Standard numbering of the aligned sequence
 
-### ClustalOmegaResult(_AlignmentResult_)
-
-- version
-  - Type: string
-  - Description: Version of the Clustal Omega software
-
 ## Enumerations
-
-### Ontology
-
-Ontology endpoints for different types of sequences.
-
-```python
-GO = "https://amigo.geneontology.org/amigo/term/"
-SIO = "http://semanticscience.org/resource/"
-ECO = "https://www.evidenceontology.org/term/"
-```
 
 ### Annotation
 
@@ -292,13 +307,6 @@ MOTIVE = "http://semanticscience.org/resource/SIO_000131"
 CODING_SEQ = "http://semanticscience.org/resource/SIO_001276"
 ALPHAHELIX = "http://semanticscience.org/resource/SIO_010468"
 BETASTRAND = "http://semanticscience.org/resource/SIO_010469"
-```
-
-### SequenceType
-
-Ontology terms for different types of sequences.
-
-```python
 DNA = "http://semanticscience.org/resource/SIO_010018"
 PROTEIN = "http://semanticscience.org/resource/SIO_010015"
 ```

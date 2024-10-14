@@ -1,0 +1,247 @@
+{
+    "style": {
+        "node-color": "#ffffff",
+        "border-color": "#000000",
+        "caption-color": "#000000",
+        "arrow-color": "#000000",
+        "label-background-color": "#ffffff",
+        "directionality": "directed",
+        "arrow-width": 5
+    },
+    "nodes": [
+        {
+            "id": "n0",
+            "position": {
+                "x": 0,
+                "y": 0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "StrictStructuredNode"
+            ],
+            "properties": {}
+        },
+        {
+            "id": "n1",
+            "position": {
+                "x": 346.4101615137755,
+                "y": 199.99999999999997
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Organism"
+            ],
+            "properties": {
+                "taxonomy_id": "int - required",
+                "name": "str",
+                "domain": "str",
+                "kingdom": "str",
+                "phylum": "str",
+                "tax_class": "str",
+                "order": "str",
+                "family": "str",
+                "genus": "str",
+                "species": "str"
+            }
+        },
+        {
+            "id": "n2",
+            "position": {
+                "x": 2.4492935982947064e-14,
+                "y": 400.0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Site"
+            ],
+            "properties": {
+                "site_id": "id - unique",
+                "name": "str",
+                "positions": "list[int] - required",
+                "annotation": "str - required"
+            }
+        },
+        {
+            "id": "n3",
+            "position": {
+                "x": -346.4101615137754,
+                "y": 200.00000000000014
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Region"
+            ],
+            "properties": {
+                "region_id": "id - unique",
+                "start": "int - required",
+                "end": "int - required",
+                "annotation": "str - required"
+            }
+        },
+        {
+            "id": "n4",
+            "position": {
+                "x": -346.4101615137755,
+                "y": -199.99999999999991
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "GOAnnotation"
+            ],
+            "properties": {
+                "go_id": "str - required",
+                "term": "str",
+                "definition": "str"
+            }
+        },
+        {
+            "id": "n5",
+            "position": {
+                "x": -7.347880794884119e-14,
+                "y": -400.0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Protein"
+            ],
+            "properties": {
+                "accession_id": "str - required",
+                "sequence": "str - required",
+                "name": "str",
+                "seq_length": "int - required",
+                "mol_weight": "float",
+                "ec_number": "str",
+                "nucleotide_id": "str",
+                "locus_tag": "str",
+                "structure_ids": "list[str]",
+                "go_terms": "list[str]",
+                "embedding": "list[float]"
+            }
+        },
+        {
+            "id": "n6",
+            "position": {
+                "x": 346.41016151377534,
+                "y": -200.00000000000017
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "DNA"
+            ],
+            "properties": {
+                "accession_id": "str - required",
+                "sequence": "str - required",
+                "name": "str",
+                "seq_length": "int - required",
+                "go_terms": "list[str]",
+                "embedding": "list[float]",
+                "gc_content": "float"
+            }
+        }
+    ],
+    "relationships": [
+        {
+            "id": "e0",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n5",
+            "toId": "n1"
+        },
+        {
+            "id": "e1",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n1"
+        },
+        {
+            "id": "e2",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n4",
+            "toId": "n5"
+        },
+        {
+            "id": "e3",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n4",
+            "toId": "n6"
+        },
+        {
+            "id": "e4",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n5",
+            "toId": "n1"
+        },
+        {
+            "id": "e5",
+            "type": "HAS_SITE",
+            "style": {},
+            "properties": {},
+            "fromId": "n5",
+            "toId": "n2"
+        },
+        {
+            "id": "e6",
+            "type": "HAS_REGION",
+            "style": {},
+            "properties": {},
+            "fromId": "n5",
+            "toId": "n3"
+        },
+        {
+            "id": "e7",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n5",
+            "toId": "n4"
+        },
+        {
+            "id": "e8",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n1"
+        },
+        {
+            "id": "e9",
+            "type": "HAS_SITE",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n2"
+        },
+        {
+            "id": "e10",
+            "type": "HAS_REGION",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n3"
+        },
+        {
+            "id": "e11",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n4"
+        }
+    ]
+}

@@ -1,26 +1,24 @@
 import asyncio
 import json
-import logging
+from logging import Logger
 from typing import List
 
 import nest_asyncio
 from rich.console import Console
 from rich.progress import Progress
 
+from pyeed.adapter.primary_db_adapter import AsyncParamRequester, AsyncRequester
+from pyeed.dbconnect import DatabaseConnector
 from pyeed.fetch.dbsort import DBPattern, SortIDs
 from pyeed.fetch.ncbiproteinmapper import NCBIProteinMapper
 from pyeed.fetch.pdbmapper import PDBMapper
-from pyeed.fetch.requester import AsyncParamRequester, AsyncRequester
 from pyeed.fetch.taxonomymapper import TaxonomyMapper
-from pyeed.fetch.uniprotmapper import UniprotMapper
-
-LOGGER = logging.getLogger(__name__)
 
 
 class ProteinFetcher:
-    def __init__(self, ids: List[str]):
+    def __init__(self, ids: List[str], db: DatabaseConnector):
         self.ids = ids
-        # self.ncbi_key = ncbi_key #TODO: Add NCBI key to NCBI requester
+        self.db = db
         nest_asyncio.apply()
 
     async def fetch(self, **console_kwargs):
@@ -36,15 +34,15 @@ class ProteinFetcher:
 
         Raises:
             Exception: If there is an error during the fetching process.
-
         """
+
         db_entries = SortIDs.sort(self.ids)
         param_requester = None
 
         with Progress(
             console=Console(**console_kwargs),
         ) as progress:
-            requesters: List[AsyncRequester] = []
+            requesters = []
             for db_name, db_ids in db_entries.items():
                 if db_name == DBPattern.UNIPROT.name:
                     task_id = progress.add_task(
@@ -256,7 +254,7 @@ class ProteinFetcher:
                     json.loads(entry)[0] for entry in response
                 ]
             else:
-                LOGGER.warning(f"Response could not be mapped to mapper: {response[0]}")
+                Logger.warning(f"Response could not be mapped to mapper: {response[0]}")
 
         if not ncbi:
             ncbi = []

@@ -25,7 +25,6 @@ from .sequencerecord import SequenceRecord
 
 class ProteinRecord(
     SequenceRecord,
-    search_mode="unordered",
 ):
     """A protein sequence and associated metadata."""
 
@@ -342,7 +341,7 @@ class ProteinRecord(
             return DNARecord.get_id(self.coding_sequence[0].id)
 
         except Exception as e:
-            print('The DNA sequence could not be retrieved. The error is: ', e)
+            print("The DNA sequence could not be retrieved. The error is: ", e)
             return
 
     def _nblast(sequence: str, n_hits: int = None) -> List["ProteinRecord"]:
