@@ -4,7 +4,6 @@ from neomodel import (
     ArrayProperty,
     FloatProperty,
     IntegerProperty,
-    RelationshipFrom,
     RelationshipTo,
     StringProperty,
     StructuredNode,
@@ -151,10 +150,6 @@ class Organism(StrictStructuredNode):
     genus = StringProperty()
     species = StringProperty()
 
-    # Relationships
-    protein = RelationshipFrom("Protein", "ORIGINATES_FROM")
-    dna = RelationshipFrom("DNA", "ORIGINATES_FROM")
-
 
 class Site(StrictStructuredNode):
     site_id = UniqueIdProperty()
@@ -197,7 +192,7 @@ class Protein(StrictStructuredNode):
     go_terms = ArrayProperty(StringProperty())
     embedding = ArrayProperty(
         FloatProperty(),
-        vector_index=VectorIndex(dimensions=1048),
+        vector_index=VectorIndex(dimensions=1280),
     )
 
     # Relationships

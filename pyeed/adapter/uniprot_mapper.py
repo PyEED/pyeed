@@ -37,7 +37,6 @@ class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
         )
 
         protein.organism.connect(organism)
-        organism.protein.connect(protein)
 
         self.add_sites(data, protein)
         self.add_go(data, protein)
