@@ -5,7 +5,7 @@ description = "Toolkit to create, annotate, and analyze sequence data"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{ include = "pyeed" }]
+packages = [{ include = "pyeed" , from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"

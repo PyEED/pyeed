@@ -2,8 +2,8 @@
 from pyeed.core.organism import Organism
 from pyeed.core.proteinrecord import ProteinRecord
 
-class TestProteinRecord:
 
+class TestProteinRecord:
     # In Docs
     def test_instantiation_from_ncbi(self):
         proteinRecord = ProteinRecord.get_id("UCS38941.1")
@@ -43,7 +43,6 @@ class TestProteinRecord:
         assert protein_record.organism.family == "Hominidae"
         assert protein_record.organism.genus == "Homo"
         assert protein_record.organism.species == "sapiens"
-
 
     # add a region to ProteinInfo object
     def test_add_region_to_protein_info(self):
@@ -100,13 +99,13 @@ class TestProteinRecord:
         site = protein_record.add_to_sites(
             name="Site1",
             uri="TestUri",
-            accession_id='1234',
-            id='idTest',
+            accession_id="1234",
+            id="idTest",
             positions=[1, 2, 3],
         )
 
         assert len(protein_record.sites) == 1
         assert protein_record.sites[0] == site
         assert protein_record.sites[0].name == "Site1"
-        assert protein_record.sites[0].accession_id == '1234'
+        assert protein_record.sites[0].accession_id == "1234"
         assert protein_record.sites[0].positions == [1, 2, 3]

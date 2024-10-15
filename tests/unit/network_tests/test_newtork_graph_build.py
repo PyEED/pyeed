@@ -1,8 +1,6 @@
 import json
-import pytest
-import pandas as pd
-import networkx as nx
 
+import pytest
 from pyeed.core import ProteinRecord
 from pyeed.network import SequenceNetwork
 
@@ -61,8 +59,8 @@ class TestNetworkGraphBuild:
         data_json = json.loads(data_string)
         # to load it into a Sequence Network object
         network2 = SequenceNetwork(**data_json)
-                
-        assert len(data_json['network']['nodes']) == len(mats)
+
+        assert len(data_json["network"]["nodes"]) == len(mats)
         assert network2.network.number_of_nodes() == network.network.number_of_nodes()
         assert network2.network.number_of_edges() == network.network.number_of_edges()
 
@@ -85,9 +83,8 @@ class TestNetworkGraphBuild:
         # to read in the data again
         data_json = json.loads(data_string)
 
-        data_json['network'] = 1
+        data_json["network"] = 1
 
         # expecte an error
         with pytest.raises(ValueError):
             network2 = SequenceNetwork(**data_json)
-
