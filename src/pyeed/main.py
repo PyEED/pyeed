@@ -25,7 +25,7 @@ class Pyeed:
     ):
         self.db = DatabaseConnector(uri, user, password)
 
-    def fetch_from_primary_db(self, ids: list[str], db="uniprot"):
+    def fetch_from_primary_db(self, ids: list[str], db="UNIPROT"):
         """
         Fetches sequences and corresponding annotations from primary sequence databases
         and adds them to local database.
@@ -43,11 +43,12 @@ class Pyeed:
         accessions = self.db.execute_read(query)[0]["accessions"]
         ids = [id for id in ids if id not in accessions]
 
-        params_template = {
-            "format": "json",
-        }
-
         if db == DBPattern.UNIPROT.name:
+
+            params_template = {
+                "format": "json",
+            }
+
             # set up UniProt adapter
             adapter = PrimaryDBAdapter(
                 ids=ids,
@@ -63,11 +64,17 @@ class Pyeed:
             )
 
         elif db == DBPattern.NCBI.name:
+
+            params_template = {
+                'retmode': 'json',
+                'rettype': 'genbank',
+            }
+
             # set up NCBI adapter
             adapter = PrimaryDBAdapter(
                 ids=ids,
-                ids_attr_name="accession",
-                url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&retmode=text&rettype=genbank&id=",
+                ids_attr_name="id",
+                url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein",
                 rate_limit=2,
                 n_concurrent=5,
                 batch_size=10,
@@ -130,3 +137,22 @@ class Pyeed:
         free_memory()
 
 
+    def getProtein(self, accession: str):
+        """
+        Fetches a protein from the database by accession ID.
+        """
+        query = f"""
+        MATCH (p:Protein {{accession_id: '{accession}'}})
+        RETURN p
+        """
+        return self.db.execute_read(query)
+    
+    def getProteins(self):
+        """
+        Fetches all proteins from the database.
+        """
+        query = """
+        MATCH (n) WHERE (n.accession_id) IS NOT NULL 
+        RETURN DISTINCT  n.accession_id AS accession_id
+        """
+        return self.db.execute_read(query)

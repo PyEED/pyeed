@@ -48,3 +48,7 @@ class SortIDs:
             db_id_dict[key] = list(set(value))
 
         return db_id_dict
+
+if __name__ == '__main__':
+
+    print(DBPattern.UNIPROT.name)

@@ -173,21 +173,34 @@ class PrimaryDBAdapter(Generic[T]):
             return []
 
         try:
-            response_json = response.json()
-            if not response_json:
-                logger.warning(f"Empty response from {response.url}")
-                return []
+            logger.debug(f"Response content: {type(response.content)}")
 
-            # If the response is a dictionary, wrap it in a list
-            if isinstance(response_json, dict):
-                response_json = [response_json]
+            # here we need to identify from where the response is coming from and parse it accordingly
+            if response.content.startswith(b"LOCUS"):
+                return response.content
+            elif response.content.startswith(b"{"):
+                None
+            elif response.content.startswith(b"["):
+                response_json = response.json()
+                if not response_json:
+                    logger.warning(f"Empty response from {response.url}")
+                    return []
 
-            # Ensure the response is a list of dictionaries
-            if not isinstance(response_json, list) or not all(
-                isinstance(item, dict) for item in response_json
-            ):
-                logger.warning(f"Unexpected response format from {response.url}")
-                return []
+                # If the response is a dictionary, wrap it in a list
+                if isinstance(response_json, dict):
+                    response_json = [response_json]
+
+                # Ensure the response is a list of dictionaries
+                if not isinstance(response_json, list) or not all(
+                    isinstance(item, dict) for item in response_json
+                ):
+                    logger.warning(f"Unexpected response format from {response.url}")
+                    return []
+                
+                return response_json
+            
+            else:
+                logger.warning(f"Response could not be mapped to mapper: {response[0]}")
 
         except ValueError as e:
             logger.warning(f"Failed to parse JSON response from {response.url}: {e}")
