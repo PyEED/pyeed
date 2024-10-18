@@ -1,14 +1,15 @@
 import io
+import re
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, List
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature
 
 from loguru import logger
 
-from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site
+from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site, Region
 
 T = TypeVar("T")
 
@@ -68,7 +69,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
 
     def map_protein(self, seq_record: SeqRecord):
 
-        protein_info_dict = {'name': None, 'mol_weight': None, 'ec_number': None}
+        # DANGERDANGER mol_weight is a float, but here it is set to 0.0
+        protein_info_dict = {'name': None, 'mol_weight': 0.0, 'ec_number': None}
 
         protein = self.get_feature(seq_record, "Protein")
         if len(protein) == 0:
@@ -104,7 +106,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             logger.debug(
                 f"No molecular weight found for {seq_record.id}: {protein.qualifiers}"
             )
-            protein_info_dict["mol_weight"] = None
+            protein_info_dict["mol_weight"] = 0.0
 
         try:
             protein_info_dict["ec_number"] = protein.qualifiers["EC_number"][0]
@@ -142,53 +144,70 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
                 )
 
         return protein_info
+
+    """
     
-    def map_sites(self, seq_record: SeqRecord, protein_info: ProteinRecord):
+    def map_sites(self, seq_record: SeqRecord):
+
+        sites_list = []
 
         sites = self.get_feature(seq_record, "site")
         for site in sites:
+
+            sites_dict = {}
             try:
-                protein_info.add_to_sites(
-                    name=site.qualifiers["site_type"][0],
-                    id=site.qualifiers["site_type"][0].lower(),
-                    positions=[int(part.start) for part in site.location.parts],
-                    cross_ref=site.qualifiers["db_xref"][0],
-                )
+
+                sites_dict['type'] = site.qualifiers["site_type"][0]
+                sites_dict['positions'] = [int(part.start) for part in site.location.parts]
+                sites_dict['cross_ref'] = site.qualifiers["db_xref"][0]
+            
             except KeyError:
-                LOGGER.debug(
+                logger.debug(
                     f"Incomplete site data found for {seq_record.id}: {site.qualifiers}, skipping site"
                 )
 
-        return protein_info
+            sites_list.append(sites_dict)
 
-    def map_cds(self, seq_record: SeqRecord, protein_record: ProteinRecord):
+        return sites_list
+    
+    def add_sites(self, sites_list: List[dict], protein: Protein):
+        for site_dict in sites_list:
+            site = Site(
+                name=site_dict['type'],
+                positions=site_dict['positions'],
+                # DANGERDANGER
+                annotation=Annotation.ACTIVE_SITE.value,
+            ).save()
+
+            protein.site.connect(site)
+
+    def map_cds(self, seq_record: SeqRecord):
 
         cds = self.get_feature(seq_record, "CDS")
+
         if len(cds) > 1:
-            LOGGER.info(
+            logger.info(
                 f"Multiple features ({len(cds)}) of type `CDS` found for {seq_record.id}"
             )
 
         try:
             cds = cds[0]
         except IndexError:
-            LOGGER.debug(f"No CDS found for {seq_record.id}: {cds}")
+            logger.debug(f"No CDS found for {seq_record.id}: {cds}")
 
-            return protein_record
+            return None
 
         try:
-            protein_record.coding_sequence = self.get_cds_regions(
-                cds.qualifiers["coded_by"][0]
-            )
+            return self.get_cds_regions(cds.qualifiers["coded_by"][0])
         except IndexError:
-            LOGGER.debug(
+            logger.debug(
                 f"No coding sequence reference found for {seq_record.id}: {cds.qualifiers}"
             )
 
-        return protein_record
+        return None
 
     @staticmethod
-    def get_cds_regions(coded_by: dict) -> List[DNARecord]:
+    def get_cds_regions(coded_by: dict):
 
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
@@ -203,7 +222,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         if not all(
             [reference_id == reference_ids[0] for reference_id in reference_ids]
         ):
-            LOGGER.warning(
+            logger.warning(
                 "Nucleotide sequence references are not identical: {reference_ids}"
             )
 
@@ -214,17 +233,54 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         for region in cds_ranges:
             start, end = region.split("..")
 
-            region = Region(
-                id=reference_ids[0],
-                start=int(start),
-                end=int(end),
-                type=Annotation.CODING_SEQ,
-            )
+            region = {}
+            region["start"] = int(start)
+            region["end"] = int(end)
+            region["type"] = Annotation.CODING_SEQ.value
+            region['id'] = reference_ids[0]
+
             regions.append(region)
 
         return regions
+    
 
-    """
+    def map_regions(self, seq_record: SeqRecord):
+
+        regions = self.get_feature(seq_record, "region")
+        regions_list = []
+
+        for region in regions:
+            try:
+                if "db_xref" not in region.qualifiers:
+                    db_xref = None
+                else:
+                    db_xref = region.qualifiers["db_xref"][0]
+
+                regions_list.append({
+                    'id': region.qualifiers["region_name"][0],
+                    'start': int(region.location.start),
+                    'end': int(region.location.end),
+                    'type': region.qualifiers["note"][0],
+                    'cross_reference': db_xref,
+                })
+            except KeyError:
+                logger.debug(
+                    f"Incomplete region data found for {seq_record.id}: {region.qualifiers}, skipping region"
+                )
+
+        return regions_list
+    
+    def add_regions(self, regions_list: List[dict], protein: Protein):
+        for region_dict in regions_list:
+            region = Region(
+                region_id=region_dict['id'],
+                start=region_dict['start'],
+                end=region_dict['end'],
+                annotation=Annotation.ACTIVE_SITE.value,
+            ).save()
+
+            protein.region.connect(region)
+
 
     def add_to_db(self, record: SeqIO.SeqRecord):
 
@@ -235,8 +291,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         # Organism information
         organism = Organism.get_or_save(
             taxonomy_id=taxonomy_id,
-            name=
-            organism_name,
+            name=organism_name,
         )
 
         # Protein information
@@ -251,7 +306,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             protein = Protein.get_or_save(
                 accession_id=record.id,
                 sequence=record.seq.__str__(),
-                mol_weight=protein_info_dict["mol_weight"],
+                mol_weight=float(protein_info_dict["mol_weight"]),
                 ec_number=ec_number,
                 name=protein_info_dict["name"],
                 seq_length=len(record.seq),
@@ -264,10 +319,30 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
 
         protein.organism.connect(organism)
 
-        # self.add_sites(data, protein)
+        # Here we add the sites
+        sites_list = self.map_sites(record)
+        self.add_sites(sites_list, protein)
+
+        # Here we add the coding sequence
+        cds_regions = self.map_cds(record)
+        if cds_regions is not None:
+            for region in cds_regions:
+                
+                region_coding = Region(
+                        region_id=region['id'],
+                        start=region['start'],
+                        end=region['end'],
+                        annotation=region['type'],
+                ).save()
+
+                protein.region.connect(region_coding)
+
+        # Here we add the regions
+        regions_list = self.map_regions(record)
+        self.add_regions(regions_list, protein)
+        
+        # Here we add the GO annotations    
         # self.add_go(data, protein)
-
-
 
 
 

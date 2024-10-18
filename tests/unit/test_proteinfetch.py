@@ -55,8 +55,12 @@ class TestProteinFetech:
         LOGGER.info(f"Proteins in database: {ids_in_db}")
 
         assert len(ids_in_db) == 2
-        assert ids_in_db[0]['accession_id'] == "P04182"
-        assert ids_in_db[1]['accession_id'] == "Q6QDP7"
+        # check if all ids are in the database
+        for id in ids:
+            assert id in [protein['accession_id'] for protein in ids_in_db]
+        # check if all ids in the database are in the ids
+        for protein in ids_in_db:
+            assert protein['accession_id'] in ids
 
     def test_ncbi_fetch(self):
         LOGGER.info("Running test_ncbi_fetch")
@@ -64,7 +68,16 @@ class TestProteinFetech:
 
         # ids 
         ids = [
-            "AAL29438",
+            "AAL29438.1",
+            'HBQ2613975.1',
+            'EKW4005960.1',
+            'EJG7116187.1',
+            'AMM70781.1',
+            'HCO3480053.1',
+            'HAI5030310.1',
+            'WP_000027057.1',
+            'WP_215748091.1',
+            'WP_261627585.1'
         ]
 
         # Fetch proteins from primary database
@@ -78,11 +91,12 @@ class TestProteinFetech:
 
         LOGGER.info(f"Proteins in database: {ids_in_db}")
 
-        assert len(ids_in_db) == 2
-        assert ids_in_db[0]['accession_id'] == "NP_001356"
-        assert ids_in_db[1]['accession_id'] == "NP_001356.1"
+        assert len(ids_in_db) == len(ids)
+        # check if all ids are in the database
+        for id in ids:
+            assert id in [protein['accession_id'] for protein in ids_in_db]
+        # check if all ids in the database are in the ids
+        for protein in ids_in_db:
+            assert protein['accession_id'] in ids
 
-
-        
-
-    
+       

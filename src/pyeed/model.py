@@ -265,6 +265,7 @@ class Protein(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION")
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
+    coding_sequence = RelationshipTo("DNA", "CODING_SEQUENCE")
 
 
 class DNA(StrictStructuredNode):
