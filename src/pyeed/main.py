@@ -5,6 +5,8 @@ from loguru import logger
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
+from pyeed.adapter.ncbi_mapper import NCBIProteinToPyeed
+from pyeed.dbsort import DBPattern
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import (
     free_memory,
@@ -23,7 +25,7 @@ class Pyeed:
     ):
         self.db = DatabaseConnector(uri, user, password)
 
-    def fetch_from_primary_db(self, ids: list[str]):
+    def fetch_from_primary_db(self, ids: list[str], db="uniprot"):
         """
         Fetches sequences and corresponding annotations from primary sequence databases
         and adds them to local database.
@@ -45,20 +47,39 @@ class Pyeed:
             "format": "json",
         }
 
-        adapter = PrimaryDBAdapter(
-            ids=ids,
-            ids_attr_name="accession",
-            url="https://www.ebi.ac.uk/proteins/api/proteins",
-            rate_limit=10,
-            n_concurrent=5,
-            batch_size=5,
-            data_mapper=UniprotToPyeed(),
-            progress=None,
-            task_id=None,
-            request_params=params_template,
-        )
+        if db == DBPattern.UNIPROT.name:
+            # set up UniProt adapter
+            adapter = PrimaryDBAdapter(
+                ids=ids,
+                ids_attr_name="accession",
+                url="https://www.ebi.ac.uk/proteins/api/proteins",
+                rate_limit=10,
+                n_concurrent=5,
+                batch_size=5,
+                data_mapper=UniprotToPyeed(),
+                progress=None,
+                task_id=None,
+                request_params=params_template,
+            )
+
+        elif db == DBPattern.NCBI.name:
+            # set up NCBI adapter
+            adapter = PrimaryDBAdapter(
+                ids=ids,
+                ids_attr_name="accession",
+                url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&retmode=text&rettype=genbank&id=",
+                rate_limit=2,
+                n_concurrent=5,
+                batch_size=10,
+                data_mapper=NCBIProteinToPyeed(),
+                progress=None,
+                task_id=None,
+                request_params=params_template,
+            )
 
         asyncio.run(adapter.make_request())
+
+
 
     def calculate_sequence_embeddings(self, batch_size=16):
         """
@@ -107,3 +128,5 @@ class Pyeed:
         # Free memory after processing all batches
         del model, tokenizer
         free_memory()
+
+

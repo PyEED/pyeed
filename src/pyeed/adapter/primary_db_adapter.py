@@ -152,6 +152,7 @@ class PrimaryDBAdapter(Generic[T]):
                 async for response_coroutine in response_coroutines:
                     res = await response_coroutine
                     sanitized_response = self.sanitize_response(res)
+                    logger.debug(f"Received response: {sanitized_response}")
                     [self.map_and_add_to_db(entry) for entry in sanitized_response]
 
                     update_progress()
