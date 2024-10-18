@@ -1,5 +1,6 @@
 from typing import Any, Coroutine, Generic, NamedTuple, TypeVar
 
+import io
 import aiometer
 import tenacity
 from httpx import (
@@ -11,6 +12,7 @@ from httpx import (
 )
 from loguru import logger
 from pyeed.adapter.uniprot_mapper import PrimaryDBtoPyeed
+from Bio import SeqIO
 from rich.progress import Progress, TaskID
 
 T = TypeVar("T")
@@ -177,7 +179,7 @@ class PrimaryDBAdapter(Generic[T]):
 
             # here we need to identify from where the response is coming from and parse it accordingly
             if response.content.startswith(b"LOCUS"):
-                return response.content
+                return SeqIO.parse(io.StringIO(response.content.decode()), "gb")
             elif response.content.startswith(b"{"):
                 None
             elif response.content.startswith(b"["):
