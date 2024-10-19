@@ -143,11 +143,34 @@ class Organism(StrictStructuredNode):
     taxonomy_id: int = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
 
+class SiteRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list,
+    ):
+        molecule1.site.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
 
 class Site(StrictStructuredNode):
     site_id = UniqueIdProperty()
     name = StringProperty()
-    positions = ArrayProperty(IntegerProperty(), required=True)
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
@@ -290,7 +313,7 @@ class Protein(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    site = RelationshipTo("Site", "HAS_SITE")
+    site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
@@ -311,7 +334,7 @@ class DNA(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    site = RelationshipTo("Site", "HAS_SITE")
+    site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)

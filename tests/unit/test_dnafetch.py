@@ -33,7 +33,6 @@ class TestDNAFetech:
 
         self.eedb = eedb
 
-
     def test_fetch_dna_from_ncbi(self):
         LOGGER.info("Running dna fetch test")
         self.set_up_test()

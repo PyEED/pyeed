@@ -143,14 +143,13 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
     
     def add_sites(self, sites_list: List[dict], protein: Protein):
         for site_dict in sites_list:
-            site = Site(
+            site = Site.get_or_save(
                 name=site_dict['type'],
-                positions=site_dict['positions'],
                 # DANGERDANGER
                 annotation=Annotation.ACTIVE_SITE.value,
-            ).save()
+            )
 
-            protein.site.connect(site)
+            protein.site.connect(site, {'positions': site_dict['positions']})
 
     def map_cds(self, seq_record: SeqRecord):
 
