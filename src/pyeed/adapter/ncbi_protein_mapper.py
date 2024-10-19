@@ -242,14 +242,12 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
     
     def add_regions(self, regions_list: List[dict], protein: Protein):
         for region_dict in regions_list:
-            region = Region(
+            region = Region.get_or_save(
                 region_id=region_dict['id'],
-                start=region_dict['start'],
-                end=region_dict['end'],
                 annotation=Annotation.ACTIVE_SITE.value,
-            ).save()
+            )
 
-            protein.region.connect(region)
+            protein.region.connect(region, {'start': region_dict['start'], 'end': region_dict['end']})
 
 
     def add_to_db(self, record: SeqIO.SeqRecord):
@@ -298,18 +296,16 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         if cds_regions is not None:
             for region in cds_regions:
                 
-                region_coding = Region(
+                region_coding = Region.get_or_save(
                         region_id=region['id'],
-                        start=region['start'],
-                        end=region['end'],
                         annotation=region['type'],
-                ).save()
+                )
 
                 # add the id to protein nucleotide_id (StringProperty)
                 protein.nucleotide_id = region['id']
                 protein.save()               
 
-                protein.region.connect(region_coding)
+                protein.region.connect(region_coding, {'start': region['start'], 'end': region['end']})
 
         # Here we add the regions
         regions_list = self.map_regions(record)

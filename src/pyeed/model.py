@@ -155,11 +155,40 @@ class Site(StrictStructuredNode):
 
 class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
-    start = IntegerProperty(required=True)
-    end = IntegerProperty(required=True)
+    # start = IntegerProperty(required=True)
+    # end = IntegerProperty(required=True)
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
+
+class RegionRel(StructuredRel):
+    start = IntegerProperty(required=True)
+    end = IntegerProperty(required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        start: int,
+        end: int,
+    ):
+        molecule1.region.connect(
+            molecule2,
+            {
+                "start": start,
+                "end": end,
+            },
+        )
+
+        return cls(
+            start=start,
+            end=end,
+        )
+
+    @property
+    def label(self):
+        return f"{self.start}-{self.end}"
 
 
 class GOAnnotation(StrictStructuredNode):
@@ -262,7 +291,7 @@ class Protein(StrictStructuredNode):
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
     site = RelationshipTo("Site", "HAS_SITE")
-    region = RelationshipTo("Region", "HAS_REGION")
+    region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     coding_sequence = RelationshipTo("DNA", "HAS_CODING_SEQUENCE")
@@ -283,6 +312,6 @@ class DNA(StrictStructuredNode):
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
     site = RelationshipTo("Site", "HAS_SITE")
-    region = RelationshipTo("Region", "HAS_REGION")
+    region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)

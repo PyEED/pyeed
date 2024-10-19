@@ -1,5 +1,5 @@
 import subprocess
-
+import os
 from neo4j import Driver, GraphDatabase
 from neomodel import db as neomodel_db
 from pyeed.model import Protein
@@ -68,12 +68,16 @@ class DatabaseConnector:
         self,
         user: str | None,
         password: str | None,
-        models_path: str = "pyeed/model.py",
+        models_path: str = "model.py",
     ):
         """
         Run the neomodel_install_labels script to set up indexes and constraints on labels
         of Object-Graph Mapping (OGM) models.
         """
+        # set the path to the models file
+        # work from the path of this file
+        models_path = os.path.join(os.path.dirname(__file__), models_path)
+
         try:
             # Construct connection string based on whether user/password are provided
             if user and password:

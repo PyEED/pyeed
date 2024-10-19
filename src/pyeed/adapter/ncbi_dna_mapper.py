@@ -77,15 +77,13 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
 
         for region in regions:
             try:
-                region_saving = Region(
+                region_saving = Region.get_or_save(
                     region_id=region["id"],
-                    start=region["start"],
-                    end=region["end"],
                     # DANGERDANGER
                     annotation=Annotation.ACTIVE_SITE.value,
-                ).save()
+                )
 
-                dna.region.connect(region_saving)
+                dna.region.connect(region_saving, {"start": region["start"], "end": region["end"]})
 
             except Exception as e:
                 logger.error(f"Error saving region {region['id']} for {dna.accession_id}: {e}")
