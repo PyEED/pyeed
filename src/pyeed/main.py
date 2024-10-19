@@ -237,5 +237,18 @@ class Pyeed:
         # Fetch the coding sequences
         self.fetch_nucleotide_from_db(nucleotide_ids)
 
+        # we need to update the protein records with the coding sequences
+        # the connection between the protein and the coding sequence is the nucleotide_id
+        # the relationship is called "HAS_CODING_SEQUENCE"
+        query = """
+        MATCH (p:Protein) 
+        WHERE p.nucleotide_id IS NOT NULL
+        MATCH (n:DNA {accession_id: p.nucleotide_id})
+        MERGE (p)-[:HAS_CODING_SEQUENCE]->(n)
+        """
+        self.db.execute_write(query)
+
+
+
 
         
