@@ -62,13 +62,13 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
     def add_sites(self, dna: DNA, sites: List[dict]):
         for site in sites:
             try:
-                site = Site.get_or_save(
+                site_saving = Site.get_or_save(
                     site_id=site["id"],
                     # DANGERDANGER
                     annotation=Annotation.ACTIVE_SITE.value,
                 )
 
-                dna.sites.connect(site, {'position': list(range(site["start"], site["end"]))})
+                dna.site.connect(site_saving, {'positions': list(range(site["start"], site["end"]))})
 
             except Exception as e:
                 logger.error(f"Error saving site {site['id']} for {dna.accession_id}: {e}")
