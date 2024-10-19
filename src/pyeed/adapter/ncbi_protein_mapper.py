@@ -117,35 +117,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             protein_info_dict["ec_number"] = None
 
         return protein_info_dict
-
-    """
-    def map_regions(self, seq_record: SeqRecord, protein_info: ProteinRecord):
-
-        regions = self.get_feature(seq_record, "region")
-        for region in regions:
-            try:
-                if "db_xref" not in region.qualifiers:
-                    db_xref = None
-                else:
-                    db_xref = region.qualifiers["db_xref"][0]
-
-                protein_info.regions.append(
-                    Region(
-                        id=region.qualifiers["region_name"][0],
-                        start=int(region.location.start),
-                        end=int(region.location.end),
-                        note=region.qualifiers["note"][0],
-                        cross_reference=db_xref,
-                    )
-                )
-            except KeyError:
-                logger.debug(
-                    f"Incomplete region data found for {seq_record.id}: {region.qualifiers}, skipping region"
-                )
-
-        return protein_info
-
-    """
     
     def map_sites(self, seq_record: SeqRecord):
 
@@ -243,7 +214,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
 
         return regions
     
-
     def map_regions(self, seq_record: SeqRecord):
 
         regions = self.get_feature(seq_record, "region")
@@ -334,6 +304,10 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
                         end=region['end'],
                         annotation=region['type'],
                 ).save()
+
+                # add the id to protein nucleotide_id (StringProperty)
+                protein.nucleotide_id = region['id']
+                protein.save()               
 
                 protein.region.connect(region_coding)
 

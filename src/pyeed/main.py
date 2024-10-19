@@ -5,7 +5,8 @@ from loguru import logger
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
-from pyeed.adapter.ncbi_mapper import NCBIProteinToPyeed
+from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
+from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.dbsort import DBPattern
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import (
@@ -66,7 +67,7 @@ class Pyeed:
         elif db == DBPattern.NCBI.name:
 
             params_template = {
-                'retmode': 'json',
+                'retmode': 'text',
                 'rettype': 'genbank',
             }
 
@@ -85,8 +86,6 @@ class Pyeed:
             )
 
         asyncio.run(adapter.make_request())
-
-
 
     def calculate_sequence_embeddings(self, batch_size=16):
         """
@@ -136,7 +135,6 @@ class Pyeed:
         del model, tokenizer
         free_memory()
 
-
     def getProtein(self, accession: str):
         """
         Fetches a protein from the database by accession ID.
@@ -152,7 +150,92 @@ class Pyeed:
         Fetches all proteins from the database.
         """
         query = """
-        MATCH (n) WHERE (n.accession_id) IS NOT NULL 
+        MATCH (n:Protein) WHERE (n.accession_id) IS NOT NULL 
         RETURN DISTINCT  n.accession_id AS accession_id
         """
         return self.db.execute_read(query)
+    
+    def fetch_nucleotide_from_db(self, ids : list[str]):
+        """
+        Fetches a nucleotide sequence from the remote db and adds it to the local db.
+        """
+
+        nest_asyncio.apply()
+
+        if isinstance(ids, str):
+            ids = [ids]
+
+        # Remove accessions that are already in the database
+        query = """
+        MATCH (p:DNA)
+        RETURN collect(p.accession_id) as accessions
+        """
+        accessions = self.db.execute_read(query)[0]["accessions"]
+        ids = [id for id in ids if id not in accessions]
+
+
+        params_template = {
+                'retmode': 'text',
+                'rettype': 'genbank',
+            }
+
+        # set up NCBI adapter
+        adapter = PrimaryDBAdapter(
+            ids=ids,
+            ids_attr_name="id",
+            url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore",
+            rate_limit=2,
+            n_concurrent=5,
+            batch_size=10,
+            data_mapper=NCBIDNAToPyeed(),
+            progress=None,
+            task_id=None,
+            request_params=params_template,
+        )
+
+        asyncio.run(adapter.make_request())
+
+    def getDNAs(self):
+        """
+        Fetches all DNA sequences from the database.
+        """
+        query = """
+        MATCH (n:DNA) WHERE (n.accession_id) IS NOT NULL 
+        RETURN DISTINCT  n.accession_id AS accession_id
+        """
+        return self.db.execute_read(query)
+
+    def getDNA(self, accession: str):
+        """
+        Fetches a DNA sequence from the database by accession ID.
+        """
+        query = f"""
+        MATCH (p:DNA {{accession_id: '{accession}'}})
+        RETURN p
+        """
+        return self.db.execute_read(query)
+        
+    def fetchRemoteCodingSequences(self):
+        """
+        Fetches all of the coding sequences from the remote database and adds them to the local database.
+        The coding sequences are saved in the protein records.
+        """
+
+        # Get all proteins and a list of coding sequences ids
+        query = """
+        MATCH (p:Protein) 
+        WHERE p.nucleotide_id IS NOT NULL 
+        RETURN p.nucleotide_id AS nucleotide_id
+        """
+
+        nucleotide_ids = self.db.execute_read(query)
+        nucleotide_ids = [record["nucleotide_id"] for record in nucleotide_ids]
+
+        logger.info(f"Fetching {len(nucleotide_ids)} coding sequences.")
+        logger.info(f"Fetching coding sequences: {nucleotide_ids}")
+
+        # Fetch the coding sequences
+        self.fetch_nucleotide_from_db(nucleotide_ids)
+
+
+        

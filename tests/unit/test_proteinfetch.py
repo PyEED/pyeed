@@ -1,4 +1,4 @@
-# this is the first general test for the fetching a protein and loaidng it into the database
+# this is the first general test for the fetching a protein and loading it into the database
 import logging
 
 from pyeed import Pyeed
@@ -99,4 +99,41 @@ class TestProteinFetech:
         for protein in ids_in_db:
             assert protein['accession_id'] in ids
 
-       
+    def test_ncbi_fetch_and_dna(self):
+        LOGGER.info("Running test_ncbi_fetch")
+        self.set_up_test()
+
+        # ids 
+        ids = [
+            "AAL29438.1",
+            'HBQ2613975.1',
+            'EKW4005960.1',
+            'EJG7116187.1',
+            'AMM70781.1',
+            'HCO3480053.1',
+            'HAI5030310.1',
+            'WP_000027057.1',
+            'WP_215748091.1',
+            'WP_261627585.1'
+        ]
+
+        # Fetch proteins from primary database
+        self.eedb.fetch_from_primary_db(ids, db="NCBI")
+
+        # Check that the proteins were fetched
+        LOGGER.info(f"Database stats: {self.eedb.db.stats()}")
+        LOGGER.info("Test complete")
+
+        ids_in_db = self.eedb.getProteins()
+
+        LOGGER.info(f"Proteins in database: {ids_in_db}")
+
+        self.eedb.fetchRemoteCodingSequences()
+
+        assert len(ids_in_db) == len(ids)
+        # check if all ids are in the database
+        for id in ids:
+            assert id in [protein['accession_id'] for protein in ids_in_db]
+        # check if all ids in the database are in the ids
+        for protein in ids_in_db:
+            assert protein['accession_id'] in ids
