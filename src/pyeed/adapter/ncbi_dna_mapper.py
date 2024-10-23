@@ -1,41 +1,31 @@
-import io
-import re
-from abc import abstractmethod
-from collections import defaultdict
-from typing import Generic, TypeVar, List
-from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature
+from typing import List, TypeVar
 
+from Bio import SeqIO
+from Bio.SeqFeature import SeqFeature
+from Bio.SeqRecord import SeqRecord
 from loguru import logger
 
-from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site, Region, DNA
+from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
+from pyeed.model import DNA, Annotation, Organism, Region, Site
 
 T = TypeVar("T")
 
-class PrimaryDBtoPyeed(Generic[T]):
-    @abstractmethod
-    def add_to_db(self, data: dict):
-        pass
 
-class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
-
-    def __init__(self):
-        pass
+class NCBIDNAToPyeed(PrimaryDBtoPyeed):
+    """
+    Maps DNA sequence entries from NCBI to the PyEED graph object model and saves them to the database.
+    """
 
     def add_to_db(self, record: SeqIO.SeqRecord):
+        logger.debug(f"Mapping DNA record: {record.id}")
 
-        logger.info(f"Mapping DNA record: {record.id}")
-
-        # Here we get the organism information
+        # Get the organism information
         organism_dict = self.map_organism(record)
         organism = Organism.get_or_save(
             taxonomy_id=organism_dict["taxonomy_id"], name=organism_dict["name"]
         )
 
-        # Here we get the nucleotide sequence informations (general informations)
         dna_infos_dict = self.map_general_infos(record)
-
 
         try:
             dna = DNA.get_or_save(
@@ -48,7 +38,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
         except Exception as e:
             logger.error(f"Error saving DNA record {record.id}: {e}")
             return
-        
+
         dna.organism.connect(organism)
 
         # Here we get the sites informations
@@ -68,13 +58,16 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
                     annotation=Annotation.ACTIVE_SITE.value,
                 )
 
-                dna.site.connect(site_saving, {'positions': list(range(site["start"], site["end"]))})
+                dna.site.connect(
+                    site_saving, {"positions": list(range(site["start"], site["end"]))}
+                )
 
             except Exception as e:
-                logger.error(f"Error saving site {site['id']} for {dna.accession_id}: {e}")
+                logger.error(
+                    f"Error saving site {site['id']} for {dna.accession_id}: {e}"
+                )
 
     def add_regions(self, dna: DNA, regions: List[dict]):
-
         for region in regions:
             try:
                 region_saving = Region.get_or_save(
@@ -83,24 +76,34 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
                     annotation=Annotation.ACTIVE_SITE.value,
                 )
 
-                dna.region.connect(region_saving, {"start": region["start"], "end": region["end"]})
+                dna.region.connect(
+                    region_saving, {"start": region["start"], "end": region["end"]}
+                )
 
             except Exception as e:
-                logger.error(f"Error saving region {region['id']} for {dna.accession_id}: {e}")
+                logger.error(
+                    f"Error saving region {region['id']} for {dna.accession_id}: {e}"
+                )
 
     def map_general_infos(self, seq_record: SeqRecord):
-
+        """
+        Extracts general information from a DNA sequence record.
+        """
         dna_infos_dict = {}
 
-        dna_infos_dict['name'] = seq_record.name
-        dna_infos_dict['seq_length'] = len(seq_record.seq)
-        # GC-content=(A+T+G+C)(G+C)​×100
-        dna_infos_dict['gc_content'] = (
-            (seq_record.seq.count("G") + seq_record.seq.count("C"))
-            / dna_infos_dict['seq_length']
-        ) * 100
+        dna_infos_dict["name"] = seq_record.name
+        dna_infos_dict["seq_length"] = len(seq_record.seq)
+        dna_infos_dict["gc_content"] = self.calculate_gc_content(seq_record.seq)
 
         return dna_infos_dict
+
+    def calculate_gc_content(self, sequence: str) -> float:
+        """
+        Calculates the GC content of a DNA sequence.
+        """
+        gc_count = sequence.count("G") + sequence.count("C")
+        gc_content = gc_count / len(sequence)
+        return gc_content
 
     def map_organism(self, seq_record: SeqRecord) -> dict:
         """
@@ -145,9 +148,13 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
             )
             organism_name = ""
 
-        return {"id": taxonomy_id, "name": organism_name[0], "taxonomy_id": int(taxonomy_id)}
-        
-    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
+        return {
+            "id": taxonomy_id,
+            "name": organism_name[0],
+            "taxonomy_id": int(taxonomy_id),
+        }
+
+    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> list[SeqFeature]:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
             feature
@@ -156,17 +163,14 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
         ]
 
     def map_sites(self, seq_record: SeqRecord):
-
         sites_list = []
 
         sites = self.get_feature(seq_record, "variation")
 
         for site in sites:
-
             sites_dict = {}
 
             try:
-
                 sites_dict["id"] = site.qualifiers["note"][0]
                 sites_dict["start"] = int(site.location.start)
                 sites_dict["end"] = int(site.location.end)
@@ -181,7 +185,6 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
         return sites_list
 
     def map_regions(self, seq_record: SeqRecord):
-
         regions_list = []
 
         regions = self.get_feature(seq_record, "gene")
@@ -193,12 +196,14 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed[DNA]):
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
 
-                regions_list.append({
-                    "id": region.qualifiers["gene"][0],
-                    "start": int(region.location.start),
-                    "end": int(region.location.end),
-                    "cross_reference": db_xref
-                })
+                regions_list.append(
+                    {
+                        "id": region.qualifiers["gene"][0],
+                        "start": int(region.location.start),
+                        "end": int(region.location.end),
+                        "cross_reference": db_xref,
+                    }
+                )
 
             except KeyError:
                 logger.debug(

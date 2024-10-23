@@ -1,22 +1,14 @@
-from abc import abstractmethod
 from collections import defaultdict
-from typing import Generic, TypeVar
+from typing import Any
 
 from loguru import logger
 
+from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
 from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site
 
-T = TypeVar("T")
 
-
-class PrimaryDBtoPyeed(Generic[T]):
-    @abstractmethod
-    def add_to_db(self, data: dict):
-        pass
-
-
-class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
-    def add_to_db(self, data: dict):
+class UniprotToPyeed(PrimaryDBtoPyeed):
+    def add_to_db(self, data: Any) -> None:
         # Organism information
         taxonomy_id = data["organism"]["taxonomy"]
         organism = Organism.get_or_save(

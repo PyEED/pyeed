@@ -3,12 +3,12 @@ import asyncio
 import nest_asyncio
 from loguru import logger
 
+from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
+from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
-from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
-from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
-from pyeed.dbsort import DBPattern
 from pyeed.dbconnect import DatabaseConnector
+from pyeed.dbsort import DBPattern
 from pyeed.embedding import (
     free_memory,
     get_batch_embeddings,
@@ -45,7 +45,6 @@ class Pyeed:
         ids = [id for id in ids if id not in accessions]
 
         if db == DBPattern.UNIPROT.name:
-
             params_template = {
                 "format": "json",
             }
@@ -65,17 +64,17 @@ class Pyeed:
             )
 
         elif db == DBPattern.NCBI.name:
-
             params_template = {
-                'retmode': 'text',
-                'rettype': 'genbank',
+                "retmode": "text",
+                "rettype": "genbank",
+                "db": "protein",
             }
 
             # set up NCBI adapter
             adapter = PrimaryDBAdapter(
                 ids=ids,
                 ids_attr_name="id",
-                url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein",
+                url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
                 rate_limit=2,
                 n_concurrent=5,
                 batch_size=10,
@@ -144,7 +143,7 @@ class Pyeed:
         RETURN p
         """
         return self.db.execute_read(query)
-    
+
     def getProteins(self):
         """
         Fetches all proteins from the database.
@@ -154,13 +153,11 @@ class Pyeed:
         RETURN DISTINCT  n.accession_id AS accession_id
         """
         return self.db.execute_read(query)
-    
-    def fetch_nucleotide_from_db(self, ids : list[str]):
+
+    def fetch_nucleotide_from_db(self, ids: list[str]):
         """
         Fetches a nucleotide sequence from the remote db and adds it to the local db.
         """
-
-        nest_asyncio.apply()
 
         if isinstance(ids, str):
             ids = [ids]
@@ -173,17 +170,17 @@ class Pyeed:
         accessions = self.db.execute_read(query)[0]["accessions"]
         ids = [id for id in ids if id not in accessions]
 
-
         params_template = {
-                'retmode': 'text',
-                'rettype': 'genbank',
-            }
+            "retmode": "text",
+            "rettype": "genbank",
+            "db": "nuccore",
+        }
 
         # set up NCBI adapter
         adapter = PrimaryDBAdapter(
             ids=ids,
             ids_attr_name="id",
-            url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore",
+            url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
             rate_limit=2,
             n_concurrent=5,
             batch_size=10,
@@ -214,7 +211,7 @@ class Pyeed:
         RETURN p
         """
         return self.db.execute_read(query)
-        
+
     def fetchRemoteCodingSequences(self):
         """
         Fetches all of the coding sequences from the remote database and adds them to the local database.
@@ -249,6 +246,22 @@ class Pyeed:
         self.db.execute_write(query)
 
 
+if __name__ == "__main__":
+    import os
 
+    from dotenv import load_dotenv
 
-        
+    load_dotenv()
+
+    eed = Pyeed(
+        uri=os.getenv("NEO4J_URI"),
+        user=os.getenv("NEO4J_USER"),
+        password=os.getenv("NEO4J_PASSWORD"),
+    )
+    eed.db._wipe_database()
+
+    dna_ids = ["NM_001300612.1"]
+
+    eed.fetch_nucleotide_from_db(dna_ids)
+
+    eed.db.close()
