@@ -1,7 +1,9 @@
-import subprocess
 import os
+import subprocess
+
 from neo4j import Driver, GraphDatabase
 from neomodel import db as neomodel_db
+
 from pyeed.model import Protein
 
 
@@ -80,12 +82,19 @@ class DatabaseConnector:
 
         try:
             # Construct connection string based on whether user/password are provided
-            if user and password:
+            if user and password and self._uri.startswith("bolt"):
                 connection_url = f"bolt://{user}:{password}@{self._uri.split('//')[1]}"
+                print("the connection url is", connection_url)
+            elif user and password and self._uri.startswith("neo4j+s"):
+                connection_url = (
+                    f"neo4j+s://{user}:{password}@{self._uri.split('//')[1]}"
+                )
+                print("the connection url is", connection_url)
             else:
                 connection_url = self.insert_after_second_slash(
                     self._uri, "neo4j:neo4j@"
                 )
+                print("the connection url is", connection_url)
 
             subprocess.run(
                 [
