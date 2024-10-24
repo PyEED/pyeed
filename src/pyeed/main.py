@@ -110,16 +110,23 @@ class Pyeed:
 
         asyncio.run(adapter.make_request())
 
-    def calculate_sequence_embeddings(self, batch_size: int = 16):
+    def calculate_sequence_embeddings(
+        self,
+        batch_size: int = 16,
+        model_name: str = "facebook/esm2_t33_650M_UR50D",
+    ):
         """
         Calculates embeddings for all sequences in the database that do not have embeddings, processing in batches.
 
         Args:
             batch_size (int): Number of sequences to process in each batch.
+            model_name (str): Name of the model to use for calculating embeddings.
+                Defaults to "facebook/esm2_t33_650M_UR50D".
+                Available model can be found at https://huggingface.co/facebook/esm2_t6_8M_UR50D.
         """
 
         # Load the model, tokenizer, and device
-        model, tokenizer, device = load_model_and_tokenizer()
+        model, tokenizer, device = load_model_and_tokenizer(model_name)
 
         # Cypher query to retrieve proteins without embeddings and with valid sequences
         query = """

@@ -1,7 +1,3 @@
----
-icon: simple/docker
----
-
 ## Concept
 
 The PyEED Docker Service combines the PyEED toolkit with JupyterLab, a web-based editor for writing and executing Jupyter Notebooks with analysis tools. In combination, the `pyeed` package can be used from inside JupyterLab, whereas the setup and configuration of the analysis tools are taken care of by the Docker Service(1).  

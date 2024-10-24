@@ -6,16 +6,15 @@ site_author: Max Häußler
 
 nav:
   - Home: index.md
-  - Usage:
-    - Basics: examples/basics.ipynb
-    - Alignments: examples/alignment.ipynb
-    - Networks: examples/network.ipynb
+  - Usage: 
+    - Initial Setup: usage/initial_setup.ipynb
+    - Query from Primary Database: usage/basics.ipynb
   - API Reference:
     - Pyeed: api/pyeed.md
     - DatabaseConnector: api/dbconnect.md
     - PrimaryDBAdapter: api/primarydbadapter.md
   - Setup:
-    - Neo4j Database: installation/docker.md
+    - Neo4j Database: setup/database.md
 
 plugins:
   - mkdocs-jupyter
