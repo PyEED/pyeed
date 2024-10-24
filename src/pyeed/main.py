@@ -7,6 +7,7 @@ from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
+from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.dbsort import DBPattern
 from pyeed.embedding import (
@@ -18,6 +19,10 @@ from pyeed.embedding import (
 
 
 class Pyeed:
+    """
+    Main class to interact with the pyeed graph database.
+    """
+
     def __init__(
         self,
         uri: str,
@@ -26,10 +31,29 @@ class Pyeed:
     ):
         self.db = DatabaseConnector(uri, user, password)
 
+    def chat(self, question: str, openai_key: str, retry: bool = False) -> list[dict]:
+        """Query the database using natural language via OpenAI's GPT-4 model.
+
+        Args:
+            question (str): Question to ask the database.
+            openai_key (str): OpenAI API key.
+            retry (bool, optional): Whether to retry once if the query if it fails.
+                Defaults to False.
+
+        Returns:
+            list[dict]: List of responses from the database.
+        """
+        chat = DBChat(self.db)
+        return chat.run(question=question, openai_key=openai_key, retry=retry)
+
     def fetch_from_primary_db(self, ids: list[str], db="UNIPROT"):
         """
         Fetches sequences and corresponding annotations from primary sequence databases
         and adds them to local database.
+
+        Args:
+            ids (list[str]): List of sequence IDs to fetch from the primary database.
+            db (str): Name of the primary database to fetch from. Options are "UNIPROT" and "NCBI".
         """
         nest_asyncio.apply()
 
@@ -86,9 +110,12 @@ class Pyeed:
 
         asyncio.run(adapter.make_request())
 
-    def calculate_sequence_embeddings(self, batch_size=16):
+    def calculate_sequence_embeddings(self, batch_size: int = 16):
         """
         Calculates embeddings for all sequences in the database that do not have embeddings, processing in batches.
+
+        Args:
+            batch_size (int): Number of sequences to process in each batch.
         """
 
         # Load the model, tokenizer, and device

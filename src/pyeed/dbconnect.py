@@ -4,8 +4,6 @@ import subprocess
 from neo4j import Driver, GraphDatabase
 from neomodel import db as neomodel_db
 
-from pyeed.model import Protein
-
 
 class DatabaseConnector:
     def __init__(self, uri: str, user: str | None, password: str | None):
@@ -16,7 +14,7 @@ class DatabaseConnector:
         self.driver = self._get_driver(uri, user, password)
         neomodel_db.set_connection(driver=self.driver)  # patch db for neomodel
 
-        if not self._constraints_exist():
+        if not self.constraints_exist():
             print(
                 "Pyeed Graph Object Mapping constraints not defined. Use _install_labels() to set up model constraints."
             )
@@ -29,30 +27,37 @@ class DatabaseConnector:
         self.driver.close()
         print("🔌 Connection closed.")
 
-    def execute_read(self, query: str, parameters=None):
+    def execute_read(self, query: str, parameters=None) -> list[dict]:
         """
-        Executes a read (MATCH) query using the Neo4j driver directly.
+        Executes a read (MATCH) query using the Neo4j driver.
+
+        Args:
+            query (str): The Cypher query to execute.
+            parameters (dict): A dictionary of parameters to pass to the query.
+
+        Returns:
+            list[dict]: The result of the query as a list of dictionaries.
         """
         with self.driver.session() as session:
             return session.execute_read(self._run_query, query, parameters)
 
     def execute_write(self, query: str, parameters=None):
         """
-        Executes a write (CREATE, DELETE, etc.) query using the Neo4j driver directly.
+        Executes a write (CREATE, DELETE, etc.) query using the Neo4j driver.
+
+        Args:
+            query (str): The Cypher query to execute.
+            parameters (dict): A dictionary of parameters to pass to the query.
         """
         with self.driver.session() as session:
             return session.execute_write(self._run_query, query, parameters)
 
-    def add_protein(self, protein_record: Protein):
-        """
-        Placeholder for adding a Protein to the database via Neomodel.
-        """
-        # Here you can add logic to store protein_record using Neomodel models
-        pass
-
     def stats(self) -> dict:
         """
         Returns the number of nodes and relationships in the database.
+
+        Returns:
+            dict: The number of nodes and relationships in the database.
         """
         node_count_query = "MATCH (n) RETURN count(n) AS node_count"
         relationship_count_query = (
@@ -66,7 +71,7 @@ class DatabaseConnector:
 
         return {"nodes": node_count, "relationships": relationship_count}
 
-    def _initialize_db_constraints(
+    def initialize_db_constraints(
         self,
         user: str | None,
         password: str | None,
@@ -75,6 +80,11 @@ class DatabaseConnector:
         """
         Run the neomodel_install_labels script to set up indexes and constraints on labels
         of Object-Graph Mapping (OGM) models.
+
+        Args:
+            user (str): The username for the Neo4j database.
+            password (str): The password for the Neo4j database.
+            models_path (str): The path to the models file. Defaults to "model.py".
         """
         # set the path to the models file
         # work from the path of this file
@@ -91,7 +101,7 @@ class DatabaseConnector:
                 )
                 print("the connection url is", connection_url)
             else:
-                connection_url = self.insert_after_second_slash(
+                connection_url = self._insert_after_second_slash(
                     self._uri, "neo4j:neo4j@"
                 )
                 print("the connection url is", connection_url)
@@ -111,8 +121,13 @@ class DatabaseConnector:
         except subprocess.CalledProcessError as e:
             print(f"Failed to install labels: {str(e)}")
 
-    def _constraints_exist(self) -> bool:
-        """Check and if constraints exist in the database. Return True if constraints exist."""
+    def constraints_exist(self) -> bool:
+        """
+        Check and if constraints exist in the database. Return True if constraints exist.
+
+        Returns:
+            bool: True if constraints exist in the database, False otherwise.
+        """
         query = """
         SHOW CONSTRAINTS YIELD name, type
         RETURN count(*) AS constraint_count
@@ -121,7 +136,7 @@ class DatabaseConnector:
         results = self.execute_read(query)
         return True if results[0]["constraint_count"] > 0 else False
 
-    def _remove_db_constraints(
+    def remove_db_constraints(
         self,
         user: str | None,
         password: str | None,
@@ -129,12 +144,16 @@ class DatabaseConnector:
         """
         Run the neomodel_remove_labels script to drop all indexes and constraints
         from labels in the Neo4j database.
+
+        Args:
+            user (str): The username for the Neo4j database.
+            password (str): The password for the Neo4j database
         """
         try:
             if user and password:
                 connection_url = f"bolt://{user}:{password}@{self._uri.split('//')[1]}"
             else:
-                connection_url = self.insert_after_second_slash(
+                connection_url = self._insert_after_second_slash(
                     self._uri, "neo4j:neo4j@"
                 )
 
@@ -154,6 +173,11 @@ class DatabaseConnector:
         self,
         models_path: str = "pyeed/model.py",
     ):
+        """Generates a arrows json file representing the model diagram.
+
+        Args:
+            models_path (str, optional): The path to the models file. Defaults to "pyeed/model.py".
+        """
         subprocess.run(
             [
                 "neomodel_generate_diagram",
@@ -161,7 +185,7 @@ class DatabaseConnector:
             ]
         )
 
-    def _wipe_database(self):
+    def wipe_database(self):
         """
         Deletes all nodes and relationships in the database.
         """
@@ -188,10 +212,60 @@ class DatabaseConnector:
         auth = (user, password) if user and password else None
         return GraphDatabase.driver(uri, auth=auth)
 
-    @staticmethod
-    def insert_after_second_slash(uri: str, to_insert: str) -> str:
-        # Split the string at '//' into two parts
-        scheme, rest = uri.split("//", 1)
+    @property
+    def node_properties(self) -> list[dict]:
+        """
+        Returns a list of dictionaries containing the node labels and their properties.
+        """
+        node_properties_query = """
+            CALL apoc.meta.data()
+            YIELD label, other, elementType, type, property
+            WHERE NOT type = "RELATIONSHIP" AND elementType = "node"
+            WITH label AS nodeLabels, collect(property) AS properties
+            RETURN {labels: nodeLabels, properties: properties} AS output
+            """
 
-        # Insert the new content after the second '//'
+        return self.execute_read(node_properties_query)
+
+    @property
+    def relationship_properties(self) -> list[dict]:
+        """
+        Returns a list of dictionaries containing the relationship types and their properties.
+        """
+        rel_properties_query = """
+            CALL apoc.meta.data()
+            YIELD label, other, elementType, type, property
+            WHERE NOT type = "RELATIONSHIP" AND elementType = "relationship"
+            WITH label AS nodeLabels, collect(property) AS properties
+            RETURN {type: nodeLabels, properties: properties} AS output
+            """
+
+        return self.execute_read(rel_properties_query)
+
+    @property
+    def relationships(self) -> list[dict]:
+        """
+        Returns a list of dictionaries containing the source node label, relationship type, and target node label.
+        """
+        rel_query = """
+            CALL apoc.meta.data()
+            YIELD label, other, elementType, type, property
+            WHERE type = "RELATIONSHIP" AND elementType = "node"
+            RETURN {source: label, relationship: property, target: other} AS output
+            """
+
+        return self.execute_read(rel_query)
+
+    @staticmethod
+    def _insert_after_second_slash(uri: str, to_insert: str) -> str:
+        """Inserts a string after the second '//' in a URI.
+
+        Args:
+            uri (str): The URI to modify.
+            to_insert (str): The string to insert.
+
+        Returns:
+            str: The modified URI.
+        """
+        scheme, rest = uri.split("//", 1)
         return f"{scheme}//{to_insert}{rest}"
