@@ -1,25 +1,18 @@
-import io
 import re
-from abc import abstractmethod
-from collections import defaultdict
-from typing import Generic, TypeVar, List
-from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature
+from typing import List, TypeVar
 
+from Bio import SeqIO
+from Bio.SeqFeature import SeqFeature
+from Bio.SeqRecord import SeqRecord
 from loguru import logger
 
-from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site, Region
+from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
+from pyeed.model import Annotation, Organism, Protein, Region, Site
 
 T = TypeVar("T")
 
-class PrimaryDBtoPyeed(Generic[T]):
-    @abstractmethod
-    def add_to_db(self, data: dict):
-        pass
 
-class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
-
+class NCBIProteinToPyeed(PrimaryDBtoPyeed):
     def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
@@ -68,9 +61,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         return organism_name[0], taxonomy_id
 
     def map_protein(self, seq_record: SeqRecord):
-
         # DANGERDANGER mol_weight is a float, but here it is set to 0.0
-        protein_info_dict = {'name': None, 'mol_weight': 0.0, 'ec_number': None}
+        protein_info_dict = {"name": None, "mol_weight": 0.0, "ec_number": None}
 
         protein = self.get_feature(seq_record, "Protein")
         if len(protein) == 0:
@@ -117,21 +109,20 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             protein_info_dict["ec_number"] = None
 
         return protein_info_dict
-    
-    def map_sites(self, seq_record: SeqRecord):
 
+    def map_sites(self, seq_record: SeqRecord):
         sites_list = []
 
         sites = self.get_feature(seq_record, "site")
         for site in sites:
-
             sites_dict = {}
             try:
+                sites_dict["type"] = site.qualifiers["site_type"][0]
+                sites_dict["positions"] = [
+                    int(part.start) for part in site.location.parts
+                ]
+                sites_dict["cross_ref"] = site.qualifiers["db_xref"][0]
 
-                sites_dict['type'] = site.qualifiers["site_type"][0]
-                sites_dict['positions'] = [int(part.start) for part in site.location.parts]
-                sites_dict['cross_ref'] = site.qualifiers["db_xref"][0]
-            
             except KeyError:
                 logger.debug(
                     f"Incomplete site data found for {seq_record.id}: {site.qualifiers}, skipping site"
@@ -140,19 +131,18 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             sites_list.append(sites_dict)
 
         return sites_list
-    
+
     def add_sites(self, sites_list: List[dict], protein: Protein):
         for site_dict in sites_list:
             site = Site.get_or_save(
-                name=site_dict['type'],
+                name=site_dict["type"],
                 # DANGERDANGER
                 annotation=Annotation.ACTIVE_SITE.value,
             )
 
-            protein.site.connect(site, {'positions': site_dict['positions']})
+            protein.site.connect(site, {"positions": site_dict["positions"]})
 
     def map_cds(self, seq_record: SeqRecord):
-
         cds = self.get_feature(seq_record, "CDS")
 
         if len(cds) > 1:
@@ -178,7 +168,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
 
     @staticmethod
     def get_cds_regions(coded_by: dict):
-
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
         # Extract all regions from the 'coded_by' qualifier
@@ -207,14 +196,13 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
             region["start"] = int(start)
             region["end"] = int(end)
             region["type"] = Annotation.CODING_SEQ.value
-            region['id'] = reference_ids[0]
+            region["id"] = reference_ids[0]
 
             regions.append(region)
 
         return regions
-    
-    def map_regions(self, seq_record: SeqRecord):
 
+    def map_regions(self, seq_record: SeqRecord):
         regions = self.get_feature(seq_record, "region")
         regions_list = []
 
@@ -225,32 +213,34 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
 
-                regions_list.append({
-                    'id': region.qualifiers["region_name"][0],
-                    'start': int(region.location.start),
-                    'end': int(region.location.end),
-                    'type': region.qualifiers["note"][0],
-                    'cross_reference': db_xref,
-                })
+                regions_list.append(
+                    {
+                        "id": region.qualifiers["region_name"][0],
+                        "start": int(region.location.start),
+                        "end": int(region.location.end),
+                        "type": region.qualifiers["note"][0],
+                        "cross_reference": db_xref,
+                    }
+                )
             except KeyError:
                 logger.debug(
                     f"Incomplete region data found for {seq_record.id}: {region.qualifiers}, skipping region"
                 )
 
         return regions_list
-    
+
     def add_regions(self, regions_list: List[dict], protein: Protein):
         for region_dict in regions_list:
             region = Region.get_or_save(
-                region_id=region_dict['id'],
+                region_id=region_dict["id"],
                 annotation=Annotation.ACTIVE_SITE.value,
             )
 
-            protein.region.connect(region, {'start': region_dict['start'], 'end': region_dict['end']})
-
+            protein.region.connect(
+                region, {"start": region_dict["start"], "end": region_dict["end"]}
+            )
 
     def add_to_db(self, record: SeqIO.SeqRecord):
-
         logger.info(f"Mapping {record.id} to PyEED model")
 
         organism_name, taxonomy_id = self.map_organism(record)
@@ -279,9 +269,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
                 seq_length=len(record.seq),
             )
         except KeyError as e:
-            logger.warning(
-                f"Error during mapping of {record.id} to graph model: {e}"
-            )
+            logger.warning(f"Error during mapping of {record.id} to graph model: {e}")
             return
 
         protein.organism.connect(organism)
@@ -294,26 +282,22 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed[Protein]):
         cds_regions = self.map_cds(record)
         if cds_regions is not None:
             for region in cds_regions:
-                
                 region_coding = Region.get_or_save(
-                        region_id=region['id'],
-                        annotation=region['type'],
+                    region_id=region["id"],
+                    annotation=region["type"],
                 )
 
                 # add the id to protein nucleotide_id (StringProperty)
-                protein.nucleotide_id = region['id']
-                protein.save()               
+                protein.nucleotide_id = region["id"]
+                protein.save()
 
-                protein.region.connect(region_coding, {'start': region['start'], 'end': region['end']})
+                protein.region.connect(
+                    region_coding, {"start": region["start"], "end": region["end"]}
+                )
 
         # Here we add the regions
         regions_list = self.map_regions(record)
         self.add_regions(regions_list, protein)
-        
-        # Here we add the GO annotations    
+
+        # Here we add the GO annotations
         # self.add_go(data, protein)
-
-
-
-    
-

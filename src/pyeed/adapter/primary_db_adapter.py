@@ -1,8 +1,10 @@
+import io
+from abc import ABC, abstractmethod
 from typing import Any, Coroutine, Generic, NamedTuple, TypeVar
 
-import io
 import aiometer
 import tenacity
+from Bio import SeqIO
 from httpx import (
     AsyncClient,
     Limits,
@@ -11,11 +13,26 @@ from httpx import (
     TimeoutException,
 )
 from loguru import logger
-from pyeed.adapter.uniprot_mapper import PrimaryDBtoPyeed
-from Bio import SeqIO
 from rich.progress import Progress, TaskID
 
-T = TypeVar("T")
+T = TypeVar("T", bound="PrimaryDBtoPyeed")
+
+
+class PrimaryDBtoPyeed(ABC):
+    """
+    Abstract base class for mapping data from a primary sequence database to the pyeed
+    graph object model and saving it to the database.
+    """
+
+    @abstractmethod
+    def add_to_db(self, data: Any) -> None:
+        """Abstract method for mapping data from a primary sequence database to the pyeed
+        graph object model and saving it to the database.
+
+        Args:
+            data (Any): The data to be mapped and saved to the database.
+        """
+        pass
 
 
 class RequestPayload(NamedTuple):
@@ -41,7 +58,7 @@ class PrimaryDBAdapter(Generic[T]):
         rate_limit: int,
         n_concurrent: int,
         batch_size: int,
-        data_mapper: "PrimaryDBtoPyeed[T]",
+        data_mapper: T,
         timeout: int = 120,
         progress: Progress | None = None,
         task_id: TaskID | None = None,
@@ -198,9 +215,9 @@ class PrimaryDBAdapter(Generic[T]):
                 ):
                     logger.warning(f"Unexpected response format from {response.url}")
                     return []
-                
+
                 return response_json
-            
+
             else:
                 logger.warning(f"Response could not be mapped to mapper: {response[0]}")
 
