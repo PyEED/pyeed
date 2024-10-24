@@ -2,14 +2,14 @@
 import logging
 
 from pyeed import Pyeed
-from pyeed.model import GOAnnotation, Protein
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 LOGGER = logging.getLogger(__name__)
 
 
 class TestDNAFetech:
-
     # this function is run before each test
     def set_up_test(self):
         LOGGER.info("Setting up test")
@@ -56,7 +56,7 @@ class TestDNAFetech:
         assert len(ids_in_db) == 2
         # check if all ids are in the database
         for id in ids:
-            assert id in [protein['accession_id'] for protein in ids_in_db]
+            assert id in [protein["accession_id"] for protein in ids_in_db]
         # check if all ids in the database are in the ids
         for protein in ids_in_db:
-            assert protein['accession_id'] in ids
+            assert protein["accession_id"] in ids
