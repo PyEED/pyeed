@@ -1,7 +1,7 @@
 # this is the first general test for the fetching a protein and loading it into the database
 import logging
 
-from pyeed import Pyeed
+from pyeed.main import Pyeed
 from pyeed.model import GOAnnotation, Protein
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,14 +22,14 @@ class TestProteinFetech:
         eedb = Pyeed(uri, user, password)
 
         # For testing purposes, we will wipe the database and remove all constraints
-        eedb.db._wipe_database()
-        eedb.db._remove_db_constraints(user, password)
+        eedb.db.wipe_database()
+        eedb.db.remove_db_constraints(user=user, password=password)
 
         # DB connector is an attribute of the Pyeed object, type `DatabaseConnector`
         LOGGER.info(f"Database stats: {eedb.db.stats()}")
 
         # The first time the pyeed database is initialized, we need to create the constraints which are defined in the pyeed graph model
-        eedb.db._initialize_db_constraints(user=user, password=password)
+        eedb.db.initialize_db_constraints(user=user, password=password)
 
         self.eedb = eedb
 
