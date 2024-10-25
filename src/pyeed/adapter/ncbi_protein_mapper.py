@@ -1,5 +1,5 @@
 import re
-from typing import List, TypeVar, Tuple
+from typing import List, TypeVar, Tuple, Any
 
 from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
@@ -21,7 +21,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             if feature.type.lower() == feature_type.lower()
         ]
 
-    def map_organism(self, seq_record: SeqRecord) -> Tuple[str, int]:
+    def map_organism(self, seq_record: SeqRecord) -> Tuple[Any, Any]:
         """
         Gets the organism name and taxonomy ID from the source data.
         Maps it to an Organism object.
@@ -64,20 +64,20 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         # default values of the protein_info_dict
         protein_info_dict = {"name": None, "mol_weight": None, "ec_number": None}
 
-        protein = self.get_feature(seq_record, "Protein")
-        if len(protein) == 0:
+        protein_list = self.get_feature(seq_record, "Protein")
+        if len(protein_list) == 0:
             logger.debug(
                 f"No protein feature found for {seq_record.id}: {seq_record.features}"
             )
 
             return protein_info_dict
 
-        if len(protein) > 1:
+        if len(protein_list) > 1:
             logger.debug(
-                f"Multiple features ({len(protein)}) of type `Protein` found for {seq_record.id}"
+                f"Multiple features ({len(protein_list)}) of type `Protein` found for {seq_record.id}"
             )
 
-        protein = protein[0]
+        protein = protein_list[0]
         try:
             protein_info_dict["name"] = protein.qualifiers["product"][0]
         except KeyError:
@@ -136,8 +136,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         for site_dict in sites_list:
             site = Site.get_or_save(
                 name=site_dict["type"],
-                # DANGERDANGER
-                annotation=Annotation.ACTIVE_SITE.value,
+                annotation=Annotation.PROTEIN.value,
             )
 
             protein.site.connect(site, {"positions": site_dict["positions"]})
@@ -232,7 +231,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         for region_dict in regions_list:
             region = Region.get_or_save(
                 region_id=region_dict["id"],
-                annotation=Annotation.ACTIVE_SITE.value,
+                annotation=Annotation.PROTEIN.value,
             )
 
             protein.region.connect(

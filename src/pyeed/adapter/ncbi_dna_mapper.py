@@ -54,8 +54,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
             try:
                 site_saving = Site.get_or_save(
                     site_id=site["id"],
-                    # DANGERDANGER
-                    annotation=Annotation.ACTIVE_SITE.value,
+                    annotation=Annotation.DNA.value,
                 )
 
                 dna.site.connect(
@@ -72,8 +71,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
             try:
                 region_saving = Region.get_or_save(
                     region_id=region["id"],
-                    # DANGERDANGER
-                    annotation=Annotation.ACTIVE_SITE.value,
+                    annotation=Annotation.DNA.value,
                 )
 
                 dna.region.connect(

@@ -1,7 +1,7 @@
 # this is the first general test for the fetching a protein and loading it into the database
 import logging
 
-from pyeed import Pyeed
+from pyeed.main import Pyeed
 from pyeed.model import GOAnnotation, Protein
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
