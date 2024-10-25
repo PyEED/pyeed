@@ -92,8 +92,8 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         dna_infos_dict = {}
 
         dna_infos_dict["name"] = seq_record.name
-        dna_infos_dict["seq_length"] = len(seq_record.seq)
-        dna_infos_dict["gc_content"] = self.calculate_gc_content(seq_record.seq)
+        dna_infos_dict["seq_length"] = str(len(seq_record.seq))
+        dna_infos_dict["gc_content"] = str(self.calculate_gc_content(seq_record.seq))
 
         return dna_infos_dict
 
@@ -111,12 +111,12 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         Maps it to an Organism object.
         """
 
-        feature = self.get_feature(seq_record, "source")
-        if len(feature) < 1:
+        feature_list = self.get_feature(seq_record, "source")
+        if len(feature_list) < 1:
             logger.debug(
-                f"Multiple features ({len(feature)}) of type `source` found for {seq_record.id}: {feature}"
+                f"Multiple features ({len(feature_list)}) of type `source` found for {seq_record.id}: {feature_list}"
             )
-        feature = feature[0]
+        feature = feature_list[0]
 
         try:
             if len(feature.qualifiers["db_xref"]) != 1:
@@ -144,7 +144,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
             organism_name = feature.qualifiers["organism"]
         except KeyError:
             logger.debug(
-                f"No organism name found for {seq_record.id}: {feature[0].qualifiers}"
+                f"No organism name found for {seq_record.id}: {feature_list[0].qualifiers}"
             )
             organism_name = ""
 

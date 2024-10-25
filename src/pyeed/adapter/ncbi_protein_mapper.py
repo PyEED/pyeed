@@ -1,5 +1,5 @@
 import re
-from typing import List, TypeVar
+from typing import List, TypeVar, Tuple
 
 from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
@@ -13,7 +13,7 @@ T = TypeVar("T")
 
 
 class NCBIProteinToPyeed(PrimaryDBtoPyeed):
-    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> SeqFeature:
+    def get_feature(self, seq_record: SeqRecord, feature_type: str) -> List[SeqFeature]:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
             feature
@@ -21,25 +21,25 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             if feature.type.lower() == feature_type.lower()
         ]
 
-    def map_organism(self, seq_record: SeqRecord) -> dict:
+    def map_organism(self, seq_record: SeqRecord) -> Tuple[str, int]:
         """
         Gets the organism name and taxonomy ID from the source data.
         Maps it to an Organism object.
         """
 
-        feature = self.get_feature(seq_record, "source")
-        if len(feature) != 1:
+        feature_list = self.get_feature(seq_record, "source")
+        if len(feature_list) != 1:
             logger.debug(
-                f"Multiple features ({len(feature)}) of type `source` found for {seq_record.id}: {feature}"
+                f"Multiple features ({len(feature_list)}) of type `source` found for {seq_record.id}: {feature_list}"
             )
-        feature = feature[0]
+        feature = feature_list[0]
 
         try:
             if len(feature.qualifiers["db_xref"]) != 1:
                 logger.info(
                     f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
                 )
-                return None
+                return (None, None)
 
             taxonomy_id = feature.qualifiers["db_xref"][0]
 
@@ -48,21 +48,21 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         except KeyError:
             logger.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")
-            return None
+            return (None, None)
 
         try:
             organism_name = feature.qualifiers["organism"]
         except KeyError:
             logger.debug(
-                f"No organism name found for {seq_record.id}: {feature[0].qualifiers}"
+                f"No organism name found for {seq_record.id}: {feature_list[0].qualifiers}"
             )
             organism_name = None
 
         return organism_name[0], taxonomy_id
 
     def map_protein(self, seq_record: SeqRecord):
-        # DANGERDANGER mol_weight is a float, but here it is set to 0.0
-        protein_info_dict = {"name": None, "mol_weight": 0.0, "ec_number": None}
+        # default values of the protein_info_dict
+        protein_info_dict = {"name": None, "mol_weight": None, "ec_number": None}
 
         protein = self.get_feature(seq_record, "Protein")
         if len(protein) == 0:
@@ -151,23 +151,23 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             )
 
         try:
-            cds = cds[0]
+            cds_feature = cds[0]
         except IndexError:
             logger.debug(f"No CDS found for {seq_record.id}: {cds}")
 
             return None
 
         try:
-            return self.get_cds_regions(cds.qualifiers["coded_by"][0])
+            return self.get_cds_regions(cds_feature.qualifiers["coded_by"][0])
         except IndexError:
             logger.debug(
-                f"No coding sequence reference found for {seq_record.id}: {cds.qualifiers}"
+                f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
             )
 
         return None
 
     @staticmethod
-    def get_cds_regions(coded_by: dict):
+    def get_cds_regions(coded_by: str):
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
         # Extract all regions from the 'coded_by' qualifier
@@ -185,7 +185,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 "Nucleotide sequence references are not identical: {reference_ids}"
             )
 
-        # TODO MAX ist hier nicht früher ein Fehler gewesen? es wird doch nur die etzte Region return, macht doch kein Sinn
         # Extract the start and end position of each region
         cds_ranges = [region.split(":")[1] for region in cds_regions]
         regions = []
