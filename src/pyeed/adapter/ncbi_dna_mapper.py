@@ -6,7 +6,7 @@ from Bio.SeqRecord import SeqRecord
 from loguru import logger
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
-from pyeed.model import DNA, Annotation, Organism, Region, Site
+from pyeed.model import DNA, Annotation, Organism, Region, Site, Protein
 
 T = TypeVar("T")
 
@@ -48,6 +48,9 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         # Here we get the regions informations
         regions = self.map_regions(record)
         self.add_regions(dna, regions)
+
+        # check encodings for known proteins
+        self.map_cds(dna, record)
 
     def add_sites(self, dna: DNA, sites: List[dict]):
         for site in sites:
@@ -187,12 +190,14 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
         regions = self.get_feature(seq_record, "gene")
 
-        for region in regions:
+        for i, region in enumerate(regions):
             try:
                 if "db_xref" not in region.qualifiers:
                     db_xref = None
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
+
+                
 
                 regions_list.append(
                     {
@@ -209,3 +214,39 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 )
 
         return regions_list
+    
+    def map_cds(self, dna, seq_record: SeqRecord):
+
+        cds_list_features = self.get_feature(seq_record, "CDS")
+
+        for i, cds in enumerate(cds_list_features):
+            try:
+                # get protein id and pull the protein sequence
+                protein_id = cds.qualifiers["protein_id"][0]
+
+                # check if the protein sequence is in database
+                protein = Protein.get_or_save(
+                    accession_id=protein_id,
+                    sequence=cds.qualifiers["translation"][0],
+                    seq_length=len(cds.qualifiers["translation"][0]),
+                )
+
+                region_saving = Region.get_or_save(
+                    region_id=cds.qualifiers["locus_tag"][0],
+                    annotation=Annotation.ENCODES.value,
+                )
+
+                dna.region.connect(
+                    region_saving, {"start": int(cds.location.start), "end": int(cds.location.end)}
+                )
+
+                protein.region.connect(
+                    region_saving, {"start": int(cds.location.start), "end": int(cds.location.end)}
+                )
+
+
+            except KeyError:
+                logger.debug(
+                    f"Error mapping CDS for {seq_record.id}: {cds.qualifiers}"
+                )
+

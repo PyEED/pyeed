@@ -137,6 +137,7 @@ class Annotation(Enum):
     FAMILY = "family"
     MOTIVE = "motive"
     PROTEIN = "protein"
+    ENCODES = "encodes"
 
 
 class Organism(StrictStructuredNode):
