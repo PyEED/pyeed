@@ -231,17 +231,8 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                     seq_length=len(cds.qualifiers["translation"][0]),
                 )
 
-                region_saving = Region.get_or_save(
-                    region_id=cds.qualifiers["locus_tag"][0],
-                    annotation=Annotation.ENCODES.value,
-                )
-
-                dna.region.connect(
-                    region_saving, {"start": int(cds.location.start), "end": int(cds.location.end)}
-                )
-
-                protein.region.connect(
-                    region_saving, {"start": int(cds.location.start), "end": int(cds.location.end)}
+                dna.protein.connect(
+                    protein, {"start": int(cds.location.start), "end": int(cds.location.end)}
                 )
 
 

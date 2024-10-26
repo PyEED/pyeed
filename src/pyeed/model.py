@@ -137,8 +137,6 @@ class Annotation(Enum):
     FAMILY = "family"
     MOTIVE = "motive"
     PROTEIN = "protein"
-    ENCODES = "encodes"
-
 
 class Organism(StrictStructuredNode):
     taxonomy_id: int = IntegerProperty(required=True, unique_index=True)
@@ -338,3 +336,4 @@ class DNA(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)
+    protein = RelationshipTo("Protein", "ENCODES", model=RegionRel)
