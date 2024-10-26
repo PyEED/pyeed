@@ -32,8 +32,8 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 accession_id=record.id,
                 sequence=str(record.seq),
                 name=dna_infos_dict["name"],
-                seq_length=dna_infos_dict["seq_length"],
-                gc_content=dna_infos_dict["gc_content"],
+                seq_length=int(dna_infos_dict["seq_length"]),
+                gc_content=float(dna_infos_dict["gc_content"]),
             )
         except Exception as e:
             logger.error(f"Error saving DNA record {record.id}: {e}")

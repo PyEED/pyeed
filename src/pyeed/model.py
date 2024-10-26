@@ -175,7 +175,6 @@ class Site(StrictStructuredNode):
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
 
-
 class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
     # start = IntegerProperty(required=True)
