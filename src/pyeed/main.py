@@ -3,6 +3,7 @@ import asyncio
 import nest_asyncio
 from loguru import logger
 
+from pyeed.tools.sequence_alignment import PairwiseAligner
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
@@ -300,6 +301,65 @@ class Pyeed:
 
         # Fetch the proteins
         self.fetch_from_primary_db(protein_ids, db="NCBI")
+
+    def perform_pairwise_alignment_proteins(self):
+        """
+        Aligns all proteins in the database with each other. And update the Similarity relationship. for all of the alignments.
+        """
+
+        # get all proteins with their ids and their sequence in a dictionary
+        query = """
+        MATCH (p:Protein) 
+        WHERE p.sequence IS NOT NULL
+        RETURN p.accession_id AS accession_id, p.sequence AS sequence
+        """
+
+        proteins_read = self.db.execute_read(query)
+        proteins_dict = {protein["accession_id"]: protein["sequence"] for protein in proteins_read}
+
+        # perform the pairwise alignment
+        aligner = PairwiseAligner()
+        alignments = aligner.align_multipairwise(proteins_dict)
+        # data strcuture alignment
+        """
+        result_dict = {
+            "score": alignment.score,
+            "identity": identity,
+            "gaps": gaps,
+            "mismatches": mismatches,
+            "sequences": sequences,
+            "aligned_sequences": aligned_sequences,
+        }
+
+        sequences = [
+            {"id": list(seq1.keys())[0], "sequence": list(seq1.values())[0]},
+            {"id": list(seq2.keys())[0], "sequence": list(seq2.values())[0]},
+        ]
+
+        aligned_sequences = [
+            {"id": list(seq1.keys())[0], "sequence": alignment[0]},
+            {"id": list(seq2.keys())[0], "sequence": alignment[1]},
+        ]
+        """
+
+        # update the database with the alignments
+        for alignment in alignments:
+            query = f"""
+            MATCH (p1:Protein {{accession_id: '{alignment['sequences'][0]['id']}'}})
+            MATCH (p2:Protein {{accession_id: '{alignment['sequences'][1]['id']}'}})
+            MERGE (p1)-[r:SIMILARITY]->(p2)
+            SET r.similarity = {alignment['identity']}
+            SET r.mismatches = {alignment['mismatches']}
+            SET r.gaps = {alignment['gaps']}
+            SET r.score = {alignment['score']}
+            SET r.aligned_sequences = {[alignment['aligned_sequences'][0]['sequence'], alignment['aligned_sequences'][1]['sequence']]}
+            """
+            self.db.execute_write(query)
+
+
+
+
+        
 
 
 if __name__ == "__main__":
