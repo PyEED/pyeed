@@ -61,12 +61,14 @@ class Pyeed:
             ids = [ids]
 
         # Remove accessions that are already in the database
-        query = """
-        MATCH (p:Protein)
-        RETURN collect(p.accession_id) as accessions
-        """
-        accessions = self.db.execute_read(query)[0]["accessions"]
-        ids = [id for id in ids if id not in accessions]
+        # query = """
+        # MATCH (p:Protein)
+        # RETURN collect(p.accession_id) as accessions
+        # """
+        # accessions = self.db.execute_read(query)[0]["accessions"]
+        # ids = [id for id in ids if id not in accessions]
+        
+        logger.info(f"Fetching {len(ids)} sequences from {db}.")
 
         if db == DBPattern.UNIPROT.name:
             params_template = {
@@ -162,7 +164,7 @@ class Pyeed:
             )
 
             # Update the database for the current batch
-            update_protein_embeddings_in_db(self.db, batch_accessions, embeddings_batch)
+            update_protein_embeddings_in_db(self.db, list(batch_accessions), embeddings_batch)
 
         # Free memory after processing all batches
         del model, tokenizer
@@ -279,6 +281,26 @@ class Pyeed:
         """
         self.db.execute_write(query)
 
+    def fetch_remote_proteins(self):
+        """
+        Fetches all proteins from the remote database and adds them to the local database.
+        """
+
+        # Get all proteins
+        query = """
+        MATCH (p:Protein) 
+        RETURN p.accession_id AS accession_id
+        """
+
+        protein_ids = self.db.execute_read(query)
+        protein_ids = [record["accession_id"] for record in protein_ids]
+
+        logger.info(f"Fetching {len(protein_ids)} proteins.")
+        logger.info(f"Fetching proteins: {protein_ids}")
+
+        # Fetch the proteins
+        self.fetch_from_primary_db(protein_ids, db="NCBI")
+
 
 if __name__ == "__main__":
     import os
@@ -287,12 +309,16 @@ if __name__ == "__main__":
 
     load_dotenv()
 
+    neo4j_uri = os.getenv("NEO4J_URI")
+    if neo4j_uri is None:
+        raise ValueError("NEO4J_URI environment variable is not set")
+
     eed = Pyeed(
-        uri=os.getenv("NEO4J_URI"),
+        uri=neo4j_uri,
         user=os.getenv("NEO4J_USER"),
         password=os.getenv("NEO4J_PASSWORD"),
     )
-    eed.db._wipe_database()
+    eed.db.wipe_database()
 
     dna_ids = ["NM_001300612.1"]
 

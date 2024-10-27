@@ -154,6 +154,7 @@ class PrimaryDBAdapter(Generic[T]):
         async with AsyncClient(
             limits=Limits(max_connections=self.n_concurrent),
         ) as client:
+            logger.info(f"Making requests with ids list: {self.ids}")
             # Build the list of request arguments (this prepares the coroutine tasks)
             requests = [self.build_request_payload(client, id) for id in self.ids]
 
@@ -219,7 +220,7 @@ class PrimaryDBAdapter(Generic[T]):
                 return response_json
 
             else:
-                logger.warning(f"Response could not be mapped to mapper: {response[0]}")
+                logger.warning(f"Response could not be mapped to mapper: {response}")
 
         except ValueError as e:
             logger.warning(f"Failed to parse JSON response from {response.url}: {e}")

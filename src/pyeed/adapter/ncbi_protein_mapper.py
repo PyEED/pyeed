@@ -62,7 +62,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
     def map_protein(self, seq_record: SeqRecord):
         # default values of the protein_info_dict
-        protein_info_dict = {"name": None, "mol_weight": None, "ec_number": None}
+        protein_info_dict = {"name": None, "mol_weight": 0.0, "ec_number": None}
 
         protein_list = self.get_feature(seq_record, "Protein")
         if len(protein_list) == 0:
@@ -257,15 +257,39 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         except KeyError:
             ec_number = None
 
-        try:
-            protein = Protein.get_or_save(
-                accession_id=record.id,
-                sequence=record.seq.__str__(),
-                mol_weight=float(protein_info_dict["mol_weight"]),
-                ec_number=ec_number,
-                name=protein_info_dict["name"],
-                seq_length=len(record.seq),
-            )
+        logger.info(f"Adding protein {record.id} to the database")
+
+        try: 
+            protein_info = {
+                "sequence": str(record.seq),
+                "mol_weight": float(protein_info_dict.get("mol_weight", 0.0)),
+                "ec_number": ec_number,
+                "name": protein_info_dict.get("name", None),
+                "seq_length": len(record.seq),
+                "accession_id": str(record.id),
+            }
+
+            # Try to get existing protein
+            protein = Protein.nodes.get_or_none(accession_id=record.id)
+            logger.info(f"Protein: {protein}")
+
+            if protein is not None:
+                logger.info(f"Updating existing protein {record.id}")
+                protein.sequence = protein_info["sequence"]
+                protein.mol_weight = protein_info["mol_weight"]
+                protein.ec_number = protein_info["ec_number"]
+                protein.name = protein_info["name"]
+                protein.seq_length = protein_info["seq_length"]
+                protein.save()
+
+
+            else:
+                logger.info(f"Creating new protein {record.id}")
+                # Create new protein
+                protein = Protein(**protein_info)
+                protein.save()
+            
+
         except KeyError as e:
             logger.warning(f"Error during mapping of {record.id} to graph model: {e}")
             return

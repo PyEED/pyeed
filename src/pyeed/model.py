@@ -1,4 +1,5 @@
 from enum import Enum
+from neomodel import db
 
 from neomodel import (
     ArrayProperty,
@@ -123,6 +124,7 @@ class StrictStructuredNode(StructuredNode):
         except UniqueProperty:
             # If a unique constraint error occurs, retrieve the existing node
             return cls.nodes.get(**kwargs)
+
 
 
 class Annotation(Enum):
