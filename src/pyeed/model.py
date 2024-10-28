@@ -217,6 +217,74 @@ class RegionRel(StructuredRel):
     def label(self):
         return f"{self.start}-{self.end}"
 
+class StandardNumberingRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list,
+    ):
+        molecule1.sequences_protein.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
+
+class StandardNumbering(StrictStructuredNode):
+    name = StringProperty(required=True)
+    definition = StringProperty(required=True)
+
+    # Relationships
+    sequences_protein = RelationshipTo("Protein", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel)
+
+class Similarity(StructuredRel):
+    similarity = FloatProperty(required=True)
+    gaps = IntegerProperty()
+    mismatches = IntegerProperty()
+    score = IntegerProperty()
+    aligned_sequences = ArrayProperty(StringProperty())
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        similarity: float,
+        gaps: int,
+        mismatches: int,
+        score: int,
+        aligned_sequences: list,
+    ):
+        molecule1.similar.connect(
+            molecule2,
+            {
+                "similarity": similarity,
+                "gaps": gaps,
+                "mismatches": mismatches,
+                "score": score,
+                "aligned_sequences": aligned_sequences,
+            },
+        )
+
+        return cls(
+            similarity=similarity,
+            gaps=gaps,
+            mismatches=mismatches,
+            score=score,
+            aligned_sequences=aligned_sequences,
+        )
 
 class GOAnnotation(StrictStructuredNode):
     go_id = StringProperty(unique_index=True, required=True)
@@ -322,6 +390,7 @@ class Protein(StrictStructuredNode):
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     coding_sequence = RelationshipTo("DNA", "HAS_CODING_SEQUENCE")
+    similar = RelationshipTo("Protein", "SIMILARITY", model=Similarity)
 
 
 class DNA(StrictStructuredNode):
@@ -343,3 +412,4 @@ class DNA(StrictStructuredNode):
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)
     protein = RelationshipTo("Protein", "ENCODES", model=RegionRel)
+    similar = RelationshipTo("DNA", "SIMILARITY", model=Similarity)
