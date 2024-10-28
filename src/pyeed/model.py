@@ -212,6 +212,38 @@ class RegionRel(StructuredRel):
     def label(self):
         return f"{self.start}-{self.end}"
 
+class StandardNumberingRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list,
+    ):
+        molecule1.sequences_protein.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
+
+class StandardNumbering(StrictStructuredNode):
+    name = StringProperty(required=True)
+    definition = StringProperty(required=True)
+
+    # Relationships
+    sequences_protein = RelationshipTo("Protein", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel)
+
 class Similarity(StructuredRel):
     similarity = FloatProperty(required=True)
     gaps = IntegerProperty()
