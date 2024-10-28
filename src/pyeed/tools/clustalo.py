@@ -1,5 +1,4 @@
 import io
-from typing import Dict, List
 
 import httpx
 from Bio import AlignIO
@@ -11,20 +10,20 @@ class ClustalOmega(AbstractTool):
     """
     Class for ClustalOmega aligner running as a REST service.
     """
+
     def __init__(self):
         super().__init__()
         self._service_url = ServiceURL.CLUSTALO.value
 
-
-    def create_file(self, multifasta: List[str]) -> Dict[str, str]:
+    def create_file(self, multifasta: list[str]) -> dict[str, str]:
         """
         Sets up the input data for the ClustalOmega container.
 
         Args:
-            multifasta (List[str]): List of FASTA formatted sequences to be aligned.
+            multifasta (list[str]): List of FASTA formatted sequences to be aligned.
 
         Returns:
-            Dict[str, str]: A dictionary containing the input file.
+            dict[str, str]: A dictionary containing the input file.
         """
         data = "\n".join(multifasta)
         return {"file": data}
@@ -49,18 +48,22 @@ class ClustalOmega(AbstractTool):
 
         except httpx.ConnectError as connect_error:
             context = connect_error.__context__
-            if context and hasattr(context, 'args'):
+            if context and hasattr(context, "args"):
                 error_number = context.args[0].errno
                 if error_number == 8 or error_number == -3:
-                    self._service_url = self._service_url.replace("clustalo", "localhost")
+                    self._service_url = self._service_url.replace(
+                        "clustalo", "localhost"
+                    )
                     try:
                         return httpx.post(self._service_url, files=file, timeout=600)
                     except httpx.ConnectError:
-                        raise httpx.ConnectError("PyEED Docker Service is not running.") from None
+                        raise httpx.ConnectError(
+                            "PyEED Docker Service is not running."
+                        ) from None
             print(connect_error)
             raise httpx.ConnectError("PyEED Docker Service is not running.") from None
 
-    def align(self, sequences: List[str]):
+    def align(self, sequences: list[str]):
         """
         Aligns multiple sequences and returns the alignment result.
 
