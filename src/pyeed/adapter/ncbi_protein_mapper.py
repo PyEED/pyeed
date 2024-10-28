@@ -1,5 +1,5 @@
 import re
-from typing import List, TypeVar, Tuple, Any
+from typing import Any, List, Tuple, TypeVar
 
 from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
@@ -60,10 +60,17 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return organism_name[0], taxonomy_id
 
-    def map_protein(self, seq_record: SeqRecord):
-        # default values of the protein_info_dict
-        protein_info_dict = {"name": None, "mol_weight": 0.0, "ec_number": None}
+    def map_protein(self, seq_record: SeqRecord) -> dict:
+        """Maps protein information from a `Bio.SeqRecord` object to a dictionary.
 
+        Args:
+            seq_record (SeqRecord): A `Bio.SeqRecord` object.
+
+        Returns:
+            dict: A dictionary containing the protein information.
+        """
+
+        protein_info_dict: dict = {}
         protein_list = self.get_feature(seq_record, "Protein")
         if len(protein_list) == 0:
             logger.debug(
@@ -93,12 +100,14 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 protein_info_dict["name"] = None
 
         try:
-            protein_info_dict["mol_weight"] = protein.qualifiers["calculated_mol_wt"][0]
+            protein_info_dict["mol_weight"] = float(
+                protein.qualifiers["calculated_mol_wt"][0]
+            )
         except KeyError:
             logger.debug(
                 f"No molecular weight found for {seq_record.id}: {protein.qualifiers}"
             )
-            protein_info_dict["mol_weight"] = 0.0
+            protein_info_dict["mol_weight"] = None
 
         try:
             protein_info_dict["ec_number"] = protein.qualifiers["EC_number"][0]
@@ -252,26 +261,22 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         # Protein information
         protein_info_dict = self.map_protein(record)
 
-        try:
-            ec_number = protein_info_dict["ec_number"]
-        except KeyError:
-            ec_number = None
-
         logger.info(f"Adding protein {record.id} to the database")
 
-        try: 
+        try:
             protein_info = {
                 "sequence": str(record.seq),
-                "mol_weight": float(protein_info_dict.get("mol_weight", 0.0)),
-                "ec_number": ec_number,
-                "name": protein_info_dict.get("name", None),
+                "mol_weight": protein_info_dict.get("mol_weight"),
+                "ec_number": protein_info_dict.get("ec_number"),
+                "name": protein_info_dict.get("name"),
                 "seq_length": len(record.seq),
                 "accession_id": str(record.id),
             }
 
             # Try to get existing protein
             protein = Protein.nodes.get_or_none(accession_id=record.id)
-            logger.info(f"Protein: {protein}")
+            if not protein:
+                logger.debug(f"Protein {record.id} already exists")
 
             if protein is not None:
                 logger.info(f"Updating existing protein {record.id}")
@@ -282,13 +287,11 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 protein.seq_length = protein_info["seq_length"]
                 protein.save()
 
-
             else:
                 logger.info(f"Creating new protein {record.id}")
                 # Create new protein
                 protein = Protein(**protein_info)
                 protein.save()
-            
 
         except KeyError as e:
             logger.warning(f"Error during mapping of {record.id} to graph model: {e}")
