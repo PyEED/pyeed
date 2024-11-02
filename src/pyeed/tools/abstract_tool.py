@@ -1,19 +1,10 @@
-import logging
-import logging.config
 import shutil
-import httpx
-
 import tempfile
 from abc import ABC, abstractmethod
 from enum import Enum
 
+import httpx
 from pydantic import BaseModel, PrivateAttr
-
-# path_config = Path(__file__).parent.parent.parent / "logging.conf"
-# logging.config.fileConfig(path_config)
-# logger = logging.getLogger("pyeed")
-
-logger = logging.getLogger(__name__)
 
 
 class ServiceURL(Enum):

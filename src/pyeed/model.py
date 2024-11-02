@@ -125,13 +125,13 @@ class StrictStructuredNode(StructuredNode):
             return cls.nodes.get(**kwargs)
 
 
-
 class Annotation(Enum):
     ACTIVE_SITE = "active site"
     ALLOSTERIC_SITE = "allosteric site"
     ALPHAHELIX = "alpha helix"
     BETASTRAND = "beta strand"
     BINDING_SITE = "binding site"
+    MATURE_PROTEIN = "mature protein"
     CODING_SEQ = "coding sequence"
     DNA = "DNA"
     DOMAIN = "domain"
@@ -139,9 +139,11 @@ class Annotation(Enum):
     MOTIVE = "motive"
     PROTEIN = "protein"
 
+
 class Organism(StrictStructuredNode):
     taxonomy_id: int = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
+
 
 class SiteRel(StructuredRel):
     positions = ArrayProperty(IntegerProperty(), required=True)
@@ -168,12 +170,14 @@ class SiteRel(StructuredRel):
     def label(self):
         return f"{self.positions}"
 
+
 class Site(StrictStructuredNode):
     site_id = UniqueIdProperty()
     name = StringProperty()
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
+
 
 class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
@@ -182,6 +186,7 @@ class Region(StrictStructuredNode):
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
+
 
 class RegionRel(StructuredRel):
     start = IntegerProperty(required=True)
