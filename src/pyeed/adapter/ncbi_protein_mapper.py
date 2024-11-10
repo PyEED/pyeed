@@ -299,11 +299,11 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         protein.organism.connect(organism)
 
-        # Here we add the sites
+        # Add the sites
         sites_list = self.map_sites(record)
         self.add_sites(sites_list, protein)
 
-        # Here we add the coding sequence
+        # Add the coding sequence
         cds_regions = self.map_cds(record)
         if cds_regions is not None:
             for region in cds_regions:
@@ -312,7 +312,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                     annotation=region["type"],
                 )
 
-                # add the id to protein nucleotide_id (StringProperty)
+                # add the id to protein nucleotide_id
                 protein.nucleotide_id = region["id"]
                 protein.save()
 
@@ -320,7 +320,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                     region_coding, {"start": region["start"], "end": region["end"]}
                 )
 
-        # Here we add the regions
+        # Add the regions
         regions_list = self.map_regions(record)
         self.add_regions(regions_list, protein)
 
