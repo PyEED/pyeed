@@ -44,6 +44,7 @@ ruff = "^0.4.1"
 mkdocs-jupyter = "^0.24.7"
 jupyter-contrib-nbextensions = "^0.7.0"
 notebook = "^6"
+pytest-loguru = "^0.4.0"
 
 [build-system]
 requires = ["poetry-core"]
