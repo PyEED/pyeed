@@ -6,14 +6,15 @@ from Bio.SeqRecord import SeqRecord
 from loguru import logger
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
-from pyeed.model import DNA, Annotation, Organism, Region, Site, Protein
+from pyeed.model import DNA, Annotation, Organism, Protein, Region, Site
 
 T = TypeVar("T")
 
 
 class NCBIDNAToPyeed(PrimaryDBtoPyeed):
     """
-    Maps DNA sequence entries from NCBI to the PyEED graph object model and saves them to the database.
+    Maps DNA sequence entries from NCBI to the PyEED graph object model and saves
+    them to the database.
     """
 
     def add_to_db(self, record: SeqIO.SeqRecord):
@@ -197,8 +198,6 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
 
-                
-
                 regions_list.append(
                     {
                         "id": region.qualifiers["gene"][0],
@@ -214,14 +213,12 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 )
 
         return regions_list
-    
-    def map_cds(self, dna, seq_record: SeqRecord):
 
+    def map_cds(self, dna, seq_record: SeqRecord):
         cds_list_features = self.get_feature(seq_record, "CDS")
 
-        for i, cds in enumerate(cds_list_features):
+        for cds in cds_list_features:
             try:
-                # get protein id and pull the protein sequence
                 protein_id = cds.qualifiers["protein_id"][0]
 
                 # check if the protein sequence is in database
@@ -232,12 +229,9 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 )
 
                 dna.protein.connect(
-                    protein, {"start": int(cds.location.start), "end": int(cds.location.end)}
+                    protein,
+                    {"start": int(cds.location.start), "end": int(cds.location.end)},
                 )
-
 
             except KeyError:
-                logger.debug(
-                    f"Error mapping CDS for {seq_record.id}: {cds.qualifiers}"
-                )
-
+                logger.debug(f"Error mapping CDS for {seq_record.id}: {cds.qualifiers}")
