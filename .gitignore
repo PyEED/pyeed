@@ -159,3 +159,6 @@ pyrightconfig.json
 poetry.lock
 
 .ruff_cache
+
+# Test python files
+test.py
