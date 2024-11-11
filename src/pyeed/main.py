@@ -327,7 +327,7 @@ class Pyeed:
             except IndexError:
                 logger.debug(f"No connection between {protein['accession_id']} and {protein['nucleotide_id']} found.")
                 continue
-            
+
             if exists:
                 logger.info(f"Connection between {protein['accession_id']} and {protein['nucleotide_id']} already exists.")
                 continue
@@ -338,56 +338,5 @@ class Pyeed:
             MATCH (d:DNA {{accession_id: '{protein["nucleotide_id"]}'}})
             MERGE (d)-[r:ENCODES]->(p)
             SET r.start = {protein["start"]}, r.end = {protein["end"]}
-            """
-            self.db.execute_write(query)
-
-    def add_standard_numbering_with_base_and_clustalo(self, name, base_sequence_id):
-        # this function adds the standard numbering to the database
-        # it runs clustalo to align the sequences and then creates the standard numbering based on a base sequence
-        # the base sequence has to be provided by the user as the id and has to be in the database
-
-        # get all proteins with their ids and their sequence in a dictionary
-        query = """
-        MATCH (p:Protein)
-        WHERE p.sequence IS NOT NULL
-        RETURN p.accession_id AS accession_id, p.sequence AS sequence
-        """
-
-        proteins_read = self.db.execute_read(query)
-        proteins_dict = {
-            protein["accession_id"]: protein["sequence"] for protein in proteins_read
-        }
-
-        base_sequence = self.db.execute_read(
-            f"MATCH (p:Protein {{accession_id: '{base_sequence_id}'}}) RETURN p"
-        )[0]["p"]
-        logger.info(f"Base sequence: {base_sequence}")
-        base_sequence_dict = {
-            "id": base_sequence["accession_id"],
-            "sequence": base_sequence["sequence"],
-        }
-
-        # perform standard numbering
-        standard_numbering = StandardNumberingTool(name=name)
-        positions_standard_numbering = (
-            standard_numbering.set_standard_numbering_with_given_base_sequence(
-                base_sequence=base_sequence_dict, proteins_dict=proteins_dict
-            )
-        )
-
-        # update the database with the standard numbering
-        # create the standard numbering node
-        StandardNumbering.get_or_save(
-            name=name, definition=f"ClustalO based on base sequence {base_sequence_id}"
-        )
-
-        # create the relationships between the standard numbering and the proteins
-        for protein_id in positions_standard_numbering:
-            # the array is in the realtionship with the attribute positions
-            query = f"""
-                MATCH (p:Protein {{accession_id: '{protein_id}'}})
-                MATCH (s:StandardNumbering {{name: '{name}'}})
-                MERGE (p)-[r:HAS_STANDARD_NUMBERING]->(s)
-                SET r.positions = {positions_standard_numbering[protein_id]}
             """
             self.db.execute_write(query)
