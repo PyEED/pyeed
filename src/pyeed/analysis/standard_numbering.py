@@ -56,7 +56,7 @@ class StandardNumberingTool:
             """
             db.execute_write(query)
 
-    def set_standard_numbering_with_given_base_sequence_clustalo(self, base_sequence_id: str, db: DatabaseConnector):
+    def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector):
         """
         This function will set the standard numbering for a given base sequence and all the sequences in the database
         The sequences will be aligned with clustal omega and the positions will be determined
