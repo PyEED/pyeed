@@ -122,6 +122,7 @@ class Pyeed:
         )
 
         asyncio.run(adapter.make_request())
+        nest_asyncio.apply()
 
     def fetch_ncbi_protein(self, ids: list[str]):
         """
@@ -151,6 +152,7 @@ class Pyeed:
         )
 
         asyncio.run(adapter.make_request())
+        nest_asyncio.apply()
 
     def fetch_ncbi_nucleotide(self, ids: list[str]):
         """
@@ -180,6 +182,7 @@ class Pyeed:
         )
 
         asyncio.run(adapter.make_request())
+        nest_asyncio.apply()
 
     def calculate_sequence_embeddings(
         self,
@@ -297,15 +300,40 @@ class Pyeed:
         self.fetch_ncbi_nucleotide(nucleotide_ids)
 
         # we need to update the protein records with the coding sequences
-        # the connection between the protein and the coding sequence is the nucleotide_id
-        # the relationship is called "HAS_CODING_SEQUENCE"
+        # the connection between protein and DNA is ENCODES (fom DNA to protein)
+        # but this connection could already exist, so we need to check if it exists, and onyl add it if it does not
+        # the start and end positions of nucleotide sequence are stored in protein record
+        # the protein record has the attribute nucleotide_id, which is the id of the coding sequence
         query = """
-        MATCH (p:Protein) 
+        MATCH (p:Protein)
         WHERE p.nucleotide_id IS NOT NULL
-        MATCH (n:DNA {accession_id: p.nucleotide_id})
-        MERGE (p)-[:HAS_CODING_SEQUENCE]->(n)
+        RETURN p
         """
-        self.db.execute_write(query)
+        proteins = self.db.execute_read(query)
+
+        for protein in proteins:
+            protein = protein["p"]
+            # check wether the connection already exists
+            # for that we take a look at the DNA node, with the nucleotide_id
+            # and check if there is a connection to the protein node
+            query = f"""
+            MATCH (p:Protein {{accession_id: '{protein["accession_id"]}'}})
+            MATCH (d:DNA {{accession_id: '{protein["nucleotide_id"]}'}})
+            RETURN EXISTS((d)-[:ENCODES]->(p)) AS exists
+            """
+            exists = self.db.execute_read(query)[0]["exists"]
+            if exists:
+                logger.info(f"Connection between {protein['accession_id']} and {protein['nucleotide_id']} already exists.")
+                continue
+
+
+            query = f"""
+            MATCH (p:Protein {{accession_id: '{protein["accession_id"]}'}})
+            MATCH (d:DNA {{accession_id: '{protein["nucleotide_id"]}'}})
+            MERGE (d)-[r:ENCODES]->(p)
+            SET r.start = {protein["start"]}, r.end = {protein["end"]}
+            """
+            self.db.execute_write(query)
 
     def add_standard_numbering_with_base_and_clustalo(self, name, base_sequence_id):
         # this function adds the standard numbering to the database

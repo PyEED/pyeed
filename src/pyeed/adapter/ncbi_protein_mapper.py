@@ -13,6 +13,7 @@ T = TypeVar("T")
 
 
 class NCBIProteinToPyeed(PrimaryDBtoPyeed):
+
     def get_feature(self, seq_record: SeqRecord, feature_type: str) -> List[SeqFeature]:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
@@ -153,6 +154,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
     def map_cds(self, seq_record: SeqRecord):
         cds = self.get_feature(seq_record, "CDS")
 
+
         if len(cds) > 1:
             logger.info(
                 f"Multiple features ({len(cds)}) of type `CDS` found for {seq_record.id}"
@@ -166,7 +168,16 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             return None
 
         try:
-            return self.get_cds_regions(cds_feature.qualifiers["coded_by"][0])
+
+            if "coded_by" not in cds_feature.qualifiers:
+                logger.debug(
+                    f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
+                )
+                return None
+
+            logger.info(f"CDS qualifiers: {cds_feature.qualifiers}")
+
+            return self.get_cds_regions(cds_feature)
         except IndexError:
             logger.debug(
                 f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
@@ -175,7 +186,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         return None
 
     @staticmethod
-    def get_cds_regions(coded_by: str):
+    def get_cds_regions(seq_feature: SeqFeature) -> List[dict]:
+        coded_by =  seq_feature.qualifiers["coded_by"][0]
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
         # Extract all regions from the 'coded_by' qualifier
@@ -196,7 +208,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         # Extract the start and end position of each region
         cds_ranges = [region.split(":")[1] for region in cds_regions]
         regions = []
-        for region in cds_ranges:
+        for i, region in enumerate(cds_ranges):
             start, end = region.split("..")
 
             region = {}
@@ -309,6 +321,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             for region in cds_regions:
                 # add the id to protein nucleotide_id
                 protein.nucleotide_id = region["id"]
+                protein.nucleotide_start = region["start"]
+                protein.nucleotide_end = region["end"]
                 protein.save()
 
         # Add the regions

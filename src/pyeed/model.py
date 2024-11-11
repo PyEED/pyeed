@@ -424,6 +424,8 @@ class Protein(StrictStructuredNode):
     mol_weight = FloatProperty()
     ec_number = StringProperty()
     nucleotide_id = StringProperty()
+    nucleotide_start = IntegerProperty()
+    nucleotide_end = IntegerProperty()
     locus_tag = StringProperty()
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
@@ -438,7 +440,6 @@ class Protein(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
-    coding_sequence = RelationshipTo("DNA", "HAS_CODING_SEQUENCE")
     pairwise_aligned = RelationshipTo(
         "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
     )
