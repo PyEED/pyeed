@@ -281,4 +281,5 @@ if __name__ == "__main__":
     username = "neo4j"
     password = "12345678"
 
-    Pyeed()
+    Pyeed(uri, user=username, password=password)
+    

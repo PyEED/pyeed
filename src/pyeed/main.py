@@ -321,7 +321,13 @@ class Pyeed:
             MATCH (d:DNA {{accession_id: '{protein["nucleotide_id"]}'}})
             RETURN EXISTS((d)-[:ENCODES]->(p)) AS exists
             """
-            exists = self.db.execute_read(query)[0]["exists"]
+            result = self.db.execute_read(query)
+            try:
+                exists = result[0]["exists"]
+            except IndexError:
+                logger.debug(f"No connection between {protein['accession_id']} and {protein['nucleotide_id']} found.")
+                continue
+            
             if exists:
                 logger.info(f"Connection between {protein['accession_id']} and {protein['nucleotide_id']} already exists.")
                 continue
