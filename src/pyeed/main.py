@@ -274,10 +274,10 @@ class Pyeed:
         """
         return self.db.execute_read(query, {"accession_ids": accession_ids})
 
-    def fetchRemoteCodingSequences(self):
+    def fetch_dna_entries_for_proteins(self):
         """
-        Fetches all of the coding sequences from the remote database and adds them to the local database.
-        The coding sequences are saved in the protein records.
+        Fetches DNA sequences for proteins that have a nucleotide id, set in the database.
+        The fetching is done from NCBI nucleotide database.
         """
 
         # Get all proteins and a list of coding sequences ids

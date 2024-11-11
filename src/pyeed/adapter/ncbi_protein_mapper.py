@@ -307,18 +307,9 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         cds_regions = self.map_cds(record)
         if cds_regions is not None:
             for region in cds_regions:
-                region_coding = Region.get_or_save(
-                    region_id=region["id"],
-                    annotation=region["type"],
-                )
-
                 # add the id to protein nucleotide_id
                 protein.nucleotide_id = region["id"]
                 protein.save()
-
-                protein.region.connect(
-                    region_coding, {"start": region["start"], "end": region["end"]}
-                )
 
         # Add the regions
         regions_list = self.map_regions(record)
