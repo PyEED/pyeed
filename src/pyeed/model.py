@@ -6,14 +6,15 @@ from neomodel import (
     IntegerProperty,
     RelationshipTo,
     StringProperty,
+    StructuredNode,
     StructuredRel,
     UniqueIdProperty,
-    VectorIndex,
     UniqueProperty,
-    StructuredNode,
+    VectorIndex,
 )
 
 # from pyeed.nodes_and_relations import StrictStructuredNode
+
 
 class StrictStructuredNode(StructuredNode):
     """A StructuredNode subclass that raises an error if an invalid property is provided."""
@@ -124,7 +125,6 @@ class StrictStructuredNode(StructuredNode):
         except UniqueProperty:
             # If a unique constraint error occurs, retrieve the existing node
             return cls.nodes.get(**kwargs)
-
 
 
 class Annotation(Enum):
