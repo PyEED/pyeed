@@ -56,6 +56,48 @@ class StandardNumberingTool:
             """
             db.execute_write(query)
 
+    def _run_standard_numbering_algo(self, base_sequence_id: str, alignment: list, base_sequence_alignment: str, positions_base: list):
+        """
+        This function will run the standard numbering algorithm
+        """
+        positions = {}  # Dictionary to store positions for each sequence in the alignment
+        for i in range(1, len(alignment)):
+            sequence = alignment[i].seq  # Get the sequence from the alignment
+            positions_sequence: list[str] = []  # List to store positions for the current sequence
+
+            for j in range(len(base_sequence_alignment.replace('-', ''))):
+                if base_sequence_alignment[j] == '-' and sequence[j] != '-':
+                    # If there is an insertion in the sequence
+                    if len(positions_sequence) > 0:
+                        if positions_sequence[-1].count('.') != 0:
+                            # If the last position is an insertion
+                            if positions_sequence[-1].split('.')[0] == str(j):
+                                insert_number = int(positions_sequence[-1].split('.')[1]) + 1
+                            else:
+                                insert_number = 1
+                        else:
+                            insert_number = 1
+                    else:
+                        insert_number = 1
+
+                    for k in range(j, len(sequence)):
+                        if base_sequence_alignment[k] != '-':
+                            break
+                        else:
+                            # Add the insertion position
+                            positions_sequence.append(str(j) + '.' + str(insert_number + (k - j)))
+                else:
+                    # Add the normal position
+                    positions_sequence.append(str(j))
+
+            # Store the positions for the current sequence
+            positions[alignment[i].id] = positions_sequence
+
+        # Store the positions for the base sequence
+        positions[base_sequence_id] = [str(i) for i in positions_base]
+
+        return positions
+
     def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector):
         """
         This function will set the standard numbering for a given base sequence and all the sequences in the database
@@ -94,41 +136,7 @@ class StandardNumberingTool:
         
         # get all positions for all the sequences
         # we want to use inserts as 2.1 .. to check wether it is an insert we take a look at the base sequence at the postions if - is present
-        positions = {}
-        for i in range(1, len(alignment)):
-            sequence = alignment[i].seq
-            positions_sequence: list[str] = []
-
-            for j in range(len(base_sequence_alignment.replace('-', ''))):
-                if base_sequence_alignment[j] == '-' and sequence[j] != '-':
-                    # insert, but could be first second etc insert
-                    if len(positions_sequence) > 0:
-                        if positions_sequence[-1].count('.') != 0:
-                            if positions_sequence[-1].split('.')[0] == str(j):
-                                insert_number = int(positions_sequence[-1].split('.')[1]) + 1
-                            else:
-                                insert_number = 1
-                        else:
-                            insert_number = 1
-                    else:
-                        insert_number = 1
-                        
-                    for k in range(j, len(sequence)):
-                        if base_sequence_alignment[k] != '-':
-                            break
-                        else:
-                            positions_sequence.append(str(j) + '.' + str(insert_number+(k-j)))
-                else:
-                    positions_sequence.append(str(j))
-
-
-            positions[alignment[i].id] = positions_sequence
-        
-        
-
-        positions[base_sequence['id']] = [str(i) for i in positions_base]
-
-        self.positions = positions
+        self.positions = self._run_standard_numbering_algo(base_sequence_id, alignment, base_sequence_alignment, positions_base)
 
 
         # update the database with the standard numbering
