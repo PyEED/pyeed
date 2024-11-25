@@ -1,7 +1,10 @@
+import io
+from abc import ABC, abstractmethod
 from typing import Any, Coroutine, Generic, NamedTuple, TypeVar
 
 import aiometer
 import tenacity
+from Bio import SeqIO
 from httpx import (
     AsyncClient,
     Limits,
@@ -10,10 +13,26 @@ from httpx import (
     TimeoutException,
 )
 from loguru import logger
-from pyeed.adapter.uniprot_mapper import PrimaryDBtoPyeed
 from rich.progress import Progress, TaskID
 
-T = TypeVar("T")
+T = TypeVar("T", bound="PrimaryDBtoPyeed")
+
+
+class PrimaryDBtoPyeed(ABC):
+    """
+    Abstract base class for mapping data from a primary sequence database to the pyeed
+    graph object model and saving it to the database.
+    """
+
+    @abstractmethod
+    def add_to_db(self, data: Any) -> None:
+        """Abstract method for mapping data from a primary sequence database to the pyeed
+        graph object model and saving it to the database.
+
+        Args:
+            data (Any): The data to be mapped and saved to the database.
+        """
+        pass
 
 
 class RequestPayload(NamedTuple):
@@ -39,7 +58,7 @@ class PrimaryDBAdapter(Generic[T]):
         rate_limit: int,
         n_concurrent: int,
         batch_size: int,
-        data_mapper: "PrimaryDBtoPyeed[T]",
+        data_mapper: T,
         timeout: int = 120,
         progress: Progress | None = None,
         task_id: TaskID | None = None,
@@ -135,6 +154,7 @@ class PrimaryDBAdapter(Generic[T]):
         async with AsyncClient(
             limits=Limits(max_connections=self.n_concurrent),
         ) as client:
+            logger.info(f"Making requests with ids list: {self.ids}")
             # Build the list of request arguments (this prepares the coroutine tasks)
             requests = [self.build_request_payload(client, id) for id in self.ids]
 
@@ -152,6 +172,7 @@ class PrimaryDBAdapter(Generic[T]):
                 async for response_coroutine in response_coroutines:
                     res = await response_coroutine
                     sanitized_response = self.sanitize_response(res)
+                    logger.debug(f"Received response: {sanitized_response}")
                     [self.map_and_add_to_db(entry) for entry in sanitized_response]
 
                     update_progress()
@@ -172,21 +193,34 @@ class PrimaryDBAdapter(Generic[T]):
             return []
 
         try:
-            response_json = response.json()
-            if not response_json:
-                logger.warning(f"Empty response from {response.url}")
-                return []
+            logger.debug(f"Response content: {type(response.content)}")
 
-            # If the response is a dictionary, wrap it in a list
-            if isinstance(response_json, dict):
-                response_json = [response_json]
+            # here we need to identify from where the response is coming from and parse it accordingly
+            if response.content.startswith(b"LOCUS"):
+                return SeqIO.parse(io.StringIO(response.content.decode()), "gb")
+            elif response.content.startswith(b"{"):
+                None
+            elif response.content.startswith(b"["):
+                response_json = response.json()
+                if not response_json:
+                    logger.warning(f"Empty response from {response.url}")
+                    return []
 
-            # Ensure the response is a list of dictionaries
-            if not isinstance(response_json, list) or not all(
-                isinstance(item, dict) for item in response_json
-            ):
-                logger.warning(f"Unexpected response format from {response.url}")
-                return []
+                # If the response is a dictionary, wrap it in a list
+                if isinstance(response_json, dict):
+                    response_json = [response_json]
+
+                # Ensure the response is a list of dictionaries
+                if not isinstance(response_json, list) or not all(
+                    isinstance(item, dict) for item in response_json
+                ):
+                    logger.warning(f"Unexpected response format from {response.url}")
+                    return []
+
+                return response_json
+
+            else:
+                logger.warning(f"Response could not be mapped to mapper: {response}")
 
         except ValueError as e:
             logger.warning(f"Failed to parse JSON response from {response.url}: {e}")

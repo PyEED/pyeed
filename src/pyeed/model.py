@@ -13,6 +13,8 @@ from neomodel import (
     VectorIndex,
 )
 
+# from pyeed.nodes_and_relations import StrictStructuredNode
+
 
 class StrictStructuredNode(StructuredNode):
     """A StructuredNode subclass that raises an error if an invalid property is provided."""
@@ -131,6 +133,7 @@ class Annotation(Enum):
     ALPHAHELIX = "alpha helix"
     BETASTRAND = "beta strand"
     BINDING_SITE = "binding site"
+    MATURE_PROTEIN = "mature protein"
     CODING_SEQ = "coding sequence"
     DNA = "DNA"
     DOMAIN = "domain"
@@ -144,10 +147,35 @@ class Organism(StrictStructuredNode):
     name = StringProperty()
 
 
+class SiteRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list,
+    ):
+        molecule1.site.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
+
+
 class Site(StrictStructuredNode):
     site_id = UniqueIdProperty()
     name = StringProperty()
-    positions = ArrayProperty(IntegerProperty(), required=True)
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
@@ -155,14 +183,154 @@ class Site(StrictStructuredNode):
 
 class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
-    start = IntegerProperty(required=True)
-    end = IntegerProperty(required=True)
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
 
 
+class RegionRel(StructuredRel):
+    start = IntegerProperty(required=True)
+    end = IntegerProperty(required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        start: int,
+        end: int,
+    ):
+        molecule1.region.connect(
+            molecule2,
+            {
+                "start": start,
+                "end": end,
+            },
+        )
+
+        return cls(
+            start=start,
+            end=end,
+        )
+
+    @property
+    def label(self):
+        return f"{self.start}-{self.end}"
+
+
+class StandardNumberingRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list[str],
+    ):
+        molecule1.sequences_protein.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
+
+
+class StandardNumbering(StrictStructuredNode):
+    name = StringProperty(required=True)
+    definition = StringProperty(required=True)
+
+    # Relationships
+    sequences_protein = RelationshipTo(
+        "Protein", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel
+    )
+
+
+class PairwiseAlignmentResult(StructuredRel):
+    """A relationship representing the similarity between two sequences.
+
+    Args:
+        similarity (float): The similarity score between the two sequences.
+        gaps (int): The number of gaps in the alignment.
+        mismatches (int): The number of mismatches in the alignment.
+        score (int): The alignment score.
+        query_aligned (str): The aligned sequence of the query.
+        target_aligned (str): The aligned sequence of the target.
+    """
+
+    similarity = FloatProperty(required=True)
+    gaps = IntegerProperty(required=True)
+    mismatches = IntegerProperty(required=True)
+    score = IntegerProperty()
+    query_aligned = StringProperty()
+    target_aligned = StringProperty()
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        similarity: float,
+        gaps: int,
+        mismatches: int,
+        score: int,
+        query_aligned: str,
+        target_aligned: str,
+    ):
+        """Validates the similarity and connects the two molecules.
+
+        Args:
+            molecule1 (StrictStructuredNode): Protein or DNA node
+            molecule2 (StrictStructuredNode): Protein or DNA node
+            similarity (float): Percentage similarity between the two sequences.
+            gaps (int): Number of gaps in the alignment.
+            mismatches (int): Number of mismatches in the alignment.
+            score (int): Alignment score.
+            query_aligned (str): Alignment of the query sequence.
+            target_aligned (str): Alignment of the target sequence.
+
+        Returns:
+            Similarity: The created similarity relationship.
+        """
+        molecule1.similar.connect(
+            molecule2,
+            {
+                "similarity": similarity,
+                "gaps": gaps,
+                "mismatches": mismatches,
+                "score": score,
+                "query_aligned": query_aligned,
+                "target_aligned": target_aligned,
+            },
+        )
+
+        return cls(
+            similarity=similarity,
+            gaps=gaps,
+            mismatches=mismatches,
+            score=score,
+            query_aligned=query_aligned,
+            target_aligned=target_aligned,
+        )
+
+
 class GOAnnotation(StrictStructuredNode):
+    """A Gene Ontology annotation for a protein or dna sequence.
+
+    Args:
+        go_id (str): The Gene Ontology ID.
+        term (str): The name of the GO term.
+        definition (str): The definition of the GO term.
+    """
+
     go_id = StringProperty(unique_index=True, required=True)
     term = StringProperty()
     definition = StringProperty()
@@ -178,14 +346,14 @@ class Mutation(StructuredRel):
     Args:
         from_position (int): The position of the mutation in the original sequence.
         to_position (int): The position of the mutation in the mutated sequence.
-        from_residue (str): The original residue at the mutation position.
-        to_residue (str): The mutated residue at the mutation
+        from_monomer (str): The original monomer at the mutation position.
+        to_monomer (str): The mutated residue at the mutation
     """
 
     from_position = IntegerProperty(required=True)
     to_position = IntegerProperty(required=True)
-    from_residue = StringProperty(required=True)
-    to_residue = StringProperty(required=True)
+    from_monomer = StringProperty(required=True)
+    to_monomer = StringProperty(required=True)
 
     @classmethod
     def validate_and_connect(
@@ -207,6 +375,9 @@ class Mutation(StructuredRel):
             from_monomer (str): Original residue / nucleotide at the specified position.
             to_monomer (str): Mutated residue / nucleotide at the specified position.
 
+        Returns:
+            Mutation: The created mutation relationship.
+
         Raises:
             ValueError: If the specified positions or residues do not match the sequences.
         """
@@ -226,24 +397,26 @@ class Mutation(StructuredRel):
             {
                 "from_position": from_position,
                 "to_position": to_position,
-                "from_residue": from_monomer,
-                "to_residue": to_monomer,
+                "from_monomer": from_monomer,
+                "to_monomer": to_monomer,
             },
         )
 
         return cls(
             from_position=from_position,
             to_position=to_position,
-            from_residue=from_monomer,
-            to_residue=to_monomer,
+            from_monomer=from_monomer,
+            to_monomer=to_monomer,
         )
 
     @property
     def label(self):
-        return f"{self.from_residue}{self.from_position}{self.to_residue}"
+        return f"{self.from_monomer}{self.from_position}{self.to_monomer}"
 
 
 class Protein(StrictStructuredNode):
+    """A protein sequence node in the database."""
+
     accession_id = StringProperty(unique_index=True, required=True)
     sequence = StringProperty(required=True)
     name = StringProperty()
@@ -251,6 +424,8 @@ class Protein(StrictStructuredNode):
     mol_weight = FloatProperty()
     ec_number = StringProperty()
     nucleotide_id = StringProperty()
+    nucleotide_start = IntegerProperty()
+    nucleotide_end = IntegerProperty()
     locus_tag = StringProperty()
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
@@ -261,13 +436,18 @@ class Protein(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    site = RelationshipTo("Site", "HAS_SITE")
-    region = RelationshipTo("Region", "HAS_REGION")
+    site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
+    region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
+    pairwise_aligned = RelationshipTo(
+        "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
+    )
 
 
 class DNA(StrictStructuredNode):
+    """A DNA sequence node in the database."""
+
     accession_id = StringProperty(unique_index=True, required=True)
     sequence = StringProperty(required=True)
     name = StringProperty()
@@ -281,7 +461,11 @@ class DNA(StrictStructuredNode):
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
-    site = RelationshipTo("Site", "HAS_SITE")
-    region = RelationshipTo("Region", "HAS_REGION")
+    site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
+    region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)
+    protein = RelationshipTo("Protein", "ENCODES", model=RegionRel)
+    pairwise_aligned = RelationshipTo(
+        "DNA", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
+    )

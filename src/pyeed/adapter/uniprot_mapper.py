@@ -1,22 +1,14 @@
-from abc import abstractmethod
 from collections import defaultdict
-from typing import Generic, TypeVar
+from typing import Any
 
 from loguru import logger
 
+from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
 from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site
 
-T = TypeVar("T")
 
-
-class PrimaryDBtoPyeed(Generic[T]):
-    @abstractmethod
-    def add_to_db(self, data: dict):
-        pass
-
-
-class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
-    def add_to_db(self, data: dict):
+class UniprotToPyeed(PrimaryDBtoPyeed):
+    def add_to_db(self, data: Any) -> None:
         # Organism information
         taxonomy_id = data["organism"]["taxonomy"]
         organism = Organism.get_or_save(
@@ -56,7 +48,7 @@ class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
         self.add_go(data, protein)
 
     def add_sites(self, data: dict, protein: Protein):
-        ligand_dict = defaultdict(list)
+        ligand_dict: dict[str, list[int]] = defaultdict(list)
 
         for feature in data.get("features", []):
             if feature["type"] == "BINDING":
@@ -66,11 +58,10 @@ class UniprotToPyeed(PrimaryDBtoPyeed[Protein]):
         for ligand, positions in ligand_dict.items():
             site = Site(
                 name=ligand,
-                positions=positions,
                 annotation=Annotation.BINDING_SITE.value,
             ).save()
 
-            protein.site.connect(site)
+            protein.site.connect(site, {"positions": positions})
 
     def add_go(self, data: dict, protein: Protein):
         for reference in data["dbReferences"]:

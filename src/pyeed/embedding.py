@@ -9,7 +9,7 @@ from pyeed.dbconnect import DatabaseConnector
 logger = logging.getLogger(__name__)
 
 
-def load_model_and_tokenizer(model_name="facebook/esm2_t33_650M_UR50D"):
+def load_model_and_tokenizer(model_name: str):
     """
     Loads the ESM2 model and tokenizer and sets the appropriate device.
     """

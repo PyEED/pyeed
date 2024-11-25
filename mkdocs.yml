@@ -5,24 +5,28 @@ site_url: https://pyeed.github.io/pyeed/
 site_author: Max Häußler
 
 nav:
-  - 🏠 Home: index.md
-  - ⚡️ Examples:
-    - Basics: examples/basics.ipynb
-    - Alignments: examples/alignment.ipynb
-    - Networks: examples/network.ipynb
-  - 🧰 Tools:
-    - quick_start/index.md
-    - The Sequence objects: quick_start/basics.md
-    - Finding Sequences: quick_start/blast.md
-    #- Aligning Sequences: quick_start/alignments.md
-    #- Clustering Sequences: quick_start/clustering.md
-    #- Creating Sequence Networks: quick_start/networks.md
-  - ⬇️ Installation:
-    - PyEED Docker Service: installation/docker.md
-    - via PIP: installation/via_pip.md
+  - Home: index.md
+  - Usage: 
+    - Initial Setup: usage/initial_setup.ipynb
+    - Query from Primary Database: usage/basics.ipynb
+  - API Reference:
+    - Pyeed: api/pyeed.md
+    - DatabaseConnector: api/dbconnect.md
+    - PrimaryDBAdapter: api/primarydbadapter.md
+  - Setup:
+    - Neo4j Database: setup/database.md
 
 plugins:
   - mkdocs-jupyter
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
 
 theme:
   name: material
