@@ -48,7 +48,7 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
         self.add_go(data, protein)
 
     def add_sites(self, data: dict, protein: Protein):
-        ligand_dict = defaultdict(list)
+        ligand_dict: dict[str, list[int]] = defaultdict(list)
 
         for feature in data.get("features", []):
             if feature["type"] == "BINDING":
@@ -58,11 +58,10 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
         for ligand, positions in ligand_dict.items():
             site = Site(
                 name=ligand,
-                positions=positions,
                 annotation=Annotation.BINDING_SITE.value,
             ).save()
 
-            protein.site.connect(site)
+            protein.site.connect(site, {"positions": positions})
 
     def add_go(self, data: dict, protein: Protein):
         for reference in data["dbReferences"]:
