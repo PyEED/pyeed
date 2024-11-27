@@ -9,6 +9,7 @@ from pydantic import BaseModel, PrivateAttr
 
 class ServiceURL(Enum):
     CLUSTALO = "http://clustalo:5001/align"
+    BLAST = "http://blast:6001/align"
 
 
 class AbstractTool(BaseModel, ABC):
