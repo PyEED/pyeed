@@ -509,6 +509,7 @@ class OntologyObject(StrictStructuredNode):
 
     name = StringProperty(required=True, unique_index=True)
     description = StringProperty()
+    label = StringProperty()
     synonyms = ArrayProperty(StringProperty())
 
     # Relationships

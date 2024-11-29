@@ -17,7 +17,9 @@ class OntologyAdapter():
         g = Graph()
         g.parse(file_path)
 
+        # Create a namespace for the ontology
         IAO_NS = Namespace("http://purl.obolibrary.org/obo/IAO_")
+        OBOINOWL_NS = Namespace("http://www.geneontology.org/formats/oboInOwl#")
 
         # create a dictonary of the labels
         dicts_labels = {}
@@ -29,6 +31,7 @@ class OntologyAdapter():
             class_name = str(s)
             db.execute_write("CREATE (c:OntologyObject {name: $name})", parameters = {"name": class_name})
 
+            # add discreption, example in CARD: <obo:IAO_0000115>eccC5 is a.....</obo:IAO_0000115>
             for _, _, desc in g.triples((s, IAO_NS['0000115'], None)):
                 description = str(desc)
                 db.execute_write("""
@@ -36,6 +39,20 @@ class OntologyAdapter():
                     SET c.description = $description
                 """, parameters = {"name": class_name, "description": description})
 
+            # add the label to the class
+            db.execute_write("""
+                MATCH (c:OntologyObject {name: $name})
+                SET c.label = $label
+            """, parameters = {"name": class_name, "label": dicts_labels[class_name]})
+
+            # add the synonyms to the class
+            # <oboInOwl:hasExactSynonym>Mtub_eccC5_FLO</oboInOwl:hasExactSynonym>
+            for _, _, syn in g.triples((s, OBOINOWL_NS.hasExactSynonym, None)):
+                synonym = str(syn)
+                db.execute_write("""
+                    MATCH (c:OntologyObject {name: $name})
+                    SET c.synonym = $synonym
+                """, parameters = {"name": class_name, "synonym": synonym})
 
 
         # Create relationships (subclasses, properties)
