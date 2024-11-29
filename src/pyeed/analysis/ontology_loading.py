@@ -18,6 +18,11 @@ class OntologyAdapter():
         g.parse(file_path)
 
         IAO_NS = Namespace("http://purl.obolibrary.org/obo/IAO_")
+
+        # create a dictonary of the labels
+        dicts_labels = {}
+        for s, p, o in g.triples((None, RDFS.label, None)):
+            dicts_labels[str(s)] = str(o)
     
         # Iterate over the classes in the OWL file
         for s, p, o in g.triples((None, RDF.type, OWL.Class)):
@@ -35,12 +40,36 @@ class OntologyAdapter():
 
         # Create relationships (subclasses, properties)
         for s, p, o in g.triples((None, RDFS.subClassOf, None)):
-            subclass = str(s)
-            superclass = str(o)
-            db.execute_write("""
-                MATCH (sub:OntologyObject {name: $subclass}), (super:OntologyObject {name: $superclass})
-                CREATE (sub)-[:SUBCLASS_OF]->(super)
-            """, parameters = {"subclass": subclass, "superclass": superclass})
+            if (o, RDF.type, OWL.Class) in g:
+                subclass = str(s)
+                superclass = str(o)
+                db.execute_write("""
+                    MATCH (sub:OntologyObject {name: $subclass}), (super:OntologyObject {name: $superclass})
+                    CREATE (sub)-[:SUBCLASS_OF]->(super)
+                """, parameters = {"subclass": subclass, "superclass": superclass})
+
+            # handels the case where the subclass is a restriction, RO_ (in CARD)
+            elif (o, RDF.type, OWL.Restriction) in g:
+                on_property = None
+                some_values_from = None
+                
+                # Extract onProperty
+                for _, _, prop in g.triples((o, OWL.onProperty, None)):
+                    on_property = str(prop)
+                
+                # Extract someValuesFrom
+                for _, _, value in g.triples((o, OWL.someValuesFrom, None)):
+                    some_values_from = str(value)
+                
+                if on_property and some_values_from:
+                    # create a realtionship of type CustomRealationship with the name on_property and the description which can be checked in the dict
+                    # link is between the subclass and the some_values_from
+                    db.execute_write("""
+                        MATCH (sub:OntologyObject {name: $subclass}), (super:OntologyObject {name: $some_values_from})
+                        CREATE (sub)-[:CustomRelationship {name: $on_property, description: $description}]->(super)
+                    """, parameters = {"subclass": subclass, "some_values_from": some_values_from, "on_property": on_property, "description": dicts_labels[on_property]})
+
+
 
 
 
