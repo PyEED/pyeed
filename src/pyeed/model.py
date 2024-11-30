@@ -439,6 +439,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
         "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
@@ -469,3 +470,49 @@ class DNA(StrictStructuredNode):
     pairwise_aligned = RelationshipTo(
         "DNA", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
     )
+
+
+class CustomRealationship(StructuredRel):
+    """A custom relationship between two ontology objects."""
+
+    name = StringProperty(required=True)
+    description = StringProperty()
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        name: str,
+        description: str,
+    ):
+        molecule1.custom_relationships.connect(
+            molecule2,
+            {
+                "name": name,
+                "description": description,
+            },
+        )
+
+        return cls(
+            name=name,
+            description=description,
+        )
+
+    @property
+    def label(self):
+        return self.name
+
+
+
+class OntologyObject(StrictStructuredNode):
+    """A node representing an ontology object in the database."""
+
+    name = StringProperty(required=True, unique_index=True)
+    description = StringProperty()
+    label = StringProperty()
+    synonyms = ArrayProperty(StringProperty())
+
+    # Relationships
+    subclasses = RelationshipTo("OntologyObject", "SUBCLASS_OF")
+    custom_relationships = RelationshipTo("OntologyObject", "CUSTOM_RELATIONSHIP", model=CustomRealationship)
