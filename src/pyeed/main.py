@@ -83,6 +83,8 @@ class Pyeed:
 
         accessions = self.db.execute_read(query)[0]["accessions"]
         ids = [id for id in ids if id not in accessions]
+        # count how many sequences are already in the database
+        logger.info(f"Found {len(accessions)} sequences in the database.")
 
         logger.info(f"Fetching {len(ids)} sequences from {db}.")
         if db.lower() == "uniprot":

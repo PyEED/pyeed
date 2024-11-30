@@ -1,7 +1,3 @@
-"""
-
-"""
-
 from Bio.Align import Alignment as Alignment
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.main import Pyeed
@@ -10,8 +6,19 @@ from rdflib import Graph, RDF, RDFS, OWL, Namespace
 
 
 class OntologyAdapter():
+    """
+    Adapter class to load ontology files into the database.
+    """
 
     def import_ontology_file_in_db(self, file_path: str, db: DatabaseConnector):
+        """
+        Imports an ontology file into the database.
+
+        :param file_path: The path to the ontology file.
+        :param db: The database connector
+
+        :return: None
+        """
         
         # Load the OWL file
         g = Graph()

@@ -439,6 +439,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
         "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
