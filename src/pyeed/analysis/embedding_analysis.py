@@ -79,6 +79,87 @@ class EmbeddingTool:
 
         return distances[:n]
 
+    def visualization_2d_projection_tsne(self, db: DatabaseConnector, perplexity = 50, n_iter = 1000, ids_list = None, ids_list_labels = None):
+        """
+        This function will perform a 2D projection of the embeddings using t-SNE and visualize it.
+        
+        Parameters:
+        db (DatabaseConnector): The database connector object
+        perplexity (int): The perplexity parameter for the t-SNE algorithm. Default is 30
+        n_iter (int): The number of iterations for the t-SNE algorithm. Default is 1000
+        ids_list (list): A list of sequence ids for which we want to visualize the embeddings. Default is None
+        ids_list_labels (list): A list of labels for the sequence ids. Default is None
+        """
+        if ids_list is None:
+            # get all the accession_ids
+            query = """
+            MATCH (p:Protein)
+            WHERE p.accession_id IS NOT NULL
+            RETURN p.accession_id AS protein_id
+            """
+            ids_list = [record['protein_id'] for record in db.execute_read(query)]
+
+        
+        # get the embeddings for the proteins based in the ids list
+        query = """
+        MATCH (p:Protein)
+        WHERE p.accession_id IN $ids
+        RETURN p.accession_id AS protein_id, p.embedding AS embedding
+        """
+        result = db.execute_read(query, {"ids": ids_list})
+        print(f"Number of proteins fetched with embeddings: {len(result)}")
+        print(f"Number of proteins in id list: {len(ids_list)}")
+
+        # prepare data for visualization
+        protein_ids, labels = [], []
+        embeddings = np.array([])
+
+        for record in result:
+            protein_ids.append(record["protein_id"])
+            embeddings.append(record["embedding"])
+            # the label is either None or the label from the ids_list_labels
+            if ids_list_labels is not None:
+                labels.append(ids_list_labels[record["protein_id"]])
+            else:
+                labels.append('None')
+            
+        embeddings = np.array(embeddings)
+
+        # assign each label a color and create the color list with the corresponding colors
+        # the default colo for 'None' is black
+        colors = []
+        color_label_dict: dict[str, str] = {}
+        import matplotlib.pyplot as plt
+        cycle_colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+
+        for label in labels:
+            if label not in color_label_dict.keys():
+                color_label_dict[label] = cycle_colors[len(color_label_dict) % len(cycle_colors)]
+        
+        # assign the colors
+        for label in labels:
+            if label == None:
+                colors.append('black')
+            else:
+                colors.append(color_label_dict[label])
+        
+        # perform t-SNE
+        from sklearn.manifold import TSNE
+        tsne = TSNE(n_components = 2, perplexity = perplexity, max_iter = n_iter, random_state=42)
+
+        embeddings_2d = tsne.fit_transform(embeddings)
+
+        return protein_ids, embeddings_2d, labels, colors
+
+
+
+
+
+
+        
+
+
+
 
 
 if __name__ == "__main__":
@@ -96,10 +177,5 @@ if __name__ == "__main__":
 
     closest_matches = et.find_closest_matches_simple("AQT03459.1", eedb.db, metric = 'cosine', n = 10)
     print(f"Closest matches for AQT03459.1: {closest_matches}")
-
-
-
-
-
 
 
