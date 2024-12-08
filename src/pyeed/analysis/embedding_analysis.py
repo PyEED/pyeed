@@ -112,7 +112,7 @@ class EmbeddingTool:
 
         # prepare data for visualization
         protein_ids, labels = [], []
-        embeddings = np.array([])
+        embeddings = []
 
         for record in result:
             protein_ids.append(record["protein_id"])
@@ -151,9 +151,81 @@ class EmbeddingTool:
 
         return protein_ids, embeddings_2d, labels, colors
 
+    def visualization_2d_projection_umap(self, db: DatabaseConnector, n_neighbors = 15, min_dist = 0.1, metric = 'cosine', ids_list = None, ids_list_labels = None):
+        """
+        This function will perform a 2D projection of the embeddings using UMAP and visualize it.
+        
+        Parameters:
+        db (DatabaseConnector): The database connector object
+        n_neighbors (int): The number of neighbors parameter for the UMAP algorithm. Default is 15
+        min_dist (float): The minimum distance parameter for the UMAP algorithm. Default is 0.1
+        metric (str): The metric to use for the distance calculation. Default is 'cosine'
+        ids_list (list): A list of sequence ids for which we want to visualize the embeddings. Default is None
+        ids_list_labels (list): A list of labels for the sequence ids. Default is None
+        """
+        if ids_list is None:
+            # get all the accession_ids
+            query = """
+            MATCH (p:Protein)
+            WHERE p.accession_id IS NOT NULL
+            RETURN p.accession_id AS protein_id
+            """
+            ids_list = [record['protein_id'] for record in db.execute_read(query)]
+
+        
+        # get the embeddings for the proteins based in the ids list
+        query = """
+        MATCH (p:Protein)
+        WHERE p.accession_id IN $ids
+        RETURN p.accession_id AS protein_id, p.embedding AS embedding
+        """
+        result = db.execute_read(query, {"ids": ids_list})
+        print(f"Number of proteins fetched with embeddings: {len(result)}")
+        print(f"Number of proteins in id list: {len(ids_list)}")
+
+        # prepare data for visualization
+        protein_ids, labels = [], []
+        embeddings = []
+
+        for record in result:
+            protein_ids.append(record["protein_id"])
+            print(type(embeddings))
+            print(type(record["embedding"]))
+            embeddings.append(record["embedding"])
+            # the label is either None or the label from the ids_list_labels
+            if ids_list_labels is not None:
+                labels.append(ids_list_labels[record["protein_id"]])
+            else:
+                labels.append('None')
+            
+        embeddings = np.array(embeddings)
+
+        # assign each label a color and create the color list with the corresponding colors
+        # the default colo for 'None' is black
+        colors = []
+        color_label_dict: dict[str, str] = {}
+        import matplotlib.pyplot as plt
+        cycle_colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
 
 
+        for label in labels:
+            if label not in color_label_dict.keys():
+                color_label_dict[label] = cycle_colors[len(color_label_dict) % len(cycle_colors)]
+            
 
+        # assign the colors
+        for label in labels:
+            if label == None:
+                colors.append('black')
+            else:
+                colors.append(color_label_dict[label])
+
+        # perform UMAP
+        import umap
+        umap_model = umap.UMAP(n_neighbors = n_neighbors, min_dist = min_dist, metric = metric)
+        embeddings_2d = umap_model.fit_transform(embeddings)
+
+        return protein_ids, embeddings_2d, labels, colors
 
 
         
