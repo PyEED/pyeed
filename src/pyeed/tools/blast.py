@@ -49,45 +49,6 @@ class Blast(AbstractTool):
             print(connect_error)
             raise httpx.ConnectError("PyEED Docker Service is not running.") from None
 
-    BLAST_COLUMNS = [
-    "query_id",      # Query sequence ID
-    "subject_id",    # Subject (database) sequence ID
-    "percent_identity",  # Percentage of identical matches
-    "alignment_length",  # Alignment length
-    "mismatches",    # Number of mismatches
-    "gap_opens",     # Number of gap openings
-    "query_start",   # Start of alignment in query
-    "query_end",     # End of alignment in query
-    "subject_start", # Start of alignment in subject
-    "subject_end",   # End of alignment in subject
-    "evalue",        # Expectation value
-    "bit_score"      # Bit score
-    ]
-
-    def parse_blast_result(result_text: str) -> pd.DataFrame:
-        """
-        Parses BLAST outfmt=6 result text into a pandas DataFrame.
-
-        Args:
-            result_text (str): BLAST result in outfmt=6.
-
-        Returns:
-            pd.DataFrame: BLAST results as a DataFrame.
-        """
-        # Split the result into lines and remove empty lines
-        lines = [line for line in result_text.split("\n") if line.strip()]
-        
-        # Convert the lines into a DataFrame
-        df = pd.DataFrame([line.split("\t") for line in lines], columns=BLAST_COLUMNS)
-        
-        # Convert numerical columns to appropriate types
-        for col in ["percent_identity", "alignment_length", "mismatches", "gap_opens",
-                    "query_start", "query_end", "subject_start", "subject_end",
-                    "evalue", "bit_score"]:
-            df[col] = pd.to_numeric(df[col])
-        
-        return df
-
     def blastp(self, query, db, evalue=0.001, outfmt=10, num_threads=50, max_target_seqs=50):
         """
         Perform a BLASTP search using the provided parameters.
@@ -106,12 +67,16 @@ class Blast(AbstractTool):
         # now we will run the run service
         result = self.run_service(query, db, evalue, outfmt, num_threads, max_target_seqs)
         
-        #parse the result to a pandas dataframe
+        #save the result as a csv file and read it with pandas
+
         
-        blast_result_text = result.text  # Assuming result.text contains the outfmt=6 text
-        df = self.parse_blast_result(blast_result_text)
+        with open('blast_result.csv', 'w') as f:
+            f.write(result.json()['result'])
+            
+        # reed the csv file
+        df = pd.read_csv('blast_result.csv')
         
-        return df
+        return df.head()
 
         
     
