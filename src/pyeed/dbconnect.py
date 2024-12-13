@@ -196,7 +196,7 @@ class DatabaseConnector:
             from datetime import datetime
 
             if datetime.now().strftime("%Y-%m-%d") != date:
-                print("The provided date does not match the current date.")
+                print(f"The provided date does not match the current date. Date is you gave is {date} actual date is {datetime.now().strftime('%Y-%m-%d')}")
                 return
 
         delete_query = """

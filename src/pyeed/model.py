@@ -219,7 +219,7 @@ class RegionRel(StructuredRel):
 
 
 class StandardNumberingRel(StructuredRel):
-    positions = ArrayProperty(IntegerProperty(), required=True)
+    positions = ArrayProperty(StringProperty(), required=True)
 
     @classmethod
     def validate_and_connect(
