@@ -156,13 +156,9 @@ class StandardNumberingTool:
 
         # get the base sequence
         base_sequence = self.get_protein_base_sequence(base_sequence_id, db)
-        print(f"Base sequence: {base_sequence}")
 
         # remove the base sequence from the proteins_dict
         proteins_dict.pop(base_sequence_id)
-
-        
-        print(f"Base sequence: {base_sequence}")
         
         # run clustal omega
         from pyeed.tools.clustalo import ClustalOmega
@@ -173,9 +169,7 @@ class StandardNumberingTool:
         for key in proteins_dict:
             # format is >id\nsequence
             sequences.append(f">{key}\n{proteins_dict[key]}")
-
-        print(sequences[:3])
-        
+       
         # run clustal omega
         clustalO = ClustalOmega()
         alignment = clustalO.align(sequences)
@@ -190,10 +184,6 @@ class StandardNumberingTool:
         # get all positions for all the sequences
         # we want to use inserts as 2.1 .. to check wether it is an insert we take a look at the base sequence at the postions if - is present
         self.positions = self.run_numbering_algorithm(base_sequence_id, alignment)
-
-        print(self.positions['AEQ59620.1'])
-        print(list(self.positions.values())[:2])
-
 
         # update the database with the standard numbering
         # create the standard numbering node
