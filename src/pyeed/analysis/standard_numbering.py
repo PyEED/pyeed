@@ -142,7 +142,7 @@ class StandardNumberingTool:
 
 
 
-    def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector):
+    def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector, list_of_seq_ids: list = None):
         """
         This function will set the standard numbering for a given base sequence and all the sequences in the database
         The sequences will be aligned with clustal omega and the positions will be determined
@@ -153,6 +153,11 @@ class StandardNumberingTool:
         """
         # get all the proteins from the database
         proteins_dict = self._get_proteins_dict(db)
+        # if list_of_seq_ids is not None, only the sequences in the list will be used
+        if list_of_seq_ids is not None:
+            proteins_dict = {protein_id: proteins_dict[protein_id] for protein_id in list_of_seq_ids if protein_id in proteins_dict}
+
+        logger.info(f"Using {len(proteins_dict)} sequences for standard numbering") 
 
         # get the base sequence
         base_sequence = self.get_protein_base_sequence(base_sequence_id, db)

@@ -230,10 +230,6 @@ class EmbeddingTool:
 
         
 
-
-
-
-
 if __name__ == "__main__":
 
     uri = "bolt://127.0.0.1:8123"

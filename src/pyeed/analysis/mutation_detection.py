@@ -11,7 +11,7 @@ class MutationDetection:
     def __init__(self):
         None
 
-    def get_mutations_between_sequences(self, sequence_id1: str, sequence_id2: str, db: DatabaseConnector, standard_numbering_tool_name: str, print_debug: bool = False):
+    def get_mutations_between_sequences(self, sequence_id1: str, sequence_id2: str, db: DatabaseConnector, standard_numbering_tool_name: str, print_debug: bool = False, save_to_db: bool = True):
         """
         This function will get the number of mutations between two sequences.
         The mutations are detected in the following way:
@@ -40,8 +40,8 @@ class MutationDetection:
         """
         results = db.execute_read(query)
 
-        if len(results) != 4:
-            raise ValueError("Could not find standard numbering positions for both sequences")
+        if len(results) < 2:
+            raise ValueError(f"Could not find standard numbering positions for both sequences {sequence_id1} and {sequence_id2} the results are: {results}")
 
         # Create dictionaries to store sequence and position info
         sequences = {}
@@ -88,7 +88,7 @@ class MutationDetection:
                 from_monomers.append(seq1[idx1])
                 to_monomers.append(seq2[idx2])
 
-        return {
+        data = {
             'sequence_id1': sequence_id1,
             'sequence_id2': sequence_id2,
             'from_positions': from_positions,
@@ -96,6 +96,11 @@ class MutationDetection:
             'from_monomers': from_monomers,
             'to_monomers': to_monomers
         }
+
+        if save_to_db:
+            self.save_mutations_to_db(data, db)
+
+        return data
     
 
     def save_mutations_to_db(self, mutations: dict, db: DatabaseConnector):
