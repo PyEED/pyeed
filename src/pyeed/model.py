@@ -217,7 +217,37 @@ class RegionRel(StructuredRel):
     def label(self):
         return f"{self.start}-{self.end}"
 
+class CatalyticActivity(StrictStructuredNode):
+    catalytic_id: int = IntegerProperty(required=True, unique_index=True)
+    name = StringProperty()
 
+
+class CatalyticActivityRel(StructuredRel):
+    positions = ArrayProperty(IntegerProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        positions: list,
+    ):
+        molecule1.catalytic_activity.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self):
+        return f"{self.positions}"
+    
+    
 class StandardNumberingRel(StructuredRel):
     positions = ArrayProperty(IntegerProperty(), required=True)
 
@@ -429,6 +459,7 @@ class Protein(StrictStructuredNode):
     locus_tag = StringProperty()
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
+    catalytic_activity = ArrayProperty(StringProperty())
     embedding = ArrayProperty(
         FloatProperty(),
         vector_index=VectorIndex(dimensions=1280),
@@ -439,6 +470,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    catalytic_annotation = RelationshipTo("CatalyticActivity", "CATALYTIC_ACTIVITY", model=CatalyticActivityRel)
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
         "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
