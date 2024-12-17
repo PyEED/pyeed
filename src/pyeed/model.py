@@ -217,7 +217,18 @@ class RegionRel(StructuredRel):
     def label(self):
         return f"{self.start}-{self.end}"
 
-
+class CatalyticActivity(StrictStructuredNode):
+    """
+    A node representing a catalytic activity.
+    """
+    
+    catalytic_id: int = IntegerProperty(required=False, unique_index=True)
+    name = StringProperty()
+    
+    @property
+    def label(self):
+        return self.name
+    
 class StandardNumberingRel(StructuredRel):
     positions = ArrayProperty(IntegerProperty(), required=True)
 
@@ -429,6 +440,7 @@ class Protein(StrictStructuredNode):
     locus_tag = StringProperty()
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
+    catalytic_name = ArrayProperty(StringProperty())
     embedding = ArrayProperty(
         FloatProperty(),
         vector_index=VectorIndex(dimensions=1280),
@@ -439,6 +451,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
+    catalytic_annotation = RelationshipTo("CatalyticActivity", "CATALYTIC_ACTIVITY")
     ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
