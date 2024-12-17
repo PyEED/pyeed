@@ -40,9 +40,14 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 logger.info(
                     f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
                 )
-                return (None, None)
 
-            taxonomy_id = feature.qualifiers["db_xref"][0]
+            # check wether one of the db_xref is a taxonomy id starts with 'taxon:'
+            taxonomy_id = None
+            for db_xref in feature.qualifiers["db_xref"]:
+                logger.debug(f"Checking db_xref: {db_xref}")
+                if db_xref.startswith("taxon:"):
+                    taxonomy_id = db_xref
+                    break
 
             if ":" in taxonomy_id:
                 taxonomy_id = int(taxonomy_id.split(":")[1])
