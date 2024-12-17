@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Any
 
 from loguru import logger
+import traceback
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
 from pyeed.model import Annotation, GOAnnotation, Organism, Protein, Site, CatalyticActivity
@@ -65,15 +66,15 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
             protein.site.connect(site, {"positions": positions})
     
     def add_catalytic_activity(self, data: dict, protein: Protein):
-        try: 
-            for reference in data["dbReferences"]:
-                if reference["type"] == "CATALYTIC ACTIVITY":
+        try:
+            for reference in data['comments']:
+                if reference['type'] == "CATALYTIC_ACTIVITY":
                     catalytic_annotation = CatalyticActivity.get_or_save(
-                        catalytic_id = reference["id"],
-                        name = reference["reaction"]["name"],
+                        catalytic_id = int(reference["id"]) if reference.get("id") else None,
+                        name=reference["reaction"]["name"],
                     )
+                    protein.catalytic_annotation.connect(catalytic_annotation)
                     
-                    protein.catalytic_activity.connect(catalytic_annotation)
         except Exception as e:
             logger.error(f"Error saving catalytic activity for {protein.accession_id}: {e}")
                 
