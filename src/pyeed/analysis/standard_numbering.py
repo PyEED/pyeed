@@ -1,6 +1,8 @@
 # here a standard numbering can be definied for proteins or dna sequences
 # the defintion then points to all the dna or protein sequences that are part of the standard numbering
 # on the relationship between the standard numbering and the dna or protein sequences, there is an array of positions
+from loguru import logger
+
 from pyeed.model import StandardNumbering
 from pyeed.dbconnect import DatabaseConnector
 
@@ -26,7 +28,7 @@ class StandardNumberingTool:
 
         return proteins_dict
 
-    def _get_protein_base_sequence(self, base_sequence_id: str, db: DatabaseConnector):
+    def get_protein_base_sequence(self, base_sequence_id: str, db: DatabaseConnector):
         """
         This function will get the base sequence from the database
         """
@@ -43,62 +45,104 @@ class StandardNumberingTool:
 
         return base_sequence
     
-    def _safe_positions(self, db: DatabaseConnector):
+    def safe_positions(self, db: DatabaseConnector):
         """
         This function will save the positions to the database
+        The positions need to be one long string
         """
         for protein_id in self.positions:
             query = f"""
                 MATCH (p:Protein {{accession_id: '{protein_id}'}})
                 MATCH (s:StandardNumbering {{name: '{self.name}'}})
                 MERGE (p)-[r:HAS_STANDARD_NUMBERING]->(s)
-                SET r.positions = {self.positions[protein_id]}
+                SET r.positions = {str(self.positions[protein_id])}
             """
             db.execute_write(query)
 
-    def _run_standard_numbering_algo(self, base_sequence_id: str, alignment: list, base_sequence_alignment: str, positions_base: list):
+    def run_numbering_algorithm(self, base_sequence_id: str, alignment):
         """
-        This function will run the standard numbering algorithm
+        Core algorithm to compute numbering positions for all sequences relative to the base sequence.
         """
-        positions = {}  # Dictionary to store positions for each sequence in the alignment
-        for i in range(1, len(alignment)):
-            sequence = alignment[i].seq  # Get the sequence from the alignment
-            positions_sequence: list[str] = []  # List to store positions for the current sequence
+        logger.info(f"Running numbering algorithm for base sequence {base_sequence_id}")
 
-            for j in range(len(base_sequence_alignment.replace('-', ''))):
-                if base_sequence_alignment[j] == '-' and sequence[j] != '-':
-                    # If there is an insertion in the sequence
-                    if len(positions_sequence) > 0:
-                        if positions_sequence[-1].count('.') != 0:
-                            # If the last position is an insertion
-                            if positions_sequence[-1].split('.')[0] == str(j):
-                                insert_number = int(positions_sequence[-1].split('.')[1]) + 1
-                            else:
-                                insert_number = 1
-                        else:
-                            insert_number = 1
+        positions = {}
+
+        # the base sequence has the postions 1, ...
+        base_sequence = alignment[0].seq
+        positions[base_sequence_id] = [str(i + 1) for i in range(len(base_sequence.replace('-', '')))]
+
+        base_seq_counter = -1
+        # iterate over the positions in the alignment
+        for pos in range(len(alignment[0].seq)):
+
+            # this is the amino acid in the base sequence
+            base_aa = alignment[0].seq[pos]
+
+            if base_aa != '-':
+                base_seq_counter += 1
+            
+            for j in range(1, len(alignment)):
+                # get the sequence
+                sequence = alignment[j].seq
+                # get the id
+                sequence_id = alignment[j].id
+
+                if base_aa == '-' and sequence[pos] == '-':
+                    # both are inserts
+                    continue
+
+                if base_aa == '-' and sequence[pos] != '-':
+                    # insert in the base sequence
+                    if sequence_id not in positions:
+                        positions[sequence_id] = []
+                        positions[sequence_id].append('0.0')
+                    
                     else:
-                        insert_number = 1
-
-                    for k in range(j, len(sequence)):
-                        if base_sequence_alignment[k] != '-':
-                            break
+                        # check if the previous position is an insert
+                        if '.' in positions[sequence_id][-1]:
+                            # get the number of the insert
+                            insert_number = int(positions[sequence_id][-1].split('.')[1])
+                            base_number = int(positions[sequence_id][-1].split('.')[0])
+                            positions[sequence_id].append(f"{base_number}.{insert_number + 1}")
+                        
                         else:
-                            # Add the insertion position
-                            positions_sequence.append(str(j) + '.' + str(insert_number + (k - j)))
-                else:
-                    # Add the normal position
-                    positions_sequence.append(str(j))
+                            positions[sequence_id].append(f"{positions[sequence_id][-1]}.1")
 
-            # Store the positions for the current sequence
-            positions[alignment[i].id] = positions_sequence
+                if base_aa != '-' and sequence[pos] == '-':
+                    if sequence_id not in positions:
+                        positions[sequence_id] = [positions[base_sequence_id][base_seq_counter] + '.GAP']
+                        
+                    positions[sequence_id].append(f"{positions[sequence_id][-1].split('.')[0]}.GAP")
 
-        # Store the positions for the base sequence
-        positions[base_sequence_id] = [str(i) for i in positions_base]
+                if base_aa != '-' and sequence[pos] != '-':
+                    # both are amino acids
+                    if sequence_id not in positions:
+                        positions[sequence_id] = []
+                        positions[sequence_id].append(positions[base_sequence_id][base_seq_counter])
+                    
+                    else:
+                        # check the previous position base number (does not matter if it is an insert)
+                        # increment the number
+                        if '.' in positions[sequence_id][-1] and 'GAP' not in positions[sequence_id][-1]:
+                            # get the number of the insert
+                            base_number = int(positions[sequence_id][-1].split('.')[0])
+                            positions[sequence_id].append(f"{base_number + 1}")
+                        
+                        else:
+                            positions[sequence_id].append(f"{int(positions[base_sequence_id][base_seq_counter])}")
 
+
+        # clean up all the GAP and remove them
+        for protein_id in positions:
+            positions[protein_id] = [pos for pos in positions[protein_id] if 'GAP' not in pos]
+
+                
         return positions
 
-    def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector):
+
+
+
+    def apply_standard_numbering(self, base_sequence_id: str, db: DatabaseConnector, list_of_seq_ids: list = None):
         """
         This function will set the standard numbering for a given base sequence and all the sequences in the database
         The sequences will be aligned with clustal omega and the positions will be determined
@@ -109,9 +153,17 @@ class StandardNumberingTool:
         """
         # get all the proteins from the database
         proteins_dict = self._get_proteins_dict(db)
+        # if list_of_seq_ids is not None, only the sequences in the list will be used
+        if list_of_seq_ids is not None:
+            proteins_dict = {protein_id: proteins_dict[protein_id] for protein_id in list_of_seq_ids if protein_id in proteins_dict}
+
+        logger.info(f"Using {len(proteins_dict)} sequences for standard numbering") 
 
         # get the base sequence
-        base_sequence = self._get_protein_base_sequence(base_sequence_id, db)
+        base_sequence = self.get_protein_base_sequence(base_sequence_id, db)
+
+        # remove the base sequence from the proteins_dict
+        proteins_dict.pop(base_sequence_id)
         
         # run clustal omega
         from pyeed.tools.clustalo import ClustalOmega
@@ -122,7 +174,7 @@ class StandardNumberingTool:
         for key in proteins_dict:
             # format is >id\nsequence
             sequences.append(f">{key}\n{proteins_dict[key]}")
-        
+       
         # run clustal omega
         clustalO = ClustalOmega()
         alignment = clustalO.align(sequences)
@@ -132,12 +184,11 @@ class StandardNumberingTool:
 
         # get all postions relative to the base sequence
         positions_base = list(range(len(base_sequence_alignment.replace('-', ''))))
-        positions_base = [i for i in positions_base]
+        positions_base = [str(i) for i in positions_base]
         
         # get all positions for all the sequences
         # we want to use inserts as 2.1 .. to check wether it is an insert we take a look at the base sequence at the postions if - is present
-        self.positions = self._run_standard_numbering_algo(base_sequence_id, alignment, base_sequence_alignment, positions_base)
-
+        self.positions = self.run_numbering_algorithm(base_sequence_id, alignment)
 
         # update the database with the standard numbering
         # create the standard numbering node
@@ -146,28 +197,67 @@ class StandardNumberingTool:
         )
 
         # create the relationships between the standard numbering and the proteins
-        self._safe_positions(db)
+        self.safe_positions(db)
     
         
 
 if __name__ == "__main__":
 
+
+    uri = "bolt://127.0.0.1:7687"
+    user = "neo4j"
+    password = "12345678"
+
+    from pyeed import Pyeed
+
+
+    # Create a Pyeed object, automatically connecting to the database
+    eedb = Pyeed(uri, user, password)
+
+    # remove all relationships on the previous standard numbering
+    query = """
+    MATCH (n:StandardNumbering)-[r:HAS_STANDARD_NUMBERING]-(c:Protein) DELETE r
+    """
+
+    eedb.db.execute_write(query)
+
+    
     # test the standard numbering
     sequences = [
         ">seq1\nMTHKLLLTLLFTLLFSSAYSRG",
-        ">seq2\nMTHKITLLLTLLFTLLFSSAYSRG",
-        ">seq3\nMTHKILLLTLLFTLLFSSCYSRG",
+        ">seq2\nABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
+        ">seq3\nMTHKILLLTLLFTLLFSSCYSRGARTHDB",
     ]
-
-    base_sequence = {
-        "id": "seq0",
-        "sequence": "MTHKLLLTLLFTLLFSSTYSRG"
-    }
 
     proteins_dict = {
         "seq1": "MTHKLLLTLLFTLLFSSAYSRG",
-        "seq2": "MTHKITLLLTLLFTLLFSSAYSRG",
-        "seq3": "MTHKILLLTLLFTLLFSSCYSRG"
+        "seq2": "ABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
+        "seq3": "MTHKILLLTLLFTLLFSSCYSRGARTHDB"
     }
 
-    None
+    base_sequence = {
+        "id": 'seq0',
+        "sequence": 'AMTHKLLLTLLFTLLFSSAYSRG'
+    }
+
+    from pyeed.tools.clustalo import ClustalOmega
+
+    clustalO = ClustalOmega()
+
+    # add base sequence to the sequences
+    sequences.insert(0, f">{base_sequence['id']}\n{base_sequence['sequence']}")
+
+    alignment = clustalO.align(sequences)
+
+    sn_tool = StandardNumberingTool("test_standard_numbering")
+    sn_tool.positions = sn_tool.run_numbering_algorithm('seq0', alignment)    
+
+    count = 0
+    for i in sn_tool.positions:
+        count += 1
+        print(i, sn_tool.positions[i])
+
+        if count > 10:
+            break
+    
+

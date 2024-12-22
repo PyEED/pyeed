@@ -90,6 +90,7 @@ class PairwiseAligner:
         db: Optional[DatabaseConnector] = None,
         batch_size: int = 500,
         return_results: bool = True,
+        pairs: Optional[list[tuple[str, str]]] = None,
     ) -> Optional[List[dict]]:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
@@ -110,6 +111,8 @@ class PairwiseAligner:
             return_results (bool): Whether to return the list of alignment results. If set to False,
                 the function will perform the alignments and any database insertion without
                 returning the results, which can reduce memory usage. Defaults to True.
+            pairs (Optional[list[tuple[str, str]]]): A list of tuples, where each tuple contains two
+                sequence IDs to align. If provided, only these pairs will be aligned.
 
         Returns:
             Optional[List[dict]]: A list of dictionaries containing the alignment results if
@@ -125,7 +128,9 @@ class PairwiseAligner:
                 "Either sequences or ids (with a database connection) must be provided."
             )
 
-        pairs = list(combinations(sequences, 2))
+        if pairs is None:
+            pairs = list(combinations(sequences, 2))
+            
         total_pairs = len(pairs)
         all_alignments = []
 
@@ -158,6 +163,7 @@ class PairwiseAligner:
                     all_alignments.extend(alignments)
 
         return all_alignments if return_results else None
+
 
     def _to_db(
         self,

@@ -185,10 +185,20 @@ class DatabaseConnector:
             ]
         )
 
-    def wipe_database(self):
+    def wipe_database(self, date=None):
         """
         Deletes all nodes and relationships in the database.
+        The date parameter can be used but is not necessary.
+        When not provided, all data will be deleted. If provided, the data will only be deleted if the date matches the current date.
+        The format of the date should be 'YYYY-MM-DD'.
         """
+        if date:
+            from datetime import datetime
+
+            if datetime.now().strftime("%Y-%m-%d") != date:
+                print(f"The provided date does not match the current date. Date is you gave is {date} actual date is {datetime.now().strftime('%Y-%m-%d')}")
+                return
+
         delete_query = """
         MATCH (n)
         DETACH DELETE n

@@ -44,7 +44,7 @@ class ClustalOmega(AbstractTool):
         """Executes the ClustalOmega service."""
         file = self.create_file(data)
         try:
-            return httpx.post(self._service_url, files=file, timeout=600)
+            return httpx.post(self._service_url, files=file, timeout=6000)
 
         except httpx.ConnectError as connect_error:
             context = connect_error.__context__
@@ -55,7 +55,7 @@ class ClustalOmega(AbstractTool):
                         "clustalo", "localhost"
                     )
                     try:
-                        return httpx.post(self._service_url, files=file, timeout=600)
+                        return httpx.post(self._service_url, files=file, timeout=6000)
                     except httpx.ConnectError:
                         raise httpx.ConnectError(
                             "PyEED Docker Service is not running."
