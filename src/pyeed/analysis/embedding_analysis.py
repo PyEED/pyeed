@@ -3,6 +3,7 @@
 # it will load the embedding results and perform some analysis on it
 # a lot of code was provided by Tim Panzer in his bachelor thesis results
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.spatial.distance import cosine
 
 from pyeed.main import Pyeed
@@ -31,6 +32,8 @@ class EmbeddingTool:
         RETURN p.embedding AS embedding
         """
         embedding_read = db.execute_read(query)
+        if len(embedding_read) == 0:
+            raise ValueError(f"No embedding found for sequence id: {sequence_id}")
         embedding = np.array(embedding_read[0]['embedding'])
 
         return embedding
@@ -227,6 +230,43 @@ class EmbeddingTool:
 
         return protein_ids, embeddings_2d, labels, colors
 
+    def plot_matrix_comparison(self, distance_matrix_1, distance_matrix_2, protein_ids_1, protein_ids_2, label_1, label_2, number_of_points_goal):
+        # general plot function
+        # we want to plot the two distance matrices against each other
+        fig = plt.figure(figsize=(15, 10))
+
+        total_number_of_points = distance_matrix_1.shape[0] * distance_matrix_1.shape[1]
+        random_chance_probability = number_of_points_goal / total_number_of_points
+        point_counter = 0
+
+        for i in range(len(protein_ids_1)):
+            for j in range(len(protein_ids_2)):
+                if np.random.rand() < random_chance_probability:
+
+                    matrix_1_id = protein_ids_1[i]
+                    matrix_2_id = protein_ids_2[j]
+
+                    if matrix_1_id == matrix_2_id:
+                        plt.scatter(distance_matrix_1[i, j], distance_matrix_2[i, j], c='gray', alpha=0.1, s=30, edgecolor="k")
+                    else:
+                        # we need to find the index of the matrix_2_id in the protein_ids_1 array from numpy
+                        # the i is the index in the protein_ids_1 array this means we are looking of the index to j in the protein_ids_1 array
+                        index_matrix_1_id = np.where(protein_ids_1 == matrix_2_id)[0][0]
+                        # now the index of the matrix_1_id is the index of the matrix_2_id in the protein_ids_2 array
+                        index_matrix_2_id = np.where(protein_ids_2 == matrix_1_id)[0][0]
+
+                        plt.scatter(distance_matrix_1[i, index_matrix_1_id], distance_matrix_2[index_matrix_2_id, j], c='gray', alpha=0.1, s=30, edgecolor="k")
+                    
+                    point_counter += 1
+                if point_counter > number_of_points_goal:
+                    break
+        
+        plt.title(f"{label_1} vs {label_2}, points placed n = {point_counter}")
+        plt.xlabel(label_1)
+        plt.ylabel(label_2)
+        plt.grid()
+        plt.tight_layout()
+        plt.show()
 
         
 
