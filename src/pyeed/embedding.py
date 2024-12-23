@@ -1,6 +1,7 @@
 import gc
 import logging
 
+import numpy as np
 import torch
 from transformers import EsmModel, EsmTokenizer
 

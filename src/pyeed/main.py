@@ -16,6 +16,7 @@ from pyeed.embedding import (
     get_batch_embeddings,
     load_model_and_tokenizer,
     update_protein_embeddings_in_db,
+    get_single_embedding_last_hidden_state,
 )
 from pyeed.model import StandardNumbering
 
