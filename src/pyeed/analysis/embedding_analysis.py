@@ -2,13 +2,14 @@
 # it assumes that the embedding is already done and the results are saved in the neo4j database
 # it will load the embedding results and perform some analysis on it
 # a lot of code was provided by Tim Panzer in his bachelor thesis results
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import cosine
+import scipy.spatial as sp
 
 from pyeed.main import Pyeed
 from pyeed.dbconnect import DatabaseConnector
-
+from pyeed.embedding import load_model_and_tokenizer
 
 
 class EmbeddingTool:
@@ -37,6 +38,30 @@ class EmbeddingTool:
         embedding = np.array(embedding_read[0]['embedding'])
 
         return embedding
+
+    def _get_single_embedding_last_hidden_state(self, sequence, model, tokenizer, device):
+        """
+        Generates embeddings for a single sequence.
+        And return the last hidden state. As a numpy array. Not the mean of the last hidden state.
+        Allows analysis of the single token in the sequences.
+        """
+
+        with torch.no_grad():
+            inputs = tokenizer(sequence, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+            embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
+
+        # normalize the embedding
+        embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
+
+        return embedding
+
+    def calculate_single_sequence_embedding(self, sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"):
+        """
+        Calculates an embedding for a single sequence.
+        """
+        model, tokenizer, device = load_model_and_tokenizer(model_name)
+        return self._get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
 
     def find_closest_matches_simple(self, start_sequence_id: str, db: DatabaseConnector, metric = 'cosine', n = 10):
         """
@@ -268,6 +293,29 @@ class EmbeddingTool:
         plt.tight_layout()
         plt.show()
 
+    def calculate_similarity(
+            self, 
+        query_embed: np.ndarray,
+        target_embed: np.ndarray,
+        mode: str = "cosine",
+    ):
+        """Calculate cosine or euclidean similarity between two protein sequences.
+
+        Args:
+            query_embed (np.ndarray): Embedding of the query sequence
+            target_embed (np.ndarray): Embedding of the target sequence
+            mode (str): The mode of similarity to calculate. Can be "cosine" or "euclidean".
+        Returns:
+            numpy.ndarray: A 2D numpy array containing cosine similarity scores
+                between all pairs of amino acids in seq1 and seq2.
+        """
+
+        if mode == "cosine":
+            return 1 - sp.distance.cdist(query_embed, target_embed, metric="cosine")
+        elif mode == "euclidean":
+            return 1 / sp.distance.cdist(query_embed, target_embed, metric="euclidean")
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
         
 
 if __name__ == "__main__":
