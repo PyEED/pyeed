@@ -95,7 +95,7 @@ class StandardNumberingTool:
                     # insert in the base sequence
                     if sequence_id not in positions:
                         positions[sequence_id] = []
-                        positions[sequence_id].append('0.0')
+                        positions[sequence_id].append('0.1')
                     
                     else:
                         # check if the previous position is an insert
@@ -139,6 +139,124 @@ class StandardNumberingTool:
                 
         return positions
 
+    def run_numbering_algorithm_pairwise(self, base_sequence_id: str, alignment):
+        """
+        This function will run the numbering algorithm pairwise
+        """
+        positions = {}
+        positions[base_sequence_id] = [str(i + 1) for i in range(len(alignment[0][0].replace('-', '')))]
+
+
+        for pair in alignment:
+            base_sequence = pair[0]
+            target_sequence = pair[1]
+            target_sequence_id = pair[2]
+
+            base_seq_counter = -1
+
+            # get the positions
+            for pos in range(len(base_sequence)):
+
+                if base_sequence[pos] != '-':
+                    base_seq_counter += 1
+
+                if base_sequence[pos] == '-' and target_sequence[pos] == '-':
+                    continue
+
+                if base_sequence[pos] == '-' and target_sequence[pos] != '-':
+                    # insert in the base sequence
+                    if target_sequence_id not in positions:
+                        positions[target_sequence_id] = []
+                        positions[target_sequence_id].append('0.1')
+
+                    else:
+                        # check if the previous position is an insert
+                        if '.' in positions[target_sequence_id][-1]:
+                            # get the number of the insert
+                            insert_number = int(positions[target_sequence_id][-1].split('.')[1])
+                            base_number = int(positions[target_sequence_id][-1].split('.')[0])
+                            positions[target_sequence_id].append(f"{base_number}.{insert_number + 1}")
+                        
+                        else:
+                            positions[target_sequence_id].append(f"{positions[target_sequence_id][-1]}.1")
+
+                if base_sequence[pos] != '-' and target_sequence[pos] == '-':
+                    if target_sequence_id not in positions:
+                        positions[target_sequence_id] = []
+                        positions[target_sequence_id].append(f"{positions[base_sequence_id][pos]}.GAP")
+
+                    positions[target_sequence_id].append(f"{positions[target_sequence_id][-1].split('.')[0]}.GAP")
+
+                if base_sequence[pos] != '-' and target_sequence[pos] != '-':
+                    # both are amino acids
+                    if target_sequence_id not in positions:
+                        positions[target_sequence_id] = []
+                        positions[target_sequence_id].append(positions[base_sequence_id][base_seq_counter])
+                    
+                    else:
+                        # check the previous position base number (does not matter if it is an insert)
+                        # increment the number
+                        if '.' in positions[target_sequence_id][-1] and 'GAP' not in positions[target_sequence_id][-1]:
+                            # get the number of the insert
+                            base_number = int(positions[target_sequence_id][-1].split('.')[0])
+                            positions[target_sequence_id].append(f"{base_number + 1}")
+                        
+                        else:
+                            positions[target_sequence_id].append(f"{int(positions[base_sequence_id][base_seq_counter])}")
+
+        # clean up all the GAP and remove them
+        for protein_id in positions:
+            positions[protein_id] = [pos for pos in positions[protein_id] if 'GAP' not in pos]
+
+        return positions
+
+
+    def apply_standard_numbering_pairwise(self, base_sequence_id: str, db: DatabaseConnector, list_of_seq_ids: list = None, return_positions: bool = False):
+        """
+        This function will apply the standard numbering pairwise
+        For that we need a base sequence and from there we get a pair list with all the sequences we ant to include
+        Then after the alignment is done we can apply the numbering
+        """
+
+        if list_of_seq_ids is None:
+            query = f"""
+            MATCH (p:Protein)
+            WHERE p.accession_id IS NOT NULL
+            RETURN p.accession_id AS accession_id
+            """ 
+            list_of_seq_ids = db.execute_read(query)
+            list_of_seq_ids = [protein["accession_id"] for protein in list_of_seq_ids]
+
+        # remove the base sequence from the list_of_seq_ids
+        list_of_seq_ids.remove(base_sequence_id)
+
+        # generate all the pairs where the base sequence is the first sequence
+        pairs = []
+        for protein_id in list_of_seq_ids:
+            pairs.append((base_sequence_id, protein_id))
+
+        from pyeed.analysis.sequence_alignment import PairwiseAligner
+
+        # run the pairwise alignment
+        pairwise_aligner = PairwiseAligner()
+        results = pairwise_aligner.align_multipairwise(ids = list_of_seq_ids + [base_sequence_id], db = db, pairs = pairs)
+
+        # change result into a nested list the first element in each list elemenet is the 'query_aligned' the second is the 'target_aligned'
+        results = [[result['query_aligned'], result['target_aligned'], result['target_id']] for result in results]
+
+        # run the numbering algorithm pairwise
+        self.positions = self.run_numbering_algorithm_pairwise(base_sequence_id, results)
+
+        # create the standard numbering node
+        StandardNumbering.get_or_save(
+            name=f"{self.name}", definition=f"Pairwise based on base sequence {base_sequence_id}"
+        )
+
+        # update the database with the standard numbering
+        self.safe_positions(db)
+
+        if return_positions:
+            return self.positions
 
 
 
@@ -179,13 +297,6 @@ class StandardNumberingTool:
         clustalO = ClustalOmega()
         alignment = clustalO.align(sequences)
 
-        # get the alignment of base sequence is the first sequence
-        base_sequence_alignment = alignment[0].seq
-
-        # get all postions relative to the base sequence
-        positions_base = list(range(len(base_sequence_alignment.replace('-', ''))))
-        positions_base = [str(i) for i in positions_base]
-        
         # get all positions for all the sequences
         # we want to use inserts as 2.1 .. to check wether it is an insert we take a look at the base sequence at the postions if - is present
         self.positions = self.run_numbering_algorithm(base_sequence_id, alignment)
