@@ -11,6 +11,8 @@ class ServiceURL(Enum):
     CLUSTALO = "http://clustalo:5001/align"
     BLASTP = "http://blast:6001/blastp"
     BLASTN = "http://blast:6001/blastn"
+    FOLDSEEK = "http://foldseek:7001/foldseek"
+    MMSEQS = "http://mmseqs:8001/easycluster"
 
 
 class AbstractTool(BaseModel, ABC):
