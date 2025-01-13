@@ -147,7 +147,6 @@ class NetworkAnalysis:
         plt.savefig(path)
         plt.close()
 
-
     def find_isolated_nodes(self, graph):
         """
         Finds isolated nodes in the graph.
@@ -183,15 +182,11 @@ class NetworkAnalysis:
             # If there are other edges, remove self-referential ones
             if other_edges and self_edges:
                 for u, v, d in self_edges:
-                    self.graph.remove_edge(u, v)
                     removed_edges.append((u, v, d))
 
         return removed_edges
-            
-        
-    
 
-    def visualize_force_directed_graph(self, attribute=None, scale=1.0, threshold=None, path=None, mode="HIDE_UNDER_THRESHOLD", show=False, save=True, type_relationship=None):
+    def calculate_positions_2d(self, attribute=None, scale=1.0, threshold=None, path=None, mode="HIDE_UNDER_THRESHOLD", show=False, save=True, type_relationship=None):
         """
         Visualizes the graph as a force-directed network with optional edge filtering.
 
@@ -233,6 +228,7 @@ class NetworkAnalysis:
 
         # Find self-referential nodes
         self_referential_edges = self.find_self_referential_nodes(type_relationship, filtered_graph)
+        logger.info(f"Number of self-referential edges: {len(self_referential_edges)}")
         filtered_graph.remove_edges_from(self_referential_edges)
 
         # Find isolated nodes
@@ -242,34 +238,7 @@ class NetworkAnalysis:
         # Use spring layout for force-directed graph
         pos = nx.spring_layout(filtered_graph, weight=attribute, scale=scale)
 
-         # Prepare edge attributes and node labels for visualization
-        edge_weights = nx.get_edge_attributes(filtered_graph, attribute) if attribute else {}
-        node_labels = {n: data["properties"].get("accession_id", n) for n, data in filtered_graph.nodes(data=True)}
-
-        # Plot graph with Matplotlib
-        plt.figure(figsize=(10, 10))
-        nx.draw(
-            filtered_graph,
-            pos,
-            with_labels=True,
-            labels=node_labels,
-            node_size=500,
-            font_size=10,
-            edge_color="gray",
-            node_color="skyblue",
-        )
-
-        # Draw edge labels if attribute is provided
-        if attribute:
-            nx.draw_networkx_edge_labels(filtered_graph, pos, edge_labels=edge_weights)
-
-
-        plt.title("Force-Directed Graph Visualization")
-        if save:
-            plt.savefig(path)
-        if show:
-            plt.show()
-        plt.close()
+        return filtered_graph, pos
 
     def compute_clustering_coefficients(self):
         """
@@ -314,6 +283,8 @@ class NetworkAnalysis:
             "degree": self.graph.degree[node_id],
             "neighbors": neighbors,
         }
+
+
 
 
 if __name__ == "__main__":
