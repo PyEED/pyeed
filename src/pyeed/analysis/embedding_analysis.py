@@ -294,11 +294,11 @@ class EmbeddingTool:
         plt.show()
 
     def calculate_similarity(
-            self, 
+        self, 
         query_embed: np.ndarray,
         target_embed: np.ndarray,
-        mode: str = "cosine",
-    ):
+        mode: Literal["cosine", "euclidean"] = "cosine",
+    ) -> np.ndarray:
         """Calculate cosine or euclidean similarity between two protein sequences.
 
         Args:

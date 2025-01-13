@@ -1,12 +1,7 @@
-# this tool should be able to analyze the network of a data strucutres
-# the network can be build on a various different parameters
-# the tool used will be networkx
 import networkx as nx
 from pyeed.dbconnect import DatabaseConnector
 import matplotlib.pyplot as plt
-import logging
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 class NetworkAnalysis:
     """
@@ -20,8 +15,8 @@ class NetworkAnalysis:
         Args:
             db (DatabaseConnector): The database connector object.
         """
-        self.db = db
-        self.graph = nx.Graph()
+        self.db: DatabaseConnector = db
+        self.graph: nx.Graph = nx.Graph()
 
     def create_graph(self, node_types=None, relationships=None, ids=None):
         """
@@ -66,12 +61,12 @@ class NetworkAnalysis:
         """
 
         # Fetch nodes and relationships
-        logger.info(f"Executing query: {query_nodes}")
+        logger.debug(f"Executing query: {query_nodes}")
         nodes = self.db.execute_read(query_nodes, {"node_types": node_types, "accession_ids": ids})
-        logger.info(f"Executing query: {query_relationships}")
+        logger.debug(f"Executing query: {query_relationships}")
         relationships = self.db.execute_read(query_relationships, {"relationships": relationships})
-        logger.info(f"Number of nodes: {len(nodes)}")
-        logger.info(f"Number of relationships: {len(relationships)}")
+        logger.debug(f"Number of nodes: {len(nodes)}")
+        logger.debug(f"Number of relationships: {len(relationships)}")
 
         # Add nodes
         for node in nodes:
@@ -129,31 +124,52 @@ class NetworkAnalysis:
 
         return list(greedy_modularity_communities(self.graph))
 
-    def visualize_graph(self, path):
+    def visualize_graph(
+        self,
+        path: str | None = None,
+        figsize: tuple[int, int] = (10, 10),
+        with_labels: bool = True,
+        node_color: str = "skyblue",
+        edge_color: str = "gray", 
+        node_size: int = 500,
+        font_size: int = 10,
+        **kwargs
+    ):
         """
         Visualizes the graph using Matplotlib.
+
+        Args:
+            path (str): Path where to save the visualization
+            figsize (tuple): Figure size as (width, height) in inches
+            with_labels (bool): Whether to show node labels
+            node_color (str): Color of the nodes
+            edge_color (str): Color of the edges
+            node_size (int): Size of the nodes
+            font_size (int): Size of the node labels
+            **kwargs: Additional arguments passed to networkx.draw()
         """
         import matplotlib.pyplot as plt
 
-        plt.figure(figsize=(10, 10))
+        plt.figure(figsize=figsize)
         nx.draw(
             self.graph,
-            with_labels=True,
-            node_color="skyblue",
-            edge_color="gray",
-            node_size=500,
-            font_size=10,
+            with_labels=with_labels,
+            node_color=node_color,
+            edge_color=edge_color,
+            node_size=node_size,
+            font_size=font_size,
+            **kwargs
         )
         plt.savefig(path)
         plt.close()
 
-    def find_isolated_nodes(self, graph):
+    def find_isolated_nodes(self, graph) -> list:
         """
         Finds isolated nodes in the graph.
         """
         return [node for node in graph if graph.degree(node) == 0]
     
-    def find_self_referential_nodes(self, relationship_type, graph):
+    def find_self_referential_nodes(self, relationship_type: str) -> list:
         """
         Finds all nodes in the graph that only have self-referential edges
         of a specified relationship type.
@@ -186,7 +202,17 @@ class NetworkAnalysis:
 
         return removed_edges
 
-    def calculate_positions_2d(self, attribute=None, scale=1.0, threshold=None, path=None, mode="HIDE_UNDER_THRESHOLD", show=False, save=True, type_relationship=None):
+    def calculate_positions_2d(
+        self,
+        attribute: str | None = None,
+        scale: float = 1.0,
+        threshold: float | None = None,
+        path: str | None = None,
+        mode: str = "HIDE_UNDER_THRESHOLD",
+        show: bool = False,
+        save: bool = True,
+        type_relationship: str | None = None
+    ) -> tuple[nx.Graph, dict[str, tuple[float, float]]]:
         """
         Visualizes the graph as a force-directed network with optional edge filtering.
 
@@ -219,7 +245,7 @@ class NetworkAnalysis:
                         if edge[2]['properties'][attribute] <= threshold:
                             edges_filtered.append(edge)
 
-        logger.info(f"Number of edges filtered: {len(edges) - len(edges_filtered)}")
+        logger.debug(f"Number of edges filtered: {len(edges) - len(edges_filtered)}")
 
         # Extract filtered graph
         filtered_graph = nx.Graph()
@@ -239,7 +265,7 @@ class NetworkAnalysis:
         pos = nx.spring_layout(filtered_graph, weight=attribute, scale=scale)
 
         return filtered_graph, pos
-
+    
     def compute_clustering_coefficients(self):
         """
         Computes the clustering coefficient for all nodes and the overall graph.
