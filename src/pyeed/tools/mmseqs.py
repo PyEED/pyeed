@@ -1,9 +1,15 @@
 import httpx
 from pyeed.tools.abstract_tool import AbstractTool, ServiceURL
+from pyeed.tools.datamodels.mmseqs_model import Cluster
 from pyeed.dbconnect import DatabaseConnector
 from loguru import logger
-from typing import Optional 
+from typing import Optional, List
 import logging
+import os 
+import subprocess
+import io
+import pandas as pd
+import json
 
 class MMSeqs(AbstractTool):
     """
@@ -13,8 +19,48 @@ class MMSeqs(AbstractTool):
     def __init__(self): 
         super().__init__()
         self._service_url = ServiceURL.MMSEQS.value
+    
+    def extract_output_data(self, result) -> List[Cluster]:
+        """
+        Extracts the output data from the ClustalOmega container.
+
+        Returns:
+            MultiSequenceAlignment: The alignment result.
+        """
         
-    def run_service(self, query: list, min_seq_id, coverage, cov_mode) -> httpx.Response:
+        cleaned_text = result.text.encode().decode("unicode_escape")  # Decode Unicode escapes
+        cleaned_text = cleaned_text.replace(">", "").splitlines()  # Remove '>' and split into lines
+
+        if cleaned_text:  # Ensure the list is not empty
+            cleaned_text.pop(-1)  # Remove the last element if needed
+
+        # Use list comprehension to filter elements
+        cleaned_text = [element for element in cleaned_text if len(element) < 25]
+
+        print(cleaned_text)
+        
+        # get all the representatives and the belonging represented sequences
+        
+        clusters = []
+        seq_counter = 0
+
+        while seq_counter < len(cleaned_text) - 1:  # Iterate over all sequences
+            # If the current and next sequence are the same, it's a representative sequence
+            if cleaned_text[seq_counter] == cleaned_text[seq_counter + 1]:
+                representative_id = cleaned_text[seq_counter]
+                represented_ids = [representative_id]  # Include itself as represented
+
+                # Add the cluster
+                clusters.append(Cluster(representative_id=representative_id, represented_ids=represented_ids))
+
+                seq_counter += 2
+            else:
+                # Skip sequences that do not follow the doubling pattern
+                seq_counter += 1
+            
+        return clusters
+        
+    def run_service(self, data, min_seq_id, coverage, cov_mode) -> httpx.Response:
         """_summary_
 
         Args:
@@ -34,7 +80,7 @@ class MMSeqs(AbstractTool):
             raise ValueError("cov_mode must be 0, 1, or 2")
         
         json_request = {
-            'query': query,
+            'query': data,
             'min_seq_id': min_seq_id,
             'coverage': coverage,
             'cov_mode': cov_mode
@@ -64,8 +110,15 @@ class MMSeqs(AbstractTool):
             raise httpx.ConnectError("PyEED Docker Service not running") from None
         
         
-    def easycluster(self, query: list, min_seq_id=0.5, coverage=0.8, cov_mode=0, dbConnector: Optional[DatabaseConnector] = None):
+    def easycluster(
+        self, 
+        query:str, 
+        min_seq_id:float = 0.5, 
+        coverage:float = 0.8, 
+        cov_mode:int = 0,
+        dbConnector:Optional[DatabaseConnector] = None) -> List[Cluster]:
         """
+        Clusters the sequences in the fasta file with the provided parameters
         Args:
             query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
             min_seq_id (float): min sequence identity for which a cluster is created
@@ -73,7 +126,7 @@ class MMSeqs(AbstractTool):
             cov_mode (int): coverage mode- choose between 0, 1, 2
         
         Returns:
-            httpx.Response: The response object containing the MMSeqs results.
+            List[Cluster]: A list of Cluster objects containing the representative and all sequences.
         """
         
         if dbConnector:
@@ -105,10 +158,9 @@ class MMSeqs(AbstractTool):
         result = self.run_service(query, min_seq_id, coverage, cov_mode)
         logger.info(f"MMSeqs2 search completed with status code: {result.status_code}")
         
-        if result.status_code == 200:
+        if result.status_code != 200:
             logger.error(f"Error: {result.json()}")
-        
-        return result
-        
-        
+            
+        return self.extract_output_data(result)
+            
         
