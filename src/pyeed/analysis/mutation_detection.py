@@ -9,27 +9,39 @@ from pyeed.dbconnect import DatabaseConnector
 
 class MutationDetection:
     def __init__(self):
+        """
+        Initialize the MutationDetection class.
+        """
         None
 
     def get_mutations_between_sequences(self, sequence_id1: str, sequence_id2: str, db: DatabaseConnector, standard_numbering_tool_name: str, print_debug: bool = False, save_to_db: bool = True):
         """
-        This function will get the number of mutations between two sequences.
-        The mutations are detected in the following way:
-        - the standard numbering tool is used to get the positions of the sequences
-        - the mutations are then detected by comparing the positions of the sequences (using the standard numbering tool)
-        - the mutations are then returned as a dictionary with the following structure:
-            - from_positions: the positions of the mutations in the original sequence
-            - to_positions: the positions of the mutations in the mutated sequence
-            - from_monomers: the original monomers at the mutation positions
-            - to_monomers: the mutated monomers at the mutation positions
-        - the position numbers are the point in the sequence not the positions from the standard numbering tool
+        Get the mutations between two sequences using a standard numbering tool.
 
-        
         Parameters:
-        sequence_id1 (str): The sequence id for the first sequence
-        sequence_id2 (str): The sequence id for the second sequence
-        db (DatabaseConnector): The database connector object
+            sequence_id1 (str): The accession ID of the first sequence
+            sequence_id2 (str): The accession ID of the second sequence
+            db (DatabaseConnector): The database connector object
+            standard_numbering_tool_name (str): Name of the standard numbering tool to use
+            print_debug (bool, optional): Whether to print debug information. Defaults to False.
+            save_to_db (bool, optional): Whether to save mutations to database. Defaults to True.
 
+        Returns:
+            dict: A dictionary containing mutation information with the following structure:
+                - sequence_id1: ID of the first sequence
+                - sequence_id2: ID of the second sequence
+                - from_positions: List of positions in the first sequence where mutations occur (1-based)
+                - to_positions: List of positions in the second sequence where mutations occur (1-based)
+                - from_monomers: List of original monomers at mutation positions
+                - to_monomers: List of mutated monomers at mutation positions
+
+        Raises:
+            ValueError: If standard numbering positions cannot be found for both sequences
+
+        Note:
+            The mutations are detected by comparing sequence positions aligned using the 
+            standard numbering tool. Only positions that exist in both sequences (common positions)
+            are compared for mutations.
         """
         # Get the standard numbering positions for both sequences
         query = f"""
@@ -105,7 +117,21 @@ class MutationDetection:
 
     def save_mutations_to_db(self, mutations: dict, db: DatabaseConnector):
         """
-        This function will save the mutations to the database
+        Save detected mutations to the database as relationships between proteins.
+
+        Parameters:
+            mutations (dict): Dictionary containing mutation information with the structure:
+                - sequence_id1: ID of the first sequence
+                - sequence_id2: ID of the second sequence
+                - from_positions: List of positions in the first sequence
+                - to_positions: List of positions in the second sequence
+                - from_monomers: List of original monomers
+                - to_monomers: List of mutated monomers
+            db (DatabaseConnector): The database connector object
+
+        Note:
+            Creates HAS_MUTATION relationships between proteins in the database,
+            with properties storing the mutation details (positions and monomers).
         """
 
         # create the mutation relationship between the proteins
