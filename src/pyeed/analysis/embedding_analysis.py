@@ -4,6 +4,7 @@
 # a lot of code was provided by Tim Panzer in his bachelor thesis results
 import torch
 import numpy as np
+from typing import Literal
 import matplotlib.pyplot as plt
 import scipy.spatial as sp
 

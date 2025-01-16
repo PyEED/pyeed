@@ -169,7 +169,7 @@ class NetworkAnalysis:
         """
         return [node for node in graph if graph.degree(node) == 0]
     
-    def find_self_referential_nodes(self, relationship_type: str) -> list:
+    def find_self_referential_nodes(self, relationship_type: str, graph: nx.Graph) -> list:
         """
         Finds all nodes in the graph that only have self-referential edges
         of a specified relationship type.
@@ -183,11 +183,11 @@ class NetworkAnalysis:
         """
         removed_edges = []
 
-        for node in list(self.graph.nodes):  # Use list to avoid mutation issues
+        for node in list(graph.nodes):  # Use list to avoid mutation issues
             # Get all edges connected to the node
             edges = [
                 (u, v, d)
-                for u, v, d in self.graph.edges(node, data=True)
+                for u, v, d in graph.edges(node, data=True)
                 if d.get("type") == relationship_type
             ]
 
@@ -209,8 +209,6 @@ class NetworkAnalysis:
         threshold: float | None = None,
         path: str | None = None,
         mode: str = "HIDE_UNDER_THRESHOLD",
-        show: bool = False,
-        save: bool = True,
         type_relationship: str | None = None
     ) -> tuple[nx.Graph, dict[str, tuple[float, float]]]:
         """
