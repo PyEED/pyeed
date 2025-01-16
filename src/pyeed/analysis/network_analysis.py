@@ -1,6 +1,5 @@
 import networkx as nx
 from pyeed.dbconnect import DatabaseConnector
-import matplotlib.pyplot as plt
 from loguru import logger
 
 class NetworkAnalysis:
@@ -25,7 +24,7 @@ class NetworkAnalysis:
         Args:
             node_types (list[str], optional): List of node types to include (e.g., ['Protein', 'DNA']).
             relationships (list[str], optional): List of relationship types to include (e.g., ['HAS_STANDARD_NUMBERING']).
-            accession_ids (list[str], optional): List of accession IDs to include specific nodes.
+            ids (list[str], optional): List of accession IDs to include specific nodes.
 
         Returns:
             networkx.Graph: The created graph.
@@ -124,58 +123,25 @@ class NetworkAnalysis:
 
         return list(greedy_modularity_communities(self.graph))
 
-    def visualize_graph(
-        self,
-        path: str | None = None,
-        figsize: tuple[int, int] = (10, 10),
-        with_labels: bool = True,
-        node_color: str = "skyblue",
-        edge_color: str = "gray", 
-        node_size: int = 500,
-        font_size: int = 10,
-        **kwargs
-    ):
-        """
-        Visualizes the graph using Matplotlib.
-
-        Args:
-            path (str): Path where to save the visualization
-            figsize (tuple): Figure size as (width, height) in inches
-            with_labels (bool): Whether to show node labels
-            node_color (str): Color of the nodes
-            edge_color (str): Color of the edges
-            node_size (int): Size of the nodes
-            font_size (int): Size of the node labels
-            **kwargs: Additional arguments passed to networkx.draw()
-        """
-        import matplotlib.pyplot as plt
-
-        plt.figure(figsize=figsize)
-        nx.draw(
-            self.graph,
-            with_labels=with_labels,
-            node_color=node_color,
-            edge_color=edge_color,
-            node_size=node_size,
-            font_size=font_size,
-            **kwargs
-        )
-        plt.savefig(path)
-        plt.close()
-
     def find_isolated_nodes(self, graph) -> list:
         """
         Finds isolated nodes in the graph.
+
+        Args:
+            graph (networkx.Graph): The graph to analyze.
+
+        Returns:
+            list: List of nodes that have no connections (degree = 0).
         """
         return [node for node in graph if graph.degree(node) == 0]
     
-    def find_self_referential_nodes(self, relationship_type: str) -> list:
+    def find_self_referential_nodes(self, relationship_type: str, graph: nx.Graph) -> list:
         """
-        Finds all nodes in the graph that only have self-referential edges
-        of a specified relationship type.
+        Finds all edges in the graph that are self-referential (loops) of a specified relationship type.
 
         Args:
             relationship_type (str): The relationship type to consider.
+            graph (networkx.Graph): The graph to analyze.
 
         Returns:
             list[tuple]: A list of tuples representing the self-referential edges,
@@ -183,11 +149,11 @@ class NetworkAnalysis:
         """
         removed_edges = []
 
-        for node in list(self.graph.nodes):  # Use list to avoid mutation issues
+        for node in list(graph.nodes):  # Use list to avoid mutation issues
             # Get all edges connected to the node
             edges = [
                 (u, v, d)
-                for u, v, d in self.graph.edges(node, data=True)
+                for u, v, d in graph.edges(node, data=True)
                 if d.get("type") == relationship_type
             ]
 
@@ -209,17 +175,23 @@ class NetworkAnalysis:
         threshold: float | None = None,
         path: str | None = None,
         mode: str = "HIDE_UNDER_THRESHOLD",
-        show: bool = False,
-        save: bool = True,
         type_relationship: str | None = None
     ) -> tuple[nx.Graph, dict[str, tuple[float, float]]]:
         """
-        Visualizes the graph as a force-directed network with optional edge filtering.
+        Calculates 2D positions for graph visualization with optional edge filtering.
 
         Args:
-            attribute (str, optional): Edge attribute to use for weighting. Defaults to None.
+            attribute (str, optional): Edge attribute to use for weighting.
             scale (float): Scale factor for node distances in the visualization. Defaults to 1.0.
-            threshold (float, optional): Minimum value of the edge attribute to include in the visualization. Defaults to None.
+            threshold (float, optional): Threshold value for edge filtering.
+            path (str, optional): Path to save the visualization (not used in current implementation).
+            mode (str): Filtering mode - either "HIDE_UNDER_THRESHOLD" or "HIDE_OVER_THRESHOLD". Defaults to "HIDE_UNDER_THRESHOLD".
+            type_relationship (str, optional): Specific relationship type to filter on.
+
+        Returns:
+            tuple[networkx.Graph, dict]: A tuple containing:
+                - The filtered graph
+                - Dictionary mapping node IDs to their 2D positions (x, y)
         """
 
         # Filter edges based on the threshold
@@ -271,7 +243,7 @@ class NetworkAnalysis:
         Computes the clustering coefficient for all nodes and the overall graph.
 
         Returns:
-            tuple: A dictionary of clustering coefficients for nodes and the overall clustering coefficient.
+            tuple: A tuple containing the clustering coefficients for nodes and the overall clustering coefficient.
         """
         return nx.clustering(self.graph), nx.average_clustering(self.graph)
 
@@ -317,4 +289,3 @@ if __name__ == "__main__":
 
     uri = "bolt://localhost:7687"
     username = "neo4j"
-    password = "12345678"
