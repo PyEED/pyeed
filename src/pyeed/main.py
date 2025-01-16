@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 from typing import Literal
 
 import nest_asyncio
@@ -342,3 +343,68 @@ class Pyeed:
             SET r.start = {protein["start"]}, r.end = {protein["end"]}
             """
             self.db.execute_write(query)
+
+    def _run_command(self, command: str):
+        """Run a shell command and handle errors."""
+        try:
+            result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+            logger.info(result.stdout)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error: {e.stderr}")
+            raise
+
+    def backup_database(self, backup_dir: str, container_name: str, import_dir: str):
+        """
+        Create a Neo4j database backup.
+        """
+        import os
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        backup_file = f"{backup_dir}/neo4j_backup_{timestamp}.dump"
+
+        # Stop the database
+        logger.info("Stopping Neo4j database...")
+        self._run_command(f"sudo docker exec {container_name} neo4j-admin server stop")
+
+        # Create backup
+        command = f"sudo docker exec {container_name} neo4j-admin database dump --verbose --to-path=/import/ --overwrite-destination=true neo4j"
+        logger.info("Creating backup...")
+        self._run_command(command)
+
+        # Start the database again
+        logger.info("Starting Neo4j database...")
+        self._run_command(f"sudo docker exec {container_name} neo4j-admin server start")
+
+        # Move backup from container's import folder to the host
+        host_backup_path = os.path.join(import_dir, "neo4j.dump")
+        self._run_command(f"mv {host_backup_path} {backup_file}")
+
+        logger.info(f"Backup saved to: {backup_file}")
+
+    def restore_database(self, backup_file: str, container_name: str, import_dir: str):
+        """
+        Restore a Neo4j database from a backup.
+        """
+        import os
+
+        if not os.path.exists(backup_file):
+            raise FileNotFoundError(f"Backup file not found: {backup_file}")
+        
+        logger.info("Stopping Neo4j container...")
+        self._run_command(f"sudo docker stop {container_name}")
+
+        logger.info("Copying backup file to import directory...")
+        self._run_command(f"cp {backup_file} {import_dir}/neo4j.dump")
+
+        logger.info("starting Neo4j container...")
+        self._run_command(f"sudo docker start {container_name}")
+
+        logger.info("Restoring database...")
+        command = f"sudo docker exec {container_name} neo4j-admin database load --from-path=/import/ --verbose --overwrite-destination=true neo4j"
+        self._run_command(command)
+
+        logger.info("Restarting Neo4j container...")
+        self._run_command(f"sudo docker start {container_name}")
+        logger.info("Restore complete.")
