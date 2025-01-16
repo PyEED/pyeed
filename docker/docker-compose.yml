@@ -1,0 +1,31 @@
+version: "2.2"
+services:
+  jupyter-lab:
+    build:
+      context: jupyterlab/
+    image: haeussma/pyeed-notebook:latest
+    container_name: jupyterlab
+    ports:
+      - '${JUPYTER_PORT}:${JUPYTER_PORT}'
+
+  cytoscape-desktop:
+    image: cytoscape/cytoscape-desktop:3.10.1
+    ports:
+      - '${NOVNC_PORT}:${NOVNC_PORT}'
+      - '${CYREST_PORT}:${CYREST_PORT}'
+    container_name: cytoscape
+    environment:
+      - XVFB_SCREEN_WIDTH=${NOVNC_SCREEN_WIDTH}
+      - XVFB_SCREEN_HEIGHT=${NOVNC_SCREEN_HEIGHT}
+      - NOVNC_PORT=${NOVNC_PORT}
+      - CYREST_PORT=${CYREST_PORT}
+
+  clustalo:
+    build:
+      context: clustalo/
+    container_name: clustalo
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./clustalo:/app/api
+      - ./clustalo:/app/data
