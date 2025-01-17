@@ -355,7 +355,20 @@ class Pyeed:
 
     def backup_database(self, backup_dir: str, container_name: str, import_dir: str):
         """
-        Create a Neo4j database backup.
+        Backup a Neo4j database to a dump file.
+
+        Args:
+            backup_dir (str): Directory where the backup file will be saved
+            container_name (str): Name of the Neo4j Docker container
+            import_dir (str): Path to Neo4j's import directory on the host machine
+
+        The backup process:
+        1. Stops the Neo4j database
+        2. Creates a dump file inside the container
+        3. Restarts the database
+        4. Moves the dump file from the container to the host backup directory
+        
+        The backup file will be named 'neo4j_backup_YYYYMMDD_HHMMSS.dump'
         """
         import os
         from datetime import datetime
@@ -385,7 +398,19 @@ class Pyeed:
 
     def restore_database(self, backup_file: str, container_name: str, import_dir: str):
         """
-        Restore a Neo4j database from a backup.
+        Restore a Neo4j database from a dump file.
+
+        Args:
+            backup_file (str): Path to the backup dump file to restore from
+            container_name (str): Name of the Neo4j Docker container
+            import_dir (str): Path to Neo4j's import directory on the host machine
+
+        The restore process:
+        1. Stops the Neo4j container
+        2. Copies the backup file to Neo4j's import directory
+        3. Starts the container
+        4. Loads the dump file into the database
+        5. Restarts the container to apply changes
         """
         import os
 
