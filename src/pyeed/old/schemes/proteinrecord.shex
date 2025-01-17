@@ -1,0 +1,125 @@
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX md: <http://mdmodel.net/>
+PREFIX edam: <http://edamontology.org/>
+PREFIX sio: <http://semanticscience.org/resource/>
+
+md:ProteinRecord {
+    sio:SIO_000729 xsd:string {
+        shex:annotation [
+            shex:label "id"
+        ]
+    };
+    sio:SIO_000116 xsd:string? {
+        shex:annotation [
+            shex:label "name"
+        ]
+    };
+    sio:SIO_010000 @md:Organism? {
+        shex:annotation [
+            shex:label "organism"
+        ]
+    };
+    sio:SIO_000030 xsd:string {
+        shex:annotation [
+            shex:label "sequence"
+        ]
+    };
+    sio:SIO_000041 xsd:integer? {
+        shex:annotation [
+            shex:label "seq_length"
+        ]
+    };
+    sio:SIO_000729 xsd:string* {
+        shex:annotation [
+            shex:label "structure_ids"
+        ]
+    };
+    edam:data_1011 xsd:string? {
+        shex:annotation [
+            shex:label "ec_number"
+        ]
+    };
+    edam:data_1505 xsd:double? {
+        shex:annotation [
+            shex:label "mol_weight"
+        ]
+    };
+}
+md:DNARecord {
+    sio:SIO_000729 xsd:string {
+        shex:annotation [
+            shex:label "id"
+        ]
+    };
+    sio:SIO_000116 xsd:string? {
+        shex:annotation [
+            shex:label "name"
+        ]
+    };
+    sio:SIO_010000 @md:Organism? {
+        shex:annotation [
+            shex:label "organism"
+        ]
+    };
+    sio:SIO_000030 xsd:string {
+        shex:annotation [
+            shex:label "sequence"
+        ]
+    };
+    sio:SIO_000041 xsd:integer? {
+        shex:annotation [
+            shex:label "seq_length"
+        ]
+    };
+}
+md:Site {
+    sio:SIO_000056 xsd:integer+ {
+        shex:annotation [
+            shex:label "positions"
+        ]
+    };
+}
+md:Region {
+    sio:SIO_000943 xsd:integer {
+        shex:annotation [
+            shex:label "start"
+        ]
+    };
+    sio:SIO_000953 xsd:integer {
+        shex:annotation [
+            shex:label "end"
+        ]
+    };
+}
+md:Organism {
+    edam:data_1179 xsd:integer {
+        shex:annotation [
+            shex:label "taxonomy_id"
+        ]
+    };
+    edam:data_2909 xsd:string? {
+        shex:annotation [
+            shex:label "name"
+        ]
+    };
+    edam:data_1044 xsd:string? {
+        shex:annotation [
+            shex:label "kingdom"
+        ]
+    };
+    edam:data_2732 xsd:string? {
+        shex:annotation [
+            shex:label "family"
+        ]
+    };
+    edam:data_1870 xsd:string? {
+        shex:annotation [
+            shex:label "genus"
+        ]
+    };
+    edam:data_1045 xsd:string? {
+        shex:annotation [
+            shex:label "species"
+        ]
+    };
+}
