@@ -8,7 +8,6 @@ from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
-from pyeed.analysis.standard_numbering import StandardNumberingTool
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import (
@@ -17,7 +16,6 @@ from pyeed.embedding import (
     load_model_and_tokenizer,
     update_protein_embeddings_in_db,
 )
-from pyeed.model import StandardNumbering
 
 
 class Pyeed:
@@ -327,13 +325,16 @@ class Pyeed:
             try:
                 exists = result[0]["exists"]
             except IndexError:
-                logger.debug(f"No connection between {protein['accession_id']} and {protein['nucleotide_id']} found.")
+                logger.debug(
+                    f"No connection between {protein['accession_id']} and {protein['nucleotide_id']} found."
+                )
                 continue
 
             if exists:
-                logger.info(f"Connection between {protein['accession_id']} and {protein['nucleotide_id']} already exists.")
+                logger.info(
+                    f"Connection between {protein['accession_id']} and {protein['nucleotide_id']} already exists."
+                )
                 continue
-
 
             query = f"""
             MATCH (p:Protein {{accession_id: '{protein["accession_id"]}'}})

@@ -13,7 +13,6 @@ T = TypeVar("T")
 
 
 class NCBIProteinToPyeed(PrimaryDBtoPyeed):
-
     def get_feature(self, seq_record: SeqRecord, feature_type: str) -> List[SeqFeature]:
         """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
         return [
@@ -159,7 +158,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
     def map_cds(self, seq_record: SeqRecord):
         cds = self.get_feature(seq_record, "CDS")
 
-
         if len(cds) > 1:
             logger.info(
                 f"Multiple features ({len(cds)}) of type `CDS` found for {seq_record.id}"
@@ -173,7 +171,6 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             return None
 
         try:
-
             if "coded_by" not in cds_feature.qualifiers:
                 logger.debug(
                     f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
@@ -192,7 +189,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
     @staticmethod
     def get_cds_regions(seq_feature: SeqFeature) -> List[dict]:
-        coded_by =  seq_feature.qualifiers["coded_by"][0]
+        coded_by = seq_feature.qualifiers["coded_by"][0]
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
         # Extract all regions from the 'coded_by' qualifier

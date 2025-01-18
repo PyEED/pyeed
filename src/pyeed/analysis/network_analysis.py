@@ -1,6 +1,9 @@
+from typing import Any
+
 import networkx as nx
-from pyeed.dbconnect import DatabaseConnector
 from loguru import logger
+from pyeed.dbconnect import DatabaseConnector
+
 
 class NetworkAnalysis:
     """
@@ -30,17 +33,19 @@ class NetworkAnalysis:
             networkx.Graph: The created graph.
         """
 
-        logger.info(f"Creating graph with node types: {node_types} and relationships: {relationships} and ids: {ids}")
+        logger.info(
+            f"Creating graph with node types: {node_types} and relationships: {relationships} and ids: {ids}"
+        )
 
         # Query to fetch nodes with filters
         node_filter = ""
         if node_types:
-            node_filter += f"WHERE labels(n)[0] IN $node_types "
+            node_filter += "WHERE labels(n)[0] IN $node_types "
         if ids:
             if "WHERE" in node_filter:
-                node_filter += f"AND n.accession_id IN $accession_ids "
+                node_filter += "AND n.accession_id IN $accession_ids "
             else:
-                node_filter += f"WHERE n.accession_id IN $accession_ids "
+                node_filter += "WHERE n.accession_id IN $accession_ids "
 
         query_nodes = f"""
         MATCH (n)
@@ -51,7 +56,7 @@ class NetworkAnalysis:
         # Query to fetch relationships with filters
         relationship_filter = ""
         if relationships:
-            relationship_filter += f"WHERE type(r) IN $relationships "
+            relationship_filter += "WHERE type(r) IN $relationships "
 
         query_relationships = f"""
         MATCH (n)-[r]->(m)
@@ -61,9 +66,13 @@ class NetworkAnalysis:
 
         # Fetch nodes and relationships
         logger.debug(f"Executing query: {query_nodes}")
-        nodes = self.db.execute_read(query_nodes, {"node_types": node_types, "accession_ids": ids})
+        nodes = self.db.execute_read(
+            query_nodes, {"node_types": node_types, "accession_ids": ids}
+        )
         logger.debug(f"Executing query: {query_relationships}")
-        relationships = self.db.execute_read(query_relationships, {"relationships": relationships})
+        relationships = self.db.execute_read(
+            query_relationships, {"relationships": relationships}
+        )
         logger.debug(f"Number of nodes: {len(nodes)}")
         logger.debug(f"Number of relationships: {len(relationships)}")
 
@@ -134,8 +143,10 @@ class NetworkAnalysis:
             list: List of nodes that have no connections (degree = 0).
         """
         return [node for node in graph if graph.degree(node) == 0]
-    
-    def find_self_referential_nodes(self, relationship_type: str, graph: nx.Graph) -> list:
+
+    def find_self_referential_nodes(
+        self, relationship_type: str, graph: nx.Graph
+    ) -> list[tuple[Any, Any, dict[str, Any]]]:
         """
         Finds all edges in the graph that are self-referential (loops) of a specified relationship type.
 
@@ -173,9 +184,8 @@ class NetworkAnalysis:
         attribute: str | None = None,
         scale: float = 1.0,
         threshold: float | None = None,
-        path: str | None = None,
         mode: str = "HIDE_UNDER_THRESHOLD",
-        type_relationship: str | None = None
+        type_relationship: str | None = None,
     ) -> tuple[nx.Graph, dict[str, tuple[float, float]]]:
         """
         Calculates 2D positions for graph visualization with optional edge filtering.
@@ -202,19 +212,19 @@ class NetworkAnalysis:
             for edge in edges:
                 if mode == "HIDE_UNDER_THRESHOLD":
                     if type_relationship is not None:
-                        if edge[2]['type'] == type_relationship:
-                            if edge[2]['properties'][attribute] >= threshold:
+                        if edge[2]["type"] == type_relationship:
+                            if edge[2]["properties"][attribute] >= threshold:
                                 edges_filtered.append(edge)
                     else:
-                        if edge[2]['properties'][attribute] >= threshold:
+                        if edge[2]["properties"][attribute] >= threshold:
                             edges_filtered.append(edge)
                 elif mode == "HIDE_OVER_THRESHOLD":
                     if type_relationship is not None:
-                        if edge[2]['type'] == type_relationship:
-                            if edge[2]['properties'][attribute] <= threshold:
+                        if edge[2]["type"] == type_relationship:
+                            if edge[2]["properties"][attribute] <= threshold:
                                 edges_filtered.append(edge)
                     else:
-                        if edge[2]['properties'][attribute] <= threshold:
+                        if edge[2]["properties"][attribute] <= threshold:
                             edges_filtered.append(edge)
 
         logger.debug(f"Number of edges filtered: {len(edges) - len(edges_filtered)}")
@@ -225,7 +235,9 @@ class NetworkAnalysis:
         filtered_graph.add_edges_from(edges_filtered)
 
         # Find self-referential nodes
-        self_referential_edges = self.find_self_referential_nodes(type_relationship, filtered_graph)
+        self_referential_edges = self.find_self_referential_nodes(
+            type_relationship, filtered_graph
+        )
         logger.info(f"Number of self-referential edges: {len(self_referential_edges)}")
         filtered_graph.remove_edges_from(self_referential_edges)
 
@@ -237,7 +249,7 @@ class NetworkAnalysis:
         pos = nx.spring_layout(filtered_graph, weight=attribute, scale=scale)
 
         return filtered_graph, pos
-    
+
     def compute_clustering_coefficients(self):
         """
         Computes the clustering coefficient for all nodes and the overall graph.
@@ -255,7 +267,9 @@ class NetworkAnalysis:
             dict: Information about whether the graph is connected and its connected components.
         """
         is_connected = nx.is_connected(self.graph)
-        components = list(nx.connected_components(self.graph)) if not is_connected else []
+        components = (
+            list(nx.connected_components(self.graph)) if not is_connected else []
+        )
         return {"is_connected": is_connected, "components": components}
 
     def analyze_node(self, node_id):
@@ -281,11 +295,3 @@ class NetworkAnalysis:
             "degree": self.graph.degree[node_id],
             "neighbors": neighbors,
         }
-
-
-
-
-if __name__ == "__main__":
-
-    uri = "bolt://localhost:7687"
-    username = "neo4j"

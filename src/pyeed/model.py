@@ -1,5 +1,7 @@
 from enum import Enum
+from typing import Any
 
+# from pyeed.nodes_and_relations import StrictStructuredNode
 from neomodel import (
     ArrayProperty,
     FloatProperty,
@@ -13,15 +15,13 @@ from neomodel import (
     VectorIndex,
 )
 
-# from pyeed.nodes_and_relations import StrictStructuredNode
 
-
-class StrictStructuredNode(StructuredNode):
+class StrictStructuredNode(StructuredNode):  # type: ignore
     """A StructuredNode subclass that raises an error if an invalid property is provided."""
 
     __abstract_node__ = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Get the defined properties of the model
         allowed_properties = set(self.__class__._class_properties())
 
@@ -35,7 +35,7 @@ class StrictStructuredNode(StructuredNode):
         super().__init__(*args, **kwargs)
 
     @classmethod
-    def _class_properties(cls):
+    def _class_properties(cls) -> set[str]:
         """Retrieve all allowed properties (fields) defined on the class."""
         return {
             k
@@ -52,7 +52,7 @@ class StrictStructuredNode(StructuredNode):
             )
         }
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Validates the properties and then saves the node."""
         allowed_properties = self.__class__._class_properties()
 
@@ -112,10 +112,10 @@ class StrictStructuredNode(StructuredNode):
                     if not all(isinstance(item, float) for item in prop):
                         raise TypeError(f"All items in '{field}' must be floats")
 
-        return super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # Don't return the result
 
     @classmethod
-    def get_or_save(cls, **kwargs):
+    def get_or_save(cls, **kwargs: Any) -> StructuredNode:
         """Attempts to save the node first, and if it already exists (due to unique constraint), retrieves it."""
         try:
             # Attempt to create and save a new node
@@ -147,7 +147,7 @@ class Organism(StrictStructuredNode):
     name = StringProperty()
 
 
-class SiteRel(StructuredRel):
+class SiteRel(StructuredRel):  # type: ignore
     positions = ArrayProperty(IntegerProperty(), required=True)
 
     @classmethod
@@ -155,8 +155,9 @@ class SiteRel(StructuredRel):
         cls,
         molecule1: StrictStructuredNode,
         molecule2: StrictStructuredNode,
-        positions: list,
-    ):
+        positions: list[int],
+    ) -> "SiteRel":
+        """Validates the positions and connects the two molecules."""
         molecule1.site.connect(
             molecule2,
             {
@@ -169,7 +170,7 @@ class SiteRel(StructuredRel):
         )
 
     @property
-    def label(self):
+    def label(self) -> str:
         return f"{self.positions}"
 
 
@@ -188,7 +189,7 @@ class Region(StrictStructuredNode):
     )
 
 
-class RegionRel(StructuredRel):
+class RegionRel(StructuredRel):  # type: ignore
     start = IntegerProperty(required=True)
     end = IntegerProperty(required=True)
 
@@ -199,7 +200,8 @@ class RegionRel(StructuredRel):
         molecule2: StrictStructuredNode,
         start: int,
         end: int,
-    ):
+    ) -> "RegionRel":
+        """Validates the start and end positions and connects the two molecules."""
         molecule1.region.connect(
             molecule2,
             {
@@ -214,22 +216,26 @@ class RegionRel(StructuredRel):
         )
 
     @property
-    def label(self):
+    def label(self) -> str:
+        """The label of the region."""
         return f"{self.start}-{self.end}"
+
 
 class CatalyticActivity(StrictStructuredNode):
     """
     A node representing a catalytic activity.
     """
-    
+
     catalytic_id: int = IntegerProperty(required=False, unique_index=True)
     name = StringProperty()
-    
+
     @property
-    def label(self):
-        return self.name
-    
-class StandardNumberingRel(StructuredRel):
+    def label(self) -> str:
+        """The label of the catalytic activity."""
+        return str(self.name)
+
+
+class StandardNumberingRel(StructuredRel):  # type: ignore
     positions = ArrayProperty(StringProperty(), required=True)
 
     @classmethod
@@ -238,7 +244,8 @@ class StandardNumberingRel(StructuredRel):
         molecule1: StrictStructuredNode,
         molecule2: StrictStructuredNode,
         positions: list[str],
-    ):
+    ) -> "StandardNumberingRel":
+        """Validates the positions and connects the two molecules."""
         molecule1.sequences_protein.connect(
             molecule2,
             {
@@ -251,7 +258,8 @@ class StandardNumberingRel(StructuredRel):
         )
 
     @property
-    def label(self):
+    def label(self) -> str:
+        """The label of the standard numbering."""
         return f"{self.positions}"
 
 
@@ -265,7 +273,7 @@ class StandardNumbering(StrictStructuredNode):
     )
 
 
-class PairwiseAlignmentResult(StructuredRel):
+class PairwiseAlignmentResult(StructuredRel):  # type: ignore
     """A relationship representing the similarity between two sequences.
 
     Args:
@@ -295,7 +303,7 @@ class PairwiseAlignmentResult(StructuredRel):
         score: int,
         query_aligned: str,
         target_aligned: str,
-    ):
+    ) -> "PairwiseAlignmentResult":
         """Validates the similarity and connects the two molecules.
 
         Args:
@@ -347,19 +355,13 @@ class GOAnnotation(StrictStructuredNode):
     definition = StringProperty()
 
     @property
-    def label(self):
-        return self.term
+    def label(self) -> str:
+        """The label of the GO annotation."""
+        return str(self.term)
 
 
-class Mutation(StructuredRel):
-    """A relationship representing mutations between two sequences.
-
-    Args:
-        from_positions (list of int): The positions of the mutations in the original sequence.
-        to_positions (list of int): The positions of the mutations in the mutated sequence.
-        from_monomers (list of str): The original monomers at the mutation positions.
-        to_monomers (list of str): The mutated residues at the mutation positions.
-    """
+class Mutation(StructuredRel):  # type: ignore
+    """A relationship representing mutations between two sequences."""
 
     from_positions = ArrayProperty(IntegerProperty(), required=True)
     to_positions = ArrayProperty(IntegerProperty(), required=True)
@@ -375,9 +377,8 @@ class Mutation(StructuredRel):
         to_positions: list[int],
         from_monomers: list[str],
         to_monomers: list[str],
-    ):
+    ) -> "Mutation":
         """Validates the mutations and connects the two molecules.
-
         Args:
             molecule1 (StrictStructuredNode): DNA or Protein node
             molecule2 (StrictStructuredNode): DNA or Protein node
@@ -392,7 +393,11 @@ class Mutation(StructuredRel):
         Raises:
             ValueError: If the specified positions or residues do not match the sequences.
         """
-        if len(from_positions) != len(to_positions) or len(from_positions) != len(from_monomers) or len(from_positions) != len(to_monomers):
+        if (
+            len(from_positions) != len(to_positions)
+            or len(from_positions) != len(from_monomers)
+            or len(from_positions) != len(to_monomers)
+        ):
             raise ValueError("All input lists must have the same length.")
 
         for from_position, from_monomer in zip(from_positions, from_monomers):
@@ -425,10 +430,13 @@ class Mutation(StructuredRel):
         )
 
     @property
-    def label(self):
+    def label(self) -> str:
+        """The label of the mutation."""
         return ",".join(
             f"{from_monomer}{from_position}{to_monomer}"
-            for from_position, from_monomer, to_monomer in zip(self.from_positions, self.from_monomers, self.to_monomers)
+            for from_position, from_monomer, to_monomer in zip(
+                self.from_positions, self.from_monomers, self.to_monomers
+            )
         )
 
 
@@ -492,7 +500,7 @@ class DNA(StrictStructuredNode):
     )
 
 
-class CustomRealationship(StructuredRel):
+class CustomRealationship(StructuredRel):  # type: ignore
     """A custom relationship between two ontology objects."""
 
     name = StringProperty(required=True)
@@ -505,7 +513,7 @@ class CustomRealationship(StructuredRel):
         molecule2: StrictStructuredNode,
         name: str,
         description: str,
-    ):
+    ) -> "CustomRealationship":
         molecule1.custom_relationships.connect(
             molecule2,
             {
@@ -520,9 +528,9 @@ class CustomRealationship(StructuredRel):
         )
 
     @property
-    def label(self):
-        return self.name
-
+    def label(self) -> str:
+        """The label of the custom relationship."""
+        return str(self.name)
 
 
 class OntologyObject(StrictStructuredNode):
@@ -535,4 +543,6 @@ class OntologyObject(StrictStructuredNode):
 
     # Relationships
     subclasses = RelationshipTo("OntologyObject", "SUBCLASS_OF")
-    custom_relationships = RelationshipTo("OntologyObject", "CUSTOM_RELATIONSHIP", model=CustomRealationship)
+    custom_relationships = RelationshipTo(
+        "OntologyObject", "CUSTOM_RELATIONSHIP", model=CustomRealationship
+    )

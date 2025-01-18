@@ -1,7 +1,8 @@
 import os
 import subprocess
+from typing import Any, Optional
 
-from neo4j import Driver, GraphDatabase
+from neo4j import Driver, GraphDatabase, ManagedTransaction
 from neomodel import db as neomodel_db
 
 
@@ -20,14 +21,16 @@ class DatabaseConnector:
             )
         print("📡 Connected to database.")
 
-    def close(self):
+    def close(self) -> None:
         """
         Closes the connection to the Neo4j database.
         """
         self.driver.close()
         print("🔌 Connection closed.")
 
-    def execute_read(self, query: str, parameters=None) -> list[dict]:
+    def execute_read(
+        self, query: str, parameters: Optional[dict[str, Any]] = None
+    ) -> Any:
         """
         Executes a read (MATCH) query using the Neo4j driver.
 
@@ -41,7 +44,9 @@ class DatabaseConnector:
         with self.driver.session() as session:
             return session.execute_read(self._run_query, query, parameters)
 
-    def execute_write(self, query: str, parameters=None):
+    def execute_write(
+        self, query: str, parameters: Optional[dict[str, Any]] = None
+    ) -> Any:
         """
         Executes a write (CREATE, DELETE, etc.) query using the Neo4j driver.
 
@@ -52,7 +57,7 @@ class DatabaseConnector:
         with self.driver.session() as session:
             return session.execute_write(self._run_query, query, parameters)
 
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, int]:
         """
         Returns the number of nodes and relationships in the database.
 
@@ -76,7 +81,7 @@ class DatabaseConnector:
         user: str | None,
         password: str | None,
         models_path: str = "model.py",
-    ):
+    ) -> None:
         """
         Run the neomodel_install_labels script to set up indexes and constraints on labels
         of Object-Graph Mapping (OGM) models.
@@ -140,7 +145,7 @@ class DatabaseConnector:
         self,
         user: str | None,
         password: str | None,
-    ):
+    ) -> None:
         """
         Run the neomodel_remove_labels script to drop all indexes and constraints
         from labels in the Neo4j database.
@@ -172,7 +177,7 @@ class DatabaseConnector:
     def generate_model_diagram(
         self,
         models_path: str = "pyeed/model.py",
-    ):
+    ) -> None:
         """Generates a arrows json file representing the model diagram.
 
         Args:
@@ -185,7 +190,7 @@ class DatabaseConnector:
             ]
         )
 
-    def wipe_database(self, date=None):
+    def wipe_database(self, date: Optional[str] = None) -> None:
         """
         Deletes all nodes and relationships in the database.
         The date parameter can be used but is not necessary.
@@ -196,7 +201,9 @@ class DatabaseConnector:
             from datetime import datetime
 
             if datetime.now().strftime("%Y-%m-%d") != date:
-                print(f"The provided date does not match the current date. Date is you gave is {date} actual date is {datetime.now().strftime('%Y-%m-%d')}")
+                print(
+                    f"The provided date does not match the current date. Date is you gave is {date} actual date is {datetime.now().strftime('%Y-%m-%d')}"
+                )
                 return
 
         delete_query = """
@@ -207,10 +214,10 @@ class DatabaseConnector:
         print("All data has been wiped from the database.")
 
     @staticmethod
-    def _run_query(tx, query, parameters):
-        """
-        Executes a Cypher query in the provided transaction.
-        """
+    def _run_query(
+        tx: ManagedTransaction, query: str, parameters: Optional[dict[str, Any]] = None
+    ) -> list[dict[str, Any]]:
+        """Executes a Cypher query in the provided transaction."""
         result = tx.run(query, parameters)
         return [record.data() for record in result]
 
@@ -223,7 +230,7 @@ class DatabaseConnector:
         return GraphDatabase.driver(uri, auth=auth)
 
     @property
-    def node_properties(self) -> list[dict]:
+    def node_properties(self) -> list[dict[str, str]]:
         """
         Returns a list of dictionaries containing the node labels and their properties.
         """
@@ -235,10 +242,10 @@ class DatabaseConnector:
             RETURN {labels: nodeLabels, properties: properties} AS output
             """
 
-        return self.execute_read(node_properties_query)
+        return self.execute_read(node_properties_query)  # type: ignore
 
     @property
-    def relationship_properties(self) -> list[dict]:
+    def relationship_properties(self) -> list[dict[str, str]]:
         """
         Returns a list of dictionaries containing the relationship types and their properties.
         """
@@ -250,10 +257,10 @@ class DatabaseConnector:
             RETURN {type: nodeLabels, properties: properties} AS output
             """
 
-        return self.execute_read(rel_properties_query)
+        return self.execute_read(rel_properties_query)  # type: ignore
 
     @property
-    def relationships(self) -> list[dict]:
+    def relationships(self) -> list[dict[str, str]]:
         """
         Returns a list of dictionaries containing the source node label, relationship type, and target node label.
         """
@@ -264,7 +271,7 @@ class DatabaseConnector:
             RETURN {source: label, relationship: property, target: other} AS output
             """
 
-        return self.execute_read(rel_query)
+        return self.execute_read(rel_query)  # type: ignore
 
     @staticmethod
     def _insert_after_second_slash(uri: str, to_insert: str) -> str:

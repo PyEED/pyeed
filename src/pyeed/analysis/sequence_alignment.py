@@ -1,12 +1,11 @@
 from itertools import combinations
-from typing import Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.main import Pyeed
 from pyeed.tools.utility import chunks
 from rich.progress import Progress
 
@@ -52,16 +51,16 @@ class PairwiseAligner:
 
         aligner = self._get_aligner()
 
-        results = aligner.align(list(seq1.values())[0], list(seq2.values())[0])
+        results = aligner.align(list(seq1.values())[0], list(seq2.values())[0])  # type: ignore
 
-        return results[0]
+        return results[0]  # type: ignore
 
     def align_pairwise(
         self,
         seq1: Dict[str, str],
         seq2: Dict[str, str],
         db: Optional[DatabaseConnector] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Aligns two sequences and returns the alignment results.
         If a `DatabaseConnector` object is provided, the results are added to the database.
 
@@ -91,7 +90,7 @@ class PairwiseAligner:
         batch_size: int = 500,
         return_results: bool = True,
         pairs: Optional[list[tuple[str, str]]] = None,
-    ) -> Optional[List[dict]]:
+    ) -> Optional[list[dict[str, Any]]]:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
         If a `DatabaseConnector` object is provided, the results can be added to the database.
@@ -130,7 +129,7 @@ class PairwiseAligner:
 
         if pairs is None:
             pairs = list(combinations(sequences, 2))
-            
+
         total_pairs = len(pairs)
         all_alignments = []
 
@@ -164,12 +163,11 @@ class PairwiseAligner:
 
         return all_alignments if return_results else None
 
-
     def _to_db(
         self,
-        alignments: list[dict],
+        alignments: list[dict[str, Any]],
         db: DatabaseConnector,
-    ):
+    ) -> None:
         """Inserts the alignment results to pyeed graph database.
 
         Args:
@@ -195,7 +193,7 @@ class PairwiseAligner:
     def _get_aligner(self) -> BioPairwiseAligner:
         """Creates a BioPython pairwise aligner object with the specified parameters
         from the class instance."""
-        aligner = BioPairwiseAligner()
+        aligner = BioPairwiseAligner()  # type: ignore
         aligner.mode = self.mode
         aligner.match_score = self.match
         aligner.mismatch_score = self.mismatch
@@ -209,7 +207,7 @@ class PairwiseAligner:
 
     def _map_alignment_results(
         self, alignment: Alignment, seq1: Dict[str, str], seq2: Dict[str, str]
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Maps the alignment results to a dictionary.
         The dictionaly has the same signature as a `PairwiseAlignmentResult` object.
 
@@ -219,10 +217,10 @@ class PairwiseAligner:
 
         shorter_seq = min(alignment[0], alignment[1], key=lambda x: len(x))
 
-        identities = alignment.counts().identities
+        identities = alignment.counts().identities  # type: ignore
         identity = identities / len(shorter_seq)
-        gaps = alignment.counts().gaps
-        mismatches = alignment.counts().mismatches
+        gaps = alignment.counts().gaps  # type: ignore
+        mismatches = alignment.counts().mismatches  # type: ignore
 
         query_aligned = alignment[0]
         target_aligned = alignment[1]
@@ -276,16 +274,4 @@ class PairwiseAligner:
     def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
         from Bio.Align import substitution_matrices
 
-        return substitution_matrices.load(self.substitution_matrix)
-
-
-if __name__ == "__main__":
-    s1 = "ACGTA"
-    s2 = "ACGA"
-
-    uri = "bolt://localhost:7688"
-    username = "neo4j"
-    password = "12345678"
-
-    Pyeed(uri, user=username, password=password)
-    
+        return substitution_matrices.load(self.substitution_matrix)  # type: ignore

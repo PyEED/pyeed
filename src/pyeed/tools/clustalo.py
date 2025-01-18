@@ -78,15 +78,3 @@ class ClustalOmega(AbstractTool):
         print(cleaned_text)
 
         return self.extract_output_data(cleaned_text)
-
-
-if __name__ == "__main__":
-    sequences = [
-        ">seq1\nMTHKLLLTLLFTLLFSSAYSRG",
-        ">seq2\nMTHKILLLTLLFTLLFSSAYSRG",
-        ">seq3\nMTHKILLLTLLFTLLFSSCYSRG",
-    ]
-
-    clustalo = ClustalOmega()
-    alignment = clustalo.align(sequences)
-    print(alignment)

@@ -52,3 +52,12 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 ignore_missing_imports = true
+line_length = 120
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+check_untyped_defs = true
+strict = true
+
+[tool.ruff.lint]
+extend-select = ["I"]

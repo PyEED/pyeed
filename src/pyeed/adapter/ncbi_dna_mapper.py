@@ -1,6 +1,5 @@
-from typing import List, TypeVar
+from typing import Any, List, TypeVar
 
-from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
 from loguru import logger
@@ -17,7 +16,16 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
     them to the database.
     """
 
-    def add_to_db(self, record: SeqIO.SeqRecord):
+    def add_to_db(self, record: SeqRecord) -> None:
+        """
+        Add a DNA record to the database.
+
+        Args:
+            record (SeqIO.SeqRecord): A `Bio.SeqRecord` object.
+
+        Returns:
+            None
+        """
         logger.debug(f"Mapping DNA record: {record.id}")
 
         # Get the organism information
@@ -38,7 +46,6 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
             )
         except Exception as e:
             logger.error(f"Error saving DNA record {record.id}: {e}")
-            return
 
         dna.organism.connect(organism)
 
@@ -53,7 +60,10 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         # check encodings for known proteins
         self.map_cds(dna, record)
 
-    def add_sites(self, dna: DNA, sites: List[dict]):
+    def add_sites(self, dna: DNA, sites: List[dict[str, Any]]) -> None:
+        """
+        Add sites to a DNA record.
+        """
         for site in sites:
             try:
                 site_saving = Site.get_or_save(
@@ -70,7 +80,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                     f"Error saving site {site['id']} for {dna.accession_id}: {e}"
                 )
 
-    def add_regions(self, dna: DNA, regions: List[dict]):
+    def add_regions(self, dna: DNA, regions: List[dict[str, Any]]) -> None:
         for region in regions:
             try:
                 region_saving = Region.get_or_save(
@@ -87,7 +97,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                     f"Error saving region {region['id']} for {dna.accession_id}: {e}"
                 )
 
-    def map_general_infos(self, seq_record: SeqRecord):
+    def map_general_infos(self, seq_record: SeqRecord) -> dict[str, Any]:
         """
         Extracts general information from a DNA sequence record.
         """
@@ -107,7 +117,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         gc_content = gc_count / len(sequence)
         return gc_content
 
-    def map_organism(self, seq_record: SeqRecord) -> dict:
+    def map_organism(self, seq_record: SeqRecord) -> dict[str, Any]:
         """
         Gets the organism name and taxonomy ID from the source data.
         Maps it to an Organism object.
@@ -164,7 +174,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
             if feature.type.lower() == feature_type.lower()
         ]
 
-    def map_sites(self, seq_record: SeqRecord):
+    def map_sites(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
         sites_list = []
 
         sites = self.get_feature(seq_record, "variation")
@@ -174,8 +184,14 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
             try:
                 sites_dict["id"] = site.qualifiers["note"][0]
-                sites_dict["start"] = int(site.location.start)
-                sites_dict["end"] = int(site.location.end)
+
+                if hasattr(site.location, "start") and hasattr(site.location, "end"):
+                    sites_dict["start"] = int(site.location.start)  # type: ignore
+                    sites_dict["end"] = int(site.location.end)  # type: ignore
+                else:
+                    logger.debug(
+                        f"Error mapping site for {seq_record.id}: {site.location}"
+                    )
 
             except KeyError:
                 logger.debug(
@@ -186,7 +202,10 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
         return sites_list
 
-    def map_regions(self, seq_record: SeqRecord):
+    def map_regions(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
+        """
+        Maps regions to a DNA record.
+        """
         regions_list = []
 
         regions = self.get_feature(seq_record, "gene")
@@ -198,14 +217,17 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                 else:
                     db_xref = region.qualifiers["db_xref"][0]
 
-                regions_list.append(
-                    {
-                        "id": region.qualifiers["gene"][0],
-                        "start": int(region.location.start),
-                        "end": int(region.location.end),
-                        "cross_reference": db_xref,
-                    }
-                )
+                if hasattr(region.location, "start") and hasattr(
+                    region.location, "end"
+                ):
+                    regions_list.append(
+                        {
+                            "id": region.qualifiers["gene"][0],
+                            "start": int(region.location.start),  # type: ignore
+                            "end": int(region.location.end),  # type: ignore
+                            "cross_reference": db_xref,
+                        }
+                    )
 
             except KeyError:
                 logger.debug(
@@ -214,7 +236,7 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
         return regions_list
 
-    def map_cds(self, dna, seq_record: SeqRecord):
+    def map_cds(self, dna: DNA, seq_record: SeqRecord) -> None:
         cds_list_features = self.get_feature(seq_record, "CDS")
 
         for cds in cds_list_features:
@@ -228,10 +250,18 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
                     seq_length=len(cds.qualifiers["translation"][0]),
                 )
 
-                dna.protein.connect(
-                    protein,
-                    {"start": int(cds.location.start), "end": int(cds.location.end)},
-                )
+                if hasattr(cds.location, "start") and hasattr(cds.location, "end"):
+                    dna.protein.connect(
+                        protein,
+                        {
+                            "start": int(cds.location.start),  # type: ignore
+                            "end": int(cds.location.end),  # type: ignore
+                        },
+                    )
+                else:
+                    logger.debug(
+                        f"Error mapping CDS for {seq_record.id}: {cds.location}"
+                    )
 
             except KeyError:
                 logger.debug(f"Error mapping CDS for {seq_record.id}: {cds.qualifiers}")

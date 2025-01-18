@@ -1,18 +1,24 @@
 import gc
-import logging
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
-logger = logging.getLogger(__name__)
 
-
-def load_model_and_tokenizer(model_name: str):
+def load_model_and_tokenizer(
+    model_name: str,
+) -> tuple[EsmModel, EsmTokenizer, torch.device]:
     """
     Loads the ESM2 model and tokenizer and sets the appropriate device.
+
+    Args:
+        model_name (str): The name of the ESM2 model to load.
+
+    Returns:
+        tuple[EsmModel, EsmTokenizer, torch.device]: The ESM2 model, tokenizer, and device.
     """
     # Load the model and tokenizer
     model = EsmModel.from_pretrained(model_name)
@@ -32,9 +38,23 @@ def load_model_and_tokenizer(model_name: str):
     return model, tokenizer, device
 
 
-def get_batch_embeddings(batch_sequences, model, tokenizer, device):
+def get_batch_embeddings(
+    batch_sequences: list[str],
+    model: EsmModel,
+    tokenizer: EsmTokenizer,
+    device: torch.device,
+) -> list[NDArray[np.float64]]:
     """
     Generates embeddings for a batch of sequences.
+
+    Args:
+        batch_sequences (list[str]): The sequences to embed.
+        model (EsmModel): The ESM2 model.
+        tokenizer (EsmTokenizer): The ESM2 tokenizer.
+        device (torch.device): The device to use for the embeddings.
+
+    Returns:
+        list[NDArray[np.float64]]: The embeddings for the sequences.
     """
     max_sequence_length = 1024
     with torch.no_grad():
@@ -64,10 +84,15 @@ def get_batch_embeddings(batch_sequences, model, tokenizer, device):
 def update_protein_embeddings_in_db(
     db: DatabaseConnector,
     accessions: list[str],
-    embeddings_batch,
-):
+    embeddings_batch: list[NDArray[np.float64]],
+) -> None:
     """
     Updates the embeddings for a batch of proteins in the database.
+
+    Args:
+        db (DatabaseConnector): The database connector.
+        accessions (list[str]): The accessions of the proteins to update.
+        embeddings_batch (list[NDArray[np.float64]]): The embeddings to update.
     """
     # Prepare the data for batch update
     updates = [
@@ -86,7 +111,7 @@ def update_protein_embeddings_in_db(
     db.execute_write(query, {"updates": updates})
 
 
-def free_memory():
+def free_memory() -> None:
     """
     Frees up memory by invoking garbage collection and clearing GPU caches.
     """
