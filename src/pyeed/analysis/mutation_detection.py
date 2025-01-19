@@ -8,8 +8,23 @@ def get_sequence_data(
     sequence_id2: str,
     db: DatabaseConnector,
     standard_numbering_tool_name: str,
-) -> tuple[dict, dict]:
-    """Fetch sequence and position data for two sequences from the databaseFetch sequence and position data for two sequences from the databaseFetch sequence and position data for two sequences from the databaseFetch sequence and position data for two sequences from the databaseFetch sequence and position data for two sequences from the database."""
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Fetch sequence and position data for two sequences from the database.
+
+    Args:
+        sequence_id1: Accession ID of the first sequence
+        sequence_id2: Accession ID of the second sequence
+        db: Database connector instance
+        standard_numbering_tool_name: Name of the standard numbering tool
+
+    Returns:
+        A tuple containing two dictionaries:
+        - First dict mapping sequence IDs to sequences
+        - Second dict mapping sequence IDs to position lists
+
+    Raises:
+        ValueError: If standard numbering positions are not found for both sequences
+    """
     query = f"""
     MATCH (p:Protein)-[r:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
     WHERE p.accession_id IN ['{sequence_id1}', '{sequence_id2}'] 
@@ -29,8 +44,27 @@ def get_sequence_data(
     return sequences, positions
 
 
-def find_mutations(seq1: str, seq2: str, pos1: list, pos2: list) -> Mutation:
-    """Compare two sequences and find mutations between them."""
+def find_mutations(
+    seq1: str,
+    seq2: str,
+    pos1: list[str],
+    pos2: list[str],
+    sequence_id1: str,
+    sequence_id2: str,
+) -> Mutation:
+    """Compare two sequences and find mutations between them.
+
+    Args:
+        seq1: First sequence string
+        seq2: Second sequence string
+        pos1: List of positions for first sequence
+        pos2: List of positions for second sequence
+        sequence_id1: Accession ID of the first sequence
+        sequence_id2: Accession ID of the second sequence
+
+    Returns:
+        Mutation object containing the detected mutations
+    """
     pos_to_idx1 = {pos: idx for idx, pos in enumerate(pos1)}
     pos_to_idx2 = {pos: idx for idx, pos in enumerate(pos2)}
     common_positions = set(pos1) & set(pos2)
@@ -61,7 +95,12 @@ def find_mutations(seq1: str, seq2: str, pos1: list, pos2: list) -> Mutation:
 
 
 def save_mutations_to_db(mutations: Mutation, db: DatabaseConnector) -> None:
-    """Save detected mutations to the database using the Mutation model."""
+    """Save detected mutations to the database.
+
+    Args:
+        mutations: Mutation object containing mutation information
+        db: Database connector instance
+    """
     query = """
     MATCH (p1:Protein), (p2:Protein)
     WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
@@ -72,15 +111,15 @@ def save_mutations_to_db(mutations: Mutation, db: DatabaseConnector) -> None:
         r.to_monomers = $to_monomers
     """
     params = {
-        "sequence_id1": mutations["sequence_id1"],
-        "sequence_id2": mutations["sequence_id2"],
-        "from_positions": mutations["from_positions"],
-        "to_positions": mutations["to_positions"],
-        "from_monomers": mutations["from_monomers"],
-        "to_monomers": mutations["to_monomers"],
+        "sequence_id1": mutations.sequence_id1,
+        "sequence_id2": mutations.sequence_id2,
+        "from_positions": mutations.from_positions,
+        "to_positions": mutations.to_positions,
+        "from_monomers": mutations.from_monomers,
+        "to_monomers": mutations.to_monomers,
     }
     db.execute_write(query, params)
-    logger.debug(f"Saved {len(mutations['from_positions'])} mutations to database")
+    logger.debug(f"Saved {len(mutations.from_positions)} mutations to database")
 
 
 def get_mutations_between_sequences(
@@ -90,18 +129,17 @@ def get_mutations_between_sequences(
     standard_numbering_tool_name: str,
     save_to_db: bool = True,
 ) -> Mutation:
-    """
-    Get the mutations between two sequences using a standard numbering tool.
+    """Get the mutations between two sequences using a standard numbering tool.
 
     Args:
-        sequence_id1: The accession ID of the first sequence
-        sequence_id2: The accession ID of the second sequence
-        db: The database connector object
+        sequence_id1: Accession ID of the first sequence
+        sequence_id2: Accession ID of the second sequence
+        db: Database connector instance
         standard_numbering_tool_name: Name of the standard numbering tool to use
         save_to_db: Whether to save mutations to database
 
     Returns:
-        Dictionary containing mutation information
+        Mutation object containing the detected mutations
     """
     sequences, positions = get_sequence_data(
         sequence_id1, sequence_id2, db, standard_numbering_tool_name
@@ -112,6 +150,8 @@ def get_mutations_between_sequences(
         sequences[sequence_id2],
         positions[sequence_id1],
         positions[sequence_id2],
+        sequence_id1,
+        sequence_id2,
     )
 
     if save_to_db:

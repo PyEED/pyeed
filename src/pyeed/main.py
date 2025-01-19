@@ -91,7 +91,7 @@ class Pyeed:
         elif db.lower() == "ncbi_protein":
             self.fetch_ncbi_protein(ids)
 
-        elif db.lower() == "ncbi_protein":
+        elif db.lower() == "ncbi_nucleotide":
             self.fetch_ncbi_nucleotide(ids)
 
         else:
@@ -293,8 +293,23 @@ class Pyeed:
         nucleotide_ids = self.db.execute_read(query)
         nucleotide_ids = [record["nucleotide_id"] for record in nucleotide_ids]
 
+        logger.info(f"Found {len(nucleotide_ids)} coding sequences.")
+
+        # check if the coding sequences are already in the database
+        query = """
+        MATCH (n:DNA)
+        WHERE n.accession_id IN $nucleotide_ids
+        RETURN n.accession_id AS accession_id
+        """
+        coding_sequences = self.db.execute_read(
+            query, {"nucleotide_ids": nucleotide_ids}
+        )
+        coding_sequences = [record["accession_id"] for record in coding_sequences]
+
+        # check each coding sequence if it is already in the database and only if not add to list
+        nucleotide_ids = [id for id in nucleotide_ids if id not in coding_sequences]
+
         logger.info(f"Fetching {len(nucleotide_ids)} coding sequences.")
-        logger.info(f"Fetching coding sequences: {nucleotide_ids}")
 
         # Fetch the coding sequences
         self.fetch_ncbi_nucleotide(nucleotide_ids)

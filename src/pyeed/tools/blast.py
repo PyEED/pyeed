@@ -165,14 +165,14 @@ class Blast(AbstractTool):
         # check if the query is an id or a sequence
         if dbConnector:
             query_run = """
-            MATCH (p:DNA)
-            WHERE p.accession_id IN $ids
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
+            MATCH (n:DNA)
+            WHERE n.accession_id IN $ids
+            RETURN n.accession_id AS accession_id, n.sequence AS sequence
             """
             dnas = dbConnector.execute_read(query_run, {"ids": [query]})
 
             if len(dnas) == 0:
-                raise ValueError("No protein found with the provided id.")
+                raise ValueError("No DNA found with the provided id.")
 
             dna_seq = dnas[0]["sequence"]
             id = dnas[0]["accession_id"]
@@ -182,7 +182,7 @@ class Blast(AbstractTool):
 
         # now we will run the run service
         result = self.run_service(
-            query, db, evalue, outfmt, num_threads, max_target_seqs
+            query, db, evalue, outfmt, num_threads, max_target_seqs, protein=False
         )
         logger.info(f"BLASTN search completed with status code {result.status_code}")
 
