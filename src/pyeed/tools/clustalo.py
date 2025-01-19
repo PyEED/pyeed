@@ -11,7 +11,7 @@ class ClustalOmega(AbstractTool):
     Class for ClustalOmega aligner running as a REST service.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._service_url = ServiceURL.CLUSTALO.value
 
@@ -28,19 +28,19 @@ class ClustalOmega(AbstractTool):
         data = "\n".join(multifasta)
         return {"file": data}
 
-    def extract_output_data(self, response) -> MultipleSeqAlignment:
+    def extract_output_data(self, response: str) -> MultipleSeqAlignment:
         """
         Extracts the output data from the ClustalOmega container.
 
         Returns:
             MultiSequenceAlignment: The alignment result.
         """
-        alignment = AlignIO.read(io.StringIO(response), "clustal")
+        alignment: MultipleSeqAlignment = AlignIO.read(io.StringIO(response), "clustal")  # type: ignore
         self._delete_temp_dir()
 
-        return alignment
+        return alignment  # type: ignore
 
-    def run_service(self, data) -> httpx.Response:
+    def run_service(self, data: list[str]) -> httpx.Response:
         """Executes the ClustalOmega service."""
         file = self.create_file(data)
         try:
