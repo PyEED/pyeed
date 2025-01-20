@@ -1,0 +1,24 @@
+{
+  "version": "1.2",
+  "dbname": "protein_db",
+  "dbtype": "Protein",
+  "db-version": 5,
+  "description": "Protein Database",
+  "number-of-letters": 893,
+  "number-of-sequences": 10,
+  "last-updated": "2025-01-20T15:57:00",
+  "number-of-volumes": 1,
+  "bytes-total": 51054,
+  "bytes-to-cache": 1088,
+  "files": [
+    "protein_db.pdb",
+    "protein_db.phr",
+    "protein_db.pin",
+    "protein_db.pog",
+    "protein_db.pos",
+    "protein_db.pot",
+    "protein_db.psq",
+    "protein_db.ptf",
+    "protein_db.pto"
+  ]
+}

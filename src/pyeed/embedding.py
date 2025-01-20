@@ -120,3 +120,13 @@ def free_memory() -> None:
         torch.mps.empty_cache()
     elif torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+
+if __name__ == "__main__":
+    model_name = "esmc_300m"
+
+    model, tokenizer, device = load_model_and_tokenizer(model_name)
+
+    print(model)
+    print(tokenizer)
+    print(device)

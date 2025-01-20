@@ -1,87 +1,68 @@
 import io
-from typing import Optional
+from typing import Literal, Optional
 
 import httpx
 import pandas as pd
 from loguru import logger
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.tools.abstract_tool import AbstractTool, ServiceURL
+from pyeed.tools.abstract_tool import AbstractTool
 
 
 class Blast(AbstractTool):
-    """
-    Class for Blast search with biopython
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._service_url = ServiceURL.BLASTP.value
-
     def run_service(
-        self, query, db, evalue, outfmt, num_threads, max_target_seqs, protein=True
-    ):
-        """
-        Run the BLAST service with the provided parameters.
+        self,
+        mode: Literal["blastp", "blastn"],
+        query: str,
+        db_path: str,
+        db_name: str,
+        evalue: float,
+        max_target_seqs: int,
+        num_threads: int,
+    ) -> httpx.Response:
+        """Run the BLAST service with the provided parameters.
 
         Args:
-            query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
-            db (str): The database to search against.
-            evalue (float): E-value threshold for BLAST hits.
-            outfmt (int): Output format for BLAST results.
-            num_threads (int): Number of threads to use for the BLAST search.
-            max_target_seqs (int): Maximum number of target sequences to retrieve.
-            protein (bool): If True, perform a BLASTP search. If False, perform a BLASTN search.
+            query: Query sequence
+            db: Path to BLAST database
+            evalue: E-value threshold
+            num_threads: Number of threads to use
+            max_target_seqs: Maximum number of target sequences
+            mode: BLAST mode ("blastp" or "blastn")
 
         Returns:
-            httpx.Response: The response object containing the BLAST results.
-
+            Response from the BLAST service
         """
+        if mode not in ["blastp", "blastn"]:
+            raise ValueError("Invalid mode. Must be 'blastp' or 'blastn'.")
+        logger.debug(f"Running {mode} search")
 
-        json_request = {
-            "query": query,
-            "db": db,
+        data = {
+            "mode": mode,
+            "sequence": query,
+            "db_path": db_path,
+            "db_name": db_name,
             "evalue": evalue,
-            "outfmt": outfmt,
-            "num_threads": num_threads,
             "max_target_seqs": max_target_seqs,
+            "num_threads": num_threads,
         }
 
-        if protein:
-            self._service_url = ServiceURL.BLASTP.value
-        else:
-            self._service_url = ServiceURL.BLASTN.value
-
         try:
-            return httpx.post(self._service_url, json=json_request, timeout=6000)
-
-        except httpx.ConnectError as connect_error:
-            context = connect_error.__context__
-            if context and hasattr(context, "args"):
-                error_number = context.args[0].errno
-                if error_number == 8 or error_number == -3:
-                    if protein:
-                        self._service_url = "http://localhost:6001/blastp"
-                    else:
-                        self._service_url = "http://localhost:6001/blastn"
-                    try:
-                        return httpx.post(
-                            self._service_url, json=json_request, timeout=6000
-                        )
-                    except httpx.ConnectError:
-                        raise httpx.ConnectError(
-                            "PyEED Docker Service is not running."
-                        ) from None
-
-            print(connect_error)
-            raise httpx.ConnectError("PyEED Docker Service is not running.") from None
+            return httpx.post(
+                "http://localhost:6001/blast",
+                json=data,  # Send as JSON body, not query params
+                timeout=6000,
+            )
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error: {e}")
+            raise httpx.ConnectError("PyEED Docker Service not running") from e
 
     def blastp(
         self,
         query,
         db,
+        num_threads,
         evalue=0.001,
-        outfmt=10,
-        num_threads=50,
+        outfmt=6,
         max_target_seqs=50,
         dbConnector: Optional[DatabaseConnector] = None,
     ) -> pd.DataFrame:
@@ -198,3 +179,19 @@ class Blast(AbstractTool):
         df.columns = header
 
         return df
+
+
+if __name__ == "__main__":
+    seq = "MSEQVAAVAKLRAKASEAAKEAKAREAAKKLAEAAKKAKAKEAAKRAEAKLAEKAKAAKRAEAKAAKEAKRAAAKRAEAKLAEKAKAAK"
+    blast = Blast()
+    res = blast.run_service(
+        mode="blastp",
+        query=seq,
+        db_path="/usr/local/bin/data/test_db/",
+        db_name="protein_db",
+        evalue=10,
+        max_target_seqs=10,
+        num_threads=4,
+    )
+
+    print(res.json())
