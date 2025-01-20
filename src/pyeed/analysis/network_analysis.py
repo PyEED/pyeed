@@ -96,14 +96,14 @@ class NetworkAnalysis:
 
         return self.graph
 
-    def compute_degree_centrality(self):
+    def compute_degree_centrality(self) -> dict[Any, float]:
         """
         Computes the degree centrality of the graph.
 
         Returns:
-            dict: A dictionary mapping each node to its degree centrality.
+            dict[Any, float]: A dictionary mapping each node to its degree centrality.
         """
-        return nx.degree_centrality(self.graph)
+        return dict(nx.degree_centrality(self.graph))
 
     def shortest_path(self, source, target):
         """
@@ -126,13 +126,15 @@ class NetworkAnalysis:
         Detects communities in the graph using the greedy modularity algorithm.
 
         Returns:
-            list: A list of sets, each containing the nodes in a community.
+            list[set]: A list of sets, each containing the nodes in a community.
         """
         from networkx.algorithms.community import greedy_modularity_communities
 
-        return list(greedy_modularity_communities(self.graph))
+        # Convert generator to list of lists for better compatibility
+        communities = [list(c) for c in greedy_modularity_communities(self.graph)]
+        return communities
 
-    def find_isolated_nodes(self, graph) -> list:
+    def find_isolated_nodes(self, graph: nx.Graph) -> list[Any]:
         """
         Finds isolated nodes in the graph.
 
@@ -140,18 +142,18 @@ class NetworkAnalysis:
             graph (networkx.Graph): The graph to analyze.
 
         Returns:
-            list: List of nodes that have no connections (degree = 0).
+            list[Any]: List of nodes that have no connections (degree = 0).
         """
         return [node for node in graph if graph.degree(node) == 0]
 
     def find_self_referential_nodes(
-        self, relationship_type: str, graph: nx.Graph
+        self, relationship_type: str | None, graph: nx.Graph
     ) -> list[tuple[Any, Any, dict[str, Any]]]:
         """
         Finds all edges in the graph that are self-referential (loops) of a specified relationship type.
 
         Args:
-            relationship_type (str): The relationship type to consider.
+            relationship_type (str | None): The relationship type to consider. Can be None to match all types.
             graph (networkx.Graph): The graph to analyze.
 
         Returns:
@@ -182,26 +184,26 @@ class NetworkAnalysis:
     def calculate_positions_2d(
         self,
         attribute: str | None = None,
-        scale: float = 1.0,
+        scale: int = 1,
         threshold: float | None = None,
         mode: str = "HIDE_UNDER_THRESHOLD",
         type_relationship: str | None = None,
-    ) -> tuple[nx.Graph, dict[str, tuple[float, float]]]:
+    ) -> tuple[nx.Graph, dict[Any, tuple[float, float]]]:
         """
         Calculates 2D positions for graph visualization with optional edge filtering.
 
         Args:
-            attribute (str, optional): Edge attribute to use for weighting.
-            scale (float): Scale factor for node distances in the visualization. Defaults to 1.0.
-            threshold (float, optional): Threshold value for edge filtering.
-            path (str, optional): Path to save the visualization (not used in current implementation).
-            mode (str): Filtering mode - either "HIDE_UNDER_THRESHOLD" or "HIDE_OVER_THRESHOLD". Defaults to "HIDE_UNDER_THRESHOLD".
-            type_relationship (str, optional): Specific relationship type to filter on.
+            attribute (str | None): Edge attribute to use for weighting. Can be None for unweighted layout.
+            scale (int): Scale factor for node distances in the visualization. Defaults to 1.
+            threshold (float | None): Threshold value for edge filtering.
+            mode (str): Filtering mode - either "HIDE_UNDER_THRESHOLD" or "HIDE_OVER_THRESHOLD".
+                       Defaults to "HIDE_UNDER_THRESHOLD".
+            type_relationship (str | None): Specific relationship type to filter on. Can be None to match all types.
 
         Returns:
-            tuple[networkx.Graph, dict]: A tuple containing:
+            tuple[nx.Graph, dict[Any, tuple[float, float]]]: A tuple containing:
                 - The filtered graph
-                - Dictionary mapping node IDs to their 2D positions (x, y)
+                - Dictionary mapping node IDs to their 2D positions as (x, y) coordinates
         """
 
         # Filter edges based on the threshold
@@ -250,37 +252,45 @@ class NetworkAnalysis:
 
         return filtered_graph, pos
 
-    def compute_clustering_coefficients(self):
+    def compute_clustering_coefficients(self) -> tuple[dict[Any, float], float]:
         """
         Computes the clustering coefficient for all nodes and the overall graph.
 
         Returns:
-            tuple: A tuple containing the clustering coefficients for nodes and the overall clustering coefficient.
+            tuple[dict[Any, float], float]: A tuple containing:
+                - Dictionary mapping nodes to their clustering coefficients
+                - Overall graph clustering coefficient
         """
-        return nx.clustering(self.graph), nx.average_clustering(self.graph)
+        node_coefficients = dict(
+            nx.clustering(self.graph)
+        )  # Convert to dict explicitly
+        return node_coefficients, nx.average_clustering(self.graph)
 
-    def analyze_connectivity(self):
+    def analyze_connectivity(self) -> dict[str, Any]:
         """
         Analyzes the connectivity of the graph.
 
         Returns:
-            dict: Information about whether the graph is connected and its connected components.
+            dict[str, Any]: Information about whether the graph is connected and its connected components.
         """
         is_connected = nx.is_connected(self.graph)
-        components = (
-            list(nx.connected_components(self.graph)) if not is_connected else []
-        )
+        components = list(nx.connected_components(self.graph))
         return {"is_connected": is_connected, "components": components}
 
-    def analyze_node(self, node_id):
+    def analyze_node(self, node_id: Any) -> dict[str, Any]:
         """
         Analyzes the properties and relationships of a specific node.
 
         Args:
-            node_id (int): The ID of the node to analyze.
+            node_id (Any): The ID of the node to analyze.
 
         Returns:
-            dict: Information about the node.
+            dict[str, Any]: Information about the node including:
+                - id: The node ID
+                - labels: Node labels from the graph
+                - properties: Node properties
+                - degree: Number of connections
+                - neighbors: List of neighboring nodes
         """
         if node_id not in self.graph:
             raise ValueError(f"Node {node_id} does not exist in the graph.")
@@ -292,6 +302,8 @@ class NetworkAnalysis:
             "id": node_id,
             "labels": node_data.get("labels"),
             "properties": node_data.get("properties"),
-            "degree": self.graph.degree[node_id],
+            "degree": self.graph.degree[
+                node_id
+            ],  # Use degree property instead of method
             "neighbors": neighbors,
         }
