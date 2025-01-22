@@ -4,9 +4,10 @@ from typing import List
 import httpx
 from loguru import logger
 from pydantic import BaseModel, Field
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.datamodels.mmseqs import Cluster
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 
 class MMSeqs(BaseModel):

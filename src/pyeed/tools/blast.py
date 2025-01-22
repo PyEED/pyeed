@@ -52,8 +52,10 @@ class Blast(BaseModel):
             pd.DataFrame: BLAST output
         """
         response = self.run_blast_service(timeout=timeout, sequence=sequence)
+        if not response.status_code == 200:
+            raise ValueError(f"BLAST failed: {response.json()}")
         return self._parse_blast_output(
-            response.json()["result"]
+            response.json()
         )  # Get string from JSON response
 
     def run_blast_service(
@@ -94,7 +96,7 @@ class Blast(BaseModel):
                 raise httpx.ConnectError("PyEED Docker Service not running") from e
 
     @staticmethod
-    def _parse_blast_output(result_str: str) -> pd.DataFrame:
+    def _parse_blast_output(result_str: dict[str, str]) -> pd.DataFrame:
         """Parse BLAST tab-delimited output into a DataFrame.
 
         Args:
@@ -104,7 +106,7 @@ class Blast(BaseModel):
             pd.DataFrame: Parsed BLAST output
         """
         df = pd.read_csv(
-            io.StringIO(result_str),
+            io.StringIO(result_str["result"]),
             sep="\t",
             names=[
                 "subject_id",
@@ -125,3 +127,23 @@ class Blast(BaseModel):
         df.index = range(len(df))
         df = df.drop_duplicates(subset=["subject_id", "query_start", "query_end"])
         return df
+
+
+if __name__ == "__main__":
+    from pyeed.tools import Blast
+
+    # Example protein sequence
+    sequence = "MSEQVAAVAKLRAKASEAAKEAKAREAAKKLAEAAKKAKAKEAAKRAEAKLAEKAKAAKRAEAKAAKEAKRAAAKRAEAKLAEKAKAAK"
+
+    # Initialize BLAST search
+    blast = Blast(
+        mode="blastp",  # Use blastp for protein sequences
+        db_path="/usr/local/bin/data/test_db/",  # Path in Docker container
+        db_name="protein_db",  # Name of your BLAST database
+        evalue=0.1,  # E-value threshold
+        max_target_seqs=10,  # Maximum number of hits to return
+    )
+
+    # Perform search
+    results = blast.search(sequence)
+    print(results)

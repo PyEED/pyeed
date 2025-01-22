@@ -21,6 +21,19 @@ def to_fasta(seq: str) -> str:
     return f">query_sequence\n{seq}"
 
 
+def _check_db_path_correct(db_path: str, db_name: str) -> None:
+    # check if db_path exists
+    if not os.path.exists(db_path):
+        raise HTTPException(
+            status_code=400, detail=f"Database path does not exist: {db_path}"
+        )
+    # check if db_path is a directory
+    if not os.path.isdir(db_path):
+        raise HTTPException(
+            status_code=400, detail=f"Database path is not a directory: {db_path}"
+        )
+
+
 @app.get("/")
 async def read_root() -> None:
     logger.debug("Entering root endpoint")
@@ -67,8 +80,11 @@ async def run_blast(request: Request) -> dict[str, str]:
         data = await request.json()
         logger.debug(f"Received request data: {data}")
 
+        _check_db_path_correct(data["db_path"], data["db_name"])
+
         mode = data["mode"]
         sequence = data["sequence"]
+        logger.debug(f"Sequence received: {sequence}")
         db_path = data["db_path"]
         db_name = data["db_name"]
         evalue = float(data["evalue"])
@@ -81,7 +97,13 @@ async def run_blast(request: Request) -> dict[str, str]:
         # Create FASTA file
         with open(query_path, "w") as file:
             file.write(to_fasta(sequence))
+        with open(query_path, "r") as file:
+            logger.debug(f" file content: {file.read()}")
 
+        # debug db path exists
+        logger.debug(f"db path exists: {os.path.exists(db_path)}")
+        # debug list all files in db path
+        logger.debug(f"files in db path: {os.listdir(db_path)}")
         # Run BLAST
         command = [
             mode,
