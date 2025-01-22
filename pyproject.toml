@@ -64,3 +64,11 @@ strict = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[project]
+dependencies = [
+    # ... existing dependencies ...
+    "numpy",
+    "scipy",
+    "torch",
+]

@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.spatial as sp
 import torch
+from matplotlib.figure import Figure
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import load_model_and_tokenizer
-from pyeed.main import Pyeed
 from scipy.spatial.distance import cosine
 
 
@@ -18,16 +18,18 @@ class EmbeddingTool:
         self,
         sequence_id: str,
         db: DatabaseConnector,
-    ) -> np.ndarray[Any, Any]:
-        """
-        This function will get the embedding for a given sequence id
+    ) -> np.ndarray:
+        """Get the embedding for a given sequence ID.
 
-        Parameters:
-        sequence_id (str): The sequence id for which we want to get the embedding
-        db (DatabaseConnector): The database connector object
+        Args:
+            sequence_id (str): The sequence ID to retrieve the embedding for
+            db (DatabaseConnector): The database connector object
 
         Returns:
-        numpy.ndarray: The embedding
+            np.ndarray: The embedding vector
+
+        Raises:
+            ValueError: If no embedding is found for the given sequence ID
         """
 
         query = f"""
@@ -42,19 +44,18 @@ class EmbeddingTool:
         return embedding
 
     def _get_single_embedding_last_hidden_state(
-        self, sequence, model, tokenizer, device
-    ):
-        """
-        Generates embeddings for a single sequence using the last hidden state.
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
+    ) -> np.ndarray:
+        """Generate embeddings for a single sequence using the last hidden state.
 
         Args:
             sequence (str): The protein sequence to embed
-            model: The transformer model to use
-            tokenizer: The tokenizer for the model
-            device: The device to run the model on (CPU/GPU)
+            model (Any): The transformer model to use
+            tokenizer (Any): The tokenizer for the model
+            device (torch.device): The device to run the model on (CPU/GPU)
 
         Returns:
-            numpy.ndarray: Normalized embeddings for each token in the sequence
+            np.ndarray: Normalized embeddings for each token in the sequence
         """
 
         with torch.no_grad():
@@ -69,16 +70,15 @@ class EmbeddingTool:
 
     def calculate_single_sequence_embedding(
         self, sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
-    ):
-        """
-        Calculates an embedding for a single sequence using a specified model.
+    ) -> np.ndarray:
+        """Calculate an embedding for a single sequence using a specified model.
 
         Args:
             sequence (str): The protein sequence to embed
-            model_name (str): Name of the pretrained model to use. Defaults to "facebook/esm2_t33_650M_UR50D"
+            model_name (str): Name of the pretrained model to use
 
         Returns:
-            numpy.ndarray: The normalized embedding for the sequence
+            np.ndarray: The normalized embedding for the sequence
         """
         model, tokenizer, device = load_model_and_tokenizer(model_name)
         return self._get_single_embedding_last_hidden_state(
@@ -86,21 +86,25 @@ class EmbeddingTool:
         )
 
     def find_closest_matches_simple(
-        self, start_sequence_id: str, db: DatabaseConnector, metric="cosine", n=10
-    ):
-        """
-        This function will find the closest matches to the start_sequence_id in the embedding space.
-        The simple in the name indicates that this function will load all the embeddings into memory and calculate the distances.
-        Hence being simple but maybe quite bad in terms of performance. ;)
+        self,
+        start_sequence_id: str,
+        db: DatabaseConnector,
+        metric: Literal["cosine", "euclidean", "manhattan"] = "cosine",
+        n: int = 10,
+    ) -> list[tuple[str, float]]:
+        """Find the closest matches to the start_sequence_id in the embedding space.
 
-        Parameters:
-        start_sequence_id (str): The sequence id for which we want to find the closest matches
-        db (DatabaseConnector): The database connector object
-        metric (str): The metric to use for the distance calculation. Default is 'cosine'
-        n (int): The number of closest matches to return. Default is 10
+        This function loads all embeddings into memory to calculate distances,
+        which may not be optimal for large datasets.
+
+        Args:
+            start_sequence_id (str): The sequence ID to find matches for
+            db (DatabaseConnector): The database connector object
+            metric (str): The metric to use for distance calculation
+            n (int): The number of closest matches to return
 
         Returns:
-        list: A list of tuples containing the sequence id and the distance
+            list[tuple[str, float]]: List of tuples containing (sequence_id, distance)
         """
 
         # get the embedding for the start_sequence_id
@@ -139,22 +143,21 @@ class EmbeddingTool:
         ids_list: Optional[list[str]] = None,
         ids_list_labels: Optional[dict[str, str]] = None,
         random_state: int = 42,
-    ) -> tuple[list[str], np.ndarray[Any, Any], list[str], list[str]]:
-        """
-        Performs a 2D projection of the embeddings using t-SNE and prepares visualization data.
+    ) -> tuple[list[str], np.ndarray, list[str], list[str]]:
+        """Perform a 2D projection of the embeddings using t-SNE and prepare visualization data.
 
         Args:
             db (DatabaseConnector): The database connector object
-            perplexity (int): The perplexity parameter for t-SNE. Defaults to 50
-            n_iter (int): Number of iterations for t-SNE. Defaults to 1000
-            ids_list (list[str], optional): List of sequence IDs to visualize. If None, uses all sequences
-            ids_list_labels (dict[str, str], optional): Dictionary mapping sequence IDs to their labels
-            random_state (int): The random state for the t-SNE algorithm. Defaults to 42
+            perplexity (int): The perplexity parameter for t-SNE
+            n_iter (int): Number of iterations for t-SNE
+            ids_list (Optional[list[str]]): List of sequence IDs to visualize
+            ids_list_labels (Optional[dict[str, str]]): Dictionary mapping sequence IDs to labels
+            random_state (int): Random seed for reproducibility
 
         Returns:
-            tuple: A tuple containing:
+            tuple:
                 - list[str]: List of protein IDs
-                - numpy.ndarray: 2D projection coordinates
+                - np.ndarray: 2D projection coordinates
                 - list[str]: Labels for each point
                 - list[str]: Colors for each point
         """
@@ -222,7 +225,7 @@ class EmbeddingTool:
         tsne = TSNE(
             n_components=2,
             perplexity=perplexity,
-            max_iter=n_iter,
+            n_iter=n_iter,
             random_state=random_state,
         )
 
@@ -232,28 +235,27 @@ class EmbeddingTool:
 
     def plot_matrix_comparison(
         self,
-        distance_matrix_1,
-        distance_matrix_2,
-        protein_ids_1,
-        protein_ids_2,
-        label_1,
-        label_2,
-        number_of_points_goal,
-    ):
-        """
-        Plots a comparison between two distance matrices.
+        distance_matrix_1: np.ndarray,
+        distance_matrix_2: np.ndarray,
+        protein_ids_1: np.ndarray,
+        protein_ids_2: np.ndarray,
+        label_1: str,
+        label_2: str,
+        number_of_points_goal: int,
+    ) -> Figure:
+        """Plot a comparison between two distance matrices.
 
         Args:
-            distance_matrix_1 (numpy.ndarray): First distance matrix to compare
-            distance_matrix_2 (numpy.ndarray): Second distance matrix to compare
-            protein_ids_1 (list[str]): Protein IDs corresponding to first matrix
-            protein_ids_2 (list[str]): Protein IDs corresponding to second matrix
+            distance_matrix_1 (np.ndarray): First distance matrix to compare
+            distance_matrix_2 (np.ndarray): Second distance matrix to compare
+            protein_ids_1 (np.ndarray): Protein IDs corresponding to first matrix
+            protein_ids_2 (np.ndarray): Protein IDs corresponding to second matrix
             label_1 (str): Label for the first matrix
             label_2 (str): Label for the second matrix
             number_of_points_goal (int): Target number of points to plot
 
         Returns:
-            matplotlib.figure.Figure: The plot object.
+            plt.Figure: The generated plot
         """
         # general plot function
         # we want to plot the two distance matrices against each other
@@ -308,19 +310,23 @@ class EmbeddingTool:
 
     def calculate_similarity(
         self,
-        query_embed: np.ndarray[Any, Any],
-        target_embed: np.ndarray[Any, Any],
+        query_embed: np.ndarray,
+        target_embed: np.ndarray,
         mode: Literal["cosine", "euclidean"] = "cosine",
-    ) -> np.ndarray[Any, Any]:
-        """Calculate cosine or euclidean similarity between two protein sequences.
+    ) -> np.ndarray:
+        """Calculate similarity between two protein sequence embeddings.
 
         Args:
             query_embed (np.ndarray): Embedding of the query sequence
             target_embed (np.ndarray): Embedding of the target sequence
-            mode (str): The mode of similarity to calculate. Can be "cosine" or "euclidean".
+            mode (Literal["cosine", "euclidean"]): Similarity metric to use
+
         Returns:
-            numpy.ndarray: A 2D numpy array containing cosine similarity scores
-                between all pairs of amino acids in seq1 and seq2.
+            np.ndarray: A 2D array containing similarity scores between all pairs
+                of amino acids in the query and target sequences
+
+        Raises:
+            ValueError: If an invalid mode is specified
         """
 
         if mode == "cosine":
@@ -335,21 +341,3 @@ class EmbeddingTool:
             raise ValueError(
                 f"Invalid mode: {mode}, valid modes are 'cosine' or 'euclidean'"
             )
-
-
-if __name__ == "__main__":
-    uri = "bolt://127.0.0.1:8123"
-    user = "neo4j"
-    password = "niklasniklaspwtem"
-
-    eedb = Pyeed(uri, user=user, password=password)
-
-    et = EmbeddingTool()
-
-    embedding_single = et.get_embedding("AQT03459.1", eedb.db)
-    print(f"Embedding for AQT03459.1: {embedding_single}")
-
-    closest_matches = et.find_closest_matches_simple(
-        "AQT03459.1", eedb.db, metric="cosine", n=10
-    )
-    print(f"Closest matches for AQT03459.1: {closest_matches}")

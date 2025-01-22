@@ -1,84 +1,128 @@
 import gc
+from typing import Tuple, Union
 
 import numpy as np
 import torch
+from esm.models.esmc import ESMC
+from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig
+from huggingface_hub import HfApi, HfFolder, login
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
+# Prompt for HuggingFace login credentials
+# Ensure that you have your API key saved or use login() to authenticate interactively
+hf_folder = HfFolder()
+api = HfApi()
+token = (
+    hf_folder.get_token() or login()
+)  # This will prompt for login if no token is saved
+
 
 def load_model_and_tokenizer(
     model_name: str,
-) -> tuple[EsmModel, EsmTokenizer, torch.device]:
+) -> Tuple[
+    Union[EsmModel, ESM3InferenceClient],  # The actual model client (ESM-2 or ESM-3)
+    Union[EsmTokenizer, None],  # The tokenizer (ESM-2) or None (ESM-3)
+    torch.device,
+]:
     """
-    Loads the ESM2 model and tokenizer and sets the appropriate device.
+    Loads either an ESM-3 (using ESMC) or an ESM-2 (using Transformers) model,
+    depending on the `model_name` provided.
 
     Args:
-        model_name (str): The name of the ESM2 model to load.
+        model_name (str): The model name or identifier (e.g., 'esm3c' or 'esm2_t12_35M_UR50D').
 
     Returns:
-        tuple[EsmModel, EsmTokenizer, torch.device]: The ESM2 model, tokenizer, and device.
+        Tuple of (model, tokenizer, device)
     """
-    # Load the model and tokenizer
-    model = EsmModel.from_pretrained(model_name)
-    tokenizer = EsmTokenizer.from_pretrained(model_name)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Determine the device
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
+    # Check if this is an ESM-3 variant (you can adjust the condition as needed)
+    if "esmc" in model_name.lower():
+        # Using ESMC from_pretrained
+        model = ESMC.from_pretrained(model_name)
+        model = model.to(device)
+
+        # No separate tokenizer is needed for ESM3 usage in this code
+        return model, None, device
     else:
-        device = torch.device("cpu")
-
-    model = model.to(device)
-    model.eval()
-
-    return model, tokenizer, device
+        # Otherwise, assume it's an ESM-2 model on Hugging Face
+        full_model_name = (
+            model_name
+            if model_name.startswith("facebook/")
+            else f"facebook/{model_name}"
+        )
+        model = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
+        tokenizer = EsmTokenizer.from_pretrained(full_model_name, use_auth_token=token)
+        model = model.to(device)
+        return model, tokenizer, device
 
 
 def get_batch_embeddings(
     batch_sequences: list[str],
-    model: EsmModel,
-    tokenizer: EsmTokenizer,
+    model: Union[EsmModel, ESM3InferenceClient],
+    tokenizer_or_alphabet: Union[EsmTokenizer, None],
     device: torch.device,
+    pool_embeddings: bool = True,
 ) -> list[NDArray[np.float64]]:
     """
-    Generates embeddings for a batch of sequences.
+    Generates mean-pooled embeddings for a batch of sequences.
 
     Args:
-        batch_sequences (list[str]): The sequences to embed.
-        model (EsmModel): The ESM2 model.
-        tokenizer (EsmTokenizer): The ESM2 tokenizer.
-        device (torch.device): The device to use for the embeddings.
+        batch_sequences (list[str]): List of sequence strings to be embedded.
+        model (Union[EsmModel, ESM3InferenceClient]): Loaded model (ESM-2 or ESM-3).
+        tokenizer_or_alphabet (Union[EsmTokenizer, None]): Tokenizer if ESM-2, None if ESM-3.
+        device (torch.device): Device on which to run inference (CPU or GPU).
 
     Returns:
-        list[NDArray[np.float64]]: The embeddings for the sequences.
+        list[NDArray[np.float64]]: A list of embeddings as NumPy arrays.
     """
-    max_sequence_length = 1024
-    with torch.no_grad():
-        # Tokenize the input sequences
-        inputs = tokenizer(
-            batch_sequences,
-            padding=True,
-            truncation=True,
-            return_tensors="pt",
-            max_length=max_sequence_length,
+    if isinstance(model, ESMC):
+        with torch.no_grad():
+            embedding_list = []
+            for sequence in batch_sequences:
+                # Process each sequence individually
+                protein = ESMProtein(sequence=sequence)
+                protein_tensor = model.encode(protein)
+                logits_output = model.logits(
+                    protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+                )
+                # Convert embeddings to numpy array and take mean across sequence length
+                if pool_embeddings:
+                    embeddings = logits_output.embeddings.cpu().numpy().mean(axis=1)
+                else:
+                    embeddings = logits_output.embeddings.cpu().numpy()
+                # make mean polling
+                embedding_list.append(embeddings[0])
+
+        return embedding_list
+
+    else:
+        # ESM-2 logic
+        inputs = tokenizer_or_alphabet(
+            batch_sequences, padding=True, truncation=True, return_tensors="pt"
         ).to(device)
+        with torch.no_grad():
+            outputs = model(**inputs)
+        embeddings = outputs.last_hidden_state.cpu().numpy()
+        return [embedding.mean(axis=0) for embedding in embeddings]
 
-        # Get model outputs
-        outputs = model(**inputs)
-        embeddings = outputs.last_hidden_state
 
-        embedding_list = []
-        # Process each sequence in the batch
-        for j in range(len(batch_sequences)):
-            valid_token_mask = inputs["attention_mask"][j].bool()
-            seq_embeddings = embeddings[j][valid_token_mask].mean(dim=0).cpu()
-            embedding_list.append(seq_embeddings.numpy())
+# The rest of your existing functions will need to be adapted in a similar way
+# if they interact with the model or tokenizer directly
 
-    return embedding_list
+
+def free_memory() -> None:
+    """
+    Frees up memory by invoking garbage collection and clearing GPU caches.
+    """
+    gc.collect()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    elif torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def update_protein_embeddings_in_db(
@@ -110,7 +154,6 @@ def update_protein_embeddings_in_db(
     # Execute the update query with parameters
     db.execute_write(query, {"updates": updates})
 
-
 def free_memory() -> None:
     """
     Frees up memory by invoking garbage collection and clearing GPU caches.
@@ -120,13 +163,3 @@ def free_memory() -> None:
         torch.mps.empty_cache()
     elif torch.cuda.is_available():
         torch.cuda.empty_cache()
-
-
-if __name__ == "__main__":
-    model_name = "esmc_300m"
-
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
-
-    print(model)
-    print(tokenizer)
-    print(device)
