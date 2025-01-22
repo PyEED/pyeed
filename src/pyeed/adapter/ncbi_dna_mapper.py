@@ -104,8 +104,8 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         dna_infos_dict = {}
 
         dna_infos_dict["name"] = seq_record.name
-        dna_infos_dict["seq_length"] = str(len(seq_record.seq))
-        dna_infos_dict["gc_content"] = str(self.calculate_gc_content(seq_record.seq))
+        dna_infos_dict["seq_length"] = int(len(seq_record.seq))
+        dna_infos_dict["gc_content"] = float(self.calculate_gc_content(seq_record.seq))
 
         return dna_infos_dict
 

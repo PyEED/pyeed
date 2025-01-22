@@ -45,6 +45,9 @@ mkdocs-jupyter = "^0.24.7"
 jupyter-contrib-nbextensions = "^0.7.0"
 notebook = "^6"
 pytest-loguru = "^0.4.0"
+fastapi = "^0.115.6"
+uvicorn = "^0.34.0"
+devtools = "^0.12.2"
 
 [build-system]
 requires = ["poetry-core"]

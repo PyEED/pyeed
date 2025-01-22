@@ -1,173 +1,182 @@
-import logging
-from typing import List, Optional
+import os
+from typing import List
 
 import httpx
 from loguru import logger
+from pydantic import BaseModel, Field
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.tools.abstract_tool import AbstractTool, ServiceURL
-from pyeed.tools.datamodels.mmseqs_model import Cluster
+from pyeed.tools.datamodels.mmseqs import Cluster
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 
-class MMSeqs(AbstractTool):
+class MMSeqs(BaseModel):
     """
-    Class for MMSeqs search with MMSeqs2 Tool
+    Performs sequence clustering using MMSeqs2.
+    The MMSeqs service is run in a Docker container, which is part
+    of the pyeed docker service.
     """
 
-    def __init__(self):
-        super().__init__()
-        self._service_url = ServiceURL.MMSEQS.value
+    min_seq_id: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Minimum sequence identity (0-1)"
+    )
+    coverage: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Minimum coverage (0-1)"
+    )
+    cov_mode: int = Field(
+        default=0,
+        ge=0,
+        le=2,
+        description="Coverage mode (0: bidirectional, 1: query, 2: target)",
+    )
+    threads: int = Field(
+        default_factory=lambda: max(1, int((os.cpu_count() or 1) - 1)),
+        ge=1,
+        description="Number of CPU threads to use",
+    )
+    cluster_mode: int = Field(
+        default=0,
+        ge=0,
+        le=2,
+        description="Cluster mode (0: set-cover, 1: connected-component, 2: greedy)",
+    )
+    sensitivity: float = Field(
+        default=7.5,
+        ge=1.0,
+        le=9.0,
+        description="Sensitivity: 1.0 faster; 7.5 default; 9.0 more sensitive",
+    )
+    seq_id_mode: int = Field(
+        default=0,
+        ge=0,
+        le=1,
+        description="Sequence identity definition (0: alignment length, 1: shorter sequence)",
+    )
+    rescore_mode: int = Field(
+        default=0,
+        ge=0,
+        le=1,
+        description="Rescore overlapping alignments (0: no, 1: yes)",
+    )
 
-    def extract_output_data(self, result) -> List[Cluster]:
-        """
-        Extracts the output data from the ClustalOmega container.
-
-        Returns:
-            MultiSequenceAlignment: The alignment result.
-        """
-
-        cleaned_text = result.text.encode().decode(
-            "unicode_escape"
-        )  # Decode Unicode escapes
-        cleaned_text = cleaned_text.replace(
-            ">", ""
-        ).splitlines()  # Remove '>' and split into lines
-
-        if cleaned_text:  # Ensure the list is not empty
-            cleaned_text.pop(-1)  # Remove the last element if needed
-
-        # Use list comprehension to filter elements
-        cleaned_text = [element for element in cleaned_text if len(element) < 25]
-
-        print(cleaned_text)
-
-        # get all the representatives and the belonging represented sequences
-
-        clusters = []
-        seq_counter = 0
-
-        while seq_counter < len(cleaned_text) - 1:  # Iterate over all sequences
-            # If the current and next sequence are the same, it's a representative sequence
-            if cleaned_text[seq_counter] == cleaned_text[seq_counter + 1]:
-                representative_id = cleaned_text[seq_counter]
-                represented_ids = [representative_id]  # Include itself as represented
-
-                # Add the cluster
-                clusters.append(
-                    Cluster(
-                        representative_id=representative_id,
-                        represented_ids=represented_ids,
-                    )
-                )
-
-                seq_counter += 2
-            else:
-                # Skip sequences that do not follow the doubling pattern
-                seq_counter += 1
-
-        return clusters
-
-    def run_service(self, data, min_seq_id, coverage, cov_mode) -> httpx.Response:
-        """_summary_
+    def cluster_from_db(
+        self,
+        accession_ids: list[str],
+        dbConnector: DatabaseConnector,
+    ) -> List[Cluster]:
+        """Cluster sequences from pyeed database.
 
         Args:
-            query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
-            result_filename (str): The name of the file to store the results.
-            min_seq_id (float): min sequence identity for which a cluster is created
-            coverage (float): min coverage for which a cluster is created
-            cov_mode (int): coverage mode- choose between 0, 1, 2
+            accession_ids: List of accession IDs
+            dbConnector: DatabaseConnector instance
 
         Returns:
-            httpx.Response: The response object containing the MMSeqs results.
+            Clustering results in Cluster objects
         """
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
-
-        if cov_mode not in [0, 1, 2]:
-            raise ValueError("cov_mode must be 0, 1, or 2")
-
-        json_request = {
-            "query": data,
-            "min_seq_id": min_seq_id,
-            "coverage": coverage,
-            "cov_mode": cov_mode,
+        # Get sequences from db
+        query = """
+        MATCH (p:Protein)
+        WHERE p.accession_id IN $ids
+        RETURN p.accession_id AS accession_id, p.sequence AS sequence
+        """
+        sequence_dict = {
+            p["accession_id"]: p["sequence"]
+            for p in dbConnector.execute_read(query, {"ids": accession_ids})
         }
 
-        self._service_url = ServiceURL.MMSEQS.value
+        return self.cluster_sequence_dict(sequence_dict)
 
-        try:
-            # Log before making the request
-            logger.info(
-                f"Sending POST request to {self._service_url} with payload: {json_request}"
-            )
-            return httpx.post(self._service_url, json=json_request, timeout=6000)
-
-        except httpx.ConnectError as connect_error:
-            context = connect_error.__context__
-            if context and hasattr(context, "args"):
-                error_number = context.args[0].errno
-                if error_number == 8 or error_number == -3:
-                    self._service_url = "http://localhost:8001/easycluster"
-                    try:
-                        return httpx.post(
-                            self._service_url, json=json_request, timeout=6000
-                        )
-                    except httpx.ConnectError:
-                        raise httpx.ConnectError(
-                            "PyEED Docker Service not running"
-                        ) from None
-            print(connect_error)
-            raise httpx.ConnectError("PyEED Docker Service not running") from None
-
-    def easycluster(
+    def cluster_sequence_dict(
         self,
-        query: str,
-        min_seq_id: float = 0.5,
-        coverage: float = 0.8,
-        cov_mode: int = 0,
-        dbConnector: Optional[DatabaseConnector] = None,
+        sequences: dict[str, str],
     ) -> List[Cluster]:
-        """
-        Clusters the sequences in the fasta file with the provided parameters
+        """Cluster sequences using MMSeqs2.
+
         Args:
-            query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
-            min_seq_id (float): min sequence identity for which a cluster is created
-            coverage (float): min coverage for which a cluster is created
-            cov_mode (int): coverage mode- choose between 0, 1, 2
+            sequences: Sequence dictionary with sequence id as key and sequence as value
+            dbConnector: DatabaseConnector instance
 
         Returns:
-            List[Cluster]: A list of Cluster objects containing the representative and all sequences.
+            Clustering results in Cluster objects
         """
+        query = self._dict_to_multifasta(sequences)
+        response = self._run_mmseqs_service(query)
+        sanitized = self._sanitize_response(response)
+        return self._parse_clustering_output(sanitized)
 
-        if dbConnector:
-            query_run = """
-            MATCH (p:Protein)
-            WHERE p.accession_id IN $ids
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
-            """
+    @staticmethod
+    def _dict_to_multifasta(sequences: dict[str, str]) -> str:
+        """Convert sequence dictionary to multifasta format.
 
-            # Execute the query for all IDs in the `query` list
-            proteins = dbConnector.execute_read(query_run, {"ids": query})
+        Args:
+            sequences: Sequence dictionary with sequence id as key and sequence as value
 
-            # Check if any proteins were found
-            if not proteins:
-                raise ValueError("No proteins found with the provided IDs.")
+        Returns:
+            Multifasta formatted sequences
+        """
+        return "\n".join(f">{k}\n{v}" + "\n" for k, v in sequences.items())
 
-            # Convert the results into FASTA format
-            fasta_sequences = []
-            for protein in proteins:
-                id = protein["accession_id"]
-                protein_seq = protein["sequence"]
-                fasta = f">{id}\n{protein_seq}"
-                fasta_sequences.append(fasta)
+    def _run_mmseqs_service(self, query: str, timeout: int = 6000) -> httpx.Response:
+        """Run the MMSeqs service with the provided parameters."""
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task(
+                    description="Running MMSeqs2 clustering...", total=None
+                )
+            response = httpx.post(
+                "http://localhost:8001/cluster",
+                json={"query": query, "params": self.model_dump()},
+                timeout=timeout,
+            )
+            self._check_clustering_success(response)
+            return response
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error: {e}")
+            raise httpx.ConnectError("PyEED Docker Service not running") from e
 
-            # Combine all FASTA sequences into a single string if needed
-            fasta_output = "\n".join(fasta_sequences)
-            query = fasta_output
+    @staticmethod
+    def _sanitize_response(response: httpx.Response) -> str:
+        """Sanitize the response to remove any unwanted characters."""
+        stripped = response.text.strip('"')
+        decoded = stripped.encode("utf-8").decode("unicode_escape")
+        return decoded
 
-        result = self.run_service(query, min_seq_id, coverage, cov_mode)
-        logger.info(f"MMSeqs2 search completed with status code: {result.status_code}")
+    @staticmethod
+    def _check_clustering_success(response: httpx.Response) -> None:
+        """Check if the response is successful."""
+        if not response.status_code == 200:
+            raise ValueError(f"MMSeqs clustering failed: {response.json()}")
 
-        if result.status_code != 200:
-            logger.error(f"Error: {result.json()}")
+    @staticmethod
+    def _parse_clustering_output(cluster_string: str) -> List[Cluster]:
+        """Parse MMSeqs clustering output into Cluster objects."""
 
-        return self.extract_output_data(result)
+        # Parse TSV output into clusters
+        clusters: List[Cluster] = []
+
+        for line in cluster_string.splitlines():
+            if not line.strip():
+                continue
+
+            parts = line.strip().split("\t")
+            if len(parts) == 1:
+                # Single ID means sequence is its own representative
+                rep_id = member_id = parts[0]
+            else:
+                # Two IDs mean rep_id clusters member_id
+                rep_id, member_id = parts
+
+            # Find or create cluster
+            for cluster in clusters:
+                if cluster.representative_id == rep_id:
+                    cluster.represented_ids.append(member_id)
+                    break
+            else:
+                clusters.append(
+                    Cluster(representative_id=rep_id, represented_ids=[member_id])
+                )
+
+        return clusters
