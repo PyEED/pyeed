@@ -82,7 +82,7 @@ class PrimaryDBAdapter(Generic[T]):
         if not self.progress:
             self._create_progress()
 
-    def _create_progress(self):
+    def _create_progress(self) -> None:
         """
         Creates a dummy progress bar for tracking the progress of the HTTP
         requests if not provided.
@@ -141,7 +141,7 @@ class PrimaryDBAdapter(Generic[T]):
         logger.debug(f"Sending request to {url} with parameters: {params}")
         return client.get(url, params=params, timeout=self.timeout)
 
-    async def make_request(self):
+    async def make_request(self) -> None:
         """
         Makes asynchronous HTTP GET requests to the specified URL using the provided
         AsyncClient, handling rate limiting and concurrency.

@@ -30,7 +30,7 @@ class DatabaseConnector:
 
     def execute_read(
         self, query: str, parameters: Optional[dict[str, Any]] = None
-    ) -> Any:
+    ) -> list[dict[str, Any]]:
         """
         Executes a read (MATCH) query using the Neo4j driver.
 

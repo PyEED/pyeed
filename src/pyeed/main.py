@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal
+from typing import Any, Literal
 
 import nest_asyncio
 from loguru import logger
@@ -31,7 +31,9 @@ class Pyeed:
     ):
         self.db = DatabaseConnector(uri, user, password)
 
-    def chat(self, question: str, openai_key: str, retry: bool = False) -> list[dict]:
+    def chat(
+        self, question: str, openai_key: str, retry: bool = False
+    ) -> list[dict[str, Any]]:
         """Query the database using natural language via OpenAI's GPT-4 model.
 
         Args:
@@ -50,7 +52,7 @@ class Pyeed:
         self,
         ids: list[str],
         db: Literal["uniprot", "ncbi_protein", "ncbi_nucleotide"],
-    ):
+    ) -> None:
         """
         Fetches sequences and corresponding annotations from primary sequence databases
         and adds them to local database.
@@ -99,7 +101,7 @@ class Pyeed:
                 f"Invalid database name '{db}'. Options are {', '.join(dbs)}."
             )
 
-    def fetch_uniprot(self, ids: list[str]):
+    def fetch_uniprot(self, ids: list[str]) -> None:
         """
         Fetches protein sequences from UniProt and adds them to the local database.
         """
@@ -124,7 +126,7 @@ class Pyeed:
         asyncio.run(adapter.make_request())
         nest_asyncio.apply()
 
-    def fetch_ncbi_protein(self, ids: list[str]):
+    def fetch_ncbi_protein(self, ids: list[str]) -> None:
         """
         Fetches protein sequences from NCBI and adds them to the local database.
 
@@ -154,7 +156,7 @@ class Pyeed:
         asyncio.run(adapter.make_request())
         nest_asyncio.apply()
 
-    def fetch_ncbi_nucleotide(self, ids: list[str]):
+    def fetch_ncbi_nucleotide(self, ids: list[str]) -> None:
         """
         Fetches nucleotide sequences from NCBI and adds them to the local database.
 
@@ -188,7 +190,7 @@ class Pyeed:
         self,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-    ):
+    ) -> None:
         """
         Calculates embeddings for all sequences in the database that do not have embeddings, processing in batches.
 
@@ -215,7 +217,6 @@ class Pyeed:
         if not data:
             logger.info("No sequences to process.")
             return
-
         accessions, sequences = zip(*data)
         total_sequences = len(sequences)
         logger.debug(f"Calculating embeddings for {total_sequences} sequences.")
@@ -232,7 +233,7 @@ class Pyeed:
 
             # Get embeddings for the current batch
             embeddings_batch = get_batch_embeddings(
-                batch_sequences, model, tokenizer, device
+                list(batch_sequences), model, tokenizer, device
             )
 
             # Update the database for the current batch
@@ -244,7 +245,7 @@ class Pyeed:
         del model, tokenizer
         free_memory()
 
-    def get_proteins(self, accession_ids: list[str]):
+    def get_proteins(self, accession_ids: list[str]) -> list[dict[str, Any]]:
         """
         Fetches a protein from the database by accession ID.
         """
@@ -259,7 +260,7 @@ class Pyeed:
         """
         return self.db.execute_read(query, {"accession_ids": accession_ids})
 
-    def get_dnas(self, accession_ids: list[str]):
+    def get_dnas(self, accession_ids: list[str]) -> list[dict[str, Any]]:
         """
         Fetches a DNA sequence from the database by accession ID.
 
@@ -277,7 +278,7 @@ class Pyeed:
         """
         return self.db.execute_read(query, {"accession_ids": accession_ids})
 
-    def fetch_dna_entries_for_proteins(self):
+    def fetch_dna_entries_for_proteins(self) -> None:
         """
         Fetches DNA sequences for proteins that have a nucleotide id, set in the database.
         The fetching is done from NCBI nucleotide database.
@@ -290,8 +291,8 @@ class Pyeed:
         RETURN p.nucleotide_id AS nucleotide_id
         """
 
-        nucleotide_ids = self.db.execute_read(query)
-        nucleotide_ids = [record["nucleotide_id"] for record in nucleotide_ids]
+        response = self.db.execute_read(query)
+        nucleotide_ids = [str(record["nucleotide_id"]) for record in response]
 
         logger.info(f"Found {len(nucleotide_ids)} coding sequences.")
 
@@ -301,10 +302,12 @@ class Pyeed:
         WHERE n.accession_id IN $nucleotide_ids
         RETURN n.accession_id AS accession_id
         """
-        coding_sequences = self.db.execute_read(
+        coding_sequences_resp = self.db.execute_read(
             query, {"nucleotide_ids": nucleotide_ids}
         )
-        coding_sequences = [record["accession_id"] for record in coding_sequences]
+        coding_sequences = [
+            str(record["accession_id"]) for record in coding_sequences_resp
+        ]
 
         # check each coding sequence if it is already in the database and only if not add to list
         nucleotide_ids = [id for id in nucleotide_ids if id not in coding_sequences]
