@@ -77,7 +77,7 @@ class ClustalOmega(BaseModel):
             self._check_alignment_success(response)
             return response
         except httpx.ConnectError as e:
-            logger.error(f"Connection error: {e}")
+            logger.debug(f"Connection error: {e}")
             # Try localhost if container name fails
             if "clustalo" in self.service_url:
                 self.service_url = self.service_url.replace("clustalo", "localhost")
