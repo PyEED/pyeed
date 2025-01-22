@@ -104,7 +104,7 @@ class ClustalOmega(BaseModel):
         lines = alignment_string.splitlines()
 
         current_id = None
-        current_sequence = []
+        current_sequence: list[str] = []
 
         for line in lines:
             line = line.strip()
@@ -132,35 +132,3 @@ class ClustalOmega(BaseModel):
             )
 
         return MultipleSequenceAlignment(sequences=sequences)
-
-
-if __name__ == "__main__":
-    # Test with sequences
-    clustalo = ClustalOmega()
-    sequences = {
-        "seq1": "AKFVMPDRAWHLYTGNECSKQRLYVWFHDGAPILKTQSDNMGAYRCPLFHVTKNWEI",
-        "seq2": "AKFVMPDRQWHLYTGQECSKQRLYVWFHDGAPILKTQSDNMGAYRCPLFHVTKNWEI",
-        "seq3": "AKFVMPDRQWHLYTGNECSKQRLYVWFHDGAPILKTQADNMGAYRCALFHVTK",
-    }
-
-    alignment = clustalo.align(sequences)
-    print("Aligned sequences:")
-    print(alignment)
-
-    # Test with FASTA string
-    alignment = clustalo.align(sequences)
-    print("\nAlignment from string:")
-    print(alignment)
-
-    from pyeed import Pyeed
-
-    # Connect to database
-    pyeed = Pyeed(uri="bolt://localhost:7687", user="neo4j", password="12345678")
-
-    # Get first 100 protein IDs from database
-    from pyeed.model import Protein
-
-    accession_ids = [protein.accession_id for protein in Protein.nodes.all()][:100]
-
-    alignment = clustalo.align_from_db(accession_ids, pyeed.db)
-    print(alignment)
