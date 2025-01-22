@@ -1,80 +1,166 @@
-import io
-
 import httpx
-from Bio import AlignIO
-from Bio.Align import MultipleSeqAlignment
-from pyeed.tools.abstract_tool import AbstractTool, ServiceURL
+from loguru import logger
+from pydantic import BaseModel, Field
+from pyeed.dbconnect import DatabaseConnector
+from pyeed.tools.datamodels.mmseqs import MultipleSequenceAlignment, Sequence
+from pyeed.tools.services import ServiceURL
+from pyeed.tools.utility import dict_to_fasta
 
 
-class ClustalOmega(AbstractTool):
+class ClustalOmega(BaseModel):
     """
-    Class for ClustalOmega aligner running as a REST service.
+    Performs multiple sequence alignment using Clustal Omega.
+    The Clustal Omega service is run in a Docker container.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._service_url = ServiceURL.CLUSTALO.value
+    service_url: str = Field(default=ServiceURL.CLUSTALO.value)
 
-    def create_file(self, multifasta: list[str]) -> dict[str, str]:
+    def align(self, sequences: dict[str, str]) -> MultipleSequenceAlignment:
         """
-        Sets up the input data for the ClustalOmega container.
+        Aligns multiple sequences using Clustal Omega.
 
         Args:
-            multifasta (list[str]): List of FASTA formatted sequences to be aligned.
-
+            sequences: Dictionary of sequences to align. Keys are sequence IDs,
+                values are sequence strings.
         Returns:
-            dict[str, str]: A dictionary containing the input file.
+            MultipleSequenceAlignment: The alignment result
         """
-        data = "\n".join(multifasta)
-        return {"file": data}
-
-    def extract_output_data(self, response: str) -> MultipleSeqAlignment:
-        """
-        Extracts the output data from the ClustalOmega container.
-
-        Returns:
-            MultiSequenceAlignment: The alignment result.
-        """
-        alignment: MultipleSeqAlignment = AlignIO.read(io.StringIO(response), "clustal")  # type: ignore
-        self._delete_temp_dir()
-
-        return alignment  # type: ignore
-
-    def run_service(self, data: list[str]) -> httpx.Response:
-        """Executes the ClustalOmega service."""
-        file = self.create_file(data)
         try:
-            return httpx.post(self._service_url, files=file, timeout=6000)
+            data = dict_to_fasta(sequences)
+            response = self._run_clustalo_service(data)
+            sanitized = self._sanitize_response(response)
+            return self._parse_alignment_output(sanitized)
+        except Exception as e:
+            logger.error(f"Alignment failed: {e}")
+            raise
 
-        except httpx.ConnectError as connect_error:
-            context = connect_error.__context__
-            if context and hasattr(context, "args"):
-                error_number = context.args[0].errno
-                if error_number == 8 or error_number == -3:
-                    self._service_url = self._service_url.replace(
-                        "clustalo", "localhost"
-                    )
-                    try:
-                        return httpx.post(self._service_url, files=file, timeout=6000)
-                    except httpx.ConnectError:
-                        raise httpx.ConnectError(
-                            "PyEED Docker Service is not running."
-                        ) from None
-            print(connect_error)
-            raise httpx.ConnectError("PyEED Docker Service is not running.") from None
-
-    def align(self, sequences: list[str]):
+    def align_from_db(
+        self, accession_ids: list[str], db: DatabaseConnector
+    ) -> MultipleSequenceAlignment:
         """
-        Aligns multiple sequences and returns the alignment result.
+        Aligns multiple sequences from a database using Clustal Omega.
 
         Args:
-            sequences (List[str]): List of FASTA formatted sequences to be aligned.
+            accession_ids: List of sequence accession IDs to align
+            db: Database connector to retrieve sequences
 
         Returns:
-            MultiSequenceAlignment: The alignment result.
-        """
-        r = self.run_service(sequences)
-        cleaned_text = r.text.replace('"', "").encode().decode("unicode_escape")
-        print(cleaned_text)
+            MultipleSequenceAlignment: The alignment result
 
-        return self.extract_output_data(cleaned_text)
+        Raises:
+            ValueError: If no sequences found for given accession IDs
+        """
+
+        query = """
+        MATCH (p:Protein)
+        WHERE p.accession_id IN $ids
+        RETURN p.accession_id AS accession_id, p.sequence AS sequence
+        """
+        sequence_dict = {
+            p["accession_id"]: p["sequence"]
+            for p in db.execute_read(query, {"ids": accession_ids})
+        }
+
+        return self.align(sequence_dict)
+
+    def _run_clustalo_service(
+        self, sequences: str, timeout: int = 3600
+    ) -> httpx.Response:
+        """Run the Clustal Omega service with the provided parameters."""
+        try:
+            files = {"file": ("input.fasta", sequences, "text/plain")}
+            response = httpx.post(
+                self.service_url,
+                files=files,
+                timeout=timeout,
+            )
+            self._check_alignment_success(response)
+            return response
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error: {e}")
+            # Try localhost if container name fails
+            if "clustalo" in self.service_url:
+                self.service_url = self.service_url.replace("clustalo", "localhost")
+                return self._run_clustalo_service(sequences, timeout)
+            raise httpx.ConnectError("PyEED Docker Service not running") from e
+
+    @staticmethod
+    def _sanitize_response(response: httpx.Response) -> str:
+        """Sanitize the response to remove any unwanted characters."""
+        stripped = response.text.strip('"')
+        decoded = stripped.encode().decode("unicode_escape")
+        return decoded
+
+    @staticmethod
+    def _check_alignment_success(response: httpx.Response) -> None:
+        """Check if the response is successful."""
+        if not response.status_code == 200:
+            raise ValueError(f"Clustal Omega alignment failed: {response.json()}")
+
+    @staticmethod
+    def _parse_alignment_output(alignment_string: str) -> MultipleSequenceAlignment:
+        """Parse Clustal Omega output into MultipleSequenceAlignment object."""
+        sequences: list[Sequence] = []
+        lines = alignment_string.splitlines()
+
+        current_id = None
+        current_sequence = []
+
+        for line in lines:
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith(">"):
+                # Save previous sequence if exists
+                if current_id is not None:
+                    sequences.append(
+                        Sequence(id=current_id, sequence="".join(current_sequence))
+                    )
+                # Start new sequence
+                current_id = line[1:]  # Remove '>' prefix
+                current_sequence = []
+            else:
+                # Add line to current sequence
+                current_sequence.append(line)
+
+        # Don't forget to add the last sequence
+        if current_id is not None:
+            sequences.append(
+                Sequence(id=current_id, sequence="".join(current_sequence))
+            )
+
+        return MultipleSequenceAlignment(sequences=sequences)
+
+
+if __name__ == "__main__":
+    # Test with sequences
+    clustalo = ClustalOmega()
+    sequences = {
+        "seq1": "AKFVMPDRAWHLYTGNECSKQRLYVWFHDGAPILKTQSDNMGAYRCPLFHVTKNWEI",
+        "seq2": "AKFVMPDRQWHLYTGQECSKQRLYVWFHDGAPILKTQSDNMGAYRCPLFHVTKNWEI",
+        "seq3": "AKFVMPDRQWHLYTGNECSKQRLYVWFHDGAPILKTQADNMGAYRCALFHVTK",
+    }
+
+    alignment = clustalo.align(sequences)
+    print("Aligned sequences:")
+    print(alignment)
+
+    # Test with FASTA string
+    alignment = clustalo.align(sequences)
+    print("\nAlignment from string:")
+    print(alignment)
+
+    from pyeed import Pyeed
+
+    # Connect to database
+    pyeed = Pyeed(uri="bolt://localhost:7687", user="neo4j", password="12345678")
+
+    # Get first 100 protein IDs from database
+    from pyeed.model import Protein
+
+    accession_ids = [protein.accession_id for protein in Protein.nodes.all()][:100]
+
+    alignment = clustalo.align_from_db(accession_ids, pyeed.db)
+    print(alignment)

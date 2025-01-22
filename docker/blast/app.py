@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import subprocess
@@ -26,27 +25,6 @@ def to_fasta(seq: str) -> str:
 async def read_root() -> None:
     logger.debug("Entering root endpoint")
     return RedirectResponse(url="/docs")  # type: ignore
-
-
-# endpoiunt to upload fasta file (query)
-@app.post("/upload_fasta")
-async def upload_fasta(fasta_string: str) -> None:
-    logger.debug("Entering upload_fasta endpoint")
-    logger.debug(f"Received request data: {fasta_string}")
-
-    # upload file to /usr/local/bin/data#
-    with open("/usr/local/bin/data/query.fasta", "w") as file:
-        file.write(fasta_string)
-
-    logger.debug("Fasta file uploaded successfully")
-
-
-# read fasta file
-@app.get("/read_fasta")
-async def read_fasta() -> str:
-    logger.debug("Entering read_fasta endpoint")
-    with open("/usr/local/bin/data/query.fasta", "r") as file:
-        return file.read()
 
 
 @app.get("/blastp_help")
@@ -114,7 +92,7 @@ async def run_blast(request: Request) -> dict[str, str]:
             "-evalue",
             str(evalue),
             "-outfmt",
-            "0",
+            "6",
             "-num_threads",
             str(num_threads),
             "-out",
@@ -138,60 +116,6 @@ async def run_blast(request: Request) -> dict[str, str]:
 
     except Exception as e:
         logger.error(f"Error running BLAST: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/blastn")
-async def run_blastn(request: Request) -> dict[str, str]:
-    logger.debug("Entering /blastn endpoint")
-
-    try:
-        data = await request.json()
-        logger.debug(f"Received request data: {data}")
-
-        query_filename = "in.fasta"
-        result_filename = "out.out"
-
-        logger.debug("Creating input and output files")
-        open(result_filename, "w").close()
-        with open(query_filename, "w") as file:
-            file.write(to_fasta(data["query"]))
-
-        command = [
-            "blastn",
-            "-query",
-            query_filename,
-            "-db",
-            data["db"],
-            "-evalue",
-            str(data["evalue"]),
-            "-outfmt",
-            str(data["outfmt"]),
-            "-num_threads",
-            str(data["num_threads"]),
-            "-out",
-            result_filename,
-            "-max_target_seqs",
-            str(data["max_target_seqs"]),
-        ]
-        logger.debug(f"Running command: {command}")
-
-        subprocess.run(command, capture_output=True, check=True, text=True)
-
-        logger.debug("Reading results file")
-        with open(result_filename, "r") as file:
-            result_data = file.read()
-
-        return {"result": result_data}
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse request JSON: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"BLASTN command failed: {e.stderr}")
-        raise HTTPException(status_code=400, detail=f"Command failed: {e.stderr}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -10,7 +10,7 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
 RUN apt-get update --allow-releaseinfo-change && \
     for i in {1..3}; do apt-get install -y python3 python3-pip && break || sleep 15; done
 
-RUN pip3 install fastapi uvicorn
+RUN pip3 install fastapi uvicorn python-multipart
 
 # Copy the FastAPI app to the container
 COPY app.py /usr/local/bin/app.py

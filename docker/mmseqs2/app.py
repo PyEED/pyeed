@@ -1,14 +1,16 @@
-import json
 import logging
-import os
+import shutil
 import subprocess
 import sys
+import time
+from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
 
-app = FastAPI()
-
+# Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(levelname)s - %(message)s",
@@ -16,130 +18,178 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-def create_fastas_file_from_seq(query_string: str, filename: str) -> None:
-    """Creates a FASTA file from a single string containing FASTA-formatted sequences."""
-    logger.debug(f"Creating FASTA file: {filename}")
-
-    def validate_sequence(sequence: str) -> bool:
-        valid_chars = set("ACDEFGHIKLMNPQRSTVWY*X")
-        sequence = sequence.upper().strip().replace("\n", "")
-        return all(char in valid_chars for char in sequence)
-
-    try:
-        lines = query_string.strip().split("\n")
-        multifasta: list[str] = []
-        current_header: str | None = None
-        current_sequence: list[str] = []
-
-        for line in lines:
-            if line.startswith(">"):
-                if current_header:
-                    sequence = "".join(current_sequence)
-                    if not validate_sequence(sequence):
-                        raise ValueError(
-                            f"Invalid characters in sequence under {current_header}"
-                        )
-                    multifasta.append(f"{current_header}\n{sequence}")
-                current_header = line.strip()
-                current_sequence = []
-            else:
-                current_sequence.append(line.strip())
-
-        if current_header and current_sequence:
-            sequence = "".join(current_sequence)
-            if not validate_sequence(sequence):
-                raise ValueError(
-                    f"Invalid characters in sequence under {current_header}"
-                )
-            multifasta.append(f"{current_header}\n{sequence}")
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write("\n".join(multifasta) + "\n")
-
-        logger.debug("FASTA file created successfully")
-
-    except Exception as e:
-        logger.error(f"Error creating FASTA file: {e}")
-        raise
+# Initialize FastAPI application
+app = FastAPI(title="MMSeqs2 API", version="1.0.0")
 
 
 @app.get("/")
-async def read_root() -> None:
-    logger.debug("Entering root endpoint")
-    return RedirectResponse(url="/docs")  # type: ignore
+async def root() -> RedirectResponse:
+    """Redirect to API documentation."""
+    logger.debug("Accessed root endpoint.")
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/help")
-def help() -> str:
-    logger.debug("Entering /help endpoint")
-
+def get_help() -> str:
+    """Retrieve help information from MMSeqs2."""
+    logger.debug("Accessed /help endpoint.")
     command = ["mmseqs", "-h"]
-    logger.debug(f"Running command: {command}")
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
         logger.error(f"MMSeqs2 help command failed: {e.stderr}")
         raise HTTPException(status_code=400, detail=f"Command failed: {e.stderr}")
 
 
-@app.post("/easycluster")
-async def easycluster(request: Request) -> str:
-    logger.debug("Entering /easycluster endpoint")
+class ClusterParams(BaseModel):
+    """Parameters for MMSeqs2 clustering."""
 
-    try:
-        data = await request.json()
-        logger.debug(f"Received request data: {data}")
+    min_seq_id: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Minimum sequence identity (0-1)"
+    )
+    coverage: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Minimum coverage (0-1)"
+    )
+    cov_mode: int = Field(
+        default=0,
+        ge=0,
+        le=2,
+        description="Coverage mode (0: bidirectional, 1: query, 2: target)",
+    )
+    threads: int = Field(
+        default=4,
+        ge=1,
+        description="Number of CPU threads to use",
+    )
+    cluster_mode: int = Field(
+        default=0,
+        ge=0,
+        le=2,
+        description="Cluster mode (0: set-cover, 1: connected-component, 2: greedy)",
+    )
+    sensitivity: float = Field(
+        default=7.5,
+        ge=1.0,
+        le=9.0,
+        description="Sensitivity: 1.0 faster; 7.5 default; 9.0 more sensitive",
+    )
+    seq_id_mode: int = Field(
+        default=0,
+        ge=0,
+        le=1,
+        description="Sequence identity definition (0: alignment length, 1: shorter sequence)",
+    )
+    rescore_mode: int = Field(
+        default=0,
+        ge=0,
+        le=1,
+        description="Rescore overlapping alignments (0: no, 1: yes)",
+    )
 
-        BASE_DIR = "/app"
-        query_filename = os.path.join(BASE_DIR, "in.fasta")
-        result_filename = os.path.join(BASE_DIR, "output")
-        tmp_dir = os.path.join(BASE_DIR, "tmp")
 
-        logger.debug("Creating directories and files")
-        os.makedirs(tmp_dir, exist_ok=True)
-        open(result_filename, "w").close()
+class MMSeqs2Runner:
+    """Handles MMSeqs2 clustering operations."""
 
-        create_fastas_file_from_seq(data["query"], query_filename)
+    def __init__(self, base_dir: Path = Path("/app")):
+        self.base_dir = base_dir
+        self.query_file = base_dir / "in.fasta"
+        self.result_file = base_dir / "output"
+        self.tmp_dir = base_dir / "tmp"
+        self.cluster_file = base_dir / "output_cluster.tsv"
+        self.rep_seq_file = base_dir / "output_rep_seq.fasta"
+        self.all_seqs_file = base_dir / "output_all_seqs.fasta"
+        self.tmp_dir.mkdir(exist_ok=True)
 
-        command = [
+    async def run_clustering(self, query: str, params: ClusterParams) -> str:
+        """Run MMSeqs2 clustering on input sequences."""
+        # Write query to file
+        self.query_file.write_text(query)
+        logger.debug(f"Query file content:\n{self.query_file.read_text()}")
+
+        # Run clustering
+        cmd = [
             "mmseqs",
             "easy-cluster",
-            query_filename,
-            result_filename,
+            str(self.query_file),
+            str(self.result_file),
+            str(self.tmp_dir),
             "--min-seq-id",
-            str(data["min_seq_id"]),
+            str(params.min_seq_id),
             "-c",
-            str(data["coverage"]),
+            str(params.coverage),
             "--cov-mode",
-            str(data["cov_mode"]),
-            tmp_dir,
+            str(params.cov_mode),
+            "--threads",
+            str(params.threads),
+            "--cluster-mode",
+            str(params.cluster_mode),
+            "-s",
+            str(params.sensitivity),
+            "--seq-id-mode",
+            str(params.seq_id_mode),
+            "--rescore-mode",
+            str(params.rescore_mode),
         ]
-        logger.debug(f"Running command: {command}")
 
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        logger.debug(f"Command output: {result.stdout}")
+        try:
+            logger.debug(f"Running command: {' '.join(cmd)}")
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logger.debug(f"Cluster file content:\n{self.cluster_file.read_text()}")
+            time.sleep(0.1)
+            content = self.cluster_file.read_text()
+            logger.debug(f"Cluster file content (raw): {repr(content)}")
+            self.remove_files_and_folders()
+            return content
+        except subprocess.CalledProcessError as e:
+            self.remove_files_and_folders()
+            raise HTTPException(
+                status_code=500, detail=f"MMSeqs2 clustering failed: {e.stderr}"
+            )
 
-        logger.debug("Reading result file")
-        with open("/app/output_all_seqs.fasta", "r") as file:
-            result_data = file.read()
+    def remove_files_and_folders(self) -> None:
+        """Deletes the temporary directory and all related files."""
+        # Remove the entire temporary directory and its contents
+        if self.tmp_dir.exists():
+            shutil.rmtree(self.tmp_dir)
 
-        return result_data
+        # Remove additional files outside tmp_dir
+        for file in [
+            self.cluster_file,
+            self.query_file,
+            self.rep_seq_file,
+            self.all_seqs_file,
+            self.result_file,
+        ]:
+            if file.exists():
+                file.unlink()
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse request JSON: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"MMSeqs2 command failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Command failed: {e.stderr}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/cluster")
+async def cluster(
+    query: Annotated[str, Body(description="FASTA formatted sequences")],
+    params: Annotated[ClusterParams, Body()] = ClusterParams(),
+) -> str:
+    """Cluster sequences using MMSeqs2.
+
+    Args:
+        query: FASTA formatted sequences
+        params: MMSeqs2 clustering parameters
+
+    Returns:
+        Clustering results in TSV format
+    """
+    runner = MMSeqs2Runner()
+    return await runner.run_clustering(query, params)
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+    )

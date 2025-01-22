@@ -1,197 +1,127 @@
 import io
-from typing import Literal, Optional
+import os
+from typing import Literal
 
 import httpx
 import pandas as pd
 from loguru import logger
-from pyeed.dbconnect import DatabaseConnector
-from pyeed.tools.abstract_tool import AbstractTool
+from pydantic import BaseModel, Field, field_validator
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 
-class Blast(AbstractTool):
-    def run_service(
+class Blast(BaseModel):
+    """Performs BLAST search on a local database.
+    The Blast service is run in a Docker container, which is part
+    of the pyeed docker service.
+
+    The serive needs to be configured and started before it can be used.
+    """
+
+    mode: Literal["blastp", "blastn"]
+    db_path: str = Field(..., description="Path to BLAST database")
+    db_name: str = Field(..., description="Name of BLAST database")
+    evalue: float = Field(default=0.001, ge=0, description="E-value threshold")
+    max_target_seqs: int = Field(
+        default=100, gt=0, description="Maximum number of target sequences"
+    )
+    num_threads: int = Field(
+        default_factory=lambda: max(1, int((os.cpu_count() or 1) - 1)),
+        gt=0,
+        description="Number of threads to use (defaults to CPU count - 1)",
+    )
+
+    @field_validator("mode")
+    def validate_mode(cls, v: str) -> str:
+        """Validate BLAST mode"""
+        if v not in ["blastp", "blastn"]:
+            raise ValueError("Mode must be either 'blastp' or 'blastn'")
+        return v
+
+    def search(
         self,
-        mode: Literal["blastp", "blastn"],
-        query: str,
-        db_path: str,
-        db_name: str,
-        evalue: float,
-        max_target_seqs: int,
-        num_threads: int,
+        sequence: str,
+        timeout: int = 3600,
+    ) -> pd.DataFrame:
+        """Search for a sequence in a local BLAST database.
+
+        Args:
+            sequence (str): Sequence to search for
+            timeout (int): Timeout for BLAST service. Defaults to 3600 seconds.
+
+        Returns:
+            pd.DataFrame: BLAST output
+        """
+        response = self.run_blast_service(timeout=timeout, sequence=sequence)
+        return self._parse_blast_output(
+            response.json()["result"]
+        )  # Get string from JSON response
+
+    def run_blast_service(
+        self,
+        sequence: str,
+        timeout: int,
     ) -> httpx.Response:
         """Run the BLAST service with the provided parameters.
 
         Args:
-            query: Query sequence
-            db: Path to BLAST database
-            evalue: E-value threshold
-            num_threads: Number of threads to use
-            max_target_seqs: Maximum number of target sequences
-            mode: BLAST mode ("blastp" or "blastn")
+            sequence (str): Sequence to search for
+            timeout (int): Timeout for BLAST service
 
         Returns:
-            Response from the BLAST service
+            httpx.Response: BLAST service response
+
+        Raises:
+            httpx.ConnectError: If the BLAST service is not running
         """
-        if mode not in ["blastp", "blastn"]:
-            raise ValueError("Invalid mode. Must be 'blastp' or 'blastn'.")
-        logger.debug(f"Running {mode} search")
+        params = self.model_dump()
+        params["sequence"] = sequence
+        logger.debug(f"Initializing BLAST search with params: {params}")
 
-        data = {
-            "mode": mode,
-            "sequence": query,
-            "db_path": db_path,
-            "db_name": db_name,
-            "evalue": evalue,
-            "max_target_seqs": max_target_seqs,
-            "num_threads": num_threads,
-        }
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task(description=f"Running {self.mode}", total=None)
+            try:
+                return httpx.post(
+                    "http://localhost:6001/blast",
+                    json=params,
+                    timeout=timeout,
+                )
+            except httpx.ConnectError as e:
+                logger.error(f"Connection error: {e}")
+                raise httpx.ConnectError("PyEED Docker Service not running") from e
 
-        try:
-            return httpx.post(
-                "http://localhost:6001/blast",
-                json=data,  # Send as JSON body, not query params
-                timeout=6000,
-            )
-        except httpx.ConnectError as e:
-            logger.error(f"Connection error: {e}")
-            raise httpx.ConnectError("PyEED Docker Service not running") from e
-
-    def blastp(
-        self,
-        query,
-        db,
-        num_threads,
-        evalue=0.001,
-        outfmt=6,
-        max_target_seqs=50,
-        dbConnector: Optional[DatabaseConnector] = None,
-    ) -> pd.DataFrame:
-        """
-        Perform a BLASTP search using the provided parameters.
+    @staticmethod
+    def _parse_blast_output(result_str: str) -> pd.DataFrame:
+        """Parse BLAST tab-delimited output into a DataFrame.
 
         Args:
-            query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
-            db (str): The database to search against.
-            evalue (float): E-value threshold for BLAST hits. Default is 0.001.
-            outfmt (int): Output format for BLAST results. Default is 10 (CSV).
-            num_threads (int): Number of threads to use for the BLAST search. Default is 50.
-            max_target_seqs (int): Maximum number of target sequences to retrieve. Default is 50.
-            dbConnector (DatabaseConnector): A DatabaseConnector object to connect to the database. Default is None.
+            result_str (str): BLAST output as a string
 
         Returns:
-            pd.DataFrame: A pandas DataFrame containing the BLAST results.
+            pd.DataFrame: Parsed BLAST output
         """
-        # check if the query is an id or a sequence
-        if dbConnector:
-            query_run = """
-            MATCH (p:Protein)
-            WHERE p.accession_id IN $ids
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
-            """
-            protein = dbConnector.execute_read(query_run, {"ids": [query]})
-
-            if len(protein) == 0:
-                raise ValueError("No protein found with the provided id.")
-
-            protein_seq = protein[0]["sequence"]
-            id = protein[0]["accession_id"]
-
-            # convert in fasta format
-            query = f">{id}\n{protein_seq}"
-
-        # now we will run the run service
-        result = self.run_service(
-            query, db, evalue, outfmt, num_threads, max_target_seqs
+        df = pd.read_csv(
+            io.StringIO(result_str),
+            sep="\t",
+            names=[
+                "subject_id",
+                "identity",
+                "alignment_length",
+                "mismatches",
+                "gap_opens",
+                "query_start",
+                "query_end",
+                "subject_start",
+                "subject_end",
+                "evalue",
+                "bit_score",
+            ],
         )
-        logger.info(f"BLASTP search completed with status code {result.status_code}")
-
-        if result.status_code != 200:
-            logger.error(f"Error: {result.json()}")
-
-        # create a dataframe from the result
-        df = pd.read_csv(io.StringIO(result.json()["result"]))
-        # add the rigth header
-        header = "Query ID,Subject ID,% Identity,Alignment Length,Mismatches,Gap Opens,Query Start,Query End,Subject Start,Subject End,E-value,Bit Score".split(
-            ","
-        )
-        df.columns = header
-
+        # Remove query_sequence index and duplicates
+        df = df.loc[df.index.repeat(1)]  # Convert index to simple range
+        df.index = range(len(df))
+        df = df.drop_duplicates(subset=["subject_id", "query_start", "query_end"])
         return df
-
-    def blastn(
-        self,
-        query,
-        db,
-        evalue=0.001,
-        outfmt=10,
-        num_threads=50,
-        max_target_seqs=50,
-        dbConnector: Optional[DatabaseConnector] = None,
-    ) -> pd.DataFrame:
-        """
-        Perform a BLASTN search using the provided parameters.
-
-        Args:
-            query (str): The query is either the sequence as it would be entered in a FASTA file or a id of a sequence in the database.
-            db (str): The database to search against.
-            evalue (float): E-value threshold for BLAST hits. Default is 0.001.
-            outfmt (int): Output format for BLAST results. Default is 10 (CSV).
-            num_threads (int): Number of threads to use for the BLAST search. Default is 50.
-            max_target_seqs (int): Maximum number of target sequences to retrieve. Default is 50.
-            dbConnector (DatabaseConnector): A DatabaseConnector object to connect to the database. Default is None.
-
-        Returns:
-            pd.DataFrame: A pandas DataFrame containing the BLAST results.
-        """
-        # check if the query is an id or a sequence
-        if dbConnector:
-            query_run = """
-            MATCH (p:DNA)
-            WHERE p.accession_id IN $ids
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
-            """
-            dnas = dbConnector.execute_read(query_run, {"ids": [query]})
-
-            if len(dnas) == 0:
-                raise ValueError("No protein found with the provided id.")
-
-            dna_seq = dnas[0]["sequence"]
-            id = dnas[0]["accession_id"]
-
-            # convert in fasta format
-            query = f">{id}\n{dna_seq}"
-
-        # now we will run the run service
-        result = self.run_service(
-            query, db, evalue, outfmt, num_threads, max_target_seqs
-        )
-        logger.info(f"BLASTN search completed with status code {result.status_code}")
-
-        if result.status_code != 200:
-            logger.error(f"Error: {result.json()}")
-
-        # create a dataframe from the result
-        df = pd.read_csv(io.StringIO(result.json()["result"]))
-        # add the rigth header
-        header = "Query ID,Subject ID,% Identity,Alignment Length,Mismatches,Gap Opens,Query Start,Query End,Subject Start,Subject End,E-value,Bit Score".split(
-            ","
-        )
-        df.columns = header
-
-        return df
-
-
-if __name__ == "__main__":
-    seq = "MSEQVAAVAKLRAKASEAAKEAKAREAAKKLAEAAKKAKAKEAAKRAEAKLAEKAKAAKRAEAKAAKEAKRAAAKRAEAKLAEKAKAAK"
-    blast = Blast()
-    res = blast.run_service(
-        mode="blastp",
-        query=seq,
-        db_path="/usr/local/bin/data/test_db/",
-        db_name="protein_db",
-        evalue=10,
-        max_target_seqs=10,
-        num_threads=4,
-    )
-
-    print(res.json())
