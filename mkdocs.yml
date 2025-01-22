@@ -26,6 +26,7 @@ nav:
     - Neo4j Database: setup/database.md
 
 plugins:
+  - search:
   - mkdocs-jupyter
   - mkdocstrings:
       handlers:
