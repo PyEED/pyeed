@@ -1,3 +1,5 @@
+from typing import Any
+
 from loguru import logger
 from pyeed.dbconnect import DatabaseConnector
 
@@ -53,7 +55,7 @@ class MutationDetection:
         seq2: str,
         pos1: list[str],
         pos2: list[str],
-    ) -> dict[str, list[int | str]]:
+    ) -> dict[str, Any]:
         """Compare two sequences and identify mutations between them.
 
         Args:

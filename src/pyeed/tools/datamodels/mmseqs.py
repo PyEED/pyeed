@@ -40,19 +40,13 @@ class MultipleSequenceAlignment(BaseModel):
         if not self.sequences:
             return "Empty alignment"
 
-        # Find longest ID for padding
         max_id_length = max(len(seq.id) for seq in self.sequences)
-
-        # Format each sequence with aligned IDs
-        formatted_lines = []
-        for seq in self.sequences:
-            formatted_lines.append(f"{seq.id:<{max_id_length}}  {seq.sequence}")
-
-        return "\n".join(formatted_lines)
+        return "\n".join(
+            f"{seq.id:<{max_id_length}}  {seq.sequence}" for seq in self.sequences
+        )
 
     def __repr__(self) -> str:
-        """Same as str() for this class."""
         return self.__str__()
 
     def __print__(self) -> None:
-        print(self.__repr__())
+        print(self.__str__())

@@ -13,7 +13,6 @@ biopython = ">=1.81,<1.84"
 networkx = "^3.2.1"
 plotly = "^5.18.0"
 scipy = "^1.11.3"
-pyhmmer = "^0.10.11"
 httpx = "^0.27.0"
 nest-asyncio = "^1.6.0"
 rich = "^13.0.0"
@@ -32,10 +31,10 @@ torch = "^2.4.1"
 transformers = "^4.45.2"
 scikit-learn = "^1.5.2"
 numpy = "^2.1.2"
-mkdocstrings = {extras = ["python"], version = "^0.26.2"}
 openai = "^1.52.2"
 
 [tool.poetry.group.dev.dependencies]
+mkdocstrings = {extras = ["python"], version = "^0.26.2"}
 mkdocs-material = "^9.5.9"
 pytest = "^8.0.1"
 python-dotenv = "^1.0.1"
@@ -64,11 +63,3 @@ strict = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
-
-[project]
-dependencies = [
-    # ... existing dependencies ...
-    "numpy",
-    "scipy",
-    "torch",
-]

@@ -5,6 +5,7 @@ import numpy as np
 import scipy.spatial as sp
 import torch
 from matplotlib.figure import Figure
+from numpy.typing import NDArray
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import load_model_and_tokenizer
 from scipy.spatial.distance import cosine
@@ -18,7 +19,7 @@ class EmbeddingTool:
         self,
         sequence_id: str,
         db: DatabaseConnector,
-    ) -> np.ndarray:
+    ) -> NDArray[np.float64]:
         """Get the embedding for a given sequence ID.
 
         Args:
@@ -45,7 +46,7 @@ class EmbeddingTool:
 
     def _get_single_embedding_last_hidden_state(
         self, sequence: str, model: Any, tokenizer: Any, device: torch.device
-    ) -> np.ndarray:
+    ) -> NDArray[np.float64]:
         """Generate embeddings for a single sequence using the last hidden state.
 
         Args:
@@ -66,11 +67,11 @@ class EmbeddingTool:
         # normalize the embedding
         embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
 
-        return embedding
+        return embedding  # type: ignore
 
     def calculate_single_sequence_embedding(
         self, sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
-    ) -> np.ndarray:
+    ) -> NDArray[np.float64]:
         """Calculate an embedding for a single sequence using a specified model.
 
         Args:
@@ -143,7 +144,7 @@ class EmbeddingTool:
         ids_list: Optional[list[str]] = None,
         ids_list_labels: Optional[dict[str, str]] = None,
         random_state: int = 42,
-    ) -> tuple[list[str], np.ndarray, list[str], list[str]]:
+    ) -> tuple[list[str], NDArray[np.float64], list[str], list[str]]:
         """Perform a 2D projection of the embeddings using t-SNE and prepare visualization data.
 
         Args:
@@ -235,10 +236,10 @@ class EmbeddingTool:
 
     def plot_matrix_comparison(
         self,
-        distance_matrix_1: np.ndarray,
-        distance_matrix_2: np.ndarray,
-        protein_ids_1: np.ndarray,
-        protein_ids_2: np.ndarray,
+        distance_matrix_1: NDArray[np.float64],
+        distance_matrix_2: NDArray[np.float64],
+        protein_ids_1: list[str],
+        protein_ids_2: list[str],
         label_1: str,
         label_2: str,
         number_of_points_goal: int,
@@ -246,10 +247,10 @@ class EmbeddingTool:
         """Plot a comparison between two distance matrices.
 
         Args:
-            distance_matrix_1 (np.ndarray): First distance matrix to compare
-            distance_matrix_2 (np.ndarray): Second distance matrix to compare
-            protein_ids_1 (np.ndarray): Protein IDs corresponding to first matrix
-            protein_ids_2 (np.ndarray): Protein IDs corresponding to second matrix
+            distance_matrix_1 (NDArray[np.float64]): First distance matrix to compare
+            distance_matrix_2 (NDArray[np.float64]): Second distance matrix to compare
+            protein_ids_1 (list[str]): Protein IDs corresponding to first matrix
+            protein_ids_2 (list[str]): Protein IDs corresponding to second matrix
             label_1 (str): Label for the first matrix
             label_2 (str): Label for the second matrix
             number_of_points_goal (int): Target number of points to plot
@@ -310,15 +311,15 @@ class EmbeddingTool:
 
     def calculate_similarity(
         self,
-        query_embed: np.ndarray,
-        target_embed: np.ndarray,
+        query_embed: NDArray[np.float64],
+        target_embed: NDArray[np.float64],
         mode: Literal["cosine", "euclidean"] = "cosine",
-    ) -> np.ndarray:
+    ) -> NDArray[np.float64]:
         """Calculate similarity between two protein sequence embeddings.
 
         Args:
-            query_embed (np.ndarray): Embedding of the query sequence
-            target_embed (np.ndarray): Embedding of the target sequence
+            query_embed (NDArray[np.float64]): Embedding of the query sequence
+            target_embed (NDArray[np.float64]): Embedding of the target sequence
             mode (Literal["cosine", "euclidean"]): Similarity metric to use
 
         Returns:
