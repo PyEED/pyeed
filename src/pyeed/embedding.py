@@ -153,13 +153,3 @@ def update_protein_embeddings_in_db(
 
     # Execute the update query with parameters
     db.execute_write(query, {"updates": updates})
-
-def free_memory() -> None:
-    """
-    Frees up memory by invoking garbage collection and clearing GPU caches.
-    """
-    gc.collect()
-    if torch.backends.mps.is_available():
-        torch.mps.empty_cache()
-    elif torch.cuda.is_available():
-        torch.cuda.empty_cache()
