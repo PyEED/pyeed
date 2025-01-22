@@ -7,8 +7,17 @@ site_author: Max Häußler
 nav:
   - Home: index.md
   - Usage: 
-    - Initial Setup: usage/initial_setup.ipynb
-    - Query from Primary Database: usage/basics.ipynb
+    - Basics:
+      - Initial Setup: usage/initial_setup.ipynb
+      - Query from Primary Database: usage/basics.ipynb
+    - Tools:
+      - Clustalo: usage/clustalo.ipynb
+      - MMseqs: usage/mmseqs.ipynb
+      - Blast: usage/blast.ipynb
+    - Analysis:
+      - Embeddings Analysis: usage/embeddings_analysis.ipynb
+      - Network Analysis: usage/network_analysis.ipynb
+      - Mutation Analysis: usage/mutation_analysis.ipynb
   - API Reference:
     - Pyeed: api/pyeed.md
     - DatabaseConnector: api/dbconnect.md
@@ -21,12 +30,14 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          paths: [src]
           options:
             docstring_style: google
             docstring_section_style: table
             docstring_options:
               ignore_init_summary: true
             merge_init_into_class: true
+            show_source: false
 
 theme:
   name: material
