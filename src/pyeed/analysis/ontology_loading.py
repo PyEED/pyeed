@@ -109,7 +109,7 @@ class OntologyAdapter:
         dicts_labels: Dict[str, str],
     ) -> None:
         """Process OWL relationships and create corresponding database relationships."""
-        for s, p, o in g.triples((None, RDFS.subClassOf, None)):  # type: tuple[Node, Node, Node]
+        for s, p, o in g.triples((None, RDFS.subClassOf, None)):
             subclass = str(s)
 
             if (o, RDF.type, OWL.Class) in g:
@@ -126,7 +126,7 @@ class OntologyAdapter:
 
             elif (o, RDF.type, OWL.Restriction) in g:
                 # Handle OWL restrictions (e.g., RO_ in CARD)
-                self._process_restriction(g, o, subclass, db, dicts_labels)
+                self._process_restriction(g, str(o), subclass, db, dicts_labels)
 
     def _process_restriction(
         self,
@@ -141,11 +141,11 @@ class OntologyAdapter:
         some_values_from = None
 
         # Extract onProperty
-        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):  # type: tuple[Node, Node, Node]
+        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):  # type: ignore
             on_property = str(prop)
 
         # Extract someValuesFrom
-        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):  # type: tuple[Node, Node, Node]
+        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):  # type: ignore
             some_values_from = str(value)
 
         if on_property and some_values_from:

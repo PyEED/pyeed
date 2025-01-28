@@ -126,13 +126,12 @@ class NetworkAnalysis:
         Detects communities in the graph using the greedy modularity algorithm.
 
         Returns:
-            list[set]: A list of sets, each containing the nodes in a community.
+            list[list[Any]]: A list of lists, each containing the nodes in a community.
         """
         from networkx.algorithms.community import greedy_modularity_communities
 
-        # Convert generator to list of lists for better compatibility
-        communities = [list(c) for c in greedy_modularity_communities(self.graph)]
-        return communities
+        # Convert frozenset to list explicitly
+        return [list(c) for c in greedy_modularity_communities(self.graph)]  # type: ignore
 
     def find_isolated_nodes(self, graph: nx.Graph) -> list[Any]:
         """
@@ -144,7 +143,8 @@ class NetworkAnalysis:
         Returns:
             list[Any]: List of nodes that have no connections (degree = 0).
         """
-        return [node for node in graph if graph.degree(node) == 0]
+        degrees = dict(graph.degree())  # type: ignore
+        return [node for node in graph.nodes() if degrees[node] == 0]
 
     def find_self_referential_nodes(
         self, relationship_type: str | None, graph: nx.Graph
@@ -248,9 +248,14 @@ class NetworkAnalysis:
         filtered_graph.remove_nodes_from(isolated_nodes)
 
         # Use spring layout for force-directed graph
-        pos = nx.spring_layout(filtered_graph, weight=attribute, scale=scale)
+        weight_attr = attribute if attribute is not None else None
+        pos = nx.spring_layout(filtered_graph, weight=weight_attr, scale=scale)  # type: ignore
+        # Convert pos to the correct return type
+        positions: dict[Any, tuple[float, float]] = {
+            node: (coord[0], coord[1]) for node, coord in pos.items()
+        }
 
-        return filtered_graph, pos
+        return filtered_graph, positions
 
     def compute_clustering_coefficients(self) -> tuple[dict[Any, float], float]:
         """
@@ -261,10 +266,13 @@ class NetworkAnalysis:
                 - Dictionary mapping nodes to their clustering coefficients
                 - Overall graph clustering coefficient
         """
-        node_coefficients = dict(
-            nx.clustering(self.graph)
-        )  # Convert to dict explicitly
-        return node_coefficients, nx.average_clustering(self.graph)
+        clustering = nx.clustering(self.graph)
+        node_coefficients: dict[Any, float] = {
+            node: float(coeff)
+            for node, coeff in clustering.items()  # type: ignore
+        }
+        avg_clustering = float(nx.average_clustering(self.graph))
+        return node_coefficients, avg_clustering
 
     def analyze_connectivity(self) -> dict[str, Any]:
         """
@@ -297,13 +305,12 @@ class NetworkAnalysis:
 
         node_data = self.graph.nodes[node_id]
         neighbors = list(self.graph.neighbors(node_id))
+        degree = self.graph.degree(node_id)  # type: ignore
 
         return {
             "id": node_id,
             "labels": node_data.get("labels"),
             "properties": node_data.get("properties"),
-            "degree": self.graph.degree[
-                node_id
-            ],  # Use degree property instead of method
+            "degree": degree,
             "neighbors": neighbors,
         }
