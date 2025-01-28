@@ -1,7 +1,6 @@
 import re
 from typing import Any, List, Tuple, TypeVar
 
-from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
 from loguru import logger
@@ -41,12 +40,19 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 )
 
             # check wether one of the db_xref is a taxonomy id starts with 'taxon:'
-            taxonomy_id = None
+            taxonomy_id_available = False
             for db_xref in feature.qualifiers["db_xref"]:
                 logger.debug(f"Checking db_xref: {db_xref}")
                 if db_xref.startswith("taxon:"):
                     taxonomy_id = db_xref
+                    taxonomy_id_available = True
                     break
+
+            if not taxonomy_id_available:
+                logger.debug(
+                    f"No taxonomy ID found for {seq_record.id}: {feature.qualifiers['db_xref']}"
+                )
+                return (None, None)
 
             if ":" in taxonomy_id:
                 taxonomy_id = int(taxonomy_id.split(":")[1])
@@ -65,7 +71,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return organism_name[0], taxonomy_id
 
-    def map_protein(self, seq_record: SeqRecord) -> dict:
+    def map_protein(self, seq_record: SeqRecord) -> dict[str, Any]:
         """Maps protein information from a `Bio.SeqRecord` object to a dictionary.
 
         Args:
@@ -75,7 +81,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             dict: A dictionary containing the protein information.
         """
 
-        protein_info_dict: dict = {}
+        protein_info_dict: dict[str, Any] = {}
         protein_list = self.get_feature(seq_record, "Protein")
         if len(protein_list) == 0:
             logger.debug(
@@ -124,7 +130,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return protein_info_dict
 
-    def map_sites(self, seq_record: SeqRecord):
+    def map_sites(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
         sites_list = []
 
         sites = self.get_feature(seq_record, "site")
@@ -133,7 +139,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
             try:
                 sites_dict["type"] = site.qualifiers["site_type"][0]
                 sites_dict["positions"] = [
-                    int(part.start) for part in site.location.parts
+                    int(part.start)
+                    for part in site.location.parts  # type: ignore
                 ]
                 sites_dict["cross_ref"] = site.qualifiers["db_xref"][0]
 
@@ -146,7 +153,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return sites_list
 
-    def add_sites(self, sites_list: List[dict], protein: Protein):
+    def add_sites(self, sites_list: List[dict[str, Any]], protein: Protein) -> None:
         for site_dict in sites_list:
             site = Site.get_or_save(
                 name=site_dict["type"],
@@ -155,7 +162,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
             protein.site.connect(site, {"positions": site_dict["positions"]})
 
-    def map_cds(self, seq_record: SeqRecord):
+    def map_cds(self, seq_record: SeqRecord) -> List[dict[str, Any]] | None:
         cds = self.get_feature(seq_record, "CDS")
 
         if len(cds) > 1:
@@ -188,7 +195,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
         return None
 
     @staticmethod
-    def get_cds_regions(seq_feature: SeqFeature) -> List[dict]:
+    def get_cds_regions(seq_feature: SeqFeature) -> List[dict[str, Any]]:
         coded_by = seq_feature.qualifiers["coded_by"][0]
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
 
@@ -223,7 +230,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return regions
 
-    def map_regions(self, seq_record: SeqRecord):
+    def map_regions(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
         regions = self.get_feature(seq_record, "region")
         regions_list = []
 
@@ -237,8 +244,8 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 regions_list.append(
                     {
                         "id": region.qualifiers["region_name"][0],
-                        "start": int(region.location.start),
-                        "end": int(region.location.end),
+                        "start": int(region.location.start),  # type: ignore
+                        "end": int(region.location.end),  # type: ignore
                         "type": region.qualifiers["note"][0],
                         "cross_reference": db_xref,
                     }
@@ -250,7 +257,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
 
         return regions_list
 
-    def add_regions(self, regions_list: List[dict], protein: Protein):
+    def add_regions(self, regions_list: List[dict[str, Any]], protein: Protein) -> None:
         for region_dict in regions_list:
             region = Region.get_or_save(
                 region_id=region_dict["id"],
@@ -261,7 +268,7 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 region, {"start": region_dict["start"], "end": region_dict["end"]}
             )
 
-    def add_to_db(self, record: SeqIO.SeqRecord):
+    def add_to_db(self, record: SeqRecord) -> None:
         logger.info(f"Mapping {record.id} to PyEED model")
 
         organism_name, taxonomy_id = self.map_organism(record)
