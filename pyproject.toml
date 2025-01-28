@@ -48,6 +48,7 @@ pytest-loguru = "^0.4.0"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 devtools = "^0.12.2"
+mypy = "^1.14.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -55,7 +56,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 ignore_missing_imports = true
-line_length = 120
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 warn_return_any = true
