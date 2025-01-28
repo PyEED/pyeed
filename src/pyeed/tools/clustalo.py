@@ -1,6 +1,7 @@
 import httpx
 from loguru import logger
 from pydantic import BaseModel, Field
+
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.datamodels.mmseqs import MultipleSequenceAlignment, Sequence
 from pyeed.tools.services import ServiceURL
