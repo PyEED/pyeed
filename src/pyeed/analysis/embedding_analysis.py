@@ -111,9 +111,10 @@ class EmbeddingTool:
         # get the embedding for the start_sequence_id
         start_embedding = self.get_embedding(start_sequence_id, db)
 
-        # get all the embeddings
+        # get all the embeddings, where the embedding is not null
         query = """
         MATCH (p:Protein)
+        WHERE p.embedding IS NOT NULL
         RETURN p.accession_id AS accession_id, p.embedding AS embedding
         """
         embeddings_read = db.execute_read(query)
