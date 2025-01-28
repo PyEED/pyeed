@@ -1,6 +1,8 @@
 from loguru import logger
+from pyeed.analysis.sequence_alignment import PairwiseAligner
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.model import StandardNumbering
+from pyeed.tools.clustalo import ClustalOmega
 
 
 class StandardNumberingTool:
@@ -14,7 +16,7 @@ class StandardNumberingTool:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.positions = None
+        self.positions: dict[str, list[str]] = {}
 
     def _get_proteins_dict(self, db: DatabaseConnector) -> dict[str, str]:
         """
@@ -35,8 +37,14 @@ class StandardNumberingTool:
     def get_protein_base_sequence(
         self, base_sequence_id: str, db: DatabaseConnector
     ) -> dict[str, str]:
-        """
-        This function will get the base sequence from the database
+        """Get the base sequence from the database.
+
+        Args:
+            base_sequence_id: The accession ID of the base sequence
+            db: Database connector instance
+
+        Returns:
+            dict: Dictionary containing sequence ID and sequence
         """
         query = f"""
         MATCH (p:Protein)
@@ -51,10 +59,13 @@ class StandardNumberingTool:
 
         return base_sequence
 
-    def safe_positions(self, db: DatabaseConnector) -> None:
-        """
-        This function will save the positions to the database
-        The positions need to be one long string
+    def save_positions(self, db: DatabaseConnector) -> None:
+        """Save the positions to the database.
+
+        The positions need to be one long string.
+
+        Args:
+            db: Database connector instance
         """
         for protein_id in self.positions:
             query = f"""
@@ -65,7 +76,9 @@ class StandardNumberingTool:
             """
             db.execute_write(query)
 
-    def run_numbering_algorithm(self, base_sequence_id: str, alignment):
+    def run_numbering_algorithm(
+        self, base_sequence_id: str, alignment
+    ) -> dict[str, list[str]]:
         """
         Core algorithm to compute numbering positions for all sequences relative to the base sequence.
         """
@@ -163,7 +176,9 @@ class StandardNumberingTool:
 
         return positions
 
-    def run_numbering_algorithm_pairwise(self, base_sequence_id: str, alignment):
+    def run_numbering_algorithm_pairwise(
+        self, base_sequence_id: str, alignment
+    ) -> dict[str, list[str]]:
         """
         This function will run the numbering algorithm pairwise
         """
@@ -261,7 +276,7 @@ class StandardNumberingTool:
         self,
         base_sequence_id: str,
         db: DatabaseConnector,
-        list_of_seq_ids: list = None,
+        list_of_seq_ids: list[str] | None = None,
         return_positions: bool = False,
     ):
         """
@@ -276,26 +291,29 @@ class StandardNumberingTool:
             WHERE p.accession_id IS NOT NULL
             RETURN p.accession_id AS accession_id
             """
-            list_of_seq_ids = db.execute_read(query)
-            list_of_seq_ids = [protein["accession_id"] for protein in list_of_seq_ids]
+            results = db.execute_read(query)
+            list_of_seq_ids = [row.get("accession_id") for row in results]  # type: ignore
 
         # remove the base sequence from the list_of_seq_ids
-        list_of_seq_ids.remove(base_sequence_id)
+        list_of_seq_ids.remove(base_sequence_id)  # type: ignore
 
         # generate all the pairs where the base sequence is the first sequence
         pairs = []
-        for protein_id in list_of_seq_ids:
+        for protein_id in list_of_seq_ids:  # type: ignore
             pairs.append((base_sequence_id, protein_id))
-
-        from pyeed.analysis.sequence_alignment import PairwiseAligner
 
         # run the pairwise alignment
         pairwise_aligner = PairwiseAligner()
         results = pairwise_aligner.align_multipairwise(
-            ids=list_of_seq_ids + [base_sequence_id], db=db, pairs=pairs
+            ids=list_of_seq_ids + [base_sequence_id],  # type: ignore
+            db=db,
+            pairs=pairs,  # type: ignore
         )
 
-        # change result into a nested list the first element in each list elemenet is the 'query_aligned' the second is the 'target_aligned'
+        if results is None:
+            raise ValueError("Pairwise alignment failed - no results returned")
+
+        # change result into a nested list
         results = [
             [result["query_aligned"], result["target_aligned"], result["target_id"]]
             for result in results
@@ -308,18 +326,21 @@ class StandardNumberingTool:
 
         # create the standard numbering node
         StandardNumbering.get_or_save(
-            name=f"{self.name}",
+            name=self.name,
             definition=f"Pairwise based on base sequence {base_sequence_id}",
         )
 
         # update the database with the standard numbering
-        self.safe_positions(db)
+        self.save_positions(db)
 
         if return_positions:
             return self.positions
 
     def apply_standard_numbering(
-        self, base_sequence_id: str, db: DatabaseConnector, list_of_seq_ids: list = None
+        self,
+        base_sequence_id: str,
+        db: DatabaseConnector,
+        list_of_seq_ids: list[str] | None = None,
     ):
         """
         This function will set the standard numbering for a given base sequence and all the sequences in the database
@@ -347,19 +368,14 @@ class StandardNumberingTool:
         # remove the base sequence from the proteins_dict
         proteins_dict.pop(base_sequence_id)
 
-        # run clustal omega
-        from pyeed.tools.clustalo import ClustalOmega
-
-        # create a list of sequences
-        sequences = []
-        sequences.append(f">{base_sequence['id']}\n{base_sequence['sequence']}")
+        # Create a dictionary for ClustalO instead of a list
+        sequences_dict = {base_sequence["id"]: base_sequence["sequence"]}
         for key in proteins_dict:
-            # format is >id\nsequence
-            sequences.append(f">{key}\n{proteins_dict[key]}")
+            sequences_dict[key] = proteins_dict[key]
 
         # run clustal omega
         clustalO = ClustalOmega()
-        alignment = clustalO.align(sequences)
+        alignment = clustalO.align(sequences_dict)  # Now passing a dict as required
 
         # get all positions for all the sequences
         # we want to use inserts as 2.1 .. to check wether it is an insert we take a look at the base sequence at the postions if - is present
@@ -373,7 +389,7 @@ class StandardNumberingTool:
         )
 
         # create the relationships between the standard numbering and the proteins
-        self.safe_positions(db)
+        self.save_positions(db)
 
 
 if __name__ == "__main__":
@@ -415,7 +431,15 @@ if __name__ == "__main__":
     # add base sequence to the sequences
     sequences.insert(0, f">{base_sequence['id']}\n{base_sequence['sequence']}")
 
-    alignment = clustalO.align(sequences)
+    # Convert sequences list to required dictionary format
+    sequences_dict = {
+        base_sequence["id"]: base_sequence["sequence"],
+        "seq1": "MTHKLLLTLLFTLLFSSAYSRG",
+        "seq2": "ABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
+        "seq3": "MTHKILLLTLLFTLLFSSCYSRGARTHDB",
+    }
+
+    alignment = clustalO.align(sequences_dict)
 
     sn_tool = StandardNumberingTool("test_standard_numbering")
     sn_tool.positions = sn_tool.run_numbering_algorithm("seq0", alignment)
