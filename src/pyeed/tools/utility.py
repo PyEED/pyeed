@@ -1,10 +1,11 @@
-from typing import Generator
+from typing import List, TypeVar
+
+T = TypeVar("T")
 
 
-def chunks(lst: list, n: int) -> Generator[list, None, None]:
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+def chunks(lst: List[T], n: int) -> List[List[T]]:
+    """Split a list into n-sized chunks."""
+    return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 
 def to_fasta(seq: str) -> str:

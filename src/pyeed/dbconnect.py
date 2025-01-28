@@ -242,7 +242,7 @@ class DatabaseConnector:
             RETURN {labels: nodeLabels, properties: properties} AS output
             """
 
-        return self.execute_read(node_properties_query)  # type: ignore
+        return self.execute_read(node_properties_query)
 
     @property
     def relationship_properties(self) -> list[dict[str, str]]:
@@ -257,7 +257,7 @@ class DatabaseConnector:
             RETURN {type: nodeLabels, properties: properties} AS output
             """
 
-        return self.execute_read(rel_properties_query)  # type: ignore
+        return self.execute_read(rel_properties_query)
 
     @property
     def relationships(self) -> list[dict[str, str]]:
@@ -271,7 +271,7 @@ class DatabaseConnector:
             RETURN {source: label, relationship: property, target: other} AS output
             """
 
-        return self.execute_read(rel_query)  # type: ignore
+        return self.execute_read(rel_query)
 
     @staticmethod
     def _insert_after_second_slash(uri: str, to_insert: str) -> str:

@@ -2,7 +2,6 @@ from typing import Dict
 
 from pyeed.dbconnect import DatabaseConnector
 from rdflib import OWL, RDF, RDFS, Graph, Namespace
-from rdflib.term import Node
 
 
 class OntologyAdapter:
@@ -38,10 +37,7 @@ class OntologyAdapter:
 
         # Create a dictionary of the labels
         dicts_labels: Dict[str, str] = {}
-        for s, p, o in g.triples((None, RDFS.label, None)):
-            s: Node
-            p: Node
-            o: Node
+        for s, _, o in g.triples((None, RDFS.label, None)):
             dicts_labels[str(s)] = str(o)
 
         # Process OWL classes
@@ -60,9 +56,6 @@ class OntologyAdapter:
     ) -> None:
         """Process OWL classes and create corresponding database nodes."""
         for s_node, p_node, o_node in g.triples((None, RDF.type, OWL.Class)):
-            s_node: Node
-            p_node: Node
-            o_node: Node
             class_name = str(s_node)
             # Create node for the class
             db.execute_write(
@@ -141,11 +134,11 @@ class OntologyAdapter:
         some_values_from = None
 
         # Extract onProperty
-        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):  # type: ignore
+        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):
             on_property = str(prop)
 
         # Extract someValuesFrom
-        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):  # type: ignore
+        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):
             some_values_from = str(value)
 
         if on_property and some_values_from:

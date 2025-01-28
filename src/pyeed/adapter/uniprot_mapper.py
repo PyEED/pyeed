@@ -55,7 +55,7 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
         self.add_catalytic_activity(data, protein)
         self.add_go(data, protein)
 
-    def add_sites(self, data: dict, protein: Protein):
+    def add_sites(self, data: dict[str, Any], protein: Protein) -> None:
         ligand_dict: dict[str, list[int]] = defaultdict(list)
 
         for feature in data.get("features", []):
@@ -67,11 +67,12 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
             site = Site(
                 name=ligand,
                 annotation=Annotation.BINDING_SITE.value,
-            ).save()
+            )
+            site.save()
 
             protein.site.connect(site, {"positions": positions})
 
-    def add_catalytic_activity(self, data: dict, protein: Protein):
+    def add_catalytic_activity(self, data: dict[str, Any], protein: Protein) -> None:
         try:
             for reference in data["comments"]:
                 if reference["type"] == "CATALYTIC_ACTIVITY":
@@ -88,7 +89,7 @@ class UniprotToPyeed(PrimaryDBtoPyeed):
                 f"Error saving catalytic activity for {protein.accession_id}: {e}"
             )
 
-    def add_go(self, data: dict, protein: Protein):
+    def add_go(self, data: dict[str, Any], protein: Protein) -> None:
         for reference in data["dbReferences"]:
             if reference["type"] == "GO":
                 go_annotation = GOAnnotation.get_or_save(

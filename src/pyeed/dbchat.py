@@ -1,3 +1,5 @@
+from typing import Optional
+
 import openai
 from neo4j.exceptions import CypherSyntaxError
 
@@ -12,8 +14,8 @@ class DBChat:
         self,
         question: str,
         openai_key: str,
-        history=None,
-    ):
+        history: Optional[list[dict[str, str]]] = None,
+    ) -> str:
         """Construct a Cypher query based on the provided question and history.
         Send the question to OpenAI's GPT-4 model to generate a Cypher query.
 
@@ -43,7 +45,10 @@ class DBChat:
             max_tokens=1000,
         )
 
-        return completions.choices[0].message.content
+        result = completions.choices[0].message.content
+        if result is None:
+            raise ValueError("No result from OpenAI")
+        return result
 
     def get_system_message(self) -> str:
         return f"""
@@ -78,8 +83,8 @@ class DBChat:
         question: str,
         retry: bool,
         openai_key: str,
-        history=None,
-    ) -> list[dict]:
+        history: Optional[list[dict[str, str]]] = None,
+    ) -> list[dict[str, str]]:
         """
         Query the database using natural language via OpenAI's GPT-4 model.
 

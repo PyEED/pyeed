@@ -131,7 +131,7 @@ class NetworkAnalysis:
         from networkx.algorithms.community import greedy_modularity_communities
 
         # Convert frozenset to list explicitly
-        return [list(c) for c in greedy_modularity_communities(self.graph)]  # type: ignore
+        return [list(c) for c in greedy_modularity_communities(self.graph)]
 
     def find_isolated_nodes(self, graph: nx.Graph) -> list[Any]:
         """
@@ -143,7 +143,7 @@ class NetworkAnalysis:
         Returns:
             list[Any]: List of nodes that have no connections (degree = 0).
         """
-        degrees = dict(graph.degree())  # type: ignore
+        degrees = dict(graph.degree())
         return [node for node in graph.nodes() if degrees[node] == 0]
 
     def find_self_referential_nodes(
@@ -249,7 +249,7 @@ class NetworkAnalysis:
 
         # Use spring layout for force-directed graph
         weight_attr = attribute if attribute is not None else None
-        pos = nx.spring_layout(filtered_graph, weight=weight_attr, scale=scale)  # type: ignore
+        pos = nx.spring_layout(filtered_graph, weight=weight_attr, scale=scale)
         # Convert pos to the correct return type
         positions: dict[Any, tuple[float, float]] = {
             node: (coord[0], coord[1]) for node, coord in pos.items()
@@ -268,8 +268,7 @@ class NetworkAnalysis:
         """
         clustering = nx.clustering(self.graph)
         node_coefficients: dict[Any, float] = {
-            node: float(coeff)
-            for node, coeff in clustering.items()  # type: ignore
+            node: float(coeff) for node, coeff in clustering.items()
         }
         avg_clustering = float(nx.average_clustering(self.graph))
         return node_coefficients, avg_clustering
@@ -305,7 +304,7 @@ class NetworkAnalysis:
 
         node_data = self.graph.nodes[node_id]
         neighbors = list(self.graph.neighbors(node_id))
-        degree = self.graph.degree(node_id)  # type: ignore
+        degree = self.graph.degree(node_id)
 
         return {
             "id": node_id,
