@@ -58,11 +58,24 @@ class EmbeddingTool:
         Returns:
             np.ndarray: Normalized embeddings for each token in the sequence
         """
+        from esm.models.esmc import ESMC
 
         with torch.no_grad():
-            inputs = tokenizer(sequence, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-            embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
+            if isinstance(model, ESMC):
+                # ESM-3 logic
+                from esm.sdk.api import ESMProtein, LogitsConfig
+
+                protein = ESMProtein(sequence=sequence)
+                protein_tensor = model.encode(protein)
+                logits_output = model.logits(
+                    protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+                )
+                embedding = logits_output.embeddings[0].cpu().numpy()
+            else:
+                # ESM-2 logic
+                inputs = tokenizer(sequence, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+                embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
 
         # normalize the embedding
         embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
