@@ -87,7 +87,7 @@ class Blast(BaseModel):
             progress.add_task(description=f"Running {self.mode}", total=None)
             try:
                 return httpx.post(
-                    "http://localhost:6001/blast",
+                    "http://129.69.129.130:6001/blast",
                     json=params,
                     timeout=timeout,
                 )
