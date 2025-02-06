@@ -8,6 +8,9 @@ from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+# set logger level to DEBUG
+logger.level("DEBUG")
+
 
 class Blast(BaseModel):
     """Performs BLAST search on a local database.
@@ -92,7 +95,6 @@ class Blast(BaseModel):
                     timeout=timeout,
                 )
             except httpx.ConnectError as e:
-                logger.error(f"Connection error: {e}")
                 raise httpx.ConnectError("PyEED Docker Service not running") from e
 
     @staticmethod
