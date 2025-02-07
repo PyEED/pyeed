@@ -39,31 +39,6 @@ class StandardNumberingTool:
         self.name = name
         self.positions: dict[str, list[str]] = {}
 
-    def _get_proteins_dict(self, db: DatabaseConnector) -> dict[str, str]:
-        """
-        Retrieve all proteins with a non-null sequence from the database.
-
-        This method executes a read query to retrieve proteins and then builds a dictionary
-        where keys are proteins' accession ids and values are their sequences.
-
-        Args:
-            db: The database connector instance used for querying.
-
-        Returns:
-            A dictionary mapping protein accession ids (str) to their sequences (str).
-        """
-        query = """
-        MATCH (p:Protein)
-        WHERE p.sequence IS NOT NULL
-        RETURN p.accession_id AS accession_id, p.sequence AS sequence
-        """
-        # Execute the query and build the proteins dictionary
-        proteins_read = db.execute_read(query)
-        proteins_dict = {
-            protein["accession_id"]: protein["sequence"] for protein in proteins_read
-        }
-        return proteins_dict
-
     def get_protein_base_sequence(
         self, base_sequence_id: str, db: DatabaseConnector
     ) -> dict[str, str]:
@@ -114,7 +89,7 @@ class StandardNumberingTool:
             # Execute the write query to update the standard numbering relationship.
             db.execute_write(query)
 
-    def run_numbering_algorithm(
+    def run_numbering_algorithm_clustalo(
         self, base_sequence_id: str, alignment
     ) -> dict[str, list[str]]:
         """
@@ -139,10 +114,9 @@ class StandardNumberingTool:
         positions = {}
 
         # Convert alignment to a list so that it is subscriptable.
-        alignment_list = list(alignment)
-
+        alignment_list = list(alignment)[0][1]
         # Extract base sequence (first in alignment)
-        base_sequence = alignment_list[0].seq
+        base_sequence = alignment_list[0].sequence
         # Populate base numbering: count only non-gap characters
         positions[base_sequence_id] = [
             str(i + 1) for i in range(len(base_sequence.replace("-", "")))
@@ -150,15 +124,15 @@ class StandardNumberingTool:
 
         base_seq_counter = -1
         # Iterate over each aligned position
-        for pos in range(len(alignment_list[0].seq)):
-            base_aa = alignment_list[0].seq[pos]
+        for pos in range(len(alignment_list[0].sequence)):
+            base_aa = alignment_list[0].sequence[pos]
             # Move counter when a real amino acid is encountered
             if base_aa != "-":
                 base_seq_counter += 1
 
             # Process each target sequence in the alignment (skip base sequence at index 0)
             for j in range(1, len(alignment_list)):
-                sequence = alignment_list[j].seq
+                sequence = alignment_list[j].sequence
                 sequence_id = alignment_list[j].id
 
                 # Both sequences have gaps at this position; nothing to number
@@ -420,15 +394,30 @@ class StandardNumberingTool:
             db: DatabaseConnector instance used for executing queries.
             list_of_seq_ids: An optional list of specific protein ids to process. If None, all proteins are used.
         """
-        # Retrieve all proteins from the database.
-        proteins_dict = self._get_proteins_dict(db)
-        # If a subset is specified, filter the proteins.
-        if list_of_seq_ids is not None:
-            proteins_dict = {
-                protein_id: proteins_dict[protein_id]
-                for protein_id in list_of_seq_ids
-                if protein_id in proteins_dict
-            }
+
+        if list_of_seq_ids is None:
+            query = """
+            MATCH (p:Protein) 
+            WHERE p.sequence IS NOT NULL
+            RETURN p.accession_id AS accession_id
+            """
+            results = db.execute_read(query)
+            list_of_seq_ids = [row["accession_id"] for row in results]
+
+        # Retrieve all proteins from the database. With both id and sequence.
+        query = """
+        MATCH (p:Protein)
+        WHERE p.sequence IS NOT NULL
+        AND p.accession_id IN $list_of_seq_ids
+        RETURN p.accession_id AS accession_id, p.sequence AS sequence
+        """
+        # Execute the query and build the proteins dictionary
+        proteins_read = db.execute_read(
+            query, parameters={"list_of_seq_ids": list_of_seq_ids}
+        )
+        proteins_dict = {
+            protein["accession_id"]: protein["sequence"] for protein in proteins_read
+        }
 
         logger.info(f"Using {len(proteins_dict)} sequences for standard numbering")
 
@@ -449,10 +438,13 @@ class StandardNumberingTool:
             sequences_dict
         )  # Passing a dict of sequences to ClustalOmega.
 
-        logger.info(f"Alignment received from ClustalOmega: {alignment}")
+        logger.info(f"Alignment received from ClustalOmega:\n{alignment}")
 
         # Compute standard numbering positions using the computed alignment.
-        self.positions = self.run_numbering_algorithm(base_sequence_id, alignment)
+        self.positions = self.run_numbering_algorithm_clustalo(
+            base_sequence_id, alignment
+        )
+        logger.info(f"Positions computed: {self.positions}")
 
         # Create (or get) the StandardNumbering node in the database.
         StandardNumbering.get_or_save(
@@ -517,7 +509,7 @@ if __name__ == "__main__":
 
     # Instantiate the numbering tool and run the numbering algorithm.
     sn_tool = StandardNumberingTool("test_standard_numbering")
-    sn_tool.positions = sn_tool.run_numbering_algorithm("seq0", alignment)
+    sn_tool.positions = sn_tool.run_numbering_algorithm_clustalo("seq0", alignment)
 
     # Print a sample of the computed positions to verify the output.
     count = 0
