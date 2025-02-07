@@ -1,23 +1,33 @@
 import gc
+import os
 from typing import Tuple, Union
 
 import numpy as np
 import torch
 from esm.models.esmc import ESMC
 from esm.sdk.api import ESMProtein, LogitsConfig
-from huggingface_hub import HfApi, HfFolder, login
+from huggingface_hub import HfFolder, login
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
-# Prompt for HuggingFace login credentials
-# Ensure that you have your API key saved or use login() to authenticate interactively
-hf_folder = HfFolder()
-api = HfApi()
-token = (
-    hf_folder.get_token() or login()
-)  # This will prompt for login if no token is saved
+
+def get_hf_token() -> str:
+    """Get or request Hugging Face token."""
+    if os.getenv("PYTEST_DISABLE_HF_LOGIN"):  # Disable Hugging Face login in tests
+        return "dummy_token_for_tests"
+
+    hf_folder = HfFolder()
+    token = hf_folder.get_token()
+    if not token:
+        login()  # Login returns None, get token after login
+        token = hf_folder.get_token()
+
+    if isinstance(token, str):
+        return token
+    else:
+        raise RuntimeError("Failed to get Hugging Face token")
 
 
 def load_model_and_tokenizer(
@@ -37,6 +47,8 @@ def load_model_and_tokenizer(
     Returns:
         Tuple of (model, tokenizer, device)
     """
+    # Get token only when loading model
+    token = get_hf_token()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Check if this is an ESM-3 variant
