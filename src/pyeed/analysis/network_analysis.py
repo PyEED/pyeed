@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, FrozenSet, Optional
 
 import networkx as nx
 from loguru import logger
@@ -20,13 +20,18 @@ class NetworkAnalysis:
         self.db: DatabaseConnector = db
         self.graph: nx.Graph = nx.Graph()
 
-    def create_graph(self, node_types=None, relationships=None, ids=None):
+    def create_graph(
+        self,
+        nodes: Optional[list[str]] = None,
+        relationships: Optional[list[str]] = None,
+        ids: Optional[list[str]] = None,
+    ) -> nx.Graph:
         """
         Creates a graph using data from the Neo4j database with specified filters.
 
         Args:
-            node_types (list[str], optional): List of node types to include (e.g., ['Protein', 'DNA']).
-            relationships (list[str], optional): List of relationship types to include (e.g., ['HAS_STANDARD_NUMBERING']).
+            node_types (list[str], optional): List of node names to include (e.g., ['Protein', 'DNA']).
+            relationships (list[str], optional): List of relationship names to include (e.g., ['HAS_STANDARD_NUMBERING']).
             ids (list[str], optional): List of accession IDs to include specific nodes.
 
         Returns:
@@ -34,12 +39,12 @@ class NetworkAnalysis:
         """
 
         logger.info(
-            f"Creating graph with node types: {node_types} and relationships: {relationships} and ids: {ids}"
+            f"Creating graph with node types: {nodes} and relationships: {relationships} and ids: {ids}"
         )
 
         # Query to fetch nodes with filters
         node_filter = ""
-        if node_types:
+        if nodes:
             node_filter += "WHERE labels(n)[0] IN $node_types "
         if ids:
             if "WHERE" in node_filter:
@@ -67,7 +72,7 @@ class NetworkAnalysis:
         # Fetch nodes and relationships
         logger.debug(f"Executing query: {query_nodes}")
         nodes = self.db.execute_read(
-            query_nodes, {"node_types": node_types, "accession_ids": ids}
+            query_nodes, {"node_types": nodes, "accession_ids": ids}
         )
         logger.debug(f"Executing query: {query_relationships}")
         relationships = self.db.execute_read(
@@ -121,7 +126,7 @@ class NetworkAnalysis:
         except nx.NetworkXNoPath:
             return None
 
-    def detect_communities(self):
+    def detect_communities(self) -> list[FrozenSet[Any]]:
         """
         Detects communities in the graph using the greedy modularity algorithm.
 
