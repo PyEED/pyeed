@@ -6,7 +6,11 @@ import httpx
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
-from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from pyeed.tools.services import ServiceURL
+
+# set level to debug
+logger.level("DEBUG")
 
 # set logger level to DEBUG
 logger.level("DEBUG")
@@ -19,6 +23,8 @@ class Blast(BaseModel):
 
     The serive needs to be configured and started before it can be used.
     """
+
+    service_url: str = Field(default=ServiceURL.BLAST.value)
 
     mode: Literal["blastp", "blastn"]
     db_path: str = Field(..., description="Path to BLAST database")
@@ -66,17 +72,17 @@ class Blast(BaseModel):
         sequence: str,
         timeout: int,
     ) -> httpx.Response:
-        """Run the BLAST service with the provided parameters.
+        """Run BLAST search via HTTP service.
 
         Args:
-            sequence (str): Sequence to search for
-            timeout (int): Timeout for BLAST service
+            sequence: Query sequence
+            timeout: Request timeout in seconds
 
         Returns:
-            httpx.Response: BLAST service response
+            httpx.Response: Response from BLAST service
 
         Raises:
-            httpx.ConnectError: If the BLAST service is not running
+            httpx.ConnectError: If BLAST service is not running
         """
         params = self.model_dump()
         params["sequence"] = sequence
@@ -129,23 +135,3 @@ class Blast(BaseModel):
         df.index = range(len(df))
         df = df.drop_duplicates(subset=["subject_id", "query_start", "query_end"])
         return df
-
-
-if __name__ == "__main__":
-    from pyeed.tools import Blast
-
-    # Example protein sequence
-    sequence = "MSEQVAAVAKLRAKASEAAKEAKAREAAKKLAEAAKKAKAKEAAKRAEAKLAEKAKAAKRAEAKAAKEAKRAAAKRAEAKLAEKAKAAK"
-
-    # Initialize BLAST search
-    blast = Blast(
-        mode="blastp",  # Use blastp for protein sequences
-        db_path="/usr/local/bin/data/test_db/",  # Path in Docker container
-        db_name="protein_db",  # Name of your BLAST database
-        evalue=0.1,  # E-value threshold
-        max_target_seqs=10,  # Maximum number of hits to return
-    )
-
-    # Perform search
-    results = blast.search(sequence)
-    print(results)
