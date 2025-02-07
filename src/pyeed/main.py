@@ -112,10 +112,10 @@ class Pyeed:
         # set up UniProt adapter
         adapter = PrimaryDBAdapter(
             ids=ids,
-            ids_attr_name="accession",
+            id_param_name="accession",
             url="https://www.ebi.ac.uk/proteins/api/proteins",
             rate_limit=10,
-            n_concurrent=5,
+            max_concurrent=5,
             batch_size=5,
             data_mapper=UniprotToPyeed(),
             progress=None,
@@ -123,7 +123,7 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.make_request())
+        asyncio.run(adapter.execute_requests())
         nest_asyncio.apply()
 
     def fetch_ncbi_protein(self, ids: list[str]) -> None:
@@ -142,10 +142,10 @@ class Pyeed:
 
         adapter = PrimaryDBAdapter(
             ids=ids,
-            ids_attr_name="id",
+            id_param_name="id",
             url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
             rate_limit=2,
-            n_concurrent=5,
+            max_concurrent=5,
             batch_size=10,
             data_mapper=NCBIProteinToPyeed(),
             progress=None,
@@ -153,7 +153,7 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.make_request())
+        asyncio.run(adapter.execute_requests())
         nest_asyncio.apply()
 
     def fetch_ncbi_nucleotide(self, ids: list[str]) -> None:
@@ -172,10 +172,10 @@ class Pyeed:
 
         adapter = PrimaryDBAdapter(
             ids=ids,
-            ids_attr_name="id",
+            id_param_name="id",
             url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
             rate_limit=2,
-            n_concurrent=5,
+            max_concurrent=5,
             batch_size=10,
             data_mapper=NCBIDNAToPyeed(),
             progress=None,
@@ -183,7 +183,7 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.make_request())
+        asyncio.run(adapter.execute_requests())
         nest_asyncio.apply()
 
     def calculate_sequence_embeddings(
@@ -198,7 +198,7 @@ class Pyeed:
             batch_size (int): Number of sequences to process in each batch.
             model_name (str): Name of the model to use for calculating embeddings.
                 Defaults to "facebook/esm2_t33_650M_UR50D".
-                Available model can be found at https://huggingface.co/facebook/esm2_t6_8M_UR50D.
+                Available models can be found at https://huggingface.co/facebook/esm2_t6_8M_UR50D.
         """
 
         # Load the model, tokenizer, and device
