@@ -6,7 +6,11 @@ import httpx
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
-from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from pyeed.tools.services import ServiceURL
+
+# set level to debug
+logger.level("DEBUG")
 
 
 class Blast(BaseModel):
@@ -16,6 +20,8 @@ class Blast(BaseModel):
 
     The serive needs to be configured and started before it can be used.
     """
+
+    service_url: str = Field(default=ServiceURL.BLAST.value)
 
     mode: Literal["blastp", "blastn"]
     db_path: str = Field(..., description="Path to BLAST database")
@@ -63,37 +69,49 @@ class Blast(BaseModel):
         sequence: str,
         timeout: int,
     ) -> httpx.Response:
-        """Run the BLAST service with the provided parameters.
+        """Run BLAST search via HTTP service.
 
         Args:
-            sequence (str): Sequence to search for
-            timeout (int): Timeout for BLAST service
+            sequence: Query sequence
+            timeout: Request timeout in seconds
 
         Returns:
-            httpx.Response: BLAST service response
+            httpx.Response: Response from BLAST service
 
         Raises:
-            httpx.ConnectError: If the BLAST service is not running
+            httpx.ConnectError: If BLAST service is not running
         """
-        params = self.model_dump()
-        params["sequence"] = sequence
-        logger.debug(f"Initializing BLAST search with params: {params}")
+        params = {
+            "sequence": sequence,
+            "db_path": self.db_path,
+            "db_name": self.db_name,
+            "mode": self.mode,
+            "evalue": self.evalue,
+            "max_target_seqs": self.max_target_seqs,
+            "num_threads": self.num_threads,
+        }
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True,
-        ) as progress:
-            progress.add_task(description=f"Running {self.mode}", total=None)
-            try:
-                return httpx.post(
-                    "http://localhost:6001/blast",
-                    json=params,
-                    timeout=timeout,
-                )
-            except httpx.ConnectError as e:
-                logger.error(f"Connection error: {e}")
-                raise httpx.ConnectError("PyEED Docker Service not running") from e
+        # service_url = "http://localhost:6001/blast"
+
+        try:
+            return httpx.post(
+                self.service_url,
+                json=params,
+                timeout=timeout,
+            )
+        except httpx.ConnectError:
+            localhost = "http://localhost:6001/blast"
+            logger.info(
+                f"Blast service not running at {self.service_url}, trying {localhost}"
+            )
+
+            # retry with localhost
+            self.service_url = localhost
+            return httpx.post(
+                self.service_url,
+                json=params,
+                timeout=timeout,
+            )
 
     @staticmethod
     def _parse_blast_output(result_str: dict[str, str]) -> pd.DataFrame:
@@ -127,23 +145,3 @@ class Blast(BaseModel):
         df.index = range(len(df))
         df = df.drop_duplicates(subset=["subject_id", "query_start", "query_end"])
         return df
-
-
-if __name__ == "__main__":
-    from pyeed.tools import Blast
-
-    # Example protein sequence
-    sequence = "MSEQVAAVAKLRAKASEAAKEAKAREAAKKLAEAAKKAKAKEAAKRAEAKLAEKAKAAKRAEAKAAKEAKRAAAKRAEAKLAEKAKAAK"
-
-    # Initialize BLAST search
-    blast = Blast(
-        mode="blastp",  # Use blastp for protein sequences
-        db_path="/usr/local/bin/data/test_db/",  # Path in Docker container
-        db_name="protein_db",  # Name of your BLAST database
-        evalue=0.1,  # E-value threshold
-        max_target_seqs=10,  # Maximum number of hits to return
-    )
-
-    # Perform search
-    results = blast.search(sequence)
-    print(results)

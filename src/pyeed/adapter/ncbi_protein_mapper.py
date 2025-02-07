@@ -1,246 +1,223 @@
+import io
 import re
-from typing import Any, List, Tuple, TypeVar
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
+from httpx import Response
 from loguru import logger
 
-from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
+from pyeed.adapter.primary_db_adapter import PrimaryDBMapper
 from pyeed.model import Annotation, Organism, Protein, Region, Site
 
-T = TypeVar("T")
 
-
-class NCBIProteinToPyeed(PrimaryDBtoPyeed):
+class NCBIProteinToPyeed(PrimaryDBMapper):
     def get_feature(self, seq_record: SeqRecord, feature_type: str) -> List[SeqFeature]:
-        """Returns a list of features of a given type from a `Bio.SeqRecord` object."""
-        return [
+        """Extract features of a given type from a SeqRecord."""
+        features = [
             feature
             for feature in seq_record.features
             if feature.type.lower() == feature_type.lower()
         ]
+        if feature_type.lower() == "source" and len(features) != 1:
+            logger.warning(
+                f"Record {seq_record.id}: Expected 1 'source' feature, found {len(features)}."
+            )
+        return features
 
     def map_organism(self, seq_record: SeqRecord) -> Tuple[Any, Any]:
         """
-        Gets the organism name and taxonomy ID from the source data.
-        Maps it to an Organism object.
+        Extract organism name and taxonomy ID from the source feature.
         """
+        source_features = self.get_feature(seq_record, "source")
+        if not source_features:
+            logger.warning(f"Record {seq_record.id}: No 'source' feature found.")
+            return (None, None)
+        feature = source_features[0]
 
-        feature_list = self.get_feature(seq_record, "source")
-        if len(feature_list) != 1:
-            logger.debug(
-                f"Multiple features ({len(feature_list)}) of type `source` found for {seq_record.id}: {feature_list}"
-            )
-        feature = feature_list[0]
-
+        taxonomy_id = None
         try:
-            if len(feature.qualifiers["db_xref"]) != 1:
-                logger.info(
-                    f"For {seq_record.id} {feature.qualifiers['db_xref']} taxonomy ID(s) were found, using the first one. Skipping organism assignment"
-                )
-
-            # check wether one of the db_xref is a taxonomy id starts with 'taxon:'
-            taxonomy_id_available = False
-            for db_xref in feature.qualifiers["db_xref"]:
-                logger.debug(f"Checking db_xref: {db_xref}")
-                if db_xref.startswith("taxon:"):
-                    taxonomy_id = db_xref
-                    taxonomy_id_available = True
-                    break
-
-            if not taxonomy_id_available:
+            db_xrefs = feature.qualifiers.get("db_xref", [])
+            if len(db_xrefs) != 1:
                 logger.debug(
-                    f"No taxonomy ID found for {seq_record.id}: {feature.qualifiers['db_xref']}"
+                    f"Record {seq_record.id}: Multiple taxonomy references found; using first valid one."
+                )
+            for ref in db_xrefs:
+                if ref.startswith("taxon:"):
+                    taxonomy_id = int(ref.split(":")[1])
+                    logger.debug(f"Record {seq_record.id}: Taxonomy ID: {taxonomy_id}")
+                    break
+            if taxonomy_id is None:
+                logger.debug(
+                    f"Record {seq_record.id}: No valid taxonomy ID found in db_xref {db_xrefs}."
                 )
                 return (None, None)
-
-            if ":" in taxonomy_id:
-                taxonomy_id = int(taxonomy_id.split(":")[1])
-
-        except KeyError:
-            logger.debug(f"No taxonomy ID found for {seq_record.id}: {feature}")
+        except KeyError as e:
+            logger.error(
+                f"Record {seq_record.id}: Exception extracting taxonomy ID: {e}."
+            )
             return (None, None)
 
         try:
-            organism_name = feature.qualifiers["organism"]
-        except KeyError:
-            logger.debug(
-                f"No organism name found for {seq_record.id}: {feature_list[0].qualifiers}"
+            organism_names = feature.qualifiers.get("organism", [])
+            if not organism_names:
+                logger.warning(
+                    f"Record {seq_record.id}: 'organism' qualifier missing in source feature."
+                )
+                organism_name = None
+            else:
+                organism_name = organism_names[0]
+        except Exception as e:
+            logger.error(
+                f"Record {seq_record.id}: Exception extracting organism name: {e}."
             )
             organism_name = None
 
-        return organism_name[0], taxonomy_id
+        logger.debug(
+            f"Record {seq_record.id}: Mapped organism '{organism_name}' with taxonomy ID {taxonomy_id}."
+        )
+        return organism_name, taxonomy_id
 
-    def map_protein(self, seq_record: SeqRecord) -> dict[str, Any]:
-        """Maps protein information from a `Bio.SeqRecord` object to a dictionary.
+    def map_protein(self, seq_record: SeqRecord) -> Dict[str, Any]:
+        """Map protein information from a SeqRecord to a dictionary."""
+        protein_info: Dict[str, Any] = {}
+        protein_features = self.get_feature(seq_record, "Protein")
+        if not protein_features:
+            logger.warning(f"Record {seq_record.id}: No protein feature found.")
+            return protein_info
 
-        Args:
-            seq_record (SeqRecord): A `Bio.SeqRecord` object.
-
-        Returns:
-            dict: A dictionary containing the protein information.
-        """
-
-        protein_info_dict: dict[str, Any] = {}
-        protein_list = self.get_feature(seq_record, "Protein")
-        if len(protein_list) == 0:
-            logger.debug(
-                f"No protein feature found for {seq_record.id}: {seq_record.features}"
+        if len(protein_features) > 1:
+            logger.warning(
+                f"Record {seq_record.id}: Multiple protein features found; using the first."
             )
 
-            return protein_info_dict
-
-        if len(protein_list) > 1:
-            logger.debug(
-                f"Multiple features ({len(protein_list)}) of type `Protein` found for {seq_record.id}"
-            )
-
-        protein = protein_list[0]
+        protein = protein_features[0]
         try:
-            protein_info_dict["name"] = protein.qualifiers["product"][0]
+            protein_info["name"] = protein.qualifiers.get("product", [None])[0]
+            if protein_info["name"] is None:
+                raise KeyError
         except KeyError:
             logger.debug(
-                f"No protein name found for {seq_record.id}: {protein.qualifiers}"
+                f"Record {seq_record.id}: 'product' qualifier missing; trying 'name' qualifier."
             )
-            try:
-                protein_info_dict["name"] = protein.qualifiers["name"][0]
-            except KeyError:
+            protein_info["name"] = protein.qualifiers.get("name", [None])[0]
+            if protein_info["name"] is None:
                 logger.debug(
-                    f"No protein name found for {seq_record.id}: {protein.qualifiers}"
+                    f"Record {seq_record.id}: Protein name not provided; setting to None."
                 )
-                protein_info_dict["name"] = None
 
         try:
-            protein_info_dict["mol_weight"] = float(
-                protein.qualifiers["calculated_mol_wt"][0]
+            protein_info["mol_weight"] = float(
+                protein.qualifiers.get("calculated_mol_wt", [None])[0]
             )
-        except KeyError:
-            logger.debug(
-                f"No molecular weight found for {seq_record.id}: {protein.qualifiers}"
+        except (KeyError, ValueError, TypeError):
+            logger.warning(
+                f"Record {seq_record.id}: Molecular weight missing or invalid; setting to None."
             )
-            protein_info_dict["mol_weight"] = None
+            protein_info["mol_weight"] = None
 
         try:
-            protein_info_dict["ec_number"] = protein.qualifiers["EC_number"][0]
+            protein_info["ec_number"] = protein.qualifiers.get("EC_number", [None])[0]
         except KeyError:
-            logger.debug(
-                f"No EC number found for {seq_record.id}: {protein.qualifiers}"
+            logger.warning(
+                f"Record {seq_record.id}: EC number not provided; setting to None."
             )
-            protein_info_dict["ec_number"] = None
+            protein_info["ec_number"] = None
 
-        return protein_info_dict
+        logger.debug(
+            f"Record {seq_record.id}: Mapped protein with name '{protein_info.get('name')}' to 'Protein' object."
+        )
+        return protein_info
 
-    def map_sites(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
+    def map_sites(self, seq_record: SeqRecord) -> List[Dict[str, Any]]:
+        """Map site features from a SeqRecord into a list of dictionaries."""
         sites_list = []
-
-        sites = self.get_feature(seq_record, "site")
-        for site in sites:
-            sites_dict = {}
+        site_features = self.get_feature(seq_record, "site")
+        for site in site_features:
             try:
-                sites_dict["type"] = site.qualifiers["site_type"][0]
-                sites_dict["positions"] = [
-                    int(part.start)
-                    for part in site.location.parts  # type: ignore
-                ]
-                sites_dict["cross_ref"] = site.qualifiers["db_xref"][0]
-
+                sites_dict = {
+                    "type": site.qualifiers["site_type"][0],
+                    "positions": [int(part.start) for part in site.location.parts],  # type: ignore
+                    "cross_ref": site.qualifiers["db_xref"][0],
+                }
+                sites_list.append(sites_dict)
             except KeyError:
-                logger.debug(
-                    f"Incomplete site data found for {seq_record.id}: {site.qualifiers}, skipping site"
+                logger.warning(
+                    f"Record {seq_record.id}: Incomplete site data; skipping site."
                 )
-
-            sites_list.append(sites_dict)
-
+        logger.debug(f"Record {seq_record.id}: Mapped {len(sites_list)} site(s).")
         return sites_list
 
-    def add_sites(self, sites_list: List[dict[str, Any]], protein: Protein) -> None:
+    def add_sites(self, sites_list: List[Dict[str, Any]], protein: Protein) -> None:
+        """Connect mapped sites to a protein."""
         for site_dict in sites_list:
             site = Site.get_or_save(
                 name=site_dict["type"],
                 annotation=Annotation.PROTEIN.value,
             )
-
             protein.site.connect(site, {"positions": site_dict["positions"]})
+        logger.debug(
+            f"Connected {len(sites_list)} site(s) to protein {protein.accession_id}."
+        )
 
-    def map_cds(self, seq_record: SeqRecord) -> List[dict[str, Any]] | None:
-        cds = self.get_feature(seq_record, "CDS")
-
-        if len(cds) > 1:
-            logger.info(
-                f"Multiple features ({len(cds)}) of type `CDS` found for {seq_record.id}"
+    def map_cds(self, seq_record: SeqRecord) -> Optional[List[Dict[str, Any]]]:
+        """Map CDS features from a SeqRecord."""
+        cds_features = self.get_feature(seq_record, "CDS")
+        if len(cds_features) > 1:
+            logger.debug(
+                f"Record {seq_record.id}: Multiple CDS features found; using the first."
             )
-
         try:
-            cds_feature = cds[0]
+            cds_feature = cds_features[0]
         except IndexError:
-            logger.debug(f"No CDS found for {seq_record.id}: {cds}")
-
+            logger.debug(f"Record {seq_record.id}: No CDS feature found.")
             return None
 
-        try:
-            if "coded_by" not in cds_feature.qualifiers:
-                logger.debug(
-                    f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
-                )
-                return None
-
-            logger.info(f"CDS qualifiers: {cds_feature.qualifiers}")
-
-            return self.get_cds_regions(cds_feature)
-        except IndexError:
+        if "coded_by" not in cds_feature.qualifiers:
             logger.debug(
-                f"No coding sequence reference found for {seq_record.id}: {cds_feature.qualifiers}"
+                f"Record {seq_record.id}: CDS feature missing 'coded_by' qualifier; skipping CDS mapping."
             )
+            return None
 
-        return None
+        logger.debug(f"Record {seq_record.id}: Processing CDS feature with qualifiers.")
+        return self.get_cds_regions(cds_feature)
 
     @staticmethod
-    def get_cds_regions(seq_feature: SeqFeature) -> List[dict[str, Any]]:
+    def get_cds_regions(seq_feature: SeqFeature) -> List[Dict[str, Any]]:
+        """Extract CDS regions from a CDS feature."""
         coded_by = seq_feature.qualifiers["coded_by"][0]
         cds_pattern = r"\w+\.\d+:\d+\.\.\d+\s?\d+"
-
-        # Extract all regions from the 'coded_by' qualifier
-        coded_by = coded_by.replace(">", "")
-        coded_by = coded_by.replace("<", "")
+        coded_by = coded_by.replace(">", "").replace("<", "")
         cds_regions = re.findall(cds_pattern, coded_by)
         cds_regions = [region.replace(" ", "") for region in cds_regions]
-
-        # Extract the reference id from the first region
         reference_ids = [region.split(":")[0] for region in cds_regions]
-        if not all(
-            [reference_id == reference_ids[0] for reference_id in reference_ids]
-        ):
+        if not all(ref == reference_ids[0] for ref in reference_ids):
             logger.warning(
-                "Nucleotide sequence references are not identical: {reference_ids}"
+                f"Inconsistent nucleotide references found: {reference_ids}."
             )
-
-        # Extract the start and end position of each region
         cds_ranges = [region.split(":")[1] for region in cds_regions]
         regions = []
-        for i, region in enumerate(cds_ranges):
-            start, end = region.split("..")
-
-            region = {}
-            region["start"] = int(start)
-            region["end"] = int(end)
-            region["type"] = Annotation.CODING_SEQ.value
-            region["id"] = reference_ids[0]
-
-            regions.append(region)
-
+        for region_str in cds_ranges:
+            start, end = region_str.split("..")
+            regions.append(
+                {
+                    "start": int(start),
+                    "end": int(end),
+                    "type": Annotation.CODING_SEQ.value,
+                    "id": reference_ids[0],
+                }
+            )
+        logger.debug(f"Extracted {len(regions)} CDS region(s).")
         return regions
 
-    def map_regions(self, seq_record: SeqRecord) -> List[dict[str, Any]]:
-        regions = self.get_feature(seq_record, "region")
+    def map_regions(self, seq_record: SeqRecord) -> List[Dict[str, Any]]:
+        """Map region features from a SeqRecord."""
+        region_features = self.get_feature(seq_record, "region")
         regions_list = []
-
-        for region in regions:
+        for region in region_features:
             try:
-                if "db_xref" not in region.qualifiers:
-                    db_xref = None
-                else:
-                    db_xref = region.qualifiers["db_xref"][0]
-
+                db_xref = region.qualifiers.get("db_xref", [None])[0]
                 regions_list.append(
                     {
                         "id": region.qualifiers["region_name"][0],
@@ -251,41 +228,41 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                     }
                 )
             except KeyError:
-                logger.debug(
-                    f"Incomplete region data found for {seq_record.id}: {region.qualifiers}, skipping region"
+                logger.warning(
+                    f"Record {seq_record.id}: Incomplete region data; skipping region."
                 )
-
+        logger.debug(f"Record {seq_record.id}: Mapped {len(regions_list)} region(s).")
         return regions_list
 
-    def add_regions(self, regions_list: List[dict[str, Any]], protein: Protein) -> None:
+    def add_regions(self, regions_list: List[Dict[str, Any]], protein: Protein) -> None:
+        """Connect mapped regions to a protein."""
         for region_dict in regions_list:
             region = Region.get_or_save(
                 region_id=region_dict["id"],
                 annotation=Annotation.PROTEIN.value,
             )
-
             protein.region.connect(
                 region, {"start": region_dict["start"], "end": region_dict["end"]}
             )
-
-    def add_to_db(self, record: SeqRecord) -> None:
-        logger.info(f"Mapping {record.id} to PyEED model")
-
-        organism_name, taxonomy_id = self.map_organism(record)
-
-        # Organism information
-        organism = Organism.get_or_save(
-            taxonomy_id=taxonomy_id,
-            name=organism_name,
+        logger.debug(
+            f"Connected {len(regions_list)} region(s) to protein {protein.accession_id}."
         )
 
-        # Protein information
-        protein_info_dict = self.map_protein(record)
+    def add_to_db(self, response: Response) -> None:
+        """Process the response, map record data, and add/update the protein in the database."""
+        records = list(self.parse_response(response))
+        if not records:
+            logger.error("Response parsing failed: no records found.")
+            return
 
-        logger.info(f"Adding protein {record.id} to the database")
+        for record in records:
+            logger.debug(f"Processing NCBI protein record {record.id}")
 
-        try:
-            protein_info = {
+            organism_name, taxonomy_id = self.map_organism(record)
+            organism = Organism.get_or_save(taxonomy_id=taxonomy_id, name=organism_name)
+
+            protein_info_dict = self.map_protein(record)
+            protein_data = {
                 "sequence": str(record.seq),
                 "mol_weight": protein_info_dict.get("mol_weight"),
                 "ec_number": protein_info_dict.get("ec_number"),
@@ -294,49 +271,42 @@ class NCBIProteinToPyeed(PrimaryDBtoPyeed):
                 "accession_id": str(record.id),
             }
 
-            # Try to get existing protein
+            # Create or update protein
             protein = Protein.nodes.get_or_none(accession_id=record.id)
-            if not protein:
-                logger.debug(f"Protein {record.id} already exists")
-
-            if protein is not None:
-                logger.info(f"Updating existing protein {record.id}")
-                protein.sequence = protein_info["sequence"]
-                protein.mol_weight = protein_info["mol_weight"]
-                protein.ec_number = protein_info["ec_number"]
-                protein.name = protein_info["name"]
-                protein.seq_length = protein_info["seq_length"]
+            if protein:
+                for key, value in protein_data.items():
+                    setattr(protein, key, value)
                 protein.save()
-
             else:
-                logger.info(f"Creating new protein {record.id}")
-                # Create new protein
-                protein = Protein(**protein_info)
+                protein = Protein(**protein_data)
                 protein.save()
 
-        except KeyError as e:
-            logger.warning(f"Error during mapping of {record.id} to graph model: {e}")
-            return
+            protein.organism.connect(organism)
 
-        protein.organism.connect(organism)
+            # Add features
+            sites_list = self.map_sites(record)
+            self.add_sites(sites_list, protein)
 
-        # Add the sites
-        sites_list = self.map_sites(record)
-        self.add_sites(sites_list, protein)
+            cds_regions = self.map_cds(record)
+            if cds_regions:
+                for region in cds_regions:
+                    protein.nucleotide_id = region["id"]
+                    protein.nucleotide_start = region["start"]
+                    protein.nucleotide_end = region["end"]
+                    protein.save()
 
-        # Add the coding sequence
-        cds_regions = self.map_cds(record)
-        if cds_regions is not None:
-            for region in cds_regions:
-                # add the id to protein nucleotide_id
-                protein.nucleotide_id = region["id"]
-                protein.nucleotide_start = region["start"]
-                protein.nucleotide_end = region["end"]
-                protein.save()
+            regions_list = self.map_regions(record)
+            self.add_regions(regions_list, protein)
 
-        # Add the regions
-        regions_list = self.map_regions(record)
-        self.add_regions(regions_list, protein)
+            logger.info(f"Added/updated NCBI protein {record.id} in database")
 
-        # Here we add the GO annotations
-        # self.add_go(data, protein)
+    def parse_response(self, response: Response) -> Generator[SeqRecord, None, None]:
+        """Parse a GenBank-format response from NCBI."""
+        if not response.content:
+            logger.error("Empty response received from NCBI.")
+            return []  # type: ignore
+        try:
+            return SeqIO.parse(io.StringIO(response.content.decode()), "gb")  # type: ignore
+        except Exception as e:
+            logger.error(f"Failed to parse GenBank response: {e}")
+            return []  # type: ignore
