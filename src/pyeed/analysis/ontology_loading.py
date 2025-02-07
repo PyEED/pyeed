@@ -1,7 +1,7 @@
 from typing import Dict
 
 from pyeed.dbconnect import DatabaseConnector
-from rdflib import OWL, RDF, RDFS, Graph, Namespace
+from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
 
 
 class OntologyAdapter:
@@ -133,12 +133,15 @@ class OntologyAdapter:
         on_property = None
         some_values_from = None
 
+        # Convert restriction_node string to RDFLib URIRef
+        restriction = URIRef(restriction_node)
+
         # Extract onProperty
-        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):
+        for _, _, prop in g.triples((restriction, OWL.onProperty, None)):
             on_property = str(prop)
 
         # Extract someValuesFrom
-        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):
+        for _, _, value in g.triples((restriction, OWL.someValuesFrom, None)):
             some_values_from = str(value)
 
         if on_property and some_values_from:
