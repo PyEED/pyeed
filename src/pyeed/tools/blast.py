@@ -6,6 +6,7 @@ import httpx
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from pyeed.tools.services import ServiceURL
 

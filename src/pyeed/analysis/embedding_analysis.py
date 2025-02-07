@@ -113,10 +113,10 @@ class EmbeddingTool:
         query = """
         MATCH (p:Protein)
         WHERE p.embedding IS NOT NULL
-        AND p.Source = "BLAST_Protein"
         RETURN p.accession_id AS accession_id, p.embedding AS embedding
         """
         embeddings_read = db.execute_read(query)
+        logger.info(f"Found {len(embeddings_read)} embeddings")
 
         # calculate the distances
         distances = []
@@ -226,7 +226,7 @@ class EmbeddingTool:
         tsne = TSNE(
             n_components=2,
             perplexity=perplexity,
-            n_iter=n_iter,
+            max_iter=n_iter,
             random_state=random_state,
         )
 
@@ -282,11 +282,13 @@ class EmbeddingTool:
                             edgecolor="k",
                         )
                     else:
-                        # we need to find the index of the matrix_2_id in the protein_ids_1 array from numpy
-                        # the i is the index in the protein_ids_1 array this means we are looking of the index to j in the protein_ids_1 array
-                        index_matrix_1_id = np.where(protein_ids_1 == matrix_2_id)[0][0]
-                        # now the index of the matrix_1_id is the index of the matrix_2_id in the protein_ids_2 array
-                        index_matrix_2_id = np.where(protein_ids_2 == matrix_1_id)[0][0]
+                        # Convert the lists to np.array for valid elementwise comparison.
+                        index_matrix_1_id = np.where(
+                            np.array(protein_ids_1) == matrix_2_id
+                        )[0][0]
+                        index_matrix_2_id = np.where(
+                            np.array(protein_ids_2) == matrix_1_id
+                        )[0][0]
 
                         plt.scatter(
                             distance_matrix_1[i, index_matrix_1_id],
@@ -389,7 +391,7 @@ class EmbeddingTool:
         query_protein_id: str,
         index_name: str = "embedding_index",
         number_of_neighbors: int = 50,
-    ):
+    ) -> list[tuple[str, float]]:
         """
         This function finds the nearest neighbors of a query protein based on the vector index.
 
@@ -449,11 +451,12 @@ class EmbeddingTool:
         YIELD node AS fprotein, score
         RETURN fprotein.accession_id, score
         """
-        result = db.execute_read(query_find_nearest_neighbors)
-        result = [
-            (record["fprotein.accession_id"], record["score"]) for record in result
+        results = db.execute_read(query_find_nearest_neighbors)  # type: list[dict[str, Any]]
+        neighbors: list[tuple[str, float]] = [
+            (str(record["fprotein.accession_id"]), float(record["score"]))
+            for record in results
         ]
-        return result
+        return neighbors
 
     def drop_vector_index(
         self,
