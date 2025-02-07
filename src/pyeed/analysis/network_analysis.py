@@ -319,7 +319,7 @@ class NetworkAnalysis:
             "neighbors": neighbors,
         }
 
-    def build_network(self, graph: Any) -> Dict[Any, Any]:
+    def build_network(self, graph: Any) -> dict[Any, Any]:
         # ... implementation ...
         pass
 
