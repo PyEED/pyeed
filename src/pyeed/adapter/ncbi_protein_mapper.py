@@ -112,7 +112,7 @@ class NCBIProteinToPyeed(PrimaryDBMapper):
                 protein.qualifiers.get("calculated_mol_wt", [None])[0]
             )
         except (KeyError, ValueError, TypeError):
-            logger.warning(
+            logger.debug(
                 f"Record {seq_record.id}: Molecular weight missing or invalid; setting to None."
             )
             protein_info["mol_weight"] = None

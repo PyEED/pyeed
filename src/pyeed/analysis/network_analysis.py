@@ -1,4 +1,4 @@
-from typing import Any, FrozenSet, Optional
+from typing import Any, Optional
 
 import networkx as nx
 from loguru import logger
@@ -71,18 +71,18 @@ class NetworkAnalysis:
 
         # Fetch nodes and relationships
         logger.debug(f"Executing query: {query_nodes}")
-        nodes = self.db.execute_read(
+        nodes_results = self.db.execute_read(
             query_nodes, {"node_types": nodes, "accession_ids": ids}
         )
         logger.debug(f"Executing query: {query_relationships}")
-        relationships = self.db.execute_read(
+        relationships_results = self.db.execute_read(
             query_relationships, {"relationships": relationships}
         )
-        logger.debug(f"Number of nodes: {len(nodes)}")
-        logger.debug(f"Number of relationships: {len(relationships)}")
+        logger.debug(f"Number of nodes: {len(nodes_results)}")
+        logger.debug(f"Number of relationships: {len(relationships_results)}")
 
         # Add nodes
-        for node in nodes:
+        for node in nodes_results:
             self.graph.add_node(
                 node["id"],
                 labels=node["labels"],
@@ -90,7 +90,7 @@ class NetworkAnalysis:
             )
 
         # Add relationships
-        for rel in relationships:
+        for rel in relationships_results:
             if rel["source"] in self.graph and rel["target"] in self.graph:
                 self.graph.add_edge(
                     rel["source"],
@@ -110,23 +110,7 @@ class NetworkAnalysis:
         """
         return dict(nx.degree_centrality(self.graph))
 
-    def shortest_path(self, source, target):
-        """
-        Finds the shortest path between two nodes.
-
-        Args:
-            source (node): The source node.
-            target (node): The target node.
-
-        Returns:
-            list: A list of nodes representing the shortest path.
-        """
-        try:
-            return nx.shortest_path(self.graph, source=source, target=target)
-        except nx.NetworkXNoPath:
-            return None
-
-    def detect_communities(self) -> list[FrozenSet[Any]]:
+    def detect_communities(self) -> list[list[Any]]:
         """
         Detects communities in the graph using the greedy modularity algorithm.
 
@@ -135,7 +119,7 @@ class NetworkAnalysis:
         """
         from networkx.algorithms.community import greedy_modularity_communities
 
-        # Convert frozenset to list explicitly
+        # Convert frozenset to list and update return type annotation
         return [list(c) for c in greedy_modularity_communities(self.graph)]
 
     def find_isolated_nodes(self, graph: nx.Graph) -> list[Any]:
@@ -318,15 +302,3 @@ class NetworkAnalysis:
             "degree": degree,
             "neighbors": neighbors,
         }
-
-    def build_network(self, graph: Any) -> dict[Any, Any]:
-        # ... implementation ...
-        pass
-
-    def analyze_data(self, data: Any) -> None:
-        # ... implementation ...
-        pass
-
-    def compute_summary(self, info: Any) -> int:
-        # ... implementation ...
-        return 0
