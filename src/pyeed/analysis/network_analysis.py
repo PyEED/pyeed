@@ -20,61 +20,67 @@ class NetworkAnalysis:
         self.db: DatabaseConnector = db
         self.graph: nx.Graph = nx.Graph()
 
-    def create_graph(self, node_types=None, relationships=None, ids=None):
-        """
-        Creates a graph using data from the Neo4j database with specified filters.
-
-        Args:
-            node_types (list[str], optional): List of node types to include (e.g., ['Protein', 'DNA']).
-            relationships (list[str], optional): List of relationship types to include (e.g., ['HAS_STANDARD_NUMBERING']).
-            ids (list[str], optional): List of accession IDs to include specific nodes.
-
-        Returns:
-            networkx.Graph: The created graph.
-        """
-
-        logger.info(
-            f"Creating graph with node types: {node_types} and relationships: {relationships} and ids: {ids}"
-        )
-
-        # Query to fetch nodes with filters
+    def _build_node_filter(
+        self, node_types: list[str], ids: list[str]
+    ) -> tuple[str, dict[str, Any]]:
+        """Build the node filter query and parameters."""
         node_filter = ""
+        params = {}
+
         if node_types:
             node_filter += "WHERE labels(n)[0] IN $node_types "
+            params["node_types"] = node_types
+
         if ids:
-            if "WHERE" in node_filter:
+            if node_filter:
                 node_filter += "AND n.accession_id IN $accession_ids "
             else:
                 node_filter += "WHERE n.accession_id IN $accession_ids "
+            params["accession_ids"] = ids
 
-        query_nodes = f"""
+        return node_filter, params
+
+    def _fetch_nodes(
+        self, node_filter: str, params: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Fetch nodes from the database."""
+        query = f"""
         MATCH (n)
         {node_filter}
         RETURN ID(n) as id, labels(n) as labels, properties(n) as properties
         """
+        logger.debug(f"Executing query: {query}")
+        return self.db.execute_read(query, params)
 
-        # Query to fetch relationships with filters
-        relationship_filter = ""
-        if relationships:
-            relationship_filter += "WHERE type(r) IN $relationships "
-
-        query_relationships = f"""
+    def _fetch_relationships(self, relationships: list[str]) -> list[dict[str, Any]]:
+        """Fetch relationships from the database."""
+        rel_filter = "WHERE type(r) IN $relationships " if relationships else ""
+        query = f"""
         MATCH (n)-[r]->(m)
-        {relationship_filter}
+        {rel_filter}
         RETURN ID(n) as source, ID(m) as target, type(r) as type, properties(r) as properties
         """
+        logger.debug(f"Executing query: {query}")
+        return self.db.execute_read(query, {"relationships": relationships})
 
-        # Fetch nodes and relationships
-        logger.debug(f"Executing query: {query_nodes}")
-        nodes = self.db.execute_read(
-            query_nodes, {"node_types": node_types, "accession_ids": ids}
+    def create_graph(
+        self,
+        node_types: list[str] = [],
+        relationships: list[str] = [],
+        ids: list[str] = [],
+    ) -> nx.Graph:
+        """Creates a graph using data from the Neo4j database with specified filters."""
+        logger.info(
+            f"Creating graph with node types: {node_types}, relationships: {relationships}, ids: {ids}"
         )
-        logger.debug(f"Executing query: {query_relationships}")
-        relationships = self.db.execute_read(
-            query_relationships, {"relationships": relationships}
-        )
-        logger.debug(f"Number of nodes: {len(nodes)}")
-        logger.debug(f"Number of relationships: {len(relationships)}")
+
+        # Fetch data
+        node_filter, params = self._build_node_filter(node_types, ids)
+        nodes = self._fetch_nodes(node_filter, params)
+        relationships_result = self._fetch_relationships(relationships)
+
+        # Build graph
+        self.graph = nx.Graph()
 
         # Add nodes
         for node in nodes:
@@ -85,7 +91,7 @@ class NetworkAnalysis:
             )
 
         # Add relationships
-        for rel in relationships:
+        for rel in relationships_result:
             if rel["source"] in self.graph and rel["target"] in self.graph:
                 self.graph.add_edge(
                     rel["source"],
@@ -94,6 +100,9 @@ class NetworkAnalysis:
                     properties=rel["properties"],
                 )
 
+        logger.debug(
+            f"Created graph with {len(nodes)} nodes and {len(relationships_result)} relationships"
+        )
         return self.graph
 
     def compute_degree_centrality(self) -> dict[Any, float]:
@@ -105,23 +114,7 @@ class NetworkAnalysis:
         """
         return dict(nx.degree_centrality(self.graph))
 
-    def shortest_path(self, source, target):
-        """
-        Finds the shortest path between two nodes.
-
-        Args:
-            source (node): The source node.
-            target (node): The target node.
-
-        Returns:
-            list: A list of nodes representing the shortest path.
-        """
-        try:
-            return nx.shortest_path(self.graph, source=source, target=target)
-        except nx.NetworkXNoPath:
-            return None
-
-    def detect_communities(self):
+    def detect_communities(self) -> list[list[Any]]:
         """
         Detects communities in the graph using the greedy modularity algorithm.
 
@@ -313,3 +306,95 @@ class NetworkAnalysis:
             "degree": degree,
             "neighbors": neighbors,
         }
+
+
+if __name__ == "__main__":
+    import logging
+
+    from pyeed import Pyeed
+    from pyeed.analysis.sequence_alignment import PairwiseAligner
+
+    # Set up logging
+    logging.basicConfig(
+        level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    # Database connection
+    uri = "bolt://127.0.0.1:7688"
+    user = "neo4j"
+    password = "12345678"
+
+    eedb = Pyeed(uri, user=user, password=password)
+
+    # Example IDs for testing
+    test_ids = [
+        "2FX5_A",
+        "ACC95208.1",
+        "ACY95991.1",
+        "ACY96861.1",
+        "ADH43200.1",
+        "ADK73612.1",
+        "ADM47605.1",
+        "ADV92525.1",
+        "ADV92526.1",
+        "ADV92528.1",
+        "ADV92571.1",
+        "AET05798.1",
+        # ... add more IDs as needed
+    ]
+
+    # Wipe database and remove constraints
+    # eedb.db.wipe_database()
+
+    # Fetch sequences
+    eedb.fetch_from_primary_db(test_ids, db="ncbi_protein")
+
+    # Perform sequence alignment
+    pa = PairwiseAligner()
+    pa.align_multipairwise(ids=test_ids, db=eedb.db)
+
+    # Create and analyze network
+    na = NetworkAnalysis(db=eedb.db)
+    na.create_graph(ids=test_ids, node_types=["Protein"])
+
+    # Calculate positions with filtering
+    attribute = "similarity"
+    scale = 1
+    threshold = 0.15
+    mode = "HIDE_UNDER_THRESHOLD"
+    type_relationship = "PAIRWISE_ALIGNED"
+
+    filtered_graph, pos = na.calculate_positions_2d(
+        attribute=attribute,
+        scale=scale,
+        threshold=threshold,
+        mode=mode,
+        type_relationship=type_relationship,
+    )
+
+    # Print some analysis results
+    print("\nNetwork Analysis Results:")
+    print(f"Number of nodes: {filtered_graph.number_of_nodes()}")
+    print(f"Number of edges: {filtered_graph.number_of_edges()}")
+
+    # Calculate some network metrics
+    node_coefficients, avg_clustering = na.compute_clustering_coefficients()
+    print(f"\nAverage clustering coefficient: {avg_clustering:.3f}")
+
+    connectivity = na.analyze_connectivity()
+    print(f"\nIs network connected? {connectivity['is_connected']}")
+    print(f"Number of components: {len(connectivity['components'])}")
+
+    # Analyze a specific node (first one in the graph)
+    if filtered_graph.nodes:
+        first_node = list(filtered_graph.nodes)[0]
+        node_analysis = na.analyze_node(first_node)
+        print(f"\nAnalysis of node {first_node}:")
+        print(f"Degree: {node_analysis['degree']}")
+        print(f"Number of neighbors: {len(node_analysis['neighbors'])}")
+
+    # detect communities
+    communities = na.detect_communities()
+    print(f"Number of communities: {len(communities)}")
+    for i, community in enumerate(communities):
+        print(f"Community {i+1}: {community}")
