@@ -12,6 +12,9 @@ from pyeed.tools.services import ServiceURL
 # set level to debug
 logger.level("DEBUG")
 
+# set logger level to DEBUG
+logger.level("DEBUG")
+
 
 class Blast(BaseModel):
     """Performs BLAST search on a local database.
@@ -81,37 +84,24 @@ class Blast(BaseModel):
         Raises:
             httpx.ConnectError: If BLAST service is not running
         """
-        params = {
-            "sequence": sequence,
-            "db_path": self.db_path,
-            "db_name": self.db_name,
-            "mode": self.mode,
-            "evalue": self.evalue,
-            "max_target_seqs": self.max_target_seqs,
-            "num_threads": self.num_threads,
-        }
+        params = self.model_dump()
+        params["sequence"] = sequence
+        logger.debug(f"Initializing BLAST search with params: {params}")
 
-        # service_url = "http://localhost:6001/blast"
-
-        try:
-            return httpx.post(
-                self.service_url,
-                json=params,
-                timeout=timeout,
-            )
-        except httpx.ConnectError:
-            localhost = "http://localhost:6001/blast"
-            logger.info(
-                f"Blast service not running at {self.service_url}, trying {localhost}"
-            )
-
-            # retry with localhost
-            self.service_url = localhost
-            return httpx.post(
-                self.service_url,
-                json=params,
-                timeout=timeout,
-            )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task(description=f"Running {self.mode}", total=None)
+            try:
+                return httpx.post(
+                    "http://129.69.129.130:6001/blast",
+                    json=params,
+                    timeout=timeout,
+                )
+            except httpx.ConnectError as e:
+                raise httpx.ConnectError("PyEED Docker Service not running") from e
 
     @staticmethod
     def _parse_blast_output(result_str: dict[str, str]) -> pd.DataFrame:
