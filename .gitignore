@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+.vscode/
+.huggingface/
 
 # Distribution / packaging
 .Python
@@ -159,3 +161,8 @@ pyrightconfig.json
 poetry.lock
 
 .ruff_cache
+
+# Test python files
+test.py
+
+docker-compose.yml
