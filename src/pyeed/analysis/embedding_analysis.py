@@ -8,7 +8,6 @@ import torch
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.embedding import load_model_and_tokenizer
 from scipy.spatial.distance import cosine
 
 logger = logging.getLogger(__name__)
@@ -84,23 +83,6 @@ class EmbeddingTool:
         embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
 
         return embedding  # type: ignore
-
-    def calculate_single_sequence_embedding(
-        self, sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
-    ) -> NDArray[np.float64]:
-        """Calculate an embedding for a single sequence using a specified model.
-
-        Args:
-            sequence (str): The protein sequence to embed
-            model_name (str): Name of the pretrained model to use
-
-        Returns:
-            np.ndarray: The normalized embedding for the sequence
-        """
-        model, tokenizer, device = load_model_and_tokenizer(model_name)
-        return self._get_single_embedding_last_hidden_state(
-            sequence, model, tokenizer, device
-        )
 
     def find_closest_matches_simple(
         self,
@@ -394,8 +376,9 @@ class EmbeddingTool:
                 `vector.similarity_function`: '{similarity_function}',
                 `vector.dimensions`: {dimensions},
                 `vector.hnsw.m`: {m},
-                `vector.hnsw.ef_construction`: {ef_construction}
-                }}
+                `vector.hnsw.ef_construction`: {ef_construction},
+                `vector.quantization.enabled`: False
+            }}
             }};
         """
         db.execute_write(query_create_index)
@@ -431,23 +414,33 @@ class EmbeddingTool:
         RETURN populationPercent
         """
 
-        with Progress() as progress:
-            task = progress.add_task("[cyan]Waiting for index population...", total=100)
+        # First check if index is already fully populated
+        result = db.execute_read(query_check_population)
+        if not result:
+            raise ValueError(f"Index {index_name} not found")
 
-            while True:
-                result = db.execute_read(query_check_population)
-                if not result:
-                    raise ValueError(f"Index {index_name} not found")
-
-                percent = result[0]["populationPercent"]
-                if percent >= 100:
-                    progress.update(task, completed=100)
-                    break
-
+        percent = result[0]["populationPercent"]
+        if percent < 100:
+            # If not fully populated, show progress bar
+            with Progress() as progress:
+                task = progress.add_task(
+                    "[cyan]Waiting for index population...", total=100
+                )
                 progress.update(task, completed=percent)
-                time.sleep(0.01)
 
-        logger.info(f"Index {index_name} is populated, finding nearest neighbors")
+                while True:
+                    result = db.execute_read(query_check_population)
+                    if not result:
+                        raise ValueError(f"Index {index_name} not found")
+
+                    percent = result[0]["populationPercent"]
+                    if percent >= 100:
+                        progress.update(task, completed=100)
+                        break
+
+                    progress.update(task, completed=percent)
+                    time.sleep(0.01)
+            logger.info(f"Index {index_name} is populated, finding nearest neighbors")
 
         query_find_nearest_neighbors = f"""
         MATCH (source:Protein {{accession_id: '{query_protein_id}'}})

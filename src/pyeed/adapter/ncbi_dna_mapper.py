@@ -58,7 +58,8 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         self.add_regions(dna, regions)
 
         # check encodings for known proteins
-        self.map_cds(dna, record)
+        # TODO: add this back in
+        # self.map_cds(dna, record)
 
     def add_sites(self, dna: DNA, sites: List[dict[str, Any]]) -> None:
         """
