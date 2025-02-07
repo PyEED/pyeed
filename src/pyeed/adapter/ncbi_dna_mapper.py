@@ -1,22 +1,24 @@
-from typing import Any, List, TypeVar
+import io
+from typing import Any, List
 
+from Bio import SeqIO
+from Bio.Seq import UndefinedSequenceError
 from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
+from httpx import Response
 from loguru import logger
 
-from pyeed.adapter.primary_db_adapter import PrimaryDBtoPyeed
+from pyeed.adapter.primary_db_adapter import PrimaryDBMapper
 from pyeed.model import DNA, Annotation, Organism, Protein, Region, Site
 
-T = TypeVar("T")
 
-
-class NCBIDNAToPyeed(PrimaryDBtoPyeed):
+class NCBIDNAToPyeed(PrimaryDBMapper):
     """
     Maps DNA sequence entries from NCBI to the PyEED graph object model and saves
     them to the database.
     """
 
-    def add_to_db(self, record: SeqRecord) -> None:
+    def add_to_db(self, response: Response) -> None:
         """
         Add a DNA record to the database.
 
@@ -26,39 +28,50 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         Returns:
             None
         """
-        logger.debug(f"Mapping DNA record: {record.id}")
 
-        # Get the organism information
-        organism_dict = self.map_organism(record)
-        organism = Organism.get_or_save(
-            taxonomy_id=organism_dict["taxonomy_id"], name=organism_dict["name"]
-        )
+        with open("tests/data/api_responses/ncbi_dna_QLYQ01000020.txt", "w") as f:
+            f.write(response.content.decode())
+        assert (
+            response.status_code == 200
+        ), f"Request to {response.url} failed with status code {response.status_code}"
 
-        dna_infos_dict = self.map_general_infos(record)
+        records = self.parse_response(response.content)
 
-        try:
-            dna = DNA.get_or_save(
-                accession_id=record.id,
-                sequence=str(record.seq),
-                name=dna_infos_dict["name"],
-                seq_length=int(dna_infos_dict["seq_length"]),
-                gc_content=float(dna_infos_dict["gc_content"]),
+        for record in records:
+            logger.debug(f"Mapping DNA record: {record.id}")
+
+            dna_infos_dict = self.map_general_infos(record)
+            if not dna_infos_dict:
+                continue
+
+            # Get the organism information
+            organism_dict = self.map_organism(record)
+            organism = Organism.get_or_save(
+                taxonomy_id=organism_dict["taxonomy_id"], name=organism_dict["name"]
             )
-        except Exception as e:
-            logger.error(f"Error saving DNA record {record.id}: {e}")
 
-        dna.organism.connect(organism)
+            try:
+                dna = DNA.get_or_save(
+                    accession_id=record.id,
+                    sequence=str(record.seq),
+                    name=dna_infos_dict["name"],
+                    seq_length=int(dna_infos_dict["seq_length"]),
+                    gc_content=float(dna_infos_dict["gc_content"]),
+                )
+            except Exception as e:
+                logger.error(f"Error saving DNA record {record.id}: {e}")
 
-        # Here we get the sites informations
-        sites = self.map_sites(record)
-        self.add_sites(dna, sites)
+            dna.organism.connect(organism)
 
-        # Here we get the regions informations
-        regions = self.map_regions(record)
-        self.add_regions(dna, regions)
+            # Here we get the sites informations
+            sites = self.map_sites(record)
+            self.add_sites(dna, sites)
 
-        # check encodings for known proteins
-        self.map_cds(dna, record)
+            # Here we get the regions informations
+            regions = self.map_regions(record)
+            self.add_regions(dna, regions)
+
+            # self.map_cds(dna, record)
 
     def add_sites(self, dna: DNA, sites: List[dict[str, Any]]) -> None:
         """
@@ -101,11 +114,15 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
         """
         Extracts general information from a DNA sequence record.
         """
-        return dict(
-            name=seq_record.name,
-            seq_length=len(str(seq_record.seq)),
-            gc_content=self.calculate_gc_content(seq_record.seq),
-        )
+        try:
+            return dict(
+                name=seq_record.name,
+                seq_length=len(str(seq_record.seq)),
+                gc_content=self.calculate_gc_content(seq_record.seq),
+            )
+        except UndefinedSequenceError:
+            logger.error(f"Undefined sequence error for {seq_record.id}")
+            return {}
 
     def calculate_gc_content(self, sequence: str) -> float:
         """
@@ -208,22 +225,22 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
         regions = self.get_feature(seq_record, "gene")
 
-        for i, region in enumerate(regions):
+        for region in regions:
             try:
-                if "db_xref" not in region.qualifiers:
-                    db_xref = None
+                if "locus_tag" not in region.qualifiers:
+                    locus_tag = None
                 else:
-                    db_xref = region.qualifiers["db_xref"][0]
+                    locus_tag = region.qualifiers["locus_tag"][0]
 
                 if hasattr(region.location, "start") and hasattr(
                     region.location, "end"
                 ):
                     regions_list.append(
                         {
-                            "id": region.qualifiers["gene"][0],
+                            "id": locus_tag,
                             "start": int(region.location.start),  # type: ignore
                             "end": int(region.location.end),  # type: ignore
-                            "cross_reference": db_xref,
+                            "cross_reference": locus_tag,
                         }
                     )
 
@@ -234,32 +251,42 @@ class NCBIDNAToPyeed(PrimaryDBtoPyeed):
 
         return regions_list
 
-    def map_cds(self, dna: DNA, seq_record: SeqRecord) -> None:
+    def map_cds(self, dna: DNA, seq_record: SeqRecord, protein_id: str) -> None:
+        """
+        Maps a  CDS to a DNA record.
+        """
+        # TODO: refactor sequence mapping to protein, allowing to specify the protein id
         cds_list_features = self.get_feature(seq_record, "CDS")
 
         for cds in cds_list_features:
-            try:
-                protein_id = cds.qualifiers["protein_id"][0]
+            if protein_id != cds.qualifiers["protein_id"][0]:
+                continue
 
-                # check if the protein sequence is in database
-                protein = Protein.get_or_save(
-                    accession_id=protein_id,
-                    sequence=cds.qualifiers["translation"][0],
-                    seq_length=len(cds.qualifiers["translation"][0]),
+            # check if the protein sequence is in database
+            protein = Protein.get_or_save(
+                accession_id=protein_id,
+                sequence=cds.qualifiers["translation"][0],
+                seq_length=len(cds.qualifiers["translation"][0]),
+            )
+
+            if hasattr(cds.location, "start") and hasattr(cds.location, "end"):
+                dna.protein.connect(
+                    protein,
+                    {
+                        "start": int(cds.location.start),  # type: ignore
+                        "end": int(cds.location.end),  # type: ignore
+                    },
                 )
+            else:
+                logger.debug(f"Error mapping CDS for {seq_record.id}: {cds.location}")
 
-                if hasattr(cds.location, "start") and hasattr(cds.location, "end"):
-                    dna.protein.connect(
-                        protein,
-                        {
-                            "start": int(cds.location.start),  # type: ignore
-                            "end": int(cds.location.end),  # type: ignore
-                        },
-                    )
-                else:
-                    logger.debug(
-                        f"Error mapping CDS for {seq_record.id}: {cds.location}"
-                    )
+    def parse_response(self, content: bytes) -> list[SeqRecord]:
+        """Parse NCBI GenBank format response."""
+        if not content:
+            return []
 
-            except KeyError:
-                logger.debug(f"Error mapping CDS for {seq_record.id}: {cds.qualifiers}")
+        try:
+            return list(SeqIO.parse(io.StringIO(content.decode()), "gb"))  # type: ignore
+        except Exception as e:
+            logger.error(f"Failed to parse NCBI DNA response: {e}")
+            return []
