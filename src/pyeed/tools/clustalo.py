@@ -81,7 +81,9 @@ class ClustalOmega(BaseModel):
             logger.debug(f"Connection error: {e}")
             # Try localhost if container name fails
             if "clustalo" in self.service_url:
-                self.service_url = self.service_url.replace("clustalo", "localhost")
+                self.service_url = self.service_url.replace(
+                    "clustalo", "129.69.129.130"
+                )
                 return self._run_clustalo_service(sequences, timeout)
             raise httpx.ConnectError("PyEED Docker Service not running") from e
 
