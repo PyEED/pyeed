@@ -459,6 +459,8 @@ class Protein(StrictStructuredNode):
     embedding = ArrayProperty(
         FloatProperty(),
         vector_index=VectorIndex(dimensions=1280),
+        index_type="hnsw",
+        distance_metric="COSINE",
     )
 
     # Relationships

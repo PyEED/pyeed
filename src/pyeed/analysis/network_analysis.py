@@ -318,3 +318,15 @@ class NetworkAnalysis:
             "degree": degree,
             "neighbors": neighbors,
         }
+
+    def build_network(self, graph: Any) -> Dict[Any, Any]:
+        # ... implementation ...
+        pass
+
+    def analyze_data(self, data: Any) -> None:
+        # ... implementation ...
+        pass
+
+    def compute_summary(self, info: Any) -> int:
+        # ... implementation ...
+        return 0

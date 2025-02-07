@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import numpy as np
 import torch
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig
+from esm.sdk.api import ESMProtein, LogitsConfig
 from huggingface_hub import HfApi, HfFolder, login
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
@@ -23,8 +23,8 @@ token = (
 def load_model_and_tokenizer(
     model_name: str,
 ) -> Tuple[
-    Union[EsmModel, ESM3InferenceClient],  # The actual model client (ESM-2 or ESM-3)
-    Union[EsmTokenizer, None],  # The tokenizer (ESM-2) or None (ESM-3)
+    Union[EsmModel, ESMC],  # Changed from ESM3InferenceClient to ESMC
+    Union[EsmTokenizer, None],
     torch.device,
 ]:
     """
@@ -32,20 +32,18 @@ def load_model_and_tokenizer(
     depending on the `model_name` provided.
 
     Args:
-        model_name (str): The model name or identifier (e.g., 'esm3c' or 'esm2_t12_35M_UR50D').
+        model_name (str): The model name or identifier (e.g., 'esmc' or 'esm2_t12_35M_UR50D').
 
     Returns:
         Tuple of (model, tokenizer, device)
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Check if this is an ESM-3 variant (you can adjust the condition as needed)
+    # Check if this is an ESM-3 variant
     if "esmc" in model_name.lower():
         # Using ESMC from_pretrained
         model = ESMC.from_pretrained(model_name)
         model = model.to(device)
-
-        # No separate tokenizer is needed for ESM3 usage in this code
         return model, None, device
     else:
         # Otherwise, assume it's an ESM-2 model on Hugging Face
@@ -62,7 +60,7 @@ def load_model_and_tokenizer(
 
 def get_batch_embeddings(
     batch_sequences: list[str],
-    model: Union[EsmModel, ESM3InferenceClient],
+    model: Union[EsmModel, ESMC],  # Updated type hint
     tokenizer_or_alphabet: Union[EsmTokenizer, None],
     device: torch.device,
     pool_embeddings: bool = True,
@@ -72,9 +70,10 @@ def get_batch_embeddings(
 
     Args:
         batch_sequences (list[str]): List of sequence strings to be embedded.
-        model (Union[EsmModel, ESM3InferenceClient]): Loaded model (ESM-2 or ESM-3).
+        model (Union[EsmModel, ESMC]): Loaded model (ESM-2 or ESM-3).
         tokenizer_or_alphabet (Union[EsmTokenizer, None]): Tokenizer if ESM-2, None if ESM-3.
         device (torch.device): Device on which to run inference (CPU or GPU).
+        pool_embeddings (bool): Whether to pool embeddings across sequence length.
 
     Returns:
         list[NDArray[np.float64]]: A list of embeddings as NumPy arrays.
@@ -89,25 +88,26 @@ def get_batch_embeddings(
                 logits_output = model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )
-                # Convert embeddings to numpy array and take mean across sequence length
+                # Convert embeddings to numpy array
+                embeddings = logits_output.embeddings.cpu().numpy()
                 if pool_embeddings:
-                    embeddings = logits_output.embeddings.cpu().numpy().mean(axis=1)
-                else:
-                    embeddings = logits_output.embeddings.cpu().numpy()
-                # make mean polling
+                    embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
 
         return embedding_list
 
     else:
         # ESM-2 logic
+        assert tokenizer_or_alphabet is not None, "Tokenizer required for ESM-2 models"
         inputs = tokenizer_or_alphabet(
             batch_sequences, padding=True, truncation=True, return_tensors="pt"
         ).to(device)
         with torch.no_grad():
             outputs = model(**inputs)
         embeddings = outputs.last_hidden_state.cpu().numpy()
-        return [embedding.mean(axis=0) for embedding in embeddings]
+        if pool_embeddings:
+            return [embedding.mean(axis=0) for embedding in embeddings]
+        return list(embeddings)
 
 
 # The rest of your existing functions will need to be adapted in a similar way
