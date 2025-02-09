@@ -1,6 +1,6 @@
 import gc
 import os
-from typing import Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 import torch
@@ -120,6 +120,55 @@ def get_batch_embeddings(
         if pool_embeddings:
             return [embedding.mean(axis=0) for embedding in embeddings]
         return list(embeddings)
+
+
+def calculate_single_sequence_embedding_last_hidden_state(
+    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+):
+    """
+    Calculates an embedding for a single sequence.
+    """
+    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    return get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
+
+
+def get_single_embedding_last_hidden_state(
+    sequence: str, model: Any, tokenizer: Any, device: torch.device
+) -> NDArray[np.float64]:
+    """Generate embeddings for a single sequence using the last hidden state.
+
+    Args:
+        sequence (str): The protein sequence to embed
+        model (Any): The transformer model to use
+        tokenizer (Any): The tokenizer for the model
+        device (torch.device): The device to run the model on (CPU/GPU)
+
+    Returns:
+        np.ndarray: Normalized embeddings for each token in the sequence
+    """
+    from esm.models.esmc import ESMC
+
+    with torch.no_grad():
+        if isinstance(model, ESMC):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, LogitsConfig
+
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            logits_output = model.logits(
+                protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+            )
+            embedding = logits_output.embeddings[0].cpu().numpy()
+        else:
+            # ESM-2 logic
+            inputs = tokenizer(sequence, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+            embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
+
+    # normalize the embedding
+    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
+
+    return embedding  # type: ignore
 
 
 # The rest of your existing functions will need to be adapted in a similar way
