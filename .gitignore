@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# AlphaFold output
+docs/resources/alphafold/output/*
+
 # C extensions
 *.so
 .vscode/

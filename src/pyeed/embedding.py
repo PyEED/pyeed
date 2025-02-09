@@ -124,9 +124,16 @@ def get_batch_embeddings(
 
 def calculate_single_sequence_embedding_last_hidden_state(
     sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
-):
+) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence.
+
+    Args:
+        sequence: Input protein sequence
+        model_name: Name of the ESM model to use
+
+    Returns:
+        NDArray[np.float64]: Normalized embedding vector for the sequence
     """
     model, tokenizer, device = load_model_and_tokenizer(model_name)
     return get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)

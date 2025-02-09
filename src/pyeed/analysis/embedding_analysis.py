@@ -412,7 +412,7 @@ class EmbeddingTool:
         YIELD node AS fprotein, score
         RETURN fprotein.accession_id, score
         """
-        results = db.execute_read(query_find_nearest_neighbors)  # type: list[dict[str, Any]]
+        results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [
             (str(record["fprotein.accession_id"]), float(record["score"]))
             for record in results
