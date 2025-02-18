@@ -19,7 +19,3 @@ Install `pyeed` by running
 ```bash
 pip install git+https://github.com/PyEED/pyeed.git
 ```
-
-## Quick start 🚀
-
-### Launch Neo4j database via Docker and mount to a local directory
