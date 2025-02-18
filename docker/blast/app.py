@@ -91,8 +91,8 @@ async def run_blast(request: Request) -> dict[str, str]:
         max_target_seqs = int(data["max_target_seqs"])
         num_threads = int(data["num_threads"])
 
-        query_path = "/usr/local/bin/data/query.fasta"
-        result_path = "/usr/local/bin/data/result.out"
+        query_path = "/query.fasta"
+        result_path = "/result.out"
 
         # Create FASTA file
         with open(query_path, "w") as file:
