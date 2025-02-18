@@ -69,8 +69,6 @@ Docker volumes provide a way to persist data and share files between the host sy
 2. **Use Cases**:
    - Persisting databases (BLAST)
    - Sharing configuration files
-   - Accessing results files
-   - Development hot-reloading
 
 3. **Benefits**:
    - Data persists between container restarts
@@ -136,7 +134,7 @@ services:
     ports:
       - "6001:6001"
     volumes:
-      - ./blast:/usr/local/bin/data
+      - /mnt/databases:/databases
 
   mmseqs:
     build:
