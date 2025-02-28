@@ -358,6 +358,6 @@ class Pyeed:
             MATCH (p:Protein {{accession_id: '{protein["accession_id"]}'}})
             MATCH (d:DNA {{accession_id: '{protein["nucleotide_id"]}'}})
             MERGE (d)-[r:ENCODES]->(p)
-            SET r.start = {protein["start"]}, r.end = {protein["end"]}
+            SET r.start = {protein["nucleotide_start"]}, r.end = {protein["nucleotide_end"]}
             """
             self.db.execute_write(query)

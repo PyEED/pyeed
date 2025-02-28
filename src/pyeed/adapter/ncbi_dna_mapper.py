@@ -29,12 +29,6 @@ class NCBIDNAToPyeed(PrimaryDBMapper):
             None
         """
 
-        with open("tests/data/api_responses/ncbi_dna_QLYQ01000020.txt", "w") as f:
-            f.write(response.content.decode())
-        assert (
-            response.status_code == 200
-        ), f"Request to {response.url} failed with status code {response.status_code}"
-
         records = self.parse_response(response.content)
 
         for record in records:

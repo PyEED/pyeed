@@ -189,6 +189,35 @@ class Region(StrictStructuredNode):
     )
 
 
+class DNAProteinRel(StructuredRel):  # type: ignore
+    """A relationship between a DNA and a protein."""
+
+    start = IntegerProperty(required=True)
+    end = IntegerProperty(required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: StrictStructuredNode,
+        molecule2: StrictStructuredNode,
+        start: int,
+        end: int,
+    ) -> "DNAProteinRel":
+        """Validates the start and end positions and connects the two molecules."""
+        molecule1.protein.connect(
+            molecule2,
+            {
+                "start": start,
+                "end": end,
+            },
+        )
+
+        return cls(
+            start=start,
+            end=end,
+        )
+
+
 class RegionRel(StructuredRel):  # type: ignore
     start = IntegerProperty(required=True)
     end = IntegerProperty(required=True)
@@ -496,7 +525,7 @@ class DNA(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)
-    protein = RelationshipTo("Protein", "ENCODES", model=RegionRel)
+    protein = RelationshipTo("Protein", "ENCODES", model=DNAProteinRel)
     pairwise_aligned = RelationshipTo(
         "DNA", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
     )

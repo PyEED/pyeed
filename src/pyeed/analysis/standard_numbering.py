@@ -487,7 +487,7 @@ class StandardNumberingTool:
 
 if __name__ == "__main__":
     # Database connection setup parameters.
-    uri = "bolt://127.0.0.1:7687"
+    uri = "bolt://129.69.129.130:7687"
     user = "neo4j"
     password = "12345678"
 
@@ -538,7 +538,7 @@ if __name__ == "__main__":
 
     # Instantiate the numbering tool and run the numbering algorithm.
     sn_tool = StandardNumberingTool("test_standard_numbering")
-    sn_tool.positions = sn_tool.run_numbering_algorithm_clustalo("seq0", alignment)
+    sn_tool.positions = sn_tool.run_numbering_algorithm_pairwise("seq0", alignment)
 
     # Print a sample of the computed positions to verify the output.
     count = 0
