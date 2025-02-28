@@ -293,7 +293,7 @@ class StandardNumberingRel(StructuredRel):  # type: ignore
 
 
 class StandardNumbering(StrictStructuredNode):
-    name = StringProperty(required=True)
+    name = StringProperty(required=True, unique_index=True)
     definition = StringProperty(required=True)
 
     # Relationships

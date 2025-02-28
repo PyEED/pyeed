@@ -354,6 +354,25 @@ class StandardNumberingTool:
         for protein_id in list_of_seq_ids:
             pairs.append((base_sequence_id, protein_id))
 
+        # check if the pairs are already existing with the same name under the same standard numbering node
+        query = """
+        MATCH (s:StandardNumbering {name: $name})
+        MATCH (p:Protein)-[r:HAS_STANDARD_NUMBERING]->(s)
+        WHERE p.accession_id IN $list_of_seq_ids
+        RETURN p.accession_id AS accession_id
+        """
+        results = db.execute_read(
+            query, parameters={"list_of_seq_ids": list_of_seq_ids, "name": self.name}
+        )
+        if results is not None:
+            for row in results:
+                if row is not None:
+                    if row.get("accession_id"):
+                        pairs.remove((base_sequence_id, row["accession_id"]))
+                        logger.info(
+                            f"Pair {base_sequence_id} and {row['accession_id']} already exists under the same standard numbering node"
+                        )
+
         # Run the pairwise alignment using the PairwiseAligner.
         pairwise_aligner = PairwiseAligner()
 
@@ -454,7 +473,8 @@ class StandardNumberingTool:
         base_sequence = self.get_protein_base_sequence(base_sequence_id, db)
 
         # Remove the base sequence from the proteins list to prevent duplicate alignment.
-        proteins_dict.pop(base_sequence_id)
+        if base_sequence_id in proteins_dict:
+            proteins_dict.pop(base_sequence_id)
 
         # Create a dictionary for ClustalOmega that includes both the base and target sequences.
         sequences_dict = {base_sequence["id"]: base_sequence["sequence"]}
