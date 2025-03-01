@@ -139,6 +139,23 @@ def calculate_single_sequence_embedding_last_hidden_state(
     return get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
 
 
+def calculate_single_sequence_embedding_all_layers(
+    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+) -> dict[int, NDArray[np.float64]]:
+    """
+    Calculates embeddings for a single sequence across all layers.
+
+    Args:
+        sequence: Input protein sequence
+        model_name: Name of the ESM model to use
+
+    Returns:
+        dict[int, NDArray[np.float64]]: A dictionary mapping layer indices (starting at 0) to normalized token embeddings.
+    """
+    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    return get_single_embedding_all_layers(sequence, model, tokenizer, device)
+
+
 def get_single_embedding_last_hidden_state(
     sequence: str, model: Any, tokenizer: Any, device: torch.device
 ) -> NDArray[np.float64]:
@@ -163,9 +180,16 @@ def get_single_embedding_last_hidden_state(
             protein = ESMProtein(sequence=sequence)
             protein_tensor = model.encode(protein)
             logits_output = model.logits(
-                protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+                protein_tensor,
+                LogitsConfig(
+                    sequence=True,
+                    return_embeddings=True,
+                    return_hidden_states=True,
+                ),
             )
-            embedding = logits_output.embeddings[0].cpu().numpy()
+            embedding = (
+                logits_output.hidden_states[-1][0].to(torch.float32).cpu().numpy()
+            )
         else:
             # ESM-2 logic
             inputs = tokenizer(sequence, return_tensors="pt").to(device)
@@ -176,6 +200,64 @@ def get_single_embedding_last_hidden_state(
     embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
 
     return embedding  # type: ignore
+
+
+def get_single_embedding_all_layers(
+    sequence: str, model: Any, tokenizer: Any, device: torch.device
+) -> NDArray[np.float64]:
+    """
+    Generates normalized embeddings for each token in the sequence across all layers.
+
+    For ESM-3 (ESMC) models, it assumes that passing
+    LogitsConfig(return_hidden_states=True) returns a collection of layer embeddings.
+    For ESM-2 models, it sets output_hidden_states=True.
+
+    Args:
+        sequence (str): The protein sequence to embed.
+        model (Any): The transformer model to use.
+        tokenizer (Any): The tokenizer for the model (None for ESMC).
+        device (torch.device): The device to run the model on (CPU/GPU).
+
+    Returns:
+        NDArray[np.float64]: A numpy array containing the normalized token embeddings
+        concatenated across all layers.
+    """
+    embeddings_list = []
+    with torch.no_grad():
+        if isinstance(model, ESMC):
+            # For ESM-3: Use ESMProtein and request hidden states via LogitsConfig
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            logits_output = model.logits(
+                protein_tensor,
+                LogitsConfig(
+                    sequence=True,
+                    return_embeddings=True,
+                    return_hidden_states=True,  # Assuming this flag is supported
+                ),
+            )
+            # logits_output.hidden_states should be a tuple of tensors: (layer, batch, seq_len, hidden_dim)
+            for layer_tensor in logits_output.hidden_states:
+                # Remove batch dimension and (if applicable) any special tokens
+                emb = layer_tensor[0].to(torch.float32).cpu().numpy()
+                # If your model adds special tokens, adjust the slicing (e.g., emb[1:-1])
+                emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+                embeddings_list.append(emb)
+
+        else:
+            # For ESM-2: Get hidden states with output_hidden_states=True
+            inputs = tokenizer(sequence, return_tensors="pt").to(device)
+            outputs = model(**inputs, output_hidden_states=True)
+            hidden_states = (
+                outputs.hidden_states
+            )  # Tuple: (layer0, layer1, ..., layerN)
+            for layer_tensor in hidden_states:
+                # Remove batch dimension and special tokens ([CLS] and [SEP])
+                emb = layer_tensor[0, 1:-1, :].detach().cpu().numpy()
+                emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+                embeddings_list.append(emb)
+
+    return np.array(embeddings_list)
 
 
 # The rest of your existing functions will need to be adapted in a similar way
