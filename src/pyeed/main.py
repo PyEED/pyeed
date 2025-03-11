@@ -8,6 +8,7 @@ from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
+from pyeed.adapter.ncbi_to_uniprot_mapper import NCBIToUniprotMapper
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import (
@@ -184,6 +185,19 @@ class Pyeed:
         )
 
         asyncio.run(adapter.execute_requests())
+        nest_asyncio.apply()
+    
+    def database_id_mapper(self, ids: list[str]) -> None:
+        """
+        Maps IDs from one database to another using the UniProt ID mapping service
+
+        Args:
+            ids (list[str]): List of IDs to map.
+        """
+
+        mapper = NCBIToUniprotMapper(ids)
+        mapper.execute_request()
+        
         nest_asyncio.apply()
 
     def calculate_sequence_embeddings(
