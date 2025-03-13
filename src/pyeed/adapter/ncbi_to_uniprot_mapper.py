@@ -128,4 +128,3 @@ class NCBIToUniprotMapper:
         with open("id_mapping_uniparc.json", "w") as f:
             json.dump(id_mapping_uniparc, f)
     
-    
