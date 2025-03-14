@@ -407,10 +407,23 @@ class Mutation(StructuredRel):  # type: ignore
         from_monomers: list[str],
         to_monomers: list[str],
     ) -> "Mutation":
-        """Validates the mutations and connects the two molecules.
+        """Validates the mutations and connects the two molecules, ensuring that no double mutations
+        occur – i.e. if a mutation affecting any of the same positions already exists between these proteins,
+        a new mutation cannot be created.
+
         Raises:
-            ValueError: If the specified positions or residues do not match the sequences.
+            ValueError: If input lists have different lengths or if a mutation for any of these positions
+                        already exists.
         """
+        # Instead of checking *any* mutation, retrieve all mutation relationships between these proteins.
+        # Here molecule1.mutation.relationship(molecule2) returns a list of mutation relationship instances.
+        existing_mutations = molecule1.mutation.relationship(molecule2)
+
+        if existing_mutations:
+            raise ValueError(
+                "A mutation relationship affecting one or more of these positions already exists between these proteins."
+            )
+
         if (
             len(from_positions) != len(to_positions)
             or len(from_positions) != len(from_monomers)

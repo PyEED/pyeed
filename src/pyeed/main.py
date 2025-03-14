@@ -123,8 +123,9 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.execute_requests())
+        # Fix: call nest_asyncio.apply() first, then run the adapter's coroutine
         nest_asyncio.apply()
+        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
 
     def fetch_ncbi_protein(self, ids: list[str]) -> None:
         """
@@ -153,8 +154,9 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.execute_requests())
+        # Fix: use run_until_complete instead of asyncio.run
         nest_asyncio.apply()
+        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
 
     def fetch_ncbi_nucleotide(self, ids: list[str]) -> None:
         """
@@ -183,8 +185,9 @@ class Pyeed:
             request_params=params_template,
         )
 
-        asyncio.run(adapter.execute_requests())
+        # Fix: apply nest_asyncio and then run the coroutine with the event loop
         nest_asyncio.apply()
+        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
 
     def calculate_sequence_embeddings(
         self,
@@ -278,21 +281,33 @@ class Pyeed:
         """
         return self.db.execute_read(query, {"accession_ids": accession_ids})
 
-    def fetch_dna_entries_for_proteins(self) -> None:
+    def fetch_dna_entries_for_proteins(self, ids: list[str] | None = None) -> None:
         """
         Fetches DNA sequences for proteins that have a nucleotide id, set in the database.
         The fetching is done from NCBI nucleotide database in batches.
+
+        Args:
+            ids (list[str], optional): List of protein IDs to fetch DNA sequences for.
+                Defaults to None.
         """
         BATCH_SIZE = 100
 
         # Get all proteins and a list of coding sequences ids
-        query = """
-        MATCH (p:Protein) 
-        WHERE p.nucleotide_id IS NOT NULL 
-        RETURN p.nucleotide_id AS nucleotide_id
-        """
+        if ids is None:
+            query = """
+            MATCH (p:Protein) 
+            WHERE p.nucleotide_id IS NOT NULL
+            RETURN p.nucleotide_id AS nucleotide_id
+            """
+            response = self.db.execute_read(query)
+        else:
+            query = """
+            MATCH (p:Protein) 
+            WHERE p.nucleotide_id IS NOT NULL AND p.accession_id IN $ids
+            RETURN p.nucleotide_id AS nucleotide_id
+            """
+            response = self.db.execute_read(query, {"ids": ids})
 
-        response = self.db.execute_read(query)
         nucleotide_ids = [str(record["nucleotide_id"]) for record in response]
 
         logger.info(f"Found {len(nucleotide_ids)} coding sequences.")
@@ -338,12 +353,20 @@ class Pyeed:
                 continue
 
         # Process protein-DNA relationships in batches
-        query = """
-        MATCH (p:Protein)
-        WHERE p.nucleotide_id IS NOT NULL
-        RETURN p
-        """
-        proteins = self.db.execute_read(query)
+        if ids is None:
+            query = """
+            MATCH (p:Protein)
+            WHERE p.nucleotide_id IS NOT NULL
+            RETURN p
+            """
+            proteins = self.db.execute_read(query)
+        else:
+            query = """
+            MATCH (p:Protein)
+            WHERE p.nucleotide_id IS NOT NULL AND p.accession_id IN $ids
+            RETURN p
+            """
+            proteins = self.db.execute_read(query, {"ids": ids})
 
         for i in range(0, len(proteins), BATCH_SIZE):
             try:

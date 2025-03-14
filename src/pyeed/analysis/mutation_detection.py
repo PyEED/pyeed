@@ -116,6 +116,22 @@ class MutationDetection:
             sequence_id1: First sequence accession ID
             sequence_id2: Second sequence accession ID
         """
+
+        # Check if a mutation relationship already exists between these proteins
+        existing_mutations = db.execute_read(
+            """
+            MATCH (p1:Protein)-[r:MUTATION]->(p2:Protein)
+            WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
+            RETURN r
+            """,
+            {"sequence_id1": sequence_id1, "sequence_id2": sequence_id2},
+        )
+        if existing_mutations:
+            logger.debug(
+                f"Mutation relationship already exists between {sequence_id1} and {sequence_id2}"
+            )
+            return
+
         query = """
         MATCH (p1:Protein), (p2:Protein)
         WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
@@ -145,6 +161,7 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
+        debug: bool = False,
     ) -> dict[str, list[int | str]]:
         """Get mutations between two sequences using standard numbering.
 
@@ -168,6 +185,9 @@ class MutationDetection:
         sequences, positions = self.get_sequence_data(
             sequence_id1, sequence_id2, db, standard_numbering_tool_name
         )
+
+        if debug:
+            logger.info(f"Debug mode output: {sequences} and {positions}")
 
         mutations = self.find_mutations(
             sequences[sequence_id1],
