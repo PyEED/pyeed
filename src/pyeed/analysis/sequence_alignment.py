@@ -90,6 +90,7 @@ class PairwiseAligner:
         batch_size: int = 500,
         return_results: bool = True,
         pairs: Optional[list[tuple[str, str]]] = None,
+        node_type: str = "Protein",
     ) -> Optional[list[dict[str, Any]]]:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
@@ -112,7 +113,7 @@ class PairwiseAligner:
                 returning the results, which can reduce memory usage. Defaults to True.
             pairs (Optional[list[tuple[str, str]]]): A list of tuples, where each tuple contains two
                 sequence IDs to align. If provided, only these pairs will be aligned.
-
+            node_type (str): The type of node to align. Defaults to "Protein".
         Returns:
             Optional[List[dict]]: A list of dictionaries containing the alignment results if
             `return_results` is True. If False, returns None.
@@ -120,7 +121,7 @@ class PairwiseAligner:
 
         # Fetch sequences if ids are provided
         if ids is not None and db is not None:
-            sequences = self._get_id_sequence_dict(db, ids)
+            sequences = self._get_id_sequence_dict(db, ids, node_type)
 
         if not sequences:
             raise ValueError(
@@ -242,6 +243,7 @@ class PairwiseAligner:
         self,
         db: DatabaseConnector,
         ids: list[str] = [],
+        node_type: str = "Protein",
     ) -> dict[str, str]:
         """Gets all sequences from the database and returns them in a dictionary.
         Key is the accession id and value is the sequence.
@@ -256,20 +258,20 @@ class PairwiseAligner:
         """
 
         if not ids:
-            query = """
-            MATCH (p:Protein)
+            query = f"""
+            MATCH (p:{node_type})
             RETURN p.accession_id AS accession_id, p.sequence AS sequence
             """
-            proteins = db.execute_read(query)
+            nodes = db.execute_read(query)
         else:
-            query = """
-            MATCH (p:Protein)
+            query = f"""
+            MATCH (p:{node_type})
             WHERE p.accession_id IN $ids
             RETURN p.accession_id AS accession_id, p.sequence AS sequence
             """
-            proteins = db.execute_read(query, {"ids": ids})
+            nodes = db.execute_read(query, {"ids": ids})
 
-        return {protein["accession_id"]: protein["sequence"] for protein in proteins}
+        return {node["accession_id"]: node["sequence"] for node in nodes}
 
     def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
         from Bio.Align import substitution_matrices

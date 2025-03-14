@@ -143,7 +143,7 @@ class Annotation(Enum):
 
 
 class Organism(StrictStructuredNode):
-    taxonomy_id: int = IntegerProperty(required=True, unique_index=True)
+    taxonomy_id = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
 
 
@@ -153,8 +153,8 @@ class SiteRel(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         positions: list[int],
     ) -> "SiteRel":
         """Validates the positions and connects the two molecules."""
@@ -189,6 +189,35 @@ class Region(StrictStructuredNode):
     )
 
 
+class DNAProteinRel(StructuredRel):  # type: ignore
+    """A relationship between a DNA and a protein."""
+
+    start = IntegerProperty(required=True)
+    end = IntegerProperty(required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: Any,
+        molecule2: Any,
+        start: int,
+        end: int,
+    ) -> "DNAProteinRel":
+        """Validates the start and end positions and connects the two molecules."""
+        molecule1.protein.connect(
+            molecule2,
+            {
+                "start": start,
+                "end": end,
+            },
+        )
+
+        return cls(
+            start=start,
+            end=end,
+        )
+
+
 class RegionRel(StructuredRel):  # type: ignore
     start = IntegerProperty(required=True)
     end = IntegerProperty(required=True)
@@ -196,8 +225,8 @@ class RegionRel(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         start: int,
         end: int,
     ) -> "RegionRel":
@@ -226,7 +255,7 @@ class CatalyticActivity(StrictStructuredNode):
     A node representing a catalytic activity.
     """
 
-    catalytic_id: int = IntegerProperty(required=False, unique_index=True)
+    catalytic_id = IntegerProperty(required=False, unique_index=True)
     name = StringProperty()
 
     @property
@@ -241,8 +270,8 @@ class StandardNumberingRel(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         positions: list[str],
     ) -> "StandardNumberingRel":
         """Validates the positions and connects the two molecules."""
@@ -264,7 +293,7 @@ class StandardNumberingRel(StructuredRel):  # type: ignore
 
 
 class StandardNumbering(StrictStructuredNode):
-    name = StringProperty(required=True)
+    name = StringProperty(required=True, unique_index=True)
     definition = StringProperty(required=True)
 
     # Relationships
@@ -295,8 +324,8 @@ class PairwiseAlignmentResult(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         similarity: float,
         gaps: int,
         mismatches: int,
@@ -371,28 +400,30 @@ class Mutation(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         from_positions: list[int],
         to_positions: list[int],
         from_monomers: list[str],
         to_monomers: list[str],
     ) -> "Mutation":
-        """Validates the mutations and connects the two molecules.
-        Args:
-            molecule1 (StrictStructuredNode): DNA or Protein node
-            molecule2 (StrictStructuredNode): DNA or Protein node
-            from_positions (list of int): Positions of the mutations in the original sequence. 0-indexed.
-            to_positions (list of int): Positions of the mutations in the mutated sequence. 0-indexed.
-            from_monomers (list of str): Original residues / nucleotides at the specified positions.
-            to_monomers (list of str): Mutated residues / nucleotides at the specified positions.
-
-        Returns:
-            Mutation: The created mutation relationship.
+        """Validates the mutations and connects the two molecules, ensuring that no double mutations
+        occur – i.e. if a mutation affecting any of the same positions already exists between these proteins,
+        a new mutation cannot be created.
 
         Raises:
-            ValueError: If the specified positions or residues do not match the sequences.
+            ValueError: If input lists have different lengths or if a mutation for any of these positions
+                        already exists.
         """
+        # Instead of checking *any* mutation, retrieve all mutation relationships between these proteins.
+        # Here molecule1.mutation.relationship(molecule2) returns a list of mutation relationship instances.
+        existing_mutations = molecule1.mutation.relationship(molecule2)
+
+        if existing_mutations:
+            raise ValueError(
+                "A mutation relationship affecting one or more of these positions already exists between these proteins."
+            )
+
         if (
             len(from_positions) != len(to_positions)
             or len(from_positions) != len(from_monomers)
@@ -435,7 +466,9 @@ class Mutation(StructuredRel):  # type: ignore
         return ",".join(
             f"{from_monomer}{from_position}{to_monomer}"
             for from_position, from_monomer, to_monomer in zip(
-                self.from_positions, self.from_monomers, self.to_monomers
+                list(self.from_positions),
+                list(self.from_monomers),
+                list(self.to_monomers),
             )
         )
 
@@ -496,7 +529,7 @@ class DNA(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     mutation = RelationshipTo("DNA", "MUTATION", model=Mutation)
-    protein = RelationshipTo("Protein", "ENCODES", model=RegionRel)
+    protein = RelationshipTo("Protein", "ENCODES", model=DNAProteinRel)
     pairwise_aligned = RelationshipTo(
         "DNA", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
     )
@@ -511,8 +544,8 @@ class CustomRealationship(StructuredRel):  # type: ignore
     @classmethod
     def validate_and_connect(
         cls,
-        molecule1: StrictStructuredNode,
-        molecule2: StrictStructuredNode,
+        molecule1: Any,
+        molecule2: Any,
         name: str,
         description: str,
     ) -> "CustomRealationship":

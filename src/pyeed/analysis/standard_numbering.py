@@ -39,26 +39,25 @@ class StandardNumberingTool:
             positions: A dictionary mapping protein accession ids to lists of numbering positions.
         """
         self.name = name
-        self.positions: dict[str, list[str]] = {}
 
-    def get_protein_base_sequence(
-        self, base_sequence_id: str, db: DatabaseConnector
+    def get_node_base_sequence(
+        self, base_sequence_id: str, db: DatabaseConnector, node_type: str = "Protein"
     ) -> dict[str, str]:
         """
-        Retrieve the base protein sequence from the database for a given accession id.
+        Retrieve the base node sequence from the database for a given accession id.
 
-        This method executes a query that returns the protein with the provided id. It assumes a
+        This method executes a query that returns the node with the provided id. It assumes a
         valid result is returned and constructs a dictionary containing the id and the sequence.
 
         Args:
-            base_sequence_id: The accession id of the base protein sequence.
+            base_sequence_id: The accession id of the base node sequence.
             db: The database connector instance to perform the query.
 
         Returns:
-            A dictionary with keys 'id' and 'sequence' holding the protein accession id and its sequence.
+            A dictionary with keys 'id' and 'sequence' holding the node type id and its sequence.
         """
         query = f"""
-        MATCH (p:Protein)
+        MATCH (p:{node_type})
         WHERE p.accession_id = '{base_sequence_id}'
         RETURN p.accession_id AS accession_id, p.sequence AS sequence
         """
@@ -70,7 +69,12 @@ class StandardNumberingTool:
         }
         return base_sequence
 
-    def save_positions(self, db: DatabaseConnector) -> None:
+    def save_positions(
+        self,
+        db: DatabaseConnector,
+        positions: dict[str, list[str]],
+        node_type: str = "Protein",
+    ) -> None:
         """
         Save the calculated numbering positions for each protein into the database.
 
@@ -81,12 +85,12 @@ class StandardNumberingTool:
         Args:
             db: The database connector instance used to execute the write queries.
         """
-        for protein_id in self.positions:
+        for protein_id in positions:
             query = f"""
-                MATCH (p:Protein {{accession_id: '{protein_id}'}})
+                MATCH (p:{node_type} {{accession_id: '{protein_id}'}})
                 MATCH (s:StandardNumbering {{name: '{self.name}'}})
                 MERGE (p)-[r:HAS_STANDARD_NUMBERING]->(s)
-                SET r.positions = {str(self.positions[protein_id])}
+                SET r.positions = {str(positions[protein_id])}
             """
             # Execute the write query to update the standard numbering relationship.
             db.execute_write(query)
@@ -312,6 +316,7 @@ class StandardNumberingTool:
         db: DatabaseConnector,
         list_of_seq_ids: Optional[List[str]] = None,
         return_positions: bool = False,
+        node_type: str = "Protein",
     ) -> Optional[Dict[str, List[str]]]:
         """
         Apply standard numbering via pairwise alignment using a base sequence.
@@ -324,15 +329,16 @@ class StandardNumberingTool:
         Args:
             base_sequence_id: The accession id of the base sequence.
             db: The DatabaseConnector instance used for communication with the database.
-            list_of_seq_ids: An optional list of protein ids to process. If None, all proteins are used.
+            list_of_seq_ids: An optional list of node type ids to process. If None, all node type ids are used.
             return_positions: If True, the method returns the computed positions dictionary after processing.
+            node_type: The type of node to process. Default is "Protein".
 
         Raises:
             ValueError: If the pairwise alignment fails and returns no results.
         """
         if list_of_seq_ids is None:
-            query = """
-            MATCH (p:Protein)
+            query = f"""
+            MATCH (p:{node_type})
             WHERE p.accession_id IS NOT NULL
             RETURN p.accession_id AS accession_id
             """
@@ -347,12 +353,36 @@ class StandardNumberingTool:
             list_of_seq_ids = [row["accession_id"] for row in results]
 
         # Remove the base sequence id from the list if present.
-        list_of_seq_ids.remove(base_sequence_id)
+        while base_sequence_id in list_of_seq_ids:
+            list_of_seq_ids.remove(base_sequence_id)
 
         # Generate pairs with the base sequence as the first element.
         pairs = []
-        for protein_id in list_of_seq_ids:
-            pairs.append((base_sequence_id, protein_id))
+        for node_id in list_of_seq_ids:
+            pairs.append((base_sequence_id, node_id))
+
+        # check if the pairs are already existing with the same name under the same standard numbering node
+        query = f"""
+        MATCH (s:StandardNumbering {{name: $name}})
+        MATCH (p:{node_type})-[r:HAS_STANDARD_NUMBERING]->(s)
+        WHERE p.accession_id IN $list_of_seq_ids
+        RETURN p.accession_id AS accession_id
+        """
+        results = db.execute_read(
+            query, parameters={"list_of_seq_ids": list_of_seq_ids, "name": self.name}
+        )
+        if results is not None:
+            for row in results:
+                if row is not None:
+                    if row.get("accession_id"):
+                        pairs.remove((base_sequence_id, row["accession_id"]))
+                        logger.info(
+                            f"Pair {base_sequence_id} and {row['accession_id']} already exists under the same standard numbering node"
+                        )
+
+        # remove double pairs in the list of pairs
+        pairs = list(set(pairs))
+        logger.info(f"Pairs: {pairs}")
 
         # Run the pairwise alignment using the PairwiseAligner.
         pairwise_aligner = PairwiseAligner()
@@ -361,11 +391,16 @@ class StandardNumberingTool:
         if not input:
             raise ValueError("No input sequences provided")
 
+        logger.info(f"Input: {input}")
+
         results_pairwise = pairwise_aligner.align_multipairwise(
             ids=input,  # Combine ids for alignment
             db=db,
             pairs=pairs,  # List of sequence pairs to be aligned
+            node_type=node_type,
         )
+
+        logger.info(f"Pairwise alignment results: {results_pairwise}")
 
         if results_pairwise is None:
             raise ValueError("Pairwise alignment failed - no results returned")
@@ -380,10 +415,18 @@ class StandardNumberingTool:
             for result in results_pairwise
         ]
 
+        if len(converted_alignment) == 0:
+            logger.info(f"No alignment found for {base_sequence_id}")
+            return None
+
+        logger.info(f"Converted alignment: {len(converted_alignment)}")
+
         # Compute positions using the pairwise numbering algorithm.
-        self.positions = self.run_numbering_algorithm_pairwise(
+        positions = self.run_numbering_algorithm_pairwise(
             base_sequence_id, converted_alignment
         )
+
+        logger.info(f"Positions: {positions}")
 
         # Ensure the standard numbering node exists in the database.
         StandardNumbering.get_or_save(
@@ -392,10 +435,10 @@ class StandardNumberingTool:
         )
 
         # Update the database with the calculated positions.
-        self.save_positions(db)
+        self.save_positions(db, positions, node_type)
 
         if return_positions:
-            return self.positions
+            return positions
         return None
 
     def apply_standard_numbering(
@@ -403,23 +446,25 @@ class StandardNumberingTool:
         base_sequence_id: str,
         db: DatabaseConnector,
         list_of_seq_ids: Optional[List[str]] = None,
+        node_type: str = "Protein",
     ) -> None:
         """
-        Apply a standard numbering scheme to a collection of proteins using multiple sequence alignment.
+        Apply a standard numbering scheme to a collection of nodes using multiple sequence alignment.
 
-        This method first retrieves all protein sequences from the database (or a subset if list_of_seq_ids is provided).
+        This method first retrieves all node sequences from the database (or a subset if list_of_seq_ids is provided).
         It then uses ClustalOmega to perform a multiple sequence alignment, computes the numbering positions via
         run_numbering_algorithm, creates (or retrieves) a StandardNumbering node, and saves the positions back into the database.
 
         Args:
             base_sequence_id: The accession id of the base sequence to which others are aligned.
             db: DatabaseConnector instance used for executing queries.
-            list_of_seq_ids: An optional list of specific protein ids to process. If None, all proteins are used.
+            list_of_seq_ids: An optional list of specific node type ids to process. If None, all node type ids are used.
+            node_type: The type of node to process. Default is "Protein".
         """
 
         if list_of_seq_ids is None:
-            query = """
-            MATCH (p:Protein) 
+            query = f"""
+            MATCH (p:{node_type}) 
             WHERE p.sequence IS NOT NULL
             RETURN p.accession_id AS accession_id
             """
@@ -428,38 +473,37 @@ class StandardNumberingTool:
                 raise ValueError("No results returned from the query")
             list_of_seq_ids = [row["accession_id"] for row in results]
 
-        # Retrieve all proteins from the database. With both id and sequence.
-        query = """
-        MATCH (p:Protein)
+        # Retrieve all nodes from the database. With both id and sequence.
+        query = f"""
+        MATCH (p:{node_type})
         WHERE p.sequence IS NOT NULL
         AND p.accession_id IN $list_of_seq_ids
         RETURN p.accession_id AS accession_id, p.sequence AS sequence
         """
-        # Execute the query and build the proteins dictionary
-        proteins_read: List[Dict[str, Any]]
+        # Execute the query and build the nodes dictionary
+        nodes_read: List[Dict[str, Any]]
         query_result = db.execute_read(
             query, parameters={"list_of_seq_ids": list_of_seq_ids}
         )
         if query_result is None:
-            proteins_read = []
+            nodes_read = []
         else:
-            proteins_read = query_result
-        proteins_dict = {
-            protein["accession_id"]: protein["sequence"] for protein in proteins_read
-        }
+            nodes_read = query_result
+        nodes_dict = {node["accession_id"]: node["sequence"] for node in nodes_read}
 
-        logger.info(f"Using {len(proteins_dict)} sequences for standard numbering")
+        logger.info(f"Using {len(nodes_dict)} sequences for standard numbering")
 
         # Obtain the base sequence details from the database.
-        base_sequence = self.get_protein_base_sequence(base_sequence_id, db)
+        base_sequence = self.get_node_base_sequence(base_sequence_id, db, node_type)
 
-        # Remove the base sequence from the proteins list to prevent duplicate alignment.
-        proteins_dict.pop(base_sequence_id)
+        # Remove the base sequence from the nodes list to prevent duplicate alignment.
+        if base_sequence_id in nodes_dict:
+            nodes_dict.pop(base_sequence_id)
 
         # Create a dictionary for ClustalOmega that includes both the base and target sequences.
         sequences_dict = {base_sequence["id"]: base_sequence["sequence"]}
-        for key in proteins_dict:
-            sequences_dict[key] = proteins_dict[key]
+        for key in nodes_dict:
+            sequences_dict[key] = nodes_dict[key]
 
         # Run the multiple sequence alignment using ClustalOmega.
         clustalO = ClustalOmega()
@@ -468,12 +512,11 @@ class StandardNumberingTool:
         )  # Passing a dict of sequences to ClustalOmega.
 
         logger.info(f"Alignment received from ClustalOmega:\n{alignment}")
+        logger.info(f"Alignment length: {len(list(alignment)[0][1][0].sequence)}")
 
         # Compute standard numbering positions using the computed alignment.
-        self.positions = self.run_numbering_algorithm_clustalo(
-            base_sequence_id, alignment
-        )
-        logger.info(f"Positions computed: {self.positions}")
+        positions = self.run_numbering_algorithm_clustalo(base_sequence_id, alignment)
+        logger.info(f"Positions computed: {positions}")
 
         # Create (or get) the StandardNumbering node in the database.
         StandardNumbering.get_or_save(
@@ -481,70 +524,5 @@ class StandardNumberingTool:
             definition=f"ClustalO based on base sequence {base_sequence_id}",
         )
 
-        # Update the database with the relationships between proteins and standard numbering.
-        self.save_positions(db)
-
-
-if __name__ == "__main__":
-    # Database connection setup parameters.
-    uri = "bolt://127.0.0.1:7687"
-    user = "neo4j"
-    password = "12345678"
-
-    from pyeed import Pyeed
-
-    # Create a Pyeed object which automatically connects to the Neo4j database.
-    eedb = Pyeed(uri, user, password)
-
-    # Clear previous standard numbering relationships from the database.
-    query = """
-    MATCH (n:StandardNumbering)-[r:HAS_STANDARD_NUMBERING]-(c:Protein) DELETE r
-    """
-    eedb.db.execute_write(query)
-
-    # Define sequences for testing the numbering algorithm.
-    sequences = [
-        ">seq1\nMTHKLLLTLLFTLLFSSAYSRG",
-        ">seq2\nABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
-        ">seq3\nMTHKILLLTLLFTLLFSSCYSRGARTHDB",
-    ]
-
-    proteins_dict = {
-        "seq1": "MTHKLLLTLLFTLLFSSAYSRG",
-        "seq2": "ABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
-        "seq3": "MTHKILLLTLLFTLLFSSCYSRGARTHDB",
-    }
-
-    # Define a base sequence that will be used as the reference.
-    base_sequence = {"id": "seq0", "sequence": "AMTHKLLLTLLFTLLFSSAYSRG"}
-
-    from pyeed.tools.clustalo import ClustalOmega
-
-    clustalO = ClustalOmega()
-
-    # Insert the base sequence as the first sequence in the alignment list.
-    sequences.insert(0, f">{base_sequence['id']}\n{base_sequence['sequence']}")
-
-    # Create a dictionary for ClustalOmega from the sequences.
-    sequences_dict = {
-        base_sequence["id"]: base_sequence["sequence"],
-        "seq1": "MTHKLLLTLLFTLLFSSAYSRG",
-        "seq2": "ABCABCABCMTHKITLLLTLLFTLLFSSAYSRG",
-        "seq3": "MTHKILLLTLLFTLLFSSCYSRGARTHDB",
-    }
-
-    # Perform multiple sequence alignment.
-    alignment = clustalO.align(sequences_dict)
-
-    # Instantiate the numbering tool and run the numbering algorithm.
-    sn_tool = StandardNumberingTool("test_standard_numbering")
-    sn_tool.positions = sn_tool.run_numbering_algorithm_clustalo("seq0", alignment)
-
-    # Print a sample of the computed positions to verify the output.
-    count = 0
-    for i in sn_tool.positions:
-        count += 1
-        print(i, sn_tool.positions[i])
-        # Only show the first few sequences
-        if count > 10:
-            break
+        # Update the database with the relationships between nodes and standard numbering.
+        self.save_positions(db, positions, node_type)

@@ -14,6 +14,7 @@ class MutationDetection:
         sequence_id2: str,
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
+        node_type: str = "Protein",
     ) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Fetch sequence and position data for two sequences from the database.
 
@@ -32,7 +33,7 @@ class MutationDetection:
             ValueError: If standard numbering positions not found for both sequences
         """
         query = f"""
-        MATCH (p:Protein)-[r:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
+        MATCH (p:{node_type})-[r:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
         WHERE p.accession_id IN ['{sequence_id1}', '{sequence_id2}'] 
         AND s.name = '{standard_numbering_tool_name}'
         RETURN p.accession_id as id, p.sequence as sequence, r.positions as positions
@@ -103,6 +104,7 @@ class MutationDetection:
         db: DatabaseConnector,
         sequence_id1: str,
         sequence_id2: str,
+        node_type: str = "Protein",
     ) -> None:
         """Save detected mutations to the database.
 
@@ -116,8 +118,24 @@ class MutationDetection:
             sequence_id1: First sequence accession ID
             sequence_id2: Second sequence accession ID
         """
-        query = """
-        MATCH (p1:Protein), (p2:Protein)
+
+        # Check if a mutation relationship already exists between these proteins
+        existing_mutations = db.execute_read(
+            f"""
+            MATCH (p1:{node_type})-[r:MUTATION]->(p2:{node_type})
+            WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
+            RETURN r
+            """,
+            {"sequence_id1": sequence_id1, "sequence_id2": sequence_id2},
+        )
+        if existing_mutations:
+            logger.debug(
+                f"Mutation relationship already exists between {sequence_id1} and {sequence_id2}"
+            )
+            return
+
+        query = f"""
+        MATCH (p1:{node_type}), (p2:{node_type})
         WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
         CREATE (p1)-[r:MUTATION]->(p2)
         SET r.from_positions = $from_positions,
@@ -145,6 +163,8 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
+        debug: bool = False,
+        node_type: str = "Protein",
     ) -> dict[str, list[int | str]]:
         """Get mutations between two sequences using standard numbering.
 
@@ -166,8 +186,11 @@ class MutationDetection:
             ValueError: If standard numbering positions not found for both sequences
         """
         sequences, positions = self.get_sequence_data(
-            sequence_id1, sequence_id2, db, standard_numbering_tool_name
+            sequence_id1, sequence_id2, db, standard_numbering_tool_name, node_type
         )
+
+        if debug:
+            logger.info(f"Debug mode output: {sequences} and {positions}")
 
         mutations = self.find_mutations(
             sequences[sequence_id1],
@@ -177,6 +200,8 @@ class MutationDetection:
         )
 
         if save_to_db:
-            self.save_mutations_to_db(mutations, db, sequence_id1, sequence_id2)
+            self.save_mutations_to_db(
+                mutations, db, sequence_id1, sequence_id2, node_type
+            )
 
         return mutations
