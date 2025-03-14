@@ -145,6 +145,20 @@ class Annotation(Enum):
 class Organism(StrictStructuredNode):
     taxonomy_id: int = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
+    
+    @classmethod
+    def get_or_save(cls, taxonomy_id, name) -> "Organism":
+        try:
+            organism = cls.nodes.get(taxonomy_id=taxonomy_id)
+            return organism
+        except cls.DoesNotExist:
+            try:
+                organism = cls(taxonomy_id=taxonomy_id, name=name)
+                organism.save()
+                return organism
+            except Exception as e:
+                print(f"Error during saving of the organism: {e}")
+                raise
 
 
 class SiteRel(StructuredRel):  # type: ignore
