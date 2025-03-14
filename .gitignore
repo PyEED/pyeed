@@ -5,6 +5,7 @@ __pycache__/
 
 # AlphaFold output
 docs/resources/alphafold/output/*
+src/pyeed/tools/alphafold2.py
 
 # C extensions
 *.so
