@@ -72,7 +72,7 @@ def load_model_and_tokenizer(
 
 def get_batch_embeddings(
     batch_sequences: list[str],
-    model: Union[EsmModel, ESMC],  # Updated type hint
+    model: Union[EsmModel, ESMC],
     tokenizer_or_alphabet: Union[EsmTokenizer, None],
     device: torch.device,
     pool_embeddings: bool = True,
@@ -100,7 +100,11 @@ def get_batch_embeddings(
                 logits_output = model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )
-                # Convert embeddings to numpy array
+                # Convert embeddings to numpy array - ensure embeddings is not None
+                if logits_output.embeddings is None:
+                    raise ValueError(
+                        "Model did not return embeddings. Check LogitsConfig settings."
+                    )
                 embeddings = logits_output.embeddings.cpu().numpy()
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=1)
@@ -141,7 +145,7 @@ def calculate_single_sequence_embedding_last_hidden_state(
 
 def calculate_single_sequence_embedding_all_layers(
     sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
-) -> dict[int, NDArray[np.float64]]:
+) -> NDArray[np.float64]:
     """
     Calculates embeddings for a single sequence across all layers.
 
@@ -150,7 +154,7 @@ def calculate_single_sequence_embedding_all_layers(
         model_name: Name of the ESM model to use
 
     Returns:
-        dict[int, NDArray[np.float64]]: A dictionary mapping layer indices (starting at 0) to normalized token embeddings.
+        NDArray[np.float64]: A numpy array containing layer embeddings for the sequence.
     """
     model, tokenizer, device = load_model_and_tokenizer(model_name)
     return get_single_embedding_all_layers(sequence, model, tokenizer, device)
@@ -187,6 +191,12 @@ def get_single_embedding_last_hidden_state(
                     return_hidden_states=True,
                 ),
             )
+            # Ensure hidden_states is not None before accessing it
+            if logits_output.hidden_states is None:
+                raise ValueError(
+                    "Model did not return hidden states. Check LogitsConfig settings."
+                )
+
             embedding = (
                 logits_output.hidden_states[-1][0].to(torch.float32).cpu().numpy()
             )
@@ -233,9 +243,15 @@ def get_single_embedding_all_layers(
                 LogitsConfig(
                     sequence=True,
                     return_embeddings=True,
-                    return_hidden_states=True,  # Assuming this flag is supported
+                    return_hidden_states=True,
                 ),
             )
+            # Ensure hidden_states is not None before iterating
+            if logits_output.hidden_states is None:
+                raise ValueError(
+                    "Model did not return hidden states. Check if return_hidden_states=True is supported."
+                )
+
             # logits_output.hidden_states should be a tuple of tensors: (layer, batch, seq_len, hidden_dim)
             for layer_tensor in logits_output.hidden_states:
                 # Remove batch dimension and (if applicable) any special tokens
