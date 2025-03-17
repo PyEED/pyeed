@@ -147,6 +147,118 @@ class Organism(StrictStructuredNode):
     name = StringProperty()
 
 
+class Mutation(StructuredRel):  # type: ignore
+    """A relationship representing mutations between two sequences."""
+
+    from_positions = ArrayProperty(IntegerProperty(), required=True)
+    to_positions = ArrayProperty(IntegerProperty(), required=True)
+    from_monomers = ArrayProperty(StringProperty(), required=True)
+    to_monomers = ArrayProperty(StringProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: Any,
+        molecule2: Any,
+        from_positions: list[int],
+        to_positions: list[int],
+        from_monomers: list[str],
+        to_monomers: list[str],
+    ) -> "Mutation":
+        """Validates the mutations and connects the two molecules, ensuring that no double mutations
+        occur – i.e. if a mutation affecting any of the same positions already exists between these proteins,
+        a new mutation cannot be created.
+
+        Raises:
+            ValueError: If input lists have different lengths or if a mutation for any of these positions
+                        already exists.
+        """
+        # Instead of checking *any* mutation, retrieve all mutation relationships between these proteins.
+        # Here molecule1.mutation.relationship(molecule2) returns a list of mutation relationship instances.
+        existing_mutations = molecule1.mutation.relationship(molecule2)
+
+        if existing_mutations:
+            raise ValueError(
+                "A mutation relationship affecting one or more of these positions already exists between these proteins."
+            )
+
+        if (
+            len(from_positions) != len(to_positions)
+            or len(from_positions) != len(from_monomers)
+            or len(from_positions) != len(to_monomers)
+        ):
+            raise ValueError("All input lists must have the same length.")
+
+        for from_position, from_monomer in zip(from_positions, from_monomers):
+            if molecule1.sequence[from_position] != from_monomer:
+                raise ValueError(
+                    f"Monomer '{from_monomer}' does not match the sequence {molecule1.accession_id} at position {from_position}"
+                )
+
+        for to_position, to_monomer in zip(to_positions, to_monomers):
+            if molecule2.sequence[to_position] != to_monomer:
+                raise ValueError(
+                    f"Monomer '{to_monomer}' does not match the sequence {molecule2.accession_id} at position {to_position}"
+                )
+
+        molecule1.mutation.connect(
+            molecule2,
+            {
+                "from_positions": from_positions,
+                "to_positions": to_positions,
+                "from_monomers": from_monomers,
+                "to_monomers": to_monomers,
+            },
+        )
+
+        return cls(
+            from_positions=from_positions,
+            to_positions=to_positions,
+            from_monomers=from_monomers,
+            to_monomers=to_monomers,
+        )
+
+    @property
+    def label(self) -> str:
+        """The label of the mutation."""
+        return ",".join(
+            f"{from_monomer}{from_position}{to_monomer}"
+            for from_position, from_monomer, to_monomer in zip(
+                list(self.from_positions),
+                list(self.from_monomers),
+                list(self.to_monomers),
+            )
+        )
+
+
+class StandardNumberingRel(StructuredRel):  # type: ignore
+    positions = ArrayProperty(StringProperty(), required=True)
+
+    @classmethod
+    def validate_and_connect(
+        cls,
+        molecule1: Any,
+        molecule2: Any,
+        positions: list[str],
+    ) -> "StandardNumberingRel":
+        """Validates the positions and connects the two molecules."""
+        molecule1.sequences_protein.connect(
+            molecule2,
+            {
+                "positions": positions,
+            },
+        )
+
+        return cls(
+            positions=positions,
+        )
+
+    @property
+    def label(self) -> str:
+        """The label of the standard numbering."""
+        return f"{self.positions}"
+
+
 class SiteRel(StructuredRel):  # type: ignore
     positions = ArrayProperty(IntegerProperty(), required=True)
 
@@ -186,6 +298,12 @@ class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
+    )
+
+    # Relationships
+    has_mutation_region = RelationshipTo("Region", "MUTATION", model=Mutation)
+    has_standard_numbering = RelationshipTo(
+        "StandardNumbering", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel
     )
 
 
@@ -262,34 +380,6 @@ class CatalyticActivity(StrictStructuredNode):
     def label(self) -> str:
         """The label of the catalytic activity."""
         return str(self.name)
-
-
-class StandardNumberingRel(StructuredRel):  # type: ignore
-    positions = ArrayProperty(StringProperty(), required=True)
-
-    @classmethod
-    def validate_and_connect(
-        cls,
-        molecule1: Any,
-        molecule2: Any,
-        positions: list[str],
-    ) -> "StandardNumberingRel":
-        """Validates the positions and connects the two molecules."""
-        molecule1.sequences_protein.connect(
-            molecule2,
-            {
-                "positions": positions,
-            },
-        )
-
-        return cls(
-            positions=positions,
-        )
-
-    @property
-    def label(self) -> str:
-        """The label of the standard numbering."""
-        return f"{self.positions}"
 
 
 class StandardNumbering(StrictStructuredNode):
@@ -389,90 +479,6 @@ class GOAnnotation(StrictStructuredNode):
         return str(self.term)
 
 
-class Mutation(StructuredRel):  # type: ignore
-    """A relationship representing mutations between two sequences."""
-
-    from_positions = ArrayProperty(IntegerProperty(), required=True)
-    to_positions = ArrayProperty(IntegerProperty(), required=True)
-    from_monomers = ArrayProperty(StringProperty(), required=True)
-    to_monomers = ArrayProperty(StringProperty(), required=True)
-
-    @classmethod
-    def validate_and_connect(
-        cls,
-        molecule1: Any,
-        molecule2: Any,
-        from_positions: list[int],
-        to_positions: list[int],
-        from_monomers: list[str],
-        to_monomers: list[str],
-    ) -> "Mutation":
-        """Validates the mutations and connects the two molecules, ensuring that no double mutations
-        occur – i.e. if a mutation affecting any of the same positions already exists between these proteins,
-        a new mutation cannot be created.
-
-        Raises:
-            ValueError: If input lists have different lengths or if a mutation for any of these positions
-                        already exists.
-        """
-        # Instead of checking *any* mutation, retrieve all mutation relationships between these proteins.
-        # Here molecule1.mutation.relationship(molecule2) returns a list of mutation relationship instances.
-        existing_mutations = molecule1.mutation.relationship(molecule2)
-
-        if existing_mutations:
-            raise ValueError(
-                "A mutation relationship affecting one or more of these positions already exists between these proteins."
-            )
-
-        if (
-            len(from_positions) != len(to_positions)
-            or len(from_positions) != len(from_monomers)
-            or len(from_positions) != len(to_monomers)
-        ):
-            raise ValueError("All input lists must have the same length.")
-
-        for from_position, from_monomer in zip(from_positions, from_monomers):
-            if molecule1.sequence[from_position] != from_monomer:
-                raise ValueError(
-                    f"Monomer '{from_monomer}' does not match the sequence {molecule1.accession_id} at position {from_position}"
-                )
-
-        for to_position, to_monomer in zip(to_positions, to_monomers):
-            if molecule2.sequence[to_position] != to_monomer:
-                raise ValueError(
-                    f"Monomer '{to_monomer}' does not match the sequence {molecule2.accession_id} at position {to_position}"
-                )
-
-        molecule1.mutation.connect(
-            molecule2,
-            {
-                "from_positions": from_positions,
-                "to_positions": to_positions,
-                "from_monomers": from_monomers,
-                "to_monomers": to_monomers,
-            },
-        )
-
-        return cls(
-            from_positions=from_positions,
-            to_positions=to_positions,
-            from_monomers=from_monomers,
-            to_monomers=to_monomers,
-        )
-
-    @property
-    def label(self) -> str:
-        """The label of the mutation."""
-        return ",".join(
-            f"{from_monomer}{from_position}{to_monomer}"
-            for from_position, from_monomer, to_monomer in zip(
-                list(self.from_positions),
-                list(self.from_monomers),
-                list(self.to_monomers),
-            )
-        )
-
-
 class Protein(StrictStructuredNode):
     """A protein sequence node in the database."""
 
@@ -507,6 +513,9 @@ class Protein(StrictStructuredNode):
     pairwise_aligned = RelationshipTo(
         "Protein", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
     )
+    has_standard_numbering = RelationshipTo(
+        "StandardNumbering", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel
+    )
 
 
 class DNA(StrictStructuredNode):
@@ -532,6 +541,9 @@ class DNA(StrictStructuredNode):
     protein = RelationshipTo("Protein", "ENCODES", model=DNAProteinRel)
     pairwise_aligned = RelationshipTo(
         "DNA", "PAIRWISE_ALIGNED", model=PairwiseAlignmentResult
+    )
+    has_standard_numbering = RelationshipTo(
+        "StandardNumbering", "HAS_STANDARD_NUMBERING", model=StandardNumberingRel
     )
 
 

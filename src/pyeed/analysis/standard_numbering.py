@@ -41,7 +41,11 @@ class StandardNumberingTool:
         self.name = name
 
     def get_node_base_sequence(
-        self, base_sequence_id: str, db: DatabaseConnector, node_type: str = "Protein"
+        self,
+        base_sequence_id: str,
+        db: DatabaseConnector,
+        node_type: str = "Protein",
+        region_based_sequence: Optional[str] = None,
     ) -> dict[str, str]:
         """
         Retrieve the base node sequence from the database for a given accession id.
@@ -52,21 +56,36 @@ class StandardNumberingTool:
         Args:
             base_sequence_id: The accession id of the base node sequence.
             db: The database connector instance to perform the query.
-
+            region_based_sequence: The annotation of the region to use for the numbering. Default is None.
         Returns:
             A dictionary with keys 'id' and 'sequence' holding the node type id and its sequence.
         """
-        query = f"""
-        MATCH (p:{node_type})
-        WHERE p.accession_id = '{base_sequence_id}'
-        RETURN p.accession_id AS accession_id, p.sequence AS sequence
-        """
+        if region_based_sequence:
+            query = f"""
+            MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region annotation: {region_based_sequence})
+            WHERE p.accession_id = '{base_sequence_id}'
+            RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+            """
+        else:
+            query = f"""
+            MATCH (p:{node_type})
+            WHERE p.accession_id = '{base_sequence_id}'
+            RETURN p.accession_id AS accession_id, p.sequence AS sequence
+            """
         base_sequence_read = db.execute_read(query)
         # Assume the first returned record is the desired base sequence
-        base_sequence = {
-            "id": base_sequence_read[0]["accession_id"],
-            "sequence": base_sequence_read[0]["sequence"],
-        }
+        if region_based_sequence:
+            base_sequence = {
+                "id": base_sequence_read[0]["accession_id"],
+                "sequence": base_sequence_read[0]["sequence"][
+                    base_sequence_read[0]["start"] : base_sequence_read[0]["end"]
+                ],
+            }
+        else:
+            base_sequence = {
+                "id": base_sequence_read[0]["accession_id"],
+                "sequence": base_sequence_read[0]["sequence"],
+            }
         return base_sequence
 
     def save_positions(
@@ -74,6 +93,7 @@ class StandardNumberingTool:
         db: DatabaseConnector,
         positions: dict[str, list[str]],
         node_type: str = "Protein",
+        region_based_sequence: bool = False,
     ) -> None:
         """
         Save the calculated numbering positions for each protein into the database.
@@ -84,14 +104,25 @@ class StandardNumberingTool:
 
         Args:
             db: The database connector instance used to execute the write queries.
+            positions: A dictionary mapping protein accession ids to lists of numbering positions.
+            node_type: The type of node to process. Default is "Protein".
+            region_based_sequence: If True, the sequence is a region based sequence. Default is False.
         """
         for protein_id in positions:
-            query = f"""
-                MATCH (p:{node_type} {{accession_id: '{protein_id}'}})
-                MATCH (s:StandardNumbering {{name: '{self.name}'}})
-                MERGE (p)-[r:HAS_STANDARD_NUMBERING]->(s)
-                SET r.positions = {str(positions[protein_id])}
-            """
+            if region_based_sequence:
+                query = f"""
+                    MATCH (p:{node_type} {{accession_id: '{protein_id}'}})-[e:HAS_REGION]->(r:Region {{annotation: 'coding sequence'}})
+                    MATCH (s:StandardNumbering {{name: '{self.name}'}})
+                    MERGE (r)-[rel:HAS_STANDARD_NUMBERING]->(s)
+                    SET rel.positions = {str(positions[protein_id])}
+                """
+            else:
+                query = f"""
+                    MATCH (p:{node_type} {{accession_id: '{protein_id}'}})
+                    MATCH (s:StandardNumbering {{name: '{self.name}'}})
+                    MERGE (p)-[rel:HAS_STANDARD_NUMBERING]->(s)
+                    SET rel.positions = {str(positions[protein_id])}
+                """
             # Execute the write query to update the standard numbering relationship.
             db.execute_write(query)
 
@@ -317,6 +348,7 @@ class StandardNumberingTool:
         list_of_seq_ids: Optional[List[str]] = None,
         return_positions: bool = False,
         node_type: str = "Protein",
+        region_based_sequence: Optional[str] = None,
     ) -> Optional[Dict[str, List[str]]]:
         """
         Apply standard numbering via pairwise alignment using a base sequence.
@@ -332,7 +364,7 @@ class StandardNumberingTool:
             list_of_seq_ids: An optional list of node type ids to process. If None, all node type ids are used.
             return_positions: If True, the method returns the computed positions dictionary after processing.
             node_type: The type of node to process. Default is "Protein".
-
+            region_based_sequence: The annotation of the region to use for the numbering. Default is None.
         Raises:
             ValueError: If the pairwise alignment fails and returns no results.
         """
@@ -362,15 +394,33 @@ class StandardNumberingTool:
             pairs.append((base_sequence_id, node_id))
 
         # check if the pairs are already existing with the same name under the same standard numbering node
-        query = f"""
-        MATCH (s:StandardNumbering {{name: $name}})
-        MATCH (p:{node_type})-[r:HAS_STANDARD_NUMBERING]->(s)
-        WHERE p.accession_id IN $list_of_seq_ids
-        RETURN p.accession_id AS accession_id
-        """
-        results = db.execute_read(
-            query, parameters={"list_of_seq_ids": list_of_seq_ids, "name": self.name}
-        )
+        if node_type == "DNA" and region_based_sequence is not None:
+            query = """
+            MATCH (s:StandardNumbering {name: $name})
+            MATCH (r:Region {annotation: $region_based_sequence})<-[rel:HAS_STANDARD_NUMBERING]-(s)
+            WHERE r.accession_id IN $list_of_seq_ids
+            RETURN r.accession_id AS accession_id
+            """
+
+            results = db.execute_read(
+                query,
+                parameters={
+                    "list_of_seq_ids": list_of_seq_ids,
+                    "name": self.name,
+                    "region_based_sequence": region_based_sequence,
+                },
+            )
+        else:
+            query = f"""
+            MATCH (s:StandardNumbering {{name: $name}})
+            MATCH (p:{node_type})-[rel:HAS_STANDARD_NUMBERING]->(s)
+            WHERE p.accession_id IN $list_of_seq_ids
+            RETURN p.accession_id AS accession_id
+            """
+            results = db.execute_read(
+                query,
+                parameters={"list_of_seq_ids": list_of_seq_ids, "name": self.name},
+            )
         if results is not None:
             for row in results:
                 if row is not None:
@@ -398,6 +448,7 @@ class StandardNumberingTool:
             db=db,
             pairs=pairs,  # List of sequence pairs to be aligned
             node_type=node_type,
+            region_based_sequence=region_based_sequence,
         )
 
         logger.info(f"Pairwise alignment results: {results_pairwise}")
@@ -435,7 +486,7 @@ class StandardNumberingTool:
         )
 
         # Update the database with the calculated positions.
-        self.save_positions(db, positions, node_type)
+        self.save_positions(db, positions, node_type, region_based_sequence)
 
         if return_positions:
             return positions
@@ -447,6 +498,7 @@ class StandardNumberingTool:
         db: DatabaseConnector,
         list_of_seq_ids: Optional[List[str]] = None,
         node_type: str = "Protein",
+        region_based_sequence: Optional[str] = None,
     ) -> None:
         """
         Apply a standard numbering scheme to a collection of nodes using multiple sequence alignment.
@@ -460,6 +512,7 @@ class StandardNumberingTool:
             db: DatabaseConnector instance used for executing queries.
             list_of_seq_ids: An optional list of specific node type ids to process. If None, all node type ids are used.
             node_type: The type of node to process. Default is "Protein".
+            region_based_sequence: The annotation of the region to use for the numbering. Default is None.
         """
 
         if list_of_seq_ids is None:
@@ -489,12 +542,36 @@ class StandardNumberingTool:
             nodes_read = []
         else:
             nodes_read = query_result
-        nodes_dict = {node["accession_id"]: node["sequence"] for node in nodes_read}
+
+        if node_type == "DNA" and region_based_sequence is not None:
+            # then the sequence is a region based sequence.
+            # get the region objects for each of the nodes as well
+            query = f"""
+            MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region {{annotation: $region_based_sequence}})
+            WHERE p.accession_id IN $list_of_seq_ids
+            RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+            """
+            region_read = db.execute_read(
+                query,
+                parameters={
+                    "list_of_seq_ids": list_of_seq_ids,
+                    "region_based_sequence": region_based_sequence,
+                },
+            )
+            nodes_dict = {
+                node["accession_id"]: node["sequence"][node["start"] : node["end"]]
+                for node in region_read
+            }
+
+        else:
+            nodes_dict = {node["accession_id"]: node["sequence"] for node in nodes_read}
 
         logger.info(f"Using {len(nodes_dict)} sequences for standard numbering")
 
         # Obtain the base sequence details from the database.
-        base_sequence = self.get_node_base_sequence(base_sequence_id, db, node_type)
+        base_sequence = self.get_node_base_sequence(
+            base_sequence_id, db, node_type, region_based_sequence
+        )
 
         # Remove the base sequence from the nodes list to prevent duplicate alignment.
         if base_sequence_id in nodes_dict:
@@ -525,4 +602,4 @@ class StandardNumberingTool:
         )
 
         # Update the database with the relationships between nodes and standard numbering.
-        self.save_positions(db, positions, node_type)
+        self.save_positions(db, positions, node_type, region_based_sequence)

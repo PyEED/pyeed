@@ -426,3 +426,20 @@ class Pyeed:
                     f"Error processing relationship batch {i//BATCH_SIZE + 1}: {str(e)}"
                 )
                 continue
+
+    def create_coding_sequences_regions(self) -> None:
+        """
+        Creates coding sequences regions for all proteins in the database.
+
+        It finds the nucleotide start and end positions and create a Region object for the corresponding DNA sequence.
+        Create the region object with the right annotation. And then connect it to the DNA sequence.
+        """
+        query = """
+        MATCH (p:Protein)
+        WHERE p.nucleotide_id IS NOT NULL
+        CREATE (r:Region {annotation: 'coding sequence'})
+        WITH p, r
+        MATCH (d:DNA {accession_id: p.nucleotide_id})
+        CREATE (d)-[:HAS_REGION {start: p.nucleotide_start, end: p.nucleotide_end}]->(r)
+        """
+        self.db.execute_write(query)
