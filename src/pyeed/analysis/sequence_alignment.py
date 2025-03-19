@@ -91,7 +91,8 @@ class PairwiseAligner:
         return_results: bool = True,
         pairs: Optional[list[tuple[str, str]]] = None,
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
+        num_cores: int = cpu_count() - 1,
     ) -> Optional[list[dict[str, Any]]]:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
@@ -115,7 +116,7 @@ class PairwiseAligner:
             pairs (Optional[list[tuple[str, str]]]): A list of tuples, where each tuple contains two
                 sequence IDs to align. If provided, only these pairs will be aligned.
             node_type (str): The type of node to align. Defaults to "Protein".
-            region_based_sequence (Optional[str]): The annotation of the region to use for the alignment. Defaults to None.
+            region_ids_neo4j (Optional[list[str]]): A list of region IDs for the sequence cuting based on region_based_sequence.
         Returns:
             Optional[List[dict]]: A list of dictionaries containing the alignment results if
             `return_results` is True. If False, returns None.
@@ -123,9 +124,7 @@ class PairwiseAligner:
 
         # Fetch sequences if ids are provided
         if ids is not None and db is not None:
-            sequences = self._get_id_sequence_dict(
-                db, ids, node_type, region_based_sequence
-            )
+            sequences = self._get_id_sequence_dict(db, ids, node_type, region_ids_neo4j)
 
         if not sequences:
             raise ValueError(
@@ -148,7 +147,7 @@ class PairwiseAligner:
 
             for pair_chunk in chunks(pairs, batch_size):
                 # Align the pairs in the current chunk
-                alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
+                alignments = Parallel(n_jobs=num_cores, prefer="processes")(
                     delayed(self.align_pairwise)(
                         {pair[0]: sequences[pair[0]]},
                         {pair[1]: sequences[pair[1]]},
@@ -160,7 +159,7 @@ class PairwiseAligner:
                 progress.update(align_task, advance=len(pair_chunk))
 
                 if db:
-                    self._to_db(alignments, db, node_type, region_based_sequence)
+                    self._to_db(alignments, db, node_type, region_ids_neo4j)
                     progress.update(db_task, advance=len(pair_chunk))
 
                 if return_results:
@@ -173,7 +172,7 @@ class PairwiseAligner:
         alignments: list[dict[str, Any]],
         db: DatabaseConnector,
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> None:
         """Inserts the alignment results to pyeed graph database.
 
@@ -181,10 +180,10 @@ class PairwiseAligner:
             alignments (list[dict]): A list of dictionaries containing the alignment results.
             db (DatabaseConnector): A `DatabaseConnector` object.
             node_type (str): The type of node to align. Defaults to "Protein".
-            region_based_sequence (Optional[str]): The annotation of the region to use for the alignment. Defaults to None.
+            region_ids_neo4j (Optional[list[str]]): A list of region IDs for the sequence cuting based on region_based_sequence.
         """
 
-        if region_based_sequence is None:
+        if region_ids_neo4j is None:
             query = f"""
             UNWIND $alignments AS alignment
             MATCH (p1:{node_type} {{accession_id: alignment.query_id}})
@@ -201,8 +200,9 @@ class PairwiseAligner:
         else:
             query = f"""
             UNWIND $alignments AS alignment
-            MATCH (p1:{node_type} {{accession_id: alignment.query_id}})-[rel1:HAS_REGION]->(r1:Region {{annotation: $region_based_sequence}})
-            MATCH (p2:{node_type} {{accession_id: alignment.target_id}})-[rel2:HAS_REGION]->(r2:Region {{annotation: $region_based_sequence}})
+            MATCH (p1:{node_type} {{accession_id: alignment.query_id}})-[rel1:HAS_REGION]->(r1:Region)
+            MATCH (p2:{node_type} {{accession_id: alignment.target_id}})-[rel2:HAS_REGION]->(r2:Region)
+            WHERE id(r1) IN $region_ids_neo4j AND id(r2) IN $region_ids_neo4j
             MERGE (r1)-[r:PAIRWISE_ALIGNED]->(r2)
             SET r.similarity = alignment.identity,
             r.mismatches = alignment.mismatches,
@@ -213,9 +213,9 @@ class PairwiseAligner:
             """
             db.execute_write(
                 query,
-                {
+                parameters={
                     "alignments": alignments,
-                    "region_based_sequence": region_based_sequence,
+                    "region_ids_neo4j": region_ids_neo4j,
                 },
             )
 
@@ -272,7 +272,7 @@ class PairwiseAligner:
         db: DatabaseConnector,
         ids: list[str] = [],
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> dict[str, str]:
         """Gets all sequences from the database and returns them in a dictionary.
         Key is the accession id and value is the sequence.
@@ -286,36 +286,16 @@ class PairwiseAligner:
             dict[str, str]: Dictionary of sequences with accession id as key.
         """
 
-        if not ids:
-            if region_based_sequence is not None:
+        if ids != []:
+            if region_ids_neo4j is not None:
                 query = f"""
-                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region {{annotation: $region_based_sequence}})
+                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
+                WHERE id(r) IN $region_ids_neo4j AND p.accession_id IN $ids
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
                 nodes = db.execute_read(
                     query,
-                    parameters={"region_based_sequence": region_based_sequence},
-                )
-
-            else:
-                query = f"""
-                MATCH (p:{node_type})
-                RETURN p.accession_id AS accession_id, p.sequence AS sequence
-                """
-                nodes = db.execute_read(query)
-        else:
-            if region_based_sequence is not None:
-                query = f"""
-                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region {{annotation: $region_based_sequence}})
-                WHERE p.accession_id IN $ids
-                RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
-                """
-                nodes = db.execute_read(
-                    query,
-                    parameters={
-                        "ids": ids,
-                        "region_based_sequence": region_based_sequence,
-                    },
+                    parameters={"region_ids_neo4j": region_ids_neo4j, "ids": ids},
                 )
             else:
                 query = f"""
@@ -325,7 +305,27 @@ class PairwiseAligner:
                 """
                 nodes = db.execute_read(query, parameters={"ids": ids})
 
-        if region_based_sequence is not None:
+        else:
+            if region_ids_neo4j is not None:
+                query = f"""
+                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
+                WHERE id(r) IN $region_ids_neo4j
+                RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+                """
+                nodes = db.execute_read(
+                    query,
+                    parameters={
+                        "region_ids_neo4j": region_ids_neo4j,
+                    },
+                )
+            else:
+                query = f"""
+                MATCH (p:{node_type})
+                RETURN p.accession_id AS accession_id, p.sequence AS sequence
+                """
+                nodes = db.execute_read(query)
+
+        if region_ids_neo4j is not None:
             return {
                 node["accession_id"]: node["sequence"][node["start"] : node["end"]]
                 for node in nodes

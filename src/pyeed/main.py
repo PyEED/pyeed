@@ -437,7 +437,7 @@ class Pyeed:
         query = """
         MATCH (p:Protein)
         WHERE p.nucleotide_id IS NOT NULL
-        CREATE (r:Region {annotation: 'coding sequence'})
+        CREATE (r:Region {annotation: 'coding sequence', sequence_id: p.accession_id})
         WITH p, r
         MATCH (d:DNA {accession_id: p.nucleotide_id})
         CREATE (d)-[:HAS_REGION {start: p.nucleotide_start, end: p.nucleotide_end}]->(r)

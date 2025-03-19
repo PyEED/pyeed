@@ -15,7 +15,7 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[int]] = None,
     ) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Fetch sequence and position data for two sequences from the database.
 
@@ -25,7 +25,7 @@ class MutationDetection:
             db: Database connection instance
             standard_numbering_tool_name: Name of standard numbering tool to use
             node_type: Type of node to use (default: "Protein")
-            region_based_sequence: Annotation of region to use for numbering (default: None)
+            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
 
         Returns:
             tuple containing:
@@ -35,14 +35,18 @@ class MutationDetection:
         Raises:
             ValueError: If standard numbering positions not found for both sequences
         """
-        if region_based_sequence is not None:
+        if region_ids_neo4j is not None:
             query = f"""
-            MATCH (p:{node_type})-[rel:HAS_REGION]->(r:Region {{annotation: '{region_based_sequence}'}})-[rel2:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
+            MATCH (p:{node_type})-[rel:HAS_REGION]->(r:Region)
+            WHERE id(r) IN $region_ids_neo4j
+            MATCH (r)-[rel2:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
             WHERE p.accession_id IN ['{sequence_id1}', '{sequence_id2}'] 
             AND s.name = '{standard_numbering_tool_name}'
             RETURN p.accession_id as id, p.sequence as sequence, rel2.positions as positions, rel.start as start, rel.end as end
             """
-            results = db.execute_read(query)
+            results = db.execute_read(
+                query, parameters={"region_ids_neo4j": region_ids_neo4j}
+            )
         else:
             query = f"""
             MATCH (p:{node_type})-[r:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
@@ -56,7 +60,7 @@ class MutationDetection:
             raise ValueError(
                 f"Could not find standard numbering positions for both sequences {sequence_id1} and {sequence_id2}"
             )
-        if region_based_sequence is not None:
+        if region_ids_neo4j is not None:
             sequences = {
                 results[i]["id"]: results[i]["sequence"][
                     results[i]["start"] : results[i]["end"]
@@ -128,7 +132,7 @@ class MutationDetection:
         sequence_id1: str,
         sequence_id2: str,
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[int]] = None,
     ) -> None:
         """Save detected mutations to the database.
 
@@ -142,12 +146,16 @@ class MutationDetection:
             sequence_id1: First sequence accession ID
             sequence_id2: Second sequence accession ID
             node_type: Type of node to use (default: "Protein")
-            region_based_sequence: Annotation of region to use for numbering (default: None)
+            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
         """
         # Check if a mutation relationship already exists between these proteins
-        if region_based_sequence is not None:
+        if region_ids_neo4j is not None:
             query = f"""
-            MATCH (p1:{node_type} {{accession_id: $sequence_id1}})-[rel:HAS_REGION]->(r1:Region {{annotation: $region_based_sequence}})-[rel_mutation:MUTATION]->(r2:Region {{annotation: $region_based_sequence}})<-[rel2:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
+            MATCH (p1:{node_type} {{accession_id: $sequence_id1}})-[rel:HAS_REGION]->(r1:Region)
+            WHERE id(r1) IN $region_ids_neo4j
+            MATCH (r1)-[rel_mutation:MUTATION]->(r2:Region)
+            WHERE id(r2) IN $region_ids_neo4j
+            MATCH (r2)<-[:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
             RETURN rel_mutation
             """
             existing_mutations = db.execute_read(
@@ -155,7 +163,7 @@ class MutationDetection:
                 {
                     "sequence_id1": sequence_id1,
                     "sequence_id2": sequence_id2,
-                    "region_based_sequence": region_based_sequence,
+                    "region_ids_neo4j": region_ids_neo4j,
                 },
             )
         else:
@@ -173,11 +181,15 @@ class MutationDetection:
             )
             return
 
-        if region_based_sequence is not None:
+        if region_ids_neo4j is not None:
             # saving the mutation between the regions
             query = f"""
-            MATCH (r1:Region {{annotation: $region_based_sequence}})<-[rel:HAS_REGION]-(p1:{node_type} {{accession_id: $sequence_id1}})
-            MATCH (r2:Region {{annotation: $region_based_sequence}})<-[rel2:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
+            MATCH (r1:Region)
+            WHERE id(r1) IN $region_ids_neo4j
+            MATCH (r1)<-[:HAS_REGION]-(p1:{node_type} {{accession_id: $sequence_id1}})
+            MATCH (r2:Region)
+            WHERE id(r2) IN $region_ids_neo4j
+            MATCH (r2)<-[:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
             CREATE (r1)-[r:MUTATION]->(r2)
             SET r.from_positions = $from_positions,
                 r.to_positions = $to_positions,
@@ -187,7 +199,7 @@ class MutationDetection:
             params = {
                 "sequence_id1": sequence_id1,
                 "sequence_id2": sequence_id2,
-                "region_based_sequence": region_based_sequence,
+                "region_ids_neo4j": region_ids_neo4j,
                 "from_positions": mutations["from_positions"],
                 "to_positions": mutations["to_positions"],
                 "from_monomers": mutations["from_monomers"],
@@ -227,7 +239,7 @@ class MutationDetection:
         save_to_db: bool = True,
         debug: bool = False,
         node_type: str = "Protein",
-        region_based_sequence: Optional[str] = None,
+        region_ids_neo4j: Optional[list[int]] = None,
     ) -> dict[str, list[int | str]]:
         """Get mutations between two sequences using standard numbering.
 
@@ -238,7 +250,7 @@ class MutationDetection:
             standard_numbering_tool_name: Name of standard numbering tool to use
             save_to_db: Whether to save mutations to database (default: True)
             node_type: Type of node to use (default: "Protein")
-            region_based_sequence: Annotation of region to use for numbering (default: None)
+            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
 
         Returns:
             dict containing mutation information:
@@ -256,7 +268,7 @@ class MutationDetection:
             db,
             standard_numbering_tool_name,
             node_type,
-            region_based_sequence,
+            region_ids_neo4j,
         )
 
         if debug:
@@ -276,7 +288,7 @@ class MutationDetection:
                 sequence_id1,
                 sequence_id2,
                 node_type,
-                region_based_sequence,
+                region_ids_neo4j,
             )
 
         return mutations

@@ -299,6 +299,7 @@ class Region(StrictStructuredNode):
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
+    sequence_id = StringProperty()
 
     # Relationships
     has_mutation_region = RelationshipTo("Region", "MUTATION", model=Mutation)
