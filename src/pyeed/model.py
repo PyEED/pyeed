@@ -140,6 +140,9 @@ class Annotation(Enum):
     FAMILY = "family"
     MOTIVE = "motive"
     PROTEIN = "protein"
+    TURN = "turn"
+    SIGNAL = "signal"
+    PROPEP = "propep"
 
 
 class Organism(StrictStructuredNode):
@@ -296,6 +299,7 @@ class Site(StrictStructuredNode):
 
 class Region(StrictStructuredNode):
     region_id = UniqueIdProperty()
+    name = StringProperty()
     annotation = StringProperty(
         choices=[(e.value, e.name) for e in Annotation], required=True
     )
