@@ -32,6 +32,7 @@ def get_hf_token() -> str:
 
 def load_model_and_tokenizer(
     model_name: str,
+    use_all_gpus: bool = True
 ) -> Tuple[
     Union[EsmModel, ESMC],  # Changed from ESM3InferenceClient to ESMC
     Union[EsmTokenizer, None],
@@ -50,12 +51,14 @@ def load_model_and_tokenizer(
     # Get token only when loading model
     token = get_hf_token()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_gpus = torch.cuda.device_count()
 
     # Check if this is an ESM-3 variant
     if "esmc" in model_name.lower():
         # Using ESMC from_pretrained
-        model = ESMC.from_pretrained(model_name)
-        model = model.to(device)
+        model = ESMC.from_pretrained(model_name).to(device)
+        if use_all_gpus and torch.cuda.device_count() > 1:
+            model = torch.nn.DataParallel(model)
         return model, None, device
     else:
         # Otherwise, assume it's an ESM-2 model on Hugging Face
@@ -64,9 +67,11 @@ def load_model_and_tokenizer(
             if model_name.startswith("facebook/")
             else f"facebook/{model_name}"
         )
-        model = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
+        model = EsmModel.from_pretrained(full_model_name, use_auth_token=token).to(device)
         tokenizer = EsmTokenizer.from_pretrained(full_model_name, use_auth_token=token)
-        model = model.to(device)
+        if use_all_gpus and torch.cuda.device_count() > 1:
+            model = torch.nn.DataParallel(model)
+
         return model, tokenizer, device
 
 
@@ -76,6 +81,7 @@ def get_batch_embeddings(
     tokenizer_or_alphabet: Union[EsmTokenizer, None],
     device: torch.device,
     pool_embeddings: bool = True,
+    use_all_gpus: bool = True,
 ) -> list[NDArray[np.float64]]:
     """
     Generates mean-pooled embeddings for a batch of sequences.
@@ -90,13 +96,21 @@ def get_batch_embeddings(
     Returns:
         list[NDArray[np.float64]]: A list of embeddings as NumPy arrays.
     """
-    if isinstance(model, ESMC):
+    # Wrap model in DataParallel if multiple GPUs should be used
+    if use_all_gpus and torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)  # Multi-GPU
+        print(f"Using {torch.cuda.device_count()} GPUs for inference.")
+
+    model = model.to(device)
+    model.eval()  # Ensure model is in inference mode
+    
+    if isinstance(model.module if use_all_gpus else model, ESMC):
         with torch.no_grad():
             embedding_list = []
             for sequence in batch_sequences:
                 # Process each sequence individually
                 protein = ESMProtein(sequence=sequence)
-                protein_tensor = model.encode(protein)
+                protein_tensor = model.module.encode(protein) if use_all_gpus else model.encode(protein)
                 logits_output = model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )

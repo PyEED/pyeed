@@ -193,6 +193,7 @@ class Pyeed:
         self,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
+        use_all_gpus: bool = True,
     ) -> None:
         """
         Calculates embeddings for all sequences in the database that do not have embeddings, processing in batches.
@@ -205,7 +206,7 @@ class Pyeed:
         """
 
         # Load the model, tokenizer, and device
-        model, tokenizer, device = load_model_and_tokenizer(model_name)
+        model, tokenizer, device = load_model_and_tokenizer(model_name, use_all_gpus)
 
         # Cypher query to retrieve proteins without embeddings and with valid sequences
         query = """
@@ -236,7 +237,7 @@ class Pyeed:
 
             # Get embeddings for the current batch
             embeddings_batch = get_batch_embeddings(
-                list(batch_sequences), model, tokenizer, device
+                list(batch_sequences), model, tokenizer, device, use_all_gpus
             )
 
             # Update the database for the current batch
