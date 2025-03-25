@@ -4,8 +4,9 @@ from typing import Any, Tuple, Union
 
 import numpy as np
 import torch
+from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESMProtein, LogitsConfig
+from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig
 from huggingface_hub import HfFolder, login
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
@@ -33,7 +34,7 @@ def get_hf_token() -> str:
 def load_model_and_tokenizer(
     model_name: str,
 ) -> Tuple[
-    Union[EsmModel, ESMC],  # Changed from ESM3InferenceClient to ESMC
+    Union[EsmModel, ESMC, ESM3InferenceClient],  # Added ESMC to the Union type
     Union[EsmTokenizer, None],
     torch.device,
 ]:
@@ -54,8 +55,12 @@ def load_model_and_tokenizer(
     # Check if this is an ESM-3 variant
     if "esmc" in model_name.lower():
         # Using ESMC from_pretrained
-        model = ESMC.from_pretrained(model_name)
+        model: Any = ESMC.from_pretrained(model_name)
         model = model.to(device)
+        return model, None, device
+    elif "esm3-sm-open-v1" in model_name.lower():
+        model: Any = ESM3.from_pretrained("esm3_sm_open_v1").to(device)
+
         return model, None, device
     else:
         # Otherwise, assume it's an ESM-2 model on Hugging Face
@@ -64,7 +69,7 @@ def load_model_and_tokenizer(
             if model_name.startswith("facebook/")
             else f"facebook/{model_name}"
         )
-        model = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
+        model: Any = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
         tokenizer = EsmTokenizer.from_pretrained(full_model_name, use_auth_token=token)
         model = model.to(device)
         return model, tokenizer, device
@@ -160,6 +165,74 @@ def calculate_single_sequence_embedding_all_layers(
     return get_single_embedding_all_layers(sequence, model, tokenizer, device)
 
 
+def calculate_single_sequence_embedding_first_layer(
+    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+) -> NDArray[np.float64]:
+    """
+    Calculates an embedding for a single sequence using the first layer.
+    """
+    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    return get_single_embedding_first_layer(sequence, model, tokenizer, device)
+
+
+def get_single_embedding_first_layer(
+    sequence: str, model: Any, tokenizer: Any, device: torch.device
+) -> NDArray[np.float64]:
+    """
+    Generates normalized embeddings for each token in the sequence across all layers.
+    """
+    embeddings_list = []
+
+    with torch.no_grad():
+        if isinstance(model, ESMC):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, LogitsConfig
+
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            logits_output = model.logits(
+                protein_tensor,
+                LogitsConfig(
+                    sequence=True,
+                    return_embeddings=True,
+                    return_hidden_states=True,
+                ),
+            )
+            if logits_output.hidden_states is None:
+                raise ValueError(
+                    "Model did not return hidden states. Check LogitsConfig settings."
+                )
+            embedding = (
+                logits_output.hidden_states[0][0].to(torch.float32).cpu().numpy()
+            )
+
+        elif isinstance(model, ESM3):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, SamplingConfig
+
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            embedding = model.forward_and_sample(
+                protein_tensor,
+                SamplingConfig(return_per_residue_embeddings=True),
+            )
+            if embedding is None or embedding.per_residue_embedding is None:
+                raise ValueError("Model did not return embeddings")
+            embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
+
+        else:
+            # ESM-2 logic
+            inputs = tokenizer(sequence, return_tensors="pt").to(device)
+            outputs = model(**inputs, output_hidden_states=True)
+            # Get the first layer's hidden states for all residues (excluding special tokens)
+            embedding = outputs.hidden_states[0][0, 1:-1, :].detach().cpu().numpy()
+
+    # Ensure embedding is a numpy array and normalize it
+    embedding = np.asarray(embedding, dtype=np.float64)
+    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
+    return embedding
+
+
 def get_single_embedding_last_hidden_state(
     sequence: str, model: Any, tokenizer: Any, device: torch.device
 ) -> NDArray[np.float64]:
@@ -200,10 +273,27 @@ def get_single_embedding_last_hidden_state(
             embedding = (
                 logits_output.hidden_states[-1][0].to(torch.float32).cpu().numpy()
             )
+        elif isinstance(model, ESM3):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, SamplingConfig
+
+            protein = ESMProtein(sequence=sequence)
+            sequence_encoding = model.encode(protein)
+
+            embedding = model.forward_and_sample(
+                sequence_encoding, SamplingConfig(return_per_residue_embeddings=True)
+            )
+
+            if embedding is None or embedding.per_residue_embedding is None:
+                raise ValueError("Model did not return embeddings")
+            embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
+
         else:
             # ESM-2 logic
             inputs = tokenizer(sequence, return_tensors="pt").to(device)
-            outputs = model(**inputs)
+            outputs = model(**inputs, output_hidden_states=True, return_dict=True)
+            # Extract per-residue embeddings (excluding special tokens)
+            # [0] to get first batch, [1:-1] to remove start/end tokens
             embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
 
     # normalize the embedding
@@ -259,6 +349,9 @@ def get_single_embedding_all_layers(
                 # If your model adds special tokens, adjust the slicing (e.g., emb[1:-1])
                 emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
                 embeddings_list.append(emb)
+
+        elif isinstance(model, ESM3):
+            raise NotImplementedError("ESM3 is not supported for all layers")
 
         else:
             # For ESM-2: Get hidden states with output_hidden_states=True
