@@ -1,5 +1,7 @@
 from itertools import combinations
-from typing import Any, Dict, Optional
+from typing import List,Any, Dict, Optional, Tuple
+import time
+import asyncio
 
 from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
@@ -151,7 +153,7 @@ class PairwiseAligner:
         print(f"Number of existing pairs: {len(existing_pairs)}")
         print(f"Number of total pairs: {len(pairs)}")
         print(f"Number of pairs to align: {len(new_pairs)}")
-        
+
         with Progress() as progress:
             align_task = progress.add_task(
                 f"⛓️ Aligning {total_pairs} sequence pairs...", total=total_pairs
@@ -170,7 +172,6 @@ class PairwiseAligner:
                     )
                     for pair in pair_chunk
                 )
-                print(f"chunk size: {len(pair_chunk)}, chunk done")
 
                 progress.update(align_task, advance=len(pair_chunk))
 
