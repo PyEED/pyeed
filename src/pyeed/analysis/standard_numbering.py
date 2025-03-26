@@ -13,6 +13,7 @@ Dependencies:
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
+
 from pyeed.analysis.sequence_alignment import PairwiseAligner
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.model import StandardNumbering
@@ -458,7 +459,7 @@ class StandardNumberingTool:
             region_ids_neo4j=region_ids_neo4j,
         )
 
-        logger.info(f"Pairwise alignment results: {results_pairwise}")
+        # logger.info(f"Pairwise alignment results: {results_pairwise}")
 
         if results_pairwise is None:
             raise ValueError("Pairwise alignment failed - no results returned")
@@ -483,8 +484,6 @@ class StandardNumberingTool:
         positions = self.run_numbering_algorithm_pairwise(
             base_sequence_id, converted_alignment
         )
-
-        logger.info(f"Positions: {positions}")
 
         # Ensure the standard numbering node exists in the database.
         StandardNumbering.get_or_save(

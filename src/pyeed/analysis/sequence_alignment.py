@@ -5,9 +5,11 @@ from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
+from loguru import logger
+from rich.progress import Progress
+
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.utility import chunks
-from rich.progress import Progress
 
 
 class PairwiseAligner:
@@ -125,6 +127,14 @@ class PairwiseAligner:
         # Fetch sequences if ids are provided
         if ids is not None and db is not None:
             sequences = self._get_id_sequence_dict(db, ids, node_type, region_ids_neo4j)
+
+        logger.info(
+            f"Length of sequences: {len(sequences)} and length of pairs: {len(pairs)} and length of ids: {len(ids)} and the length of the region_ids_neo4j: {len(region_ids_neo4j)}"
+        )
+        logger.info(f"IDS: {ids}")
+        logger.info(f"Region IDs: {region_ids_neo4j}")
+        logger.info(f"Pairs: {pairs}")
+        logger.info(f"Sequences: {sequences.keys()}")
 
         if not sequences:
             raise ValueError(
@@ -290,13 +300,11 @@ class PairwiseAligner:
             if region_ids_neo4j is not None:
                 query = f"""
                 MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-                WHERE id(r) IN $region_ids_neo4j AND p.accession_id IN $ids
+                WHERE id(r) IN {region_ids_neo4j} AND p.accession_id IN {ids}
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
-                nodes = db.execute_read(
-                    query,
-                    parameters={"region_ids_neo4j": region_ids_neo4j, "ids": ids},
-                )
+                nodes = db.execute_read(query)
+
             else:
                 query = f"""
                 MATCH (p:{node_type})
