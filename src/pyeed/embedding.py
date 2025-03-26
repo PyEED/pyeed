@@ -15,6 +15,7 @@ from transformers import EsmModel, EsmTokenizer
 from pyeed.dbconnect import DatabaseConnector
 
 
+
 def get_hf_token() -> str:
     """Get or request Hugging Face token."""
     if os.getenv("PYTEST_DISABLE_HF_LOGIN"):  # Disable Hugging Face login in tests
