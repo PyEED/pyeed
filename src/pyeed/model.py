@@ -375,12 +375,14 @@ class CatalyticActivity(StrictStructuredNode):
     """
 
     catalytic_id = IntegerProperty(required=False, unique_index=True)
-    name = StringProperty()
+    rhea_id = StringProperty(required=False, unique_index=True)
+    reactants = ArrayProperty()
+    products = ArrayProperty()
 
     @property
     def label(self) -> str:
         """The label of the catalytic activity."""
-        return str(self.name)
+        return str(self.rhea_id)
 
 
 class StandardNumbering(StrictStructuredNode):
@@ -508,7 +510,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
-    catalytic_annotation = RelationshipTo("CatalyticActivity", "CATALYTIC_ACTIVITY")
+    catalytic_annotation = RelationshipTo("CatalyticActivity", "HAS_CATALYTIC_ACTIVITY")
     ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(

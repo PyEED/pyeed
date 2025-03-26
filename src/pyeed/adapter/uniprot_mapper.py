@@ -83,17 +83,30 @@ class UniprotToPyeed(PrimaryDBMapper):
         try:
             for reference in record["comments"]:
                 if reference["type"] == "CATALYTIC_ACTIVITY":
+                    name = reference["reaction"]["name"]
+                    for i in reference["reaction"]["dbReferences"]:
+                        if i['id'].startswith("RHEA:"):
+                            rhea_id = i['id']
+                            break
+                    left_side, right_side = name.split("=")
+
+                    # Further split each side by "+"
+                    left_list = list(left_side.strip().split(" + "))
+                    right_list = list(right_side.strip().split(" + "))
+                    
                     catalytic_annotation = CatalyticActivity.get_or_save(
                         catalytic_id=int(reference["id"])
                         if reference.get("id")
                         else None,
-                        name=reference["reaction"]["name"],
+                        rhea_id=rhea_id,
+                        reactants = left_list,
+                        products = right_list,
                     )
                     protein.catalytic_annotation.connect(catalytic_annotation)
 
         except Exception as e:
             logger.error(
-                f"Error saving catalytic activity for {protein.accession_id}: {e}"
+                f"No Catalytic Activity for {protein.accession_id}: {e}"
             )
 
     def add_go(self, record: dict[str, Any], protein: Protein) -> None:
