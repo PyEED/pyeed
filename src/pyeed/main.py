@@ -347,9 +347,9 @@ class Pyeed:
             try:
                 batch_ids = nucleotide_ids[i : i + BATCH_SIZE]
                 self.fetch_ncbi_nucleotide(batch_ids)
-                logger.info(f"Successfully fetched batch {i//BATCH_SIZE + 1}")
+                logger.info(f"Successfully fetched batch {i // BATCH_SIZE + 1}")
             except Exception as e:
-                logger.error(f"Error fetching batch {i//BATCH_SIZE + 1}: {str(e)}")
+                logger.error(f"Error fetching batch {i // BATCH_SIZE + 1}: {str(e)}")
                 continue
 
         # Process protein-DNA relationships in batches
@@ -419,11 +419,11 @@ class Pyeed:
                         batch_create_query, {"relationships": new_relationships}
                     )
                     logger.info(
-                        f"Successfully processed relationship batch {i//BATCH_SIZE + 1}"
+                        f"Successfully processed relationship batch {i // BATCH_SIZE + 1}"
                     )
             except Exception as e:
                 logger.error(
-                    f"Error processing relationship batch {i//BATCH_SIZE + 1}: {str(e)}"
+                    f"Error processing relationship batch {i // BATCH_SIZE + 1}: {str(e)}"
                 )
                 continue
 
@@ -434,12 +434,45 @@ class Pyeed:
         It finds the nucleotide start and end positions and create a Region object for the corresponding DNA sequence.
         Create the region object with the right annotation. And then connect it to the DNA sequence.
         """
+
+        # in case of multiple DNA entires per Protein we need to create a Region for each DNA entry
+        # some of the DNA entries might even not have start and end vlaues on the ENCODES endge, in this case please take the entire sequence length
+        """
+        This Cypher query creates coding sequence regions for DNA sequences that don't already have them.
+        
+        The query:
+        1. Finds all Protein-DNA pairs connected by an ENCODES relationship
+        2. Filters for cases where the DNA doesn't already have a coding sequence Region for that protein
+        3. Creates a new Region node with 'coding sequence' annotation and the protein's ID
+        4. Creates a HAS_REGION relationship from the DNA to the new Region
+        5. Sets the start position to either:
+           - The start value from the ENCODES relationship if it exists
+           - 0 (beginning of sequence) if no start value is specified
+        6. Sets the end position to either:
+           - The end value from the ENCODES relationship if it exists
+           - The full DNA sequence length minus 1 if no end value is specified
+        """
         query = """
-        MATCH (p:Protein)
-        WHERE p.nucleotide_id IS NOT NULL
+        MATCH (d:DNA)-[rel_encode:ENCODES]->(p:Protein)
+        WHERE NOT EXISTS((d)-[:HAS_REGION]->(:Region {annotation: 'coding sequence', sequence_id: p.accession_id}))
         CREATE (r:Region {annotation: 'coding sequence', sequence_id: p.accession_id})
-        WITH p, r
-        MATCH (d:DNA {accession_id: p.nucleotide_id})
-        CREATE (d)-[:HAS_REGION {start: p.nucleotide_start, end: p.nucleotide_end}]->(r)
+        CREATE (d)-[rel:HAS_REGION {
+            start: CASE 
+                WHEN rel_encode.start IS NOT NULL THEN rel_encode.start 
+                ELSE 0 
+            END, 
+            end: CASE 
+                WHEN rel_encode.end IS NOT NULL THEN rel_encode.end 
+                ELSE size(d.sequence) - 1 
+            END
+        }]->(r)
         """
         self.db.execute_write(query)
+
+        # Log the number of regions created
+        count_query = """
+        MATCH (d:DNA)-[:HAS_REGION]->(r:Region {annotation: 'coding sequence'})
+        RETURN count(r) as region_count
+        """
+        result = self.db.execute_read(count_query)
+        logger.info(f"Created {result[0]['region_count']} coding sequence regions")

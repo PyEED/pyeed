@@ -1,4 +1,5 @@
 import gc
+import logging
 import os
 from typing import Any, Tuple, Union
 
@@ -6,12 +7,14 @@ import numpy as np
 import torch
 from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig
+from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
+
+logger = logging.getLogger(__name__)
 
 
 def get_hf_token() -> str:
@@ -34,36 +37,37 @@ def get_hf_token() -> str:
 def load_model_and_tokenizer(
     model_name: str,
 ) -> Tuple[
-    Union[EsmModel, ESMC, ESM3InferenceClient],  # Added ESMC to the Union type
+    Union[
+        EsmModel,
+        ESMC,
+        ESM3InferenceClient,
+        torch.nn.DataParallel,
+        ESM3,
+    ],  # Updated return type
     Union[EsmTokenizer, None],
     torch.device,
 ]:
     """
-    Loads either an ESM-3 (using ESMC) or an ESM-2 (using Transformers) model,
-    depending on the `model_name` provided.
+    Loads either an ESM++, ESM-3 (using ESMC or ESM3) or an ESM-2 (using Transformers) model,
+    depending on the `model_name` provided. Uses multiple GPUs in parallel if available.
 
     Args:
-        model_name (str): The model name or identifier (e.g., 'esmc' or 'esm2_t12_35M_UR50D').
+        model_name (str): The model name or identifier.
 
     Returns:
         Tuple of (model, tokenizer, device)
     """
-    # Get token only when loading model
     token = get_hf_token()
+    # Default device is the first CUDA device if available, else CPU.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer = None
 
-    # Check if this is an ESM-3 variant
     if "esmc" in model_name.lower():
-        # Using ESMC from_pretrained
         model: Any = ESMC.from_pretrained(model_name)
         model = model.to(device)
-        return model, None, device
     elif "esm3-sm-open-v1" in model_name.lower():
         model: Any = ESM3.from_pretrained("esm3_sm_open_v1").to(device)
-
-        return model, None, device
     else:
-        # Otherwise, assume it's an ESM-2 model on Hugging Face
         full_model_name = (
             model_name
             if model_name.startswith("facebook/")
@@ -72,40 +76,56 @@ def load_model_and_tokenizer(
         model: Any = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
         tokenizer = EsmTokenizer.from_pretrained(full_model_name, use_auth_token=token)
         model = model.to(device)
-        return model, tokenizer, device
+
+    # Check if multiple GPUs are available and wrap the model accordingly
+    if torch.cuda.device_count() > 1 and device.type == "cuda":
+        logger.info(f"Using {torch.cuda.device_count()} GPUs for parallel inference.")
+        model = torch.nn.DataParallel(model)
+
+    return model, tokenizer, device
 
 
 def get_batch_embeddings(
     batch_sequences: list[str],
-    model: Union[EsmModel, ESMC],
+    model: Union[
+        EsmModel,
+        ESMC,
+        torch.nn.DataParallel,
+        ESM3InferenceClient,
+        ESM3,
+    ],
     tokenizer_or_alphabet: Union[EsmTokenizer, None],
     device: torch.device,
     pool_embeddings: bool = True,
 ) -> list[NDArray[np.float64]]:
     """
     Generates mean-pooled embeddings for a batch of sequences.
+    Supports ESM++, ESM-2 and ESM-3 models.
 
     Args:
-        batch_sequences (list[str]): List of sequence strings to be embedded.
-        model (Union[EsmModel, ESMC]): Loaded model (ESM-2 or ESM-3).
-        tokenizer_or_alphabet (Union[EsmTokenizer, None]): Tokenizer if ESM-2, None if ESM-3.
-        device (torch.device): Device on which to run inference (CPU or GPU).
-        pool_embeddings (bool): Whether to pool embeddings across sequence length.
+        batch_sequences (list[str]): List of sequence strings.
+        model: Loaded model (could be wrapped in DataParallel).
+        tokenizer_or_alphabet: Tokenizer if needed.
+        device: Inference device (CPU/GPU).
+        pool_embeddings (bool): Whether to average embeddings across the sequence length.
 
     Returns:
-        list[NDArray[np.float64]]: A list of embeddings as NumPy arrays.
+        List of embeddings as NumPy arrays.
     """
-    if isinstance(model, ESMC):
+    # First, determine the base model type
+    base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+
+    if isinstance(base_model, ESMC):
+        # For ESMC models
+        embedding_list = []
         with torch.no_grad():
-            embedding_list = []
             for sequence in batch_sequences:
-                # Process each sequence individually
                 protein = ESMProtein(sequence=sequence)
-                protein_tensor = model.encode(protein)
-                logits_output = model.logits(
+                # Use the model directly - DataParallel handles internal distribution
+                protein_tensor = base_model.encode(protein)
+                logits_output = base_model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )
-                # Convert embeddings to numpy array - ensure embeddings is not None
                 if logits_output.embeddings is None:
                     raise ValueError(
                         "Model did not return embeddings. Check LogitsConfig settings."
@@ -114,9 +134,27 @@ def get_batch_embeddings(
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
-
         return embedding_list
-
+    elif isinstance(base_model, ESM3):
+        # For ESM3 models
+        embedding_list = []
+        with torch.no_grad():
+            for sequence in batch_sequences:
+                protein = ESMProtein(sequence=sequence)
+                sequence_encoding = base_model.encode(protein)
+                result = base_model.forward_and_sample(
+                    sequence_encoding,
+                    SamplingConfig(return_per_residue_embeddings=True),
+                )
+                if result is None or result.per_residue_embedding is None:
+                    raise ValueError("Model did not return embeddings")
+                embeddings = (
+                    result.per_residue_embedding.to(torch.float32).cpu().numpy()
+                )
+                if pool_embeddings:
+                    embeddings = embeddings.mean(axis=0)
+                embedding_list.append(embeddings)
+        return embedding_list
     else:
         # ESM-2 logic
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ESM-2 models"
@@ -124,11 +162,15 @@ def get_batch_embeddings(
             batch_sequences, padding=True, truncation=True, return_tensors="pt"
         ).to(device)
         with torch.no_grad():
-            outputs = model(**inputs)
-        embeddings = outputs.last_hidden_state.cpu().numpy()
+            outputs = model(**inputs, output_hidden_states=True)
+
+        # Get last hidden state for each sequence
+        hidden_states = outputs.last_hidden_state.cpu().numpy()
+
         if pool_embeddings:
-            return [embedding.mean(axis=0) for embedding in embeddings]
-        return list(embeddings)
+            # Mean pooling across sequence length
+            return [embedding.mean(axis=0) for embedding in hidden_states]
+        return list(hidden_states)
 
 
 def calculate_single_sequence_embedding_last_hidden_state(
@@ -259,12 +301,9 @@ def get_single_embedding_last_hidden_state(
             logits_output = model.logits(
                 protein_tensor,
                 LogitsConfig(
-                    sequence=True,
-                    return_embeddings=True,
-                    return_hidden_states=True,
+                    sequence=True, return_embeddings=True, return_hidden_states=True
                 ),
             )
-            # Ensure hidden_states is not None before accessing it
             if logits_output.hidden_states is None:
                 raise ValueError(
                     "Model did not return hidden states. Check LogitsConfig settings."
@@ -287,13 +326,10 @@ def get_single_embedding_last_hidden_state(
             if embedding is None or embedding.per_residue_embedding is None:
                 raise ValueError("Model did not return embeddings")
             embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
-
         else:
             # ESM-2 logic
             inputs = tokenizer(sequence, return_tensors="pt").to(device)
             outputs = model(**inputs, output_hidden_states=True, return_dict=True)
-            # Extract per-residue embeddings (excluding special tokens)
-            # [0] to get first batch, [1:-1] to remove start/end tokens
             embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
 
     # normalize the embedding
