@@ -20,6 +20,27 @@ class NetworkAnalysis:
         self.db: DatabaseConnector = db
         self.graph: nx.Graph = nx.Graph()
 
+    def check_indexes(self) -> list[dict[str, Any]]:
+        """
+        Checks all existing indexes in the Neo4j database.
+
+        Returns:
+            list[dict[str, Any]]: List of dictionaries containing index information including:
+                - name: The name of the index
+                - type: The type of index (e.g., "BTREE", "LOOKUP")
+                - labelsOrTypes: The labels or relationship types the index is on
+                - properties: The properties the index is on
+                - uniqueness: Whether the index is unique
+                - state: The state of the index (e.g., "ONLINE", "POPULATING")
+        """
+        query = """
+        SHOW INDEXES
+        """
+        logger.info("Checking existing indexes in the database")
+        indexes = self.db.execute_read(query)
+        logger.info(f"Found {len(indexes)} indexes")
+        return indexes
+
     def create_graph(
         self,
         nodes: Optional[list[str]] = None,
@@ -37,68 +58,77 @@ class NetworkAnalysis:
         Returns:
             networkx.Graph: The created graph.
         """
-
         logger.info(
             f"Creating graph with node types: {nodes} and relationships: {relationships} and ids: {ids}"
         )
 
-        # Query to fetch nodes with filters
-        node_filter = ""
-        if nodes:
-            node_filter += "WHERE labels(n)[0] IN $node_types "
-        if ids:
-            if "WHERE" in node_filter:
-                node_filter += "AND n.accession_id IN $accession_ids "
-            else:
-                node_filter += "WHERE n.accession_id IN $accession_ids "
-
-        query_nodes = f"""
+        # Build the base query
+        base_query = """
         MATCH (n)
-        {node_filter}
-        RETURN ID(n) as id, labels(n) as labels, properties(n) as properties
         """
-
-        # Query to fetch relationships with filters
-        relationship_filter = ""
+        
+        # Add node filters
+        node_filters = []
+        if nodes:
+            node_filters.append("labels(n)[0] IN $node_types")
+        if ids:
+            node_filters.append("n.accession_id IN $accession_ids")
+            
+        if node_filters:
+            base_query += "WHERE " + " AND ".join(node_filters)
+            
+        # Add relationship pattern and filters
+        base_query += """
+        OPTIONAL MATCH (n)-[r]->(m)
+        """
+        
+        # Add relationship type filter if specified
         if relationships:
-            relationship_filter += "WHERE type(r) IN $relationships "
-
-        query_relationships = f"""
-        MATCH (n)-[r]->(m)
-        {relationship_filter}
-        RETURN ID(n) as source, ID(m) as target, type(r) as type, properties(r) as properties
+            base_query += "WHERE type(r) IN $relationships "
+            
+        # Return both nodes and relationships in a single query
+        base_query += """
+        RETURN 
+            collect(DISTINCT {id: ID(n), labels: labels(n), properties: properties(n)}) as nodes,
+            collect(DISTINCT {source: ID(n), target: ID(m), type: type(r), properties: properties(r)}) as relationships
         """
-
-        # Fetch nodes and relationships
-        logger.debug(f"Executing query: {query_nodes}")
-        nodes_results = self.db.execute_read(
-            query_nodes, {"node_types": nodes, "accession_ids": ids}
+        
+        logger.info("Executing combined query for nodes and relationships")
+        results = self.db.execute_read(
+            base_query,
+            {
+                "node_types": nodes,
+                "accession_ids": ids,
+                "relationships": relationships
+            }
         )
-        logger.debug(f"Executing query: {query_relationships}")
-        relationships_results = self.db.execute_read(
-            query_relationships, {"relationships": relationships}
-        )
-        logger.debug(f"Number of nodes: {len(nodes_results)}")
-        logger.debug(f"Number of relationships: {len(relationships_results)}")
-
-        # Add nodes
-        for node in nodes_results:
+        
+        if not results or not results[0]:
+            logger.warning("No results found in the database")
+            return self.graph
+            
+        # Process nodes
+        nodes_data = results[0]["nodes"]
+        for node in nodes_data:
             self.graph.add_node(
                 node["id"],
                 labels=node["labels"],
-                properties=node["properties"],
+                properties=node["properties"]
             )
-
-        # Add relationships
-        for rel in relationships_results:
+        logger.info(f"Added {len(nodes_data)} nodes to the graph")
+        
+        # Process relationships
+        relationships_data = results[0]["relationships"]
+        for rel in relationships_data:
             if rel["source"] in self.graph and rel["target"] in self.graph:
                 self.graph.add_edge(
                     rel["source"],
                     rel["target"],
                     type=rel["type"],
-                    properties=rel["properties"],
+                    properties=rel["properties"]
                 )
-
+        logger.info(f"Added {len(relationships_data)} relationships to the graph")
+        
         return self.graph
 
     def compute_degree_centrality(self) -> dict[Any, float]:
@@ -233,8 +263,8 @@ class NetworkAnalysis:
         filtered_graph.remove_edges_from(self_referential_edges)
 
         # Find isolated nodes
-        isolated_nodes = self.find_isolated_nodes(filtered_graph)
-        filtered_graph.remove_nodes_from(isolated_nodes)
+        #isolated_nodes = self.find_isolated_nodes(filtered_graph)
+        #filtered_graph.remove_nodes_from(isolated_nodes)
 
         # Use spring layout for force-directed graph
         weight_attr = attribute if attribute is not None else None
