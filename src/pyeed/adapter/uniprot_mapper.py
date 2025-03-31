@@ -8,7 +8,7 @@ from loguru import logger
 from pyeed.adapter.primary_db_adapter import PrimaryDBMapper
 from pyeed.model import (
     Annotation,
-    CatalyticActivity,
+    Reaction,
     GOAnnotation,
     Organism,
     Protein,
@@ -57,9 +57,9 @@ class UniprotToPyeed(PrimaryDBMapper):
                 return
 
             protein.organism.connect(organism)
+            self.add_reaction(record, protein)
 
         self.add_sites(record, protein)
-        self.add_catalytic_activity(record, protein)
         self.add_go(record, protein)
 
     def add_sites(self, record: dict[str, Any], protein: Protein) -> None:
@@ -79,35 +79,38 @@ class UniprotToPyeed(PrimaryDBMapper):
 
             protein.site.connect(site, {"positions": positions})
 
-    def add_catalytic_activity(self, record: dict[str, Any], protein: Protein) -> None:
-        try:
-            for reference in record["comments"]:
-                if reference["type"] == "CATALYTIC_ACTIVITY":
-                    name = reference["reaction"]["name"]
-                    for i in reference["reaction"]["dbReferences"]:
-                        if i['id'].startswith("RHEA:"):
-                            rhea_id = i['id']
-                            break
+    def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
+        for reference in record.get("comments", []):  # Safe retrieval with .get()
+            if reference.get("type") == "CATALYTIC_ACTIVITY":
+                name = reference.get("reaction", {}).get("name", "")
+                rhea_id = None  # Default value
+
+                for db_ref in reference.get("reaction", {}).get("dbReferences", []):
+                    if db_ref.get("id", "").startswith("RHEA:"):
+                        rhea_id = db_ref["id"]
+                        break  # Stop after finding the first match
+
+                # Ensure we have both a reaction name and an RHEA ID
+                if not name or not rhea_id:
+                    logger.warning(f"Skipping {protein.accession_id}: Missing reaction name or RHEA ID")
+                    continue  # Move to the next reference
+
+                try:
                     left_side, right_side = name.split("=")
+                    left_list = [s.strip() for s in left_side.split(" + ")]
+                    right_list = [s.strip() for s in right_side.split(" + ")]
 
-                    # Further split each side by "+"
-                    left_list = list(left_side.strip().split(" + "))
-                    right_list = list(right_side.strip().split(" + "))
-                    
-                    catalytic_annotation = CatalyticActivity.get_or_save(
-                        catalytic_id=int(reference["id"])
-                        if reference.get("id")
-                        else None,
+                    catalytic_annotation = Reaction.get_or_save(
                         rhea_id=rhea_id,
-                        reactants = left_list,
-                        products = right_list,
+                        reactants=left_list,
+                        products=right_list,
                     )
-                    protein.catalytic_annotation.connect(catalytic_annotation)
+                    protein.reaction.connect(catalytic_annotation)
 
-        except Exception as e:
-            logger.error(
-                f"No Catalytic Activity for {protein.accession_id}: {e}"
-            )
+                except Exception as parse_error:
+                    logger.error(f"Error processing reaction for {protein.accession_id}: {parse_error}")
+                    continue  # Continue processing next accession_id
+
 
     def add_go(self, record: dict[str, Any], protein: Protein) -> None:
         for reference in record["dbReferences"]:

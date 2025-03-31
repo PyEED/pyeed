@@ -369,20 +369,19 @@ class RegionRel(StructuredRel):  # type: ignore
         return f"{self.start}-{self.end}"
 
 
-class CatalyticActivity(StrictStructuredNode):
+class Reaction(StrictStructuredNode):
     """
-    A node representing a catalytic activity.
+    A node representing a reaction.
     """
-
-    catalytic_id = IntegerProperty(required=False, unique_index=True)
+    
     rhea_id = StringProperty(required=False, unique_index=True)
     reactants = ArrayProperty()
     products = ArrayProperty()
 
     @property
     def label(self) -> str:
-        """The label of the catalytic activity."""
-        return str(self.rhea_id)
+        """The label of the reaction."""
+        return {self.rhea_id}
 
 
 class StandardNumbering(StrictStructuredNode):
@@ -497,7 +496,7 @@ class Protein(StrictStructuredNode):
     locus_tag = StringProperty()
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
-    catalytic_name = ArrayProperty(StringProperty())
+    rhea_id = ArrayProperty(StringProperty())
     embedding = ArrayProperty(
         FloatProperty(),
         vector_index=VectorIndex(dimensions=1280),
@@ -510,7 +509,7 @@ class Protein(StrictStructuredNode):
     site = RelationshipTo("Site", "HAS_SITE", model=SiteRel)
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
-    catalytic_annotation = RelationshipTo("CatalyticActivity", "HAS_CATALYTIC_ACTIVITY")
+    reaction = RelationshipTo("Reaction", "HAS_REACTION")
     ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
