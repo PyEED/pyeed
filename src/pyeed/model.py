@@ -385,7 +385,6 @@ class Reaction(StrictStructuredNode):
     
     rhea_id = StringProperty(unique_index=True, required=True)
     chebi_id = ArrayProperty(StringProperty())
-    smiles = ArrayProperty(StringProperty())
 
     # Relationships
     substrate = RelationshipTo("Molecule", "SUBSTRATE")
@@ -405,6 +404,20 @@ class Molecule(StrictStructuredNode):
     chebi_id = StringProperty(unique_index=True, required=True)
     rhea_compound_id = StringProperty()
     smiles = StringProperty()
+
+    @classmethod
+    def get_or_save(cls, chebi_id, smiles) -> "Molecule":
+        try:
+            molecule = cls.nodes.get(chebi_id=chebi_id)
+            return molecule
+        except cls.DoesNotExist:
+            try:
+                molecule = cls(chebi_id=chebi_id, smiles=smiles)
+                molecule.save()
+                return molecule
+            except Exception as e:
+                print(f"Error during saving of the molecule: {e}")
+                raise
     
     @property 
     def label(self) -> str:

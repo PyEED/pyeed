@@ -164,7 +164,6 @@ class UniprotToPyeed(PrimaryDBMapper):
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
         for reference in record.get("comments", []):  # Safe retrieval with .get()
             if reference.get("type") == "CATALYTIC_ACTIVITY":
-                name = reference.get("reaction", {}).get("name", "")
                 rhea_id = None  # Default value
 
                 for db_ref in reference.get("reaction", {}).get("dbReferences", []):
@@ -192,7 +191,7 @@ class UniprotToPyeed(PrimaryDBMapper):
             chebi_id = f"CHEBI:{chebi_id}"
             substrate = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles=smiles,
+                smiles = smiles,
             )
             reaction.substrate.connect(substrate)
         
@@ -203,7 +202,7 @@ class UniprotToPyeed(PrimaryDBMapper):
             chebi_id = f"CHEBI:{chebi_id}"
             product = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles=smiles,
+                smiles = smiles,
             )
             reaction.product.connect(product)
 
