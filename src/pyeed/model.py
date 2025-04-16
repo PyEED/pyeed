@@ -1,11 +1,13 @@
 from enum import Enum
 from typing import Any
 
+
 # from pyeed.nodes_and_relations import StrictStructuredNode
 from neomodel import (
     ArrayProperty,
     FloatProperty,
     IntegerProperty,
+    BooleanProperty,
     RelationshipTo,
     StringProperty,
     StructuredNode,
@@ -111,6 +113,13 @@ class StrictStructuredNode(StructuredNode):  # type: ignore
                 elif isinstance(base_property, FloatProperty):
                     if not all(isinstance(item, float) for item in prop):
                         raise TypeError(f"All items in '{field}' must be floats")
+                    
+            #Validate BoleanProperty
+            elif isinstance(neo_type, BooleanProperty) and not isinstance(prop, bool):
+                raise TypeError(
+                    f"Expected a boolean for '{field}', got {type(prop).__name__}"
+                )
+                
 
         super().save(*args, **kwargs)  # Don't return the result
 
@@ -374,16 +383,35 @@ class Reaction(StrictStructuredNode):
     A node representing a reaction.
     """
     
-    rhea_id = StringProperty(required=False, unique_index=True)
-    reactants = ArrayProperty()
-    products = ArrayProperty()
+    rhea_id = StringProperty(unique_index=True, required=True)
+    chebi_id = ArrayProperty(StringProperty())
+    smiles = ArrayProperty(StringProperty())
 
+    # Relationships
+    substrate = RelationshipTo("Molecule", "SUBSTRATE")
+    product = RelationshipTo("Molecule", "PRODUCT")
+    
+    
     @property
     def label(self) -> str:
         """The label of the reaction."""
         return {self.rhea_id}
 
-
+class Molecule(StrictStructuredNode):
+    """
+    A node representing a molecule in the database.
+    """
+    
+    chebi_id = StringProperty(unique_index=True, required=True)
+    rhea_compound_id = StringProperty()
+    smiles = StringProperty()
+    
+    @property 
+    def label(self) -> str:
+        """The label of the molecule."""
+        return {self.chebi_id}
+    
+    
 class StandardNumbering(StrictStructuredNode):
     name = StringProperty(required=True, unique_index=True)
     definition = StringProperty(required=True)
@@ -497,12 +525,17 @@ class Protein(StrictStructuredNode):
     structure_ids = ArrayProperty(StringProperty())
     go_terms = ArrayProperty(StringProperty())
     rhea_id = ArrayProperty(StringProperty())
+    chebi_id = ArrayProperty(StringProperty())
     embedding = ArrayProperty(
         FloatProperty(),
         vector_index=VectorIndex(dimensions=1280),
         index_type="hnsw",
         distance_metric="COSINE",
     )
+    TBT = StringProperty()
+    PCL = StringProperty()
+    BHET = StringProperty()
+    PET_powder = StringProperty()
 
     # Relationships
     organism = RelationshipTo("Organism", "ORIGINATES_FROM")
@@ -510,6 +543,8 @@ class Protein(StrictStructuredNode):
     region = RelationshipTo("Region", "HAS_REGION", model=RegionRel)
     go_annotation = RelationshipTo("GOAnnotation", "ASSOCIATED_WITH")
     reaction = RelationshipTo("Reaction", "HAS_REACTION")
+    substrate = RelationshipTo("Molecule", "SUBSTRATE")
+    product = RelationshipTo("Molecule", "PRODUCT")
     ontology_object = RelationshipTo("OntologyObject", "ASSOCIATED_WITH")
     mutation = RelationshipTo("Protein", "MUTATION", model=Mutation)
     pairwise_aligned = RelationshipTo(
