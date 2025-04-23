@@ -458,14 +458,24 @@ class Pyeed:
         CREATE (r:Region {annotation: 'coding sequence', sequence_id: p.accession_id})
         CREATE (d)-[rel:HAS_REGION {
             start: CASE 
-                WHEN rel_encode.start IS NOT NULL THEN rel_encode.start 
+                WHEN rel_encode.start IS NOT NULL THEN rel_encode.start - 1
                 ELSE 0 
             END, 
             end: CASE 
-                WHEN rel_encode.end IS NOT NULL THEN rel_encode.end 
+                WHEN rel_encode.end IS NOT NULL THEN rel_encode.end - 1
                 ELSE size(d.sequence) - 1 
             END
         }]->(r)
+        """
+        self.db.execute_write(query)
+
+        # for dna where ther is no protein encoded and no Region with coding sequence annotation, create a Region with the entire sequence length
+        # make the start at 0 and the end at the sequence length minus 1
+        query = """
+        MATCH (d:DNA)
+        WHERE NOT EXISTS((d)-[:HAS_REGION]->(:Region {annotation: 'coding sequence', sequence_id: d.accession_id}))
+        CREATE (r:Region {annotation: 'coding sequence', sequence_id: d.accession_id})
+        CREATE (d)-[:HAS_REGION {start: 0, end: size(d.sequence) - 1}]->(r)
         """
         self.db.execute_write(query)
 

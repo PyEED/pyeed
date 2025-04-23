@@ -78,9 +78,9 @@ def load_model_and_tokenizer(
         model = model.to(device)
 
     # Check if multiple GPUs are available and wrap the model accordingly
-    if torch.cuda.device_count() > 1 and device.type == "cuda":
-        logger.info(f"Using {torch.cuda.device_count()} GPUs for parallel inference.")
-        model = torch.nn.DataParallel(model)
+    # if torch.cuda.device_count() > 1 and device.type == "cuda":
+    #     logger.info(f"Using {torch.cuda.device_count()} GPUs for parallel inference.")
+    #     model = torch.nn.DataParallel(model)
 
     return model, tokenizer, device
 
@@ -113,17 +113,17 @@ def get_batch_embeddings(
         List of embeddings as NumPy arrays.
     """
     # First, determine the base model type
-    base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+    # base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
 
-    if isinstance(base_model, ESMC):
+    if isinstance(model, ESMC):
         # For ESMC models
         embedding_list = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
                 # Use the model directly - DataParallel handles internal distribution
-                protein_tensor = base_model.encode(protein)
-                logits_output = base_model.logits(
+                protein_tensor = model.encode(protein)
+                logits_output = model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )
                 if logits_output.embeddings is None:
@@ -135,14 +135,14 @@ def get_batch_embeddings(
                     embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
         return embedding_list
-    elif isinstance(base_model, ESM3):
+    elif isinstance(model, ESM3):
         # For ESM3 models
         embedding_list = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
-                sequence_encoding = base_model.encode(protein)
-                result = base_model.forward_and_sample(
+                sequence_encoding = model.encode(protein)
+                result = model.forward_and_sample(
                     sequence_encoding,
                     SamplingConfig(return_per_residue_embeddings=True),
                 )

@@ -6,8 +6,9 @@ import numpy as np
 import scipy.spatial as sp
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
-from pyeed.dbconnect import DatabaseConnector
 from scipy.spatial.distance import cosine
+
+from pyeed.dbconnect import DatabaseConnector
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +353,7 @@ class EmbeddingTool:
         query_protein_id: str,
         index_name: str = "embedding_index",
         number_of_neighbors: int = 50,
+        skip: int = 0,
     ) -> list[tuple[str, float]]:
         """
         This function finds the nearest neighbors of a query protein based on the vector index.
@@ -411,6 +413,7 @@ class EmbeddingTool:
         CALL db.index.vector.queryNodes('{index_name}', {number_of_neighbors}, embedding)
         YIELD node AS fprotein, score
         RETURN fprotein.accession_id, score
+        SKIP {skip}
         """
         results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [
