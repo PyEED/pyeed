@@ -10,8 +10,9 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 class NCBIToUniprotMapper:
-    def __init__(self, ids):
+    def __init__(self, ids: List[str], file: str):
         self.ids = ids
+        self.file = file
         self.uniparc_url = "https://www.ebi.ac.uk/proteins/api/uniparc?offset=0&size=100&sequencechecksum="
         self.ncbi_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     
@@ -122,9 +123,9 @@ class NCBIToUniprotMapper:
                         id_mapping_uniprot[self.ids[counter]] = uniprot_id
             counter += 1
         
-        with open("id_mapping_uniprot.json", "w") as f:
+        with open(f"{self.file}_uniprot.json", "w") as f:
             json.dump(id_mapping_uniprot, f)
             
-        with open("id_mapping_uniparc.json", "w") as f:
+        with open(f"{self.file}_uniparc.json", "w") as f:
             json.dump(id_mapping_uniparc, f)
     
