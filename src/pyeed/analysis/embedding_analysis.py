@@ -1,10 +1,9 @@
 import logging
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.spatial as sp
-import torch
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from pyeed.dbconnect import DatabaseConnector
@@ -45,44 +44,6 @@ class EmbeddingTool:
         embedding = np.array(embedding_read[0]["embedding"])
 
         return embedding
-
-    def _get_single_embedding_last_hidden_state(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
-    ) -> NDArray[np.float64]:
-        """Generate embeddings for a single sequence using the last hidden state.
-
-        Args:
-            sequence (str): The protein sequence to embed
-            model (Any): The transformer model to use
-            tokenizer (Any): The tokenizer for the model
-            device (torch.device): The device to run the model on (CPU/GPU)
-
-        Returns:
-            np.ndarray: Normalized embeddings for each token in the sequence
-        """
-        from esm.models.esmc import ESMC
-
-        with torch.no_grad():
-            if isinstance(model, ESMC):
-                # ESM-3 logic
-                from esm.sdk.api import ESMProtein, LogitsConfig
-
-                protein = ESMProtein(sequence=sequence)
-                protein_tensor = model.encode(protein)
-                logits_output = model.logits(
-                    protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
-                )
-                embedding = logits_output.embeddings[0].cpu().numpy()
-            else:
-                # ESM-2 logic
-                inputs = tokenizer(sequence, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-                embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
-
-        # normalize the embedding
-        embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
-
-        return embedding  # type: ignore
 
     def find_closest_matches_simple(
         self,
@@ -387,8 +348,8 @@ class EmbeddingTool:
 
     def find_nearest_neighbors_based_on_vector_index(
         self,
+        query_id: str,
         db: DatabaseConnector,
-        query_protein_id: str,
         index_name: str = "embedding_index",
         number_of_neighbors: int = 50,
     ) -> list[tuple[str, float]]:
@@ -445,13 +406,14 @@ class EmbeddingTool:
             logger.info(f"Index {index_name} is populated, finding nearest neighbors")
 
         query_find_nearest_neighbors = f"""
-        MATCH (source:Protein {{accession_id: '{query_protein_id}'}})
+        MATCH (source:Protein {{accession_id: '{query_id}'}})
         WITH source.embedding AS embedding
         CALL db.index.vector.queryNodes('{index_name}', {number_of_neighbors}, embedding)
         YIELD node AS fprotein, score
+        WHERE score > 0.95
         RETURN fprotein.accession_id, score
         """
-        results = db.execute_read(query_find_nearest_neighbors)  # type: list[dict[str, Any]]
+        results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [
             (str(record["fprotein.accession_id"]), float(record["score"]))
             for record in results

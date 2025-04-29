@@ -1,5 +1,7 @@
 from itertools import combinations
-from typing import Any, Dict, Optional
+from typing import List,Any, Dict, Optional, Tuple
+import time
+import asyncio
 
 from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
@@ -90,6 +92,9 @@ class PairwiseAligner:
         batch_size: int = 500,
         return_results: bool = True,
         pairs: Optional[list[tuple[str, str]]] = None,
+        node_type: str = "Protein",
+        region_ids_neo4j: Optional[list[str]] = None,
+        num_cores: int = cpu_count() - 1,
     ) -> Optional[list[dict[str, Any]]]:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
@@ -112,7 +117,8 @@ class PairwiseAligner:
                 returning the results, which can reduce memory usage. Defaults to True.
             pairs (Optional[list[tuple[str, str]]]): A list of tuples, where each tuple contains two
                 sequence IDs to align. If provided, only these pairs will be aligned.
-
+            node_type (str): The type of node to align. Defaults to "Protein".
+            region_ids_neo4j (Optional[list[str]]): A list of region IDs for the sequence cuting based on region_based_sequence.
         Returns:
             Optional[List[dict]]: A list of dictionaries containing the alignment results if
             `return_results` is True. If False, returns None.
@@ -120,7 +126,7 @@ class PairwiseAligner:
 
         # Fetch sequences if ids are provided
         if ids is not None and db is not None:
-            sequences = self._get_id_sequence_dict(db, ids)
+            sequences = self._get_id_sequence_dict(db, ids, node_type, region_ids_neo4j)
 
         if not sequences:
             raise ValueError(
@@ -133,6 +139,21 @@ class PairwiseAligner:
         total_pairs = len(pairs)
         all_alignments = []
 
+        query = """
+        MATCH (p1:Protein)-[:PAIRWISE_ALIGNED]->(p2:Protein)
+        RETURN p1.accession_id AS Protein1_ID, p2.accession_id AS Protein2_ID
+        """
+        
+        # Fetch results properly as a list of tuples
+        existing_pairs = set(tuple(sorted((row["Protein1_ID"], row["Protein2_ID"]))) for row in db.execute_write(query))
+
+        # Filter new pairs that are not in existing_pairs
+        new_pairs = [pair for pair in pairs if tuple(sorted(pair)) not in existing_pairs]
+
+        print(f"Number of existing pairs: {len(existing_pairs)}")
+        print(f"Number of total pairs: {len(pairs)}")
+        print(f"Number of pairs to align: {len(new_pairs)}")
+
         with Progress() as progress:
             align_task = progress.add_task(
                 f"⛓️ Aligning {total_pairs} sequence pairs...", total=total_pairs
@@ -141,9 +162,9 @@ class PairwiseAligner:
                 "📥 Inserting alignment results to database...", total=total_pairs
             )
 
-            for pair_chunk in chunks(pairs, batch_size):
+            for pair_chunk in chunks(new_pairs, batch_size):
                 # Align the pairs in the current chunk
-                alignments = Parallel(n_jobs=cpu_count(), prefer="processes")(
+                alignments = Parallel(n_jobs=num_cores, prefer="processes")(
                     delayed(self.align_pairwise)(
                         {pair[0]: sequences[pair[0]]},
                         {pair[1]: sequences[pair[1]]},
@@ -155,7 +176,7 @@ class PairwiseAligner:
                 progress.update(align_task, advance=len(pair_chunk))
 
                 if db:
-                    self._to_db(alignments, db)
+                    self._to_db(alignments, db, node_type, region_ids_neo4j)
                     progress.update(db_task, advance=len(pair_chunk))
 
                 if return_results:
@@ -167,28 +188,53 @@ class PairwiseAligner:
         self,
         alignments: list[dict[str, Any]],
         db: DatabaseConnector,
+        node_type: str = "Protein",
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> None:
         """Inserts the alignment results to pyeed graph database.
 
         Args:
             alignments (list[dict]): A list of dictionaries containing the alignment results.
             db (DatabaseConnector): A `DatabaseConnector` object.
+            node_type (str): The type of node to align. Defaults to "Protein".
+            region_ids_neo4j (Optional[list[str]]): A list of region IDs for the sequence cuting based on region_based_sequence.
         """
 
-        query = """
-        UNWIND $alignments AS alignment
-        MATCH (p1:Protein {accession_id: alignment.query_id})
-        MATCH (p2:Protein {accession_id: alignment.target_id})
-        MERGE (p1)-[r:PAIRWISE_ALIGNED]->(p2)
-        SET r.similarity = alignment.identity,
+        if region_ids_neo4j is None:
+            query = f"""
+            UNWIND $alignments AS alignment
+            MATCH (p1:{node_type} {{accession_id: alignment.query_id}})
+            MATCH (p2:{node_type} {{accession_id: alignment.target_id}})
+            MERGE (p1)-[r:PAIRWISE_ALIGNED]->(p2)
+            SET r.similarity = alignment.identity,
             r.mismatches = alignment.mismatches,
             r.gaps = alignment.gaps,
             r.score = alignment.score,
             r.query_aligned = alignment.query_aligned,
             r.target_aligned = alignment.target_aligned
-        """
-
-        db.execute_write(query, {"alignments": alignments})
+            """
+            db.execute_write(query, parameters={"alignments": alignments})
+        else:
+            query = f"""
+            UNWIND $alignments AS alignment
+            MATCH (p1:{node_type} {{accession_id: alignment.query_id}})-[rel1:HAS_REGION]->(r1:Region)
+            MATCH (p2:{node_type} {{accession_id: alignment.target_id}})-[rel2:HAS_REGION]->(r2:Region)
+            WHERE id(r1) IN $region_ids_neo4j AND id(r2) IN $region_ids_neo4j
+            MERGE (r1)-[r:PAIRWISE_ALIGNED]->(r2)
+            SET r.similarity = alignment.identity,
+            r.mismatches = alignment.mismatches,
+            r.gaps = alignment.gaps,
+            r.score = alignment.score,
+            r.query_aligned = alignment.query_aligned,
+            r.target_aligned = alignment.target_aligned
+            """
+            db.execute_write(
+                query,
+                parameters={
+                    "alignments": alignments,
+                    "region_ids_neo4j": region_ids_neo4j,
+                },
+            )
 
     def _get_aligner(self) -> BioPairwiseAligner:
         """Creates a BioPython pairwise aligner object with the specified parameters
@@ -242,6 +288,8 @@ class PairwiseAligner:
         self,
         db: DatabaseConnector,
         ids: list[str] = [],
+        node_type: str = "Protein",
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> dict[str, str]:
         """Gets all sequences from the database and returns them in a dictionary.
         Key is the accession id and value is the sequence.
@@ -255,21 +303,52 @@ class PairwiseAligner:
             dict[str, str]: Dictionary of sequences with accession id as key.
         """
 
-        if not ids:
-            query = """
-            MATCH (p:Protein)
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
-            """
-            proteins = db.execute_read(query)
-        else:
-            query = """
-            MATCH (p:Protein)
-            WHERE p.accession_id IN $ids
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
-            """
-            proteins = db.execute_read(query, {"ids": ids})
+        if ids != []:
+            if region_ids_neo4j is not None:
+                query = f"""
+                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
+                WHERE id(r) IN $region_ids_neo4j AND p.accession_id IN $ids
+                RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+                """
+                nodes = db.execute_read(
+                    query,
+                    parameters={"region_ids_neo4j": region_ids_neo4j, "ids": ids},
+                )
+            else:
+                query = f"""
+                MATCH (p:{node_type})
+                WHERE p.accession_id IN $ids
+                RETURN p.accession_id AS accession_id, p.sequence AS sequence
+                """
+                nodes = db.execute_read(query, parameters={"ids": ids})
 
-        return {protein["accession_id"]: protein["sequence"] for protein in proteins}
+        else:
+            if region_ids_neo4j is not None:
+                query = f"""
+                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
+                WHERE id(r) IN $region_ids_neo4j
+                RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+                """
+                nodes = db.execute_read(
+                    query,
+                    parameters={
+                        "region_ids_neo4j": region_ids_neo4j,
+                    },
+                )
+            else:
+                query = f"""
+                MATCH (p:{node_type})
+                RETURN p.accession_id AS accession_id, p.sequence AS sequence
+                """
+                nodes = db.execute_read(query)
+
+        if region_ids_neo4j is not None:
+            return {
+                node["accession_id"]: node["sequence"][node["start"] : node["end"]]
+                for node in nodes
+            }
+        else:
+            return {node["accession_id"]: node["sequence"] for node in nodes}
 
     def _load_substitution_matrix(self) -> "BioSubstitutionMatrix":
         from Bio.Align import substitution_matrices

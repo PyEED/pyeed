@@ -227,7 +227,9 @@ class DatabaseConnector:
         Creates a new Neo4j driver instance.
         """
         auth = (user, password) if user and password else None
-        return GraphDatabase.driver(uri, auth=auth)
+        return GraphDatabase.driver(uri, auth=auth, connection_timeout=60,  # Increase initial connection timeout
+        max_connection_lifetime=86400,  # Keep connections alive longer
+        )
 
     @property
     def node_properties(self) -> list[dict[str, str]]:
