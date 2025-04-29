@@ -141,7 +141,6 @@ class UniprotToPyeed(PrimaryDBMapper):
         }
 
     
-
     def get_smiles_from_chebi_web(self, chebi_url: str) -> str:
         """
         Extract SMILES from the official ChEBI page using HTML scraping.
