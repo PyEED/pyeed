@@ -104,7 +104,7 @@ class NCBIToUniprotMapper:
                 
             #check if the request was successful
             if response.status_code != 200:
-                print(f"Request failed with status code {r.status_code}")
+                print(f"Request failed with status code {response.status_code}")
                 response.raise_for_status()  # Raise exception for any non-200 response
                 sys.exit()
             

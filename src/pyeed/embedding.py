@@ -1,19 +1,18 @@
 import gc
 import os
 from typing import Any, Tuple, Union
-from loguru import logger
 
 import numpy as np
 import torch
-from esm.models.esmc import ESMC
 from esm.models.esm3 import ESM3
+from esm.models.esmc import ESMC
 from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
+from loguru import logger
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
-
 
 
 def get_hf_token() -> str:
