@@ -82,13 +82,15 @@ class UniprotToPyeed(PrimaryDBMapper):
             site.save()
 
             protein.site.connect(site, {"positions": positions})
-    
-    def get_substrates_and_products_from_rhea(self, rhea_id: str) -> dict[str, List[str]]:
+
+    def get_substrates_and_products_from_rhea(
+        self, rhea_id: str
+    ) -> dict[str, List[str]]:
         """Fetch substrates and products from Rhea by parsing the side URI (_L = substrate, _R = product).
-        
+
         Args:
             rhea_id (str or int): The Rhea reaction ID (e.g., 49528)
-        
+
         Returns:
             dict: {
                 'substrates': [list of chebi URIs],
@@ -134,17 +136,13 @@ class UniprotToPyeed(PrimaryDBMapper):
             elif side_uri.endswith("_R"):
                 products.add(chebi_uri)
 
-        return {
-            "substrates": sorted(substrates),
-            "products": sorted(products)
-        }
+        return {"substrates": sorted(substrates), "products": sorted(products)}
 
-    
     def get_smiles_from_chebi_web(self, chebi_url: str) -> str:
         """
         Extract SMILES from the official ChEBI page using HTML scraping.
         """
-        chebi_id = chebi_url.split('_')[-1]
+        chebi_id = chebi_url.split("_")[-1]
         url = f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:{chebi_id}"
 
         response = requests.get(url)
@@ -157,7 +155,6 @@ class UniprotToPyeed(PrimaryDBMapper):
                 if headers and "SMILES" in headers[0].text:
                     data_cell = row.find_all("td")[-1]  # Get the last <td> in row
                     return data_cell.text.strip()
-                
 
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
         for reference in record.get("comments", []):  # Safe retrieval with .get()
@@ -168,7 +165,7 @@ class UniprotToPyeed(PrimaryDBMapper):
                     if db_ref.get("id", "").startswith("RHEA:"):
                         rhea_id = db_ref["id"]
                         break  # Stop after finding the first match
-                
+
                 catalytic_annotation = Reaction.get_or_save(
                     rhea_id=rhea_id,
                 )
@@ -176,31 +173,30 @@ class UniprotToPyeed(PrimaryDBMapper):
                 protein.reaction.connect(catalytic_annotation)
 
     def add_molecule(self, rhea_id: str, reaction: Reaction) -> None:
-    
         chebi = self.get_substrates_and_products_from_rhea(rhea_id)
 
         substrate_ids = chebi["substrates"]
         product_ids = chebi["products"]
-        
+
         for i in substrate_ids:
             smiles = self.get_smiles_from_chebi_web(i)
-            
-            chebi_id = i.split('_')[-1]
+
+            chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
             substrate = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles = smiles,
+                smiles=smiles,
             )
             reaction.substrate.connect(substrate)
-        
+
         for i in product_ids:
             smiles = self.get_smiles_from_chebi_web(i)
 
-            chebi_id = i.split('_')[-1]
+            chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
             product = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles = smiles,
+                smiles=smiles,
             )
             reaction.product.connect(product)
 

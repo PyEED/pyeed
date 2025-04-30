@@ -190,8 +190,7 @@ class Pyeed:
         # Fix: apply nest_asyncio and then run the coroutine with the event loop
         nest_asyncio.apply()
         asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
-    
-    
+
     def database_id_mapper(self, ids: list[str], file: str) -> None:
         """
         Maps IDs from one database to another using the UniProt ID mapping service
@@ -202,7 +201,7 @@ class Pyeed:
 
         mapper = NCBIToUniprotMapper(ids, file)
         mapper.execute_request()
-        
+
         nest_asyncio.apply()
 
     def calculate_sequence_embeddings(
@@ -210,9 +209,9 @@ class Pyeed:
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         num_gpus: int = None,  # Number of GPUs to use
-        ) -> None:
+    ) -> None:
         """
-        Calculates embeddings for all sequences in the database that do not have embeddings, 
+        Calculates embeddings for all sequences in the database that do not have embeddings,
         distributing the workload across available GPUs.
 
         Args:
@@ -243,18 +242,19 @@ class Pyeed:
         """
         results = self.db.execute_read(query)
         data = [(result["accession"], result["sequence"]) for result in results]
-        
+
         if not data:
             logger.info("No sequences to process.")
             return
-        
+
         accessions, sequences = zip(*data)
         total_sequences = len(sequences)
         logger.debug(f"Total sequences to process: {total_sequences}")
 
         # Split the data into num_gpus chunks
         gpu_batches = [
-            list(zip(accessions[i::num_gpus], sequences[i::num_gpus])) for i in range(num_gpus)
+            list(zip(accessions[i::num_gpus], sequences[i::num_gpus]))
+            for i in range(num_gpus)
         ]
 
         start_time = time.time()
@@ -275,16 +275,17 @@ class Pyeed:
                         model,
                         tokenizer,
                         device,
-                        self.db
+                        self.db,
                     )
                 )
-            
+
             for future in futures:
                 future.result()  # Wait for all threads to complete
 
-
         end_time = time.time()
-        logger.info(f"Total embedding calculation time: {end_time - start_time:.2f} seconds")
+        logger.info(
+            f"Total embedding calculation time: {end_time - start_time:.2f} seconds"
+        )
 
         # Cleanup
         for model, _, _ in models_and_tokenizers:

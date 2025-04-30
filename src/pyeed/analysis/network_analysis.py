@@ -66,57 +66,51 @@ class NetworkAnalysis:
         base_query = """
         MATCH (n)
         """
-        
+
         # Add node filters
         node_filters = []
         if nodes:
             node_filters.append("labels(n)[0] IN $node_types")
         if ids:
             node_filters.append("n.accession_id IN $accession_ids")
-            
+
         if node_filters:
             base_query += "WHERE " + " AND ".join(node_filters)
-            
+
         # Add relationship pattern and filters
         base_query += """
         OPTIONAL MATCH (n)-[r]->(m)
         """
-        
+
         # Add relationship type filter if specified
         if relationships:
             base_query += "WHERE type(r) IN $relationships "
-            
+
         # Return both nodes and relationships in a single query
         base_query += """
         RETURN 
             collect(DISTINCT {id: ID(n), labels: labels(n), properties: properties(n)}) as nodes,
             collect(DISTINCT {source: ID(n), target: ID(m), type: type(r), properties: properties(r)}) as relationships
         """
-        
+
         logger.info("Executing combined query for nodes and relationships")
         results = self.db.execute_read(
             base_query,
-            {
-                "node_types": nodes,
-                "accession_ids": ids,
-                "relationships": relationships
-            }
+            {"node_types": nodes, "accession_ids": ids, "relationships": relationships},
         )
-        
+
         if not results or not results[0]:
             logger.warning("No results found in the database")
             return self.graph
-            
+
         # Process nodes
         nodes_data = results[0]["nodes"]
         for node in nodes_data:
             self.graph.add_node(
-                node["id"],
-                labels=node["labels"],
-                properties=node["properties"]
+                node["id"], labels=node["labels"], properties=node["properties"]
             )
         logger.info(f"Added {len(nodes_data)} nodes to the graph")
-        
+
         # Process relationships
         relationships_data = results[0]["relationships"]
         for rel in relationships_data:
@@ -125,10 +119,10 @@ class NetworkAnalysis:
                     rel["source"],
                     rel["target"],
                     type=rel["type"],
-                    properties=rel["properties"]
+                    properties=rel["properties"],
                 )
         logger.info(f"Added {len(relationships_data)} relationships to the graph")
-        
+
         return self.graph
 
     def compute_degree_centrality(self) -> dict[Any, float]:
@@ -263,8 +257,8 @@ class NetworkAnalysis:
         filtered_graph.remove_edges_from(self_referential_edges)
 
         # Find isolated nodes
-        #isolated_nodes = self.find_isolated_nodes(filtered_graph)
-        #filtered_graph.remove_nodes_from(isolated_nodes)
+        # isolated_nodes = self.find_isolated_nodes(filtered_graph)
+        # filtered_graph.remove_nodes_from(isolated_nodes)
 
         # Use spring layout for force-directed graph
         weight_attr = attribute if attribute is not None else None

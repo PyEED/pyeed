@@ -112,13 +112,12 @@ class StrictStructuredNode(StructuredNode):  # type: ignore
                 elif isinstance(base_property, FloatProperty):
                     if not all(isinstance(item, float) for item in prop):
                         raise TypeError(f"All items in '{field}' must be floats")
-                    
-            #Validate BoleanProperty
+
+            # Validate BoleanProperty
             elif isinstance(neo_type, BooleanProperty) and not isinstance(prop, bool):
                 raise TypeError(
                     f"Expected a boolean for '{field}', got {type(prop).__name__}"
                 )
-                
 
         super().save(*args, **kwargs)  # Don't return the result
 
@@ -153,7 +152,7 @@ class Annotation(Enum):
 class Organism(StrictStructuredNode):
     taxonomy_id = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
-    
+
     @classmethod
     def get_or_save(cls, taxonomy_id, name) -> "Organism":
         try:
@@ -395,25 +394,25 @@ class Reaction(StrictStructuredNode):
     """
     A node representing a reaction.
     """
-    
+
     rhea_id = StringProperty(unique_index=True, required=True)
     chebi_id = ArrayProperty(StringProperty())
 
     # Relationships
     substrate = RelationshipTo("Molecule", "SUBSTRATE")
     product = RelationshipTo("Molecule", "PRODUCT")
-    
-    
+
     @property
     def label(self) -> str:
         """The label of the reaction."""
         return {self.rhea_id}
 
+
 class Molecule(StrictStructuredNode):
     """
     A node representing a molecule in the database.
     """
-    
+
     chebi_id = StringProperty(unique_index=True, required=True)
     rhea_compound_id = StringProperty()
     smiles = StringProperty()
@@ -431,13 +430,13 @@ class Molecule(StrictStructuredNode):
             except Exception as e:
                 print(f"Error during saving of the molecule: {e}")
                 raise
-    
-    @property 
+
+    @property
     def label(self) -> str:
         """The label of the molecule."""
         return {self.chebi_id}
-    
-    
+
+
 class StandardNumbering(StrictStructuredNode):
     name = StringProperty(required=True, unique_index=True)
     definition = StringProperty(required=True)
