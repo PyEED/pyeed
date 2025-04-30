@@ -160,7 +160,11 @@ class UniprotToPyeed(PrimaryDBMapper):
                 if not isinstance(row, Tag):
                     continue
                 headers = row.find_all("td", class_="chebiDataHeader")
-                if headers and isinstance(headers[0], Tag) and "SMILES" in headers[0].text:
+                if (
+                    headers
+                    and isinstance(headers[0], Tag)
+                    and "SMILES" in headers[0].text
+                ):
                     data_cells = row.find_all("td")
                     if data_cells:
                         return f"{data_cells[-1].text.strip()}"

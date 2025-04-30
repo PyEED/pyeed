@@ -10,6 +10,7 @@ from pysam import FastaFile
 
 logger = logging.getLogger(__name__)
 
+
 class NCBIToUniprotMapper:
     def __init__(self, ids: List[str], file: str):
         self.ids = ids

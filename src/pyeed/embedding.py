@@ -34,13 +34,13 @@ def get_hf_token() -> str:
 
 
 def process_batches_on_gpu(
-    data: list[tuple[str, str]], 
-    batch_size: int, 
-    model:Module, 
-    tokenizer: EsmTokenizer, 
-    db:DatabaseConnector,
-    device:torch.device,
-    ) -> None:
+    data: list[tuple[str, str]],
+    batch_size: int,
+    model: Module,
+    tokenizer: EsmTokenizer,
+    db: DatabaseConnector,
+    device: torch.device,
+) -> None:
     """
     Splits data into batches and processes them on a single GPU.
 
@@ -96,7 +96,7 @@ def process_batches_on_gpu(
 
 def load_model_and_tokenizer(
     model_name: str,
-    device:torch.device,
+    device: torch.device,
 ) -> Tuple[Any, Union[Any, None], torch.device]:
     """
     Loads the model and assigns it to a specific GPU.
@@ -217,7 +217,7 @@ def get_batch_embeddings(
 
 
 def calculate_single_sequence_embedding_last_hidden_state(
-    sequence: str, 
+    sequence: str,
     device: torch.device,
     model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
@@ -236,7 +236,7 @@ def calculate_single_sequence_embedding_last_hidden_state(
 
 
 def calculate_single_sequence_embedding_all_layers(
-    sequence: str, 
+    sequence: str,
     device: torch.device,
     model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:

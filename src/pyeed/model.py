@@ -420,7 +420,7 @@ class Molecule(StrictStructuredNode):
     smiles = StringProperty()
 
     @classmethod
-    def get_or_save(cls, **kwargs:Any) -> "Molecule":
+    def get_or_save(cls, **kwargs: Any) -> "Molecule":
         chebi_id = kwargs.get("chebi_id")
         smiles = kwargs.get("smiles")
         try:

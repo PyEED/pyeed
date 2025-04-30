@@ -229,12 +229,14 @@ class Pyeed:
             logger.warning("No GPU available! Running on CPU.")
 
         # Load separate models for each GPU
-        devices = [
-        torch.device(f"cuda:{i}") for i in range(num_gpus)
-        ] if num_gpus > 0 else [torch.device("cpu")]
+        devices = (
+            [torch.device(f"cuda:{i}") for i in range(num_gpus)]
+            if num_gpus > 0
+            else [torch.device("cpu")]
+        )
 
         models_and_tokenizers = [
-        load_model_and_tokenizer(model_name, device) for device in devices
+            load_model_and_tokenizer(model_name, device) for device in devices
         ]
 
         # Retrieve sequences without embeddings
