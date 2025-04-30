@@ -62,7 +62,7 @@ class NCBIToUniprotMapper:
         self.download_fasta(refseq_id)
         fa = FastaFile(f"{refseq_id}.fasta")
         seq = fa.fetch(fa.references[0])
-        return crc64iso.crc64(seq)
+        return f"{crc64iso.crc64(seq)}"
 
     def checksum_list(self, refseq_ids: List[str]) -> List[str]:
         """Creates a list of checksum IDs and deletes the FASTA files after processing.

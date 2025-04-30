@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 # from pyeed.nodes_and_relations import StrictStructuredNode
 from neomodel import (
@@ -154,9 +154,11 @@ class Organism(StrictStructuredNode):
     name = StringProperty()
 
     @classmethod
-    def get_or_save(cls, taxonomy_id, name) -> "Organism":
+    def get_or_save(cls, **kwargs: Any) -> "Organism":
+        taxonomy_id = kwargs.get("taxonomy_id")
+        name = kwargs.get("name")
         try:
-            organism = cls.nodes.get(taxonomy_id=taxonomy_id)
+            organism = cast(Organism, cls.nodes.get(taxonomy_id=taxonomy_id))
             return organism
         except cls.DoesNotExist:
             try:
@@ -405,7 +407,7 @@ class Reaction(StrictStructuredNode):
     @property
     def label(self) -> str:
         """The label of the reaction."""
-        return {self.rhea_id}
+        return f"{self.rhea_id}"
 
 
 class Molecule(StrictStructuredNode):
@@ -418,9 +420,11 @@ class Molecule(StrictStructuredNode):
     smiles = StringProperty()
 
     @classmethod
-    def get_or_save(cls, chebi_id, smiles) -> "Molecule":
+    def get_or_save(cls, **kwargs:Any) -> "Molecule":
+        chebi_id = kwargs.get("chebi_id")
+        smiles = kwargs.get("smiles")
         try:
-            molecule = cls.nodes.get(chebi_id=chebi_id)
+            molecule = cast(Molecule, cls.nodes.get(chebi_id=chebi_id))
             return molecule
         except cls.DoesNotExist:
             try:
@@ -434,7 +438,7 @@ class Molecule(StrictStructuredNode):
     @property
     def label(self) -> str:
         """The label of the molecule."""
-        return {self.chebi_id}
+        return f"{self.chebi_id}"
 
 
 class StandardNumbering(StrictStructuredNode):
