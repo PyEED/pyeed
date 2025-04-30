@@ -1,11 +1,12 @@
-import httpx
+import json
 import logging
-from pysam import FastaFile
-from crc64iso import crc64iso
-import sys
-import json 
 import os
+import sys
 from typing import List
+
+import httpx
+from crc64iso import crc64iso
+from pysam import FastaFile
 
 logger = logging.getLogger(__name__)
 
