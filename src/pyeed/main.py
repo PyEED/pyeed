@@ -208,7 +208,7 @@ class Pyeed:
         self,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        num_gpus: int = None,  # Number of GPUs to use
+        num_gpus: int = 1,  # Number of GPUs to use
     ) -> None:
         """
         Calculates embeddings for all sequences in the database that do not have embeddings,
@@ -229,9 +229,12 @@ class Pyeed:
             logger.warning("No GPU available! Running on CPU.")
 
         # Load separate models for each GPU
-        devices = [f"cuda:{i}" for i in range(num_gpus)] if num_gpus > 0 else ["cpu"]
+        devices = [
+        torch.device(f"cuda:{i}") for i in range(num_gpus)
+        ] if num_gpus > 0 else [torch.device("cpu")]
+
         models_and_tokenizers = [
-            load_model_and_tokenizer(model_name, device) for device in devices
+        load_model_and_tokenizer(model_name, device) for device in devices
         ]
 
         # Retrieve sequences without embeddings
@@ -274,8 +277,8 @@ class Pyeed:
                         batch_size,
                         model,
                         tokenizer,
-                        device,
                         self.db,
+                        device,
                     )
                 )
 

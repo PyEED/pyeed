@@ -11,6 +11,7 @@ from huggingface_hub import HfFolder, login
 from loguru import logger
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
+from torch.nn import DataParallel, Module
 
 from pyeed.dbconnect import DatabaseConnector
 
@@ -32,7 +33,14 @@ def get_hf_token() -> str:
         raise RuntimeError("Failed to get Hugging Face token")
 
 
-def process_batches_on_gpu(data, batch_size, model, tokenizer, device, db):
+def process_batches_on_gpu(
+    data: list[tuple[str, str]], 
+    batch_size: int, 
+    model:Module, 
+    tokenizer: EsmTokenizer, 
+    db:DatabaseConnector,
+    device:torch.device,
+    ) -> None:
     """
     Splits data into batches and processes them on a single GPU.
 
@@ -88,8 +96,8 @@ def process_batches_on_gpu(data, batch_size, model, tokenizer, device, db):
 
 def load_model_and_tokenizer(
     model_name: str,
-    device: str,
-) -> Tuple[Any, Union[Any, None], str]:
+    device:torch.device,
+) -> Tuple[Any, Union[Any, None], torch.device]:
     """
     Loads the model and assigns it to a specific GPU.
 
@@ -125,7 +133,7 @@ def get_batch_embeddings(
     model: Union[
         EsmModel,
         ESMC,
-        torch.nn.DataParallel,
+        DataParallel[Module],
         ESM3InferenceClient,
         ESM3,
     ],
@@ -209,7 +217,9 @@ def get_batch_embeddings(
 
 
 def calculate_single_sequence_embedding_last_hidden_state(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str, 
+    device: torch.device,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence.
@@ -221,12 +231,14 @@ def calculate_single_sequence_embedding_last_hidden_state(
     Returns:
         NDArray[np.float64]: Normalized embedding vector for the sequence
     """
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
     return get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
 
 
 def calculate_single_sequence_embedding_all_layers(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str, 
+    device: torch.device,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
     Calculates embeddings for a single sequence across all layers.
@@ -238,7 +250,7 @@ def calculate_single_sequence_embedding_all_layers(
     Returns:
         NDArray[np.float64]: A numpy array containing layer embeddings for the sequence.
     """
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
     return get_single_embedding_all_layers(sequence, model, tokenizer, device)
 
 
