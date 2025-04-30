@@ -38,6 +38,7 @@ docker = "5.0.0"
 absl-py = "1.0.0"
 crc64iso = "0.0.2"
 SPARQLWrapper = "2.0.0"
+pysam = "0.23.0"
 
 [tool.poetry.group.dev.dependencies]
 mkdocstrings = {extras = ["python"], version = "^0.26.2"}
