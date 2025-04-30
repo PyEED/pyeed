@@ -10,8 +10,8 @@ from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingC
 from huggingface_hub import HfFolder, login
 from loguru import logger
 from numpy.typing import NDArray
-from transformers import EsmModel, EsmTokenizer
 from torch.nn import DataParallel, Module
+from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
