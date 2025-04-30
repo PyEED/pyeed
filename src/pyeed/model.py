@@ -1,13 +1,12 @@
 from enum import Enum
 from typing import Any
 
-
 # from pyeed.nodes_and_relations import StrictStructuredNode
 from neomodel import (
     ArrayProperty,
+    BooleanProperty,
     FloatProperty,
     IntegerProperty,
-    BooleanProperty,
     RelationshipTo,
     StringProperty,
     StructuredNode,

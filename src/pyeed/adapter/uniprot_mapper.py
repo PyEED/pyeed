@@ -1,23 +1,22 @@
 import json
 from collections import defaultdict
 from typing import Any, List
+
 import requests
 from bs4 import BeautifulSoup
-from SPARQLWrapper import SPARQLWrapper, JSON
-
 from httpx import Response
 from loguru import logger
+from SPARQLWrapper import JSON, SPARQLWrapper
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBMapper
 from pyeed.model import (
     Annotation,
-    Reaction,
     GOAnnotation,
+    Molecule,
     Organism,
     Protein,
+    Reaction,
     Site,
-    Reaction, 
-    Molecule,
 )
 
 

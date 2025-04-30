@@ -1,10 +1,10 @@
 import asyncio
-from typing import Any, Literal
 import time
 from concurrent.futures import ThreadPoolExecutor
-import torch
+from typing import Any, Literal
 
 import nest_asyncio
+import torch
 from loguru import logger
 
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
@@ -14,11 +14,8 @@ from pyeed.adapter.uniprot_mapper import UniprotToPyeed
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.embedding import (
-    free_memory,
-    get_batch_embeddings,
     load_model_and_tokenizer,
-    update_protein_embeddings_in_db,
-    process_batches_on_gpu
+    process_batches_on_gpu,
 )
 
 
