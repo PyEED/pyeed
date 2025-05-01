@@ -1,7 +1,8 @@
 from typing import Dict
 
-from pyeed.dbconnect import DatabaseConnector
 from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
+
+from pyeed.dbconnect import DatabaseConnector
 
 
 class OntologyAdapter:
