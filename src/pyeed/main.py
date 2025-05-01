@@ -347,9 +347,9 @@ class Pyeed:
             try:
                 batch_ids = nucleotide_ids[i : i + BATCH_SIZE]
                 self.fetch_ncbi_nucleotide(batch_ids)
-                logger.info(f"Successfully fetched batch {i//BATCH_SIZE + 1}")
+                logger.info(f"Successfully fetched batch {i // BATCH_SIZE + 1}")
             except Exception as e:
-                logger.error(f"Error fetching batch {i//BATCH_SIZE + 1}: {str(e)}")
+                logger.error(f"Error fetching batch {i // BATCH_SIZE + 1}: {str(e)}")
                 continue
 
         # Process protein-DNA relationships in batches
@@ -419,11 +419,11 @@ class Pyeed:
                         batch_create_query, {"relationships": new_relationships}
                     )
                     logger.info(
-                        f"Successfully processed relationship batch {i//BATCH_SIZE + 1}"
+                        f"Successfully processed relationship batch {i // BATCH_SIZE + 1}"
                     )
             except Exception as e:
                 logger.error(
-                    f"Error processing relationship batch {i//BATCH_SIZE + 1}: {str(e)}"
+                    f"Error processing relationship batch {i // BATCH_SIZE + 1}: {str(e)}"
                 )
                 continue
 
