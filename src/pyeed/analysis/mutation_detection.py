@@ -154,7 +154,7 @@ class MutationDetection:
             query = f"""
             MATCH (p1:{node_type} {{accession_id: $sequence_id1}})-[rel:HAS_REGION]->(r1:Region)
             WHERE id(r1) IN $region_ids_neo4j
-            MATCH (r1)-[rel_mutation:MUTATION]->(r2:Region)
+            MATCH (r1)-[rel_mutation:MUTATION]-(r2:Region)
             WHERE id(r2) IN $region_ids_neo4j
             MATCH (r2)<-[:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
             RETURN rel_mutation
@@ -170,7 +170,7 @@ class MutationDetection:
         else:
             existing_mutations = db.execute_read(
                 f"""
-                MATCH (p1:{node_type})-[r:MUTATION]->(p2:{node_type})
+                MATCH (p1:{node_type})-[r:MUTATION]-(p2:{node_type})
                 WHERE p1.accession_id = $sequence_id1 AND p2.accession_id = $sequence_id2
                 RETURN r
                 """,
