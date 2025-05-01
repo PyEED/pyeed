@@ -1,19 +1,18 @@
 import gc
 import os
 from typing import Any, Tuple, Union
-from loguru import logger
 
 import numpy as np
 import torch
-from esm.models.esmc import ESMC
 from esm.models.esm3 import ESM3
+from esm.models.esmc import ESMC
 from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
+from loguru import logger
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
-
 
 
 def get_hf_token() -> str:
@@ -31,6 +30,7 @@ def get_hf_token() -> str:
         return token
     else:
         raise RuntimeError("Failed to get Hugging Face token")
+
 
 def process_batches_on_gpu(data, batch_size, model, tokenizer, device, db):
     """
@@ -65,15 +65,21 @@ def process_batches_on_gpu(data, batch_size, model, tokenizer, device, db):
                 )
 
                 # Update the database
-                update_protein_embeddings_in_db(db, list(accessions[:current_batch_size]), embeddings_batch)
+                update_protein_embeddings_in_db(
+                    db, list(accessions[:current_batch_size]), embeddings_batch
+                )
 
                 # Move to the next batch
                 break  # Successful execution, move to the next batch
 
             except torch.cuda.OutOfMemoryError:
                 torch.cuda.empty_cache()
-                current_batch_size = max(1, current_batch_size // 2)  # Reduce batch size
-                logger.warning(f"Reduced batch size to {current_batch_size} due to OOM error.")
+                current_batch_size = max(
+                    1, current_batch_size // 2
+                )  # Reduce batch size
+                logger.warning(
+                    f"Reduced batch size to {current_batch_size} due to OOM error."
+                )
 
     # Free memory
     del model
@@ -83,7 +89,7 @@ def process_batches_on_gpu(data, batch_size, model, tokenizer, device, db):
 def load_model_and_tokenizer(
     model_name: str,
     device: str,
-    ) -> Tuple[Any, Union[Any, None], str]:
+) -> Tuple[Any, Union[Any, None], str]:
     """
     Loads the model and assigns it to a specific GPU.
 
