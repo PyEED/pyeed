@@ -143,13 +143,13 @@ class PairwiseAligner:
         RETURN p1.accession_id AS Protein1_ID, p2.accession_id AS Protein2_ID
         """
 
+        # Fetch results properly as a list of tuples
+        existing_pairs = set()
         if db is not None:
             existing_pairs = set(
                 tuple(sorted((row["Protein1_ID"], row["Protein2_ID"])))
                 for row in db.execute_write(query)
             )
-        else:
-            existing_pairs = set()
 
         # Filter new pairs that are not in existing_pairs
         new_pairs = [
