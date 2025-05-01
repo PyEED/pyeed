@@ -241,7 +241,6 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
-        debug: bool = False,
         node_type: str = "Protein",
         region_ids_neo4j: Optional[list[int]] = None,
     ) -> dict[str, list[int | str]]:
@@ -254,7 +253,6 @@ class MutationDetection:
             db (DatabaseConnector): Database connection instance.
             standard_numbering_tool_name (str): Name of the standard numbering tool to use.
             save_to_db (bool, optional): Whether to save mutations to the database (default: True).
-            debug (bool, optional): If True, print debug information (default: False).
             node_type (str, optional): Type of node to use (default: "Protein").
             region_ids_neo4j (Optional[list[int]], optional): List of region IDs for region-based sequence extraction.
 
@@ -277,8 +275,7 @@ class MutationDetection:
             region_ids_neo4j,
         )
 
-        if debug:
-            logger.info(f"Debug mode output: {sequences} and {positions}")
+        logger.debug(f"Debug mode output: {sequences} and {positions}")
 
         mutations = self.find_mutations(
             sequences[sequence_id1],
