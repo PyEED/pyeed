@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from neo4j.exceptions import CypherSyntaxError
-
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
 

@@ -6,9 +6,8 @@ import numpy as np
 import scipy.spatial as sp
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
-from scipy.spatial.distance import cosine
-
 from pyeed.dbconnect import DatabaseConnector
+from scipy.spatial.distance import cosine
 
 logger = logging.getLogger(__name__)
 
