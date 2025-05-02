@@ -97,7 +97,7 @@ def process_batches_on_gpu(
 def load_model_and_tokenizer(
     model_name: str,
     device: torch.device,
-) -> Tuple[Any, Union[Any, None], str]:
+) -> Tuple[Any, Union[Any, None], torch.device]:
     """
     Loads the model and assigns it to a specific GPU.
 
