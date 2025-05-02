@@ -9,6 +9,7 @@ from loguru import logger
 
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
+from pyeed.adapter.ncbi_to_uniprot_mapper import NCBIToUniprotMapper
 from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
 from pyeed.dbchat import DBChat
@@ -190,14 +191,27 @@ class Pyeed:
         nest_asyncio.apply()
         asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
 
+    def database_id_mapper(self, ids: list[str], file: str) -> None:
+        """
+        Maps IDs from one database to another using the UniProt ID mapping service
+
+        Args:
+            ids (list[str]): List of IDs to map.
+        """
+
+        mapper = NCBIToUniprotMapper(ids, file)
+        mapper.execute_request()
+
+        nest_asyncio.apply()
+
     def calculate_sequence_embeddings(
         self,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        num_gpus: int = None,  # Number of GPUs to use
-        ) -> None:
+        num_gpus: int = 1,  # Number of GPUs to use
+    ) -> None:
         """
-        Calculates embeddings for all sequences in the database that do not have embeddings, 
+        Calculates embeddings for all sequences in the database that do not have embeddings,
         distributing the workload across available GPUs.
 
         Args:
@@ -215,7 +229,12 @@ class Pyeed:
             logger.warning("No GPU available! Running on CPU.")
 
         # Load separate models for each GPU
-        devices = [f"cuda:{i}" for i in range(num_gpus)] if num_gpus > 0 else ["cpu"]
+        devices = (
+            [torch.device(f"cuda:{i}") for i in range(num_gpus)]
+            if num_gpus > 0
+            else [torch.device("cpu")]
+        )
+
         models_and_tokenizers = [
             load_model_and_tokenizer(model_name, device) for device in devices
         ]
@@ -228,18 +247,19 @@ class Pyeed:
         """
         results = self.db.execute_read(query)
         data = [(result["accession"], result["sequence"]) for result in results]
-        
+
         if not data:
             logger.info("No sequences to process.")
             return
-        
+
         accessions, sequences = zip(*data)
         total_sequences = len(sequences)
         logger.debug(f"Total sequences to process: {total_sequences}")
 
         # Split the data into num_gpus chunks
         gpu_batches = [
-            list(zip(accessions[i::num_gpus], sequences[i::num_gpus])) for i in range(num_gpus)
+            list(zip(accessions[i::num_gpus], sequences[i::num_gpus]))
+            for i in range(num_gpus)
         ]
 
         start_time = time.time()
@@ -259,17 +279,18 @@ class Pyeed:
                         batch_size,
                         model,
                         tokenizer,
+                        self.db,
                         device,
-                        self.db
                     )
                 )
-            
+
             for future in futures:
                 future.result()  # Wait for all threads to complete
 
-
         end_time = time.time()
-        logger.info(f"Total embedding calculation time: {end_time - start_time:.2f} seconds")
+        logger.info(
+            f"Total embedding calculation time: {end_time - start_time:.2f} seconds"
+        )
 
         # Cleanup
         for model, _, _ in models_and_tokenizers:

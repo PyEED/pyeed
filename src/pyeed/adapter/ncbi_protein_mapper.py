@@ -281,6 +281,8 @@ class NCBIProteinToPyeed(PrimaryDBMapper):
                 protein = Protein(**protein_data)
                 protein.save()
 
+            if not isinstance(organism, Organism):
+                raise TypeError(f"Expected Organism, but got {type(organism)}")
             protein.organism.connect(organism)
 
             # Add features

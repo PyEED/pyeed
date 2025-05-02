@@ -1,9 +1,9 @@
 import json
 from collections import defaultdict
-from typing import Any, List
+from typing import Any, List, Optional
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from httpx import Response
 from loguru import logger
 from SPARQLWrapper import JSON, SPARQLWrapper
@@ -82,13 +82,15 @@ class UniprotToPyeed(PrimaryDBMapper):
             site.save()
 
             protein.site.connect(site, {"positions": positions})
-    
-    def get_substrates_and_products_from_rhea(self, rhea_id: str) -> dict[str, List[str]]:
+
+    def get_substrates_and_products_from_rhea(
+        self, rhea_id: str
+    ) -> dict[str, List[str]]:
         """Fetch substrates and products from Rhea by parsing the side URI (_L = substrate, _R = product).
-        
+
         Args:
             rhea_id (str or int): The Rhea reaction ID (e.g., 49528)
-        
+
         Returns:
             dict: {
                 'substrates': [list of chebi URIs],
@@ -118,7 +120,11 @@ class UniprotToPyeed(PrimaryDBMapper):
         sparql.setReturnFormat(JSON)
         sparql.addCustomHttpHeader("User-Agent", "MyPythonClient/1.0")
 
-        results = sparql.query().convert()
+        results_raw = sparql.query().convert()
+        if not isinstance(results_raw, dict):
+            raise TypeError("Expected dict from SPARQL query")
+
+        results: dict[str, Any] = results_raw
 
         substrates = set()
         products = set()
@@ -134,17 +140,13 @@ class UniprotToPyeed(PrimaryDBMapper):
             elif side_uri.endswith("_R"):
                 products.add(chebi_uri)
 
-        return {
-            "substrates": sorted(substrates),
-            "products": sorted(products)
-        }
+        return {"substrates": sorted(substrates), "products": sorted(products)}
 
-    
-    def get_smiles_from_chebi_web(self, chebi_url: str) -> str:
+    def get_smiles_from_chebi_web(self, chebi_url: str) -> Optional[str]:
         """
         Extract SMILES from the official ChEBI page using HTML scraping.
         """
-        chebi_id = chebi_url.split('_')[-1]
+        chebi_id = chebi_url.split("_")[-1]
         url = f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:{chebi_id}"
 
         response = requests.get(url)
@@ -152,12 +154,21 @@ class UniprotToPyeed(PrimaryDBMapper):
 
         # Look for table rows that contain the SMILES label
         for table in soup.find_all("table", class_="chebiTableContent"):
+            if not isinstance(table, Tag):
+                continue
             for row in table.find_all("tr"):
+                if not isinstance(row, Tag):
+                    continue
                 headers = row.find_all("td", class_="chebiDataHeader")
-                if headers and "SMILES" in headers[0].text:
-                    data_cell = row.find_all("td")[-1]  # Get the last <td> in row
-                    return data_cell.text.strip()
-                
+                if (
+                    headers
+                    and isinstance(headers[0], Tag)
+                    and "SMILES" in headers[0].text
+                ):
+                    data_cells = row.find_all("td")
+                    if data_cells:
+                        return f"{data_cells[-1].text.strip()}"
+        return None
 
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
         for reference in record.get("comments", []):  # Safe retrieval with .get()
@@ -168,39 +179,39 @@ class UniprotToPyeed(PrimaryDBMapper):
                     if db_ref.get("id", "").startswith("RHEA:"):
                         rhea_id = db_ref["id"]
                         break  # Stop after finding the first match
-                
+
                 catalytic_annotation = Reaction.get_or_save(
                     rhea_id=rhea_id,
                 )
-                self.add_molecule(rhea_id, catalytic_annotation)
-                protein.reaction.connect(catalytic_annotation)
+                if rhea_id is not None:
+                    self.add_molecule(rhea_id, catalytic_annotation)
+                    protein.reaction.connect(catalytic_annotation)
 
     def add_molecule(self, rhea_id: str, reaction: Reaction) -> None:
-    
         chebi = self.get_substrates_and_products_from_rhea(rhea_id)
 
         substrate_ids = chebi["substrates"]
         product_ids = chebi["products"]
-        
+
         for i in substrate_ids:
             smiles = self.get_smiles_from_chebi_web(i)
-            
-            chebi_id = i.split('_')[-1]
+
+            chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
             substrate = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles = smiles,
+                smiles=smiles,
             )
             reaction.substrate.connect(substrate)
-        
+
         for i in product_ids:
             smiles = self.get_smiles_from_chebi_web(i)
 
-            chebi_id = i.split('_')[-1]
+            chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
             product = Molecule.get_or_save(
                 chebi_id=chebi_id,
-                smiles = smiles,
+                smiles=smiles,
             )
             reaction.product.connect(product)
 

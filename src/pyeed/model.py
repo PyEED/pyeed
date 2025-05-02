@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 # from pyeed.nodes_and_relations import StrictStructuredNode
 from neomodel import (
@@ -112,13 +112,12 @@ class StrictStructuredNode(StructuredNode):  # type: ignore
                 elif isinstance(base_property, FloatProperty):
                     if not all(isinstance(item, float) for item in prop):
                         raise TypeError(f"All items in '{field}' must be floats")
-                    
-            #Validate BoleanProperty
+
+            # Validate BoleanProperty
             elif isinstance(neo_type, BooleanProperty) and not isinstance(prop, bool):
                 raise TypeError(
                     f"Expected a boolean for '{field}', got {type(prop).__name__}"
                 )
-                
 
         super().save(*args, **kwargs)  # Don't return the result
 
@@ -153,6 +152,22 @@ class Annotation(Enum):
 class Organism(StrictStructuredNode):
     taxonomy_id = IntegerProperty(required=True, unique_index=True)
     name = StringProperty()
+
+    @classmethod
+    def get_or_save(cls, **kwargs: Any) -> "Organism":
+        taxonomy_id = kwargs.get("taxonomy_id")
+        name = kwargs.get("name")
+        try:
+            organism = cast(Organism, cls.nodes.get(taxonomy_id=taxonomy_id))
+            return organism
+        except cls.DoesNotExist:
+            try:
+                organism = cls(taxonomy_id=taxonomy_id, name=name)
+                organism.save()
+                return organism
+            except Exception as e:
+                print(f"Error during saving of the organism: {e}")
+                raise
 
 
 class Mutation(StructuredRel):  # type: ignore
@@ -381,33 +396,35 @@ class Reaction(StrictStructuredNode):
     """
     A node representing a reaction.
     """
-    
+
     rhea_id = StringProperty(unique_index=True, required=True)
     chebi_id = ArrayProperty(StringProperty())
 
     # Relationships
     substrate = RelationshipTo("Molecule", "SUBSTRATE")
     product = RelationshipTo("Molecule", "PRODUCT")
-    
-    
+
     @property
     def label(self) -> str:
         """The label of the reaction."""
-        return {self.rhea_id}
+        return f"{self.rhea_id}"
+
 
 class Molecule(StrictStructuredNode):
     """
     A node representing a molecule in the database.
     """
-    
+
     chebi_id = StringProperty(unique_index=True, required=True)
     rhea_compound_id = StringProperty()
     smiles = StringProperty()
 
     @classmethod
-    def get_or_save(cls, chebi_id, smiles) -> "Molecule":
+    def get_or_save(cls, **kwargs: Any) -> "Molecule":
+        chebi_id = kwargs.get("chebi_id")
+        smiles = kwargs.get("smiles")
         try:
-            molecule = cls.nodes.get(chebi_id=chebi_id)
+            molecule = cast(Molecule, cls.nodes.get(chebi_id=chebi_id))
             return molecule
         except cls.DoesNotExist:
             try:
@@ -417,13 +434,13 @@ class Molecule(StrictStructuredNode):
             except Exception as e:
                 print(f"Error during saving of the molecule: {e}")
                 raise
-    
-    @property 
+
+    @property
     def label(self) -> str:
         """The label of the molecule."""
-        return {self.chebi_id}
-    
-    
+        return f"{self.chebi_id}"
+
+
 class StandardNumbering(StrictStructuredNode):
     name = StringProperty(required=True, unique_index=True)
     definition = StringProperty(required=True)
