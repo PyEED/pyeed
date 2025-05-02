@@ -191,7 +191,7 @@ class Pyeed:
         nest_asyncio.apply()
         asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
 
-    def database_id_mapper(self, ids: list[str], file: str) -> None:
+    def database_id_mapper(self, ids: list[str], file_name: str) -> None:
         """
         Maps IDs from one database to another using the UniProt ID mapping service
 
@@ -199,7 +199,7 @@ class Pyeed:
             ids (list[str]): List of IDs to map.
         """
 
-        mapper = NCBIToUniprotMapper(ids, file)
+        mapper = NCBIToUniprotMapper(ids, file_name)
         mapper.execute_request()
 
         nest_asyncio.apply()

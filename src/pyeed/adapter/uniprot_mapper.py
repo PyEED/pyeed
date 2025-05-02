@@ -145,7 +145,11 @@ class UniprotToPyeed(PrimaryDBMapper):
     def get_smiles_from_chebi_web(self, chebi_url: str) -> Optional[str]:
         """
         Extract SMILES from the official ChEBI page using HTML scraping.
+
+        Args:
+            chebi_url (str): The ChEBI URL to fetch the chebi_id from
         """
+
         chebi_id = chebi_url.split("_")[-1]
         url = f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:{chebi_id}"
 
@@ -171,23 +175,38 @@ class UniprotToPyeed(PrimaryDBMapper):
         return None
 
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
-        for reference in record.get("comments", []):  # Safe retrieval with .get()
+        """
+        Adds a reaction to the protein based on the Rhea ID found in the record.
+
+        Args:
+            record (dict[str, Any]): returned from the UniProt API
+            protein (Protein): the protein object to which the reaction will be connected
+        """
+
+        for reference in record.get("comments", []):
             if reference.get("type") == "CATALYTIC_ACTIVITY":
-                rhea_id = None  # Default value
+                rhea_id = None
 
                 for db_ref in reference.get("reaction", {}).get("dbReferences", []):
                     if db_ref.get("id", "").startswith("RHEA:"):
                         rhea_id = db_ref["id"]
-                        break  # Stop after finding the first match
+                        break
 
-                catalytic_annotation = Reaction.get_or_save(
-                    rhea_id=rhea_id,
-                )
                 if rhea_id is not None:
+                    catalytic_annotation = Reaction.get_or_save(rhea_id=rhea_id)
                     self.add_molecule(rhea_id, catalytic_annotation)
                     protein.reaction.connect(catalytic_annotation)
+                else:
+                    logger.warning(f"No Rhea ID found in reference: {reference}")
 
     def add_molecule(self, rhea_id: str, reaction: Reaction) -> None:
+        """
+        Adds substrates and products to the reaction based on the Rhea ID.
+        Args:
+            rhea_id (str): The Rhea reaction ID
+            reaction (Reaction): The reaction object to which the substrates and products will be connected
+        """
+
         chebi = self.get_substrates_and_products_from_rhea(rhea_id)
 
         substrate_ids = chebi["substrates"]

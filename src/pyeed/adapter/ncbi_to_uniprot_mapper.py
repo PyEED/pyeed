@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class NCBIToUniprotMapper:
-    def __init__(self, ids: List[str], file: str):
+    def __init__(self, ids: List[str], file_name: str):
         self.ids = ids
-        self.file = file
+        self.file_name = file_name
         self.uniparc_url = "https://www.ebi.ac.uk/proteins/api/uniparc?offset=0&size=100&sequencechecksum="
         self.ncbi_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
@@ -118,15 +118,19 @@ class NCBIToUniprotMapper:
             response_body = response.json()
             for item in response_body:
                 uniparc_id = item.get("accession", None)
+                uniprot_ids = []
                 for ref in item.get("dbReference", []):
-                    if ref.get("type") == "UniProtKB/TrEMBL":
-                        uniprot_id = ref.get("id", None)
-                        id_mapping_uniparc[self.ids[counter]] = uniparc_id
-                        id_mapping_uniprot[self.ids[counter]] = uniprot_id
+                    if (
+                        ref.get("type") == "UniProtKB/TrEMBL"
+                        or ref.get("type") == "UniProtKB/Swiss-Prot"
+                    ) and ref.get("active") == "Y":
+                        uniprot_ids.append(ref.get("id"))
+                    id_mapping_uniparc[self.ids[counter]] = uniparc_id
+                    id_mapping_uniprot[self.ids[counter]] = uniprot_ids
             counter += 1
 
-        with open(f"{self.file}_uniprot.json", "w") as f:
+        with open(f"{self.file_name}_uniprot.json", "w") as f:
             json.dump(id_mapping_uniprot, f)
 
-        with open(f"{self.file}_uniparc.json", "w") as f:
+        with open(f"{self.file_name}_uniparc.json", "w") as f:
             json.dump(id_mapping_uniparc, f)
