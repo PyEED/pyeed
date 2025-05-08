@@ -349,8 +349,8 @@ class EmbeddingTool:
 
     def find_nearest_neighbors_based_on_vector_index(
         self,
+        query_id: str,
         db: DatabaseConnector,
-        query_protein_id: str,
         index_name: str = "embedding_index",
         number_of_neighbors: int = 50,
         skip: int = 0,
@@ -408,10 +408,11 @@ class EmbeddingTool:
             logger.info(f"Index {index_name} is populated, finding nearest neighbors")
 
         query_find_nearest_neighbors = f"""
-        MATCH (source:Protein {{accession_id: '{query_protein_id}'}})
+        MATCH (source:Protein {{accession_id: '{query_id}'}})
         WITH source.embedding AS embedding
         CALL db.index.vector.queryNodes('{index_name}', {number_of_neighbors}, embedding)
         YIELD node AS fprotein, score
+        WHERE score > 0.95
         RETURN fprotein.accession_id, score
         SKIP {skip}
         """

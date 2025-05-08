@@ -9,7 +9,9 @@ from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
 from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
+from loguru import logger
 from numpy.typing import NDArray
+from torch.nn import DataParallel, Module
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
@@ -34,28 +36,80 @@ def get_hf_token() -> str:
         raise RuntimeError("Failed to get Hugging Face token")
 
 
-def load_model_and_tokenizer(
-    model_name: str,
-) -> Tuple[
-    Union[
-        EsmModel,
-        ESMC,
-        ESM3InferenceClient,
-        torch.nn.DataParallel,
-        ESM3,
-    ],  # Updated return type
-    Union[EsmTokenizer, None],
-    torch.device,
-]:
+def process_batches_on_gpu(
+    data: list[tuple[str, str]],
+    batch_size: int,
+    model: Module,
+    tokenizer: EsmTokenizer,
+    db: DatabaseConnector,
+    device: torch.device,
+) -> None:
     """
-    Loads either an ESM++, ESM-3 (using ESMC or ESM3) or an ESM-2 (using Transformers) model,
-    depending on the `model_name` provided. Uses multiple GPUs in parallel if available.
+    Splits data into batches and processes them on a single GPU.
 
     Args:
-        model_name (str): The model name or identifier.
+        data (list): List of (accession_id, sequence) tuples.
+        batch_size (int): Size of each batch.
+        model: The model instance for this GPU.
+        tokenizer: The tokenizer for the model.
+        device (str): The assigned GPU device.
+        db: Database connection.
+    """
+    logger.debug(f"Processing {len(data)} sequences on {device}.")
+
+    model = model.to(device)
+
+    # Split data into smaller batches
+    for batch_start in range(0, len(data), batch_size):
+        batch_end = min(batch_start + batch_size, len(data))
+        batch = data[batch_start:batch_end]
+
+        accessions, sequences = zip(*batch)
+
+        current_batch_size = len(sequences)
+
+        while current_batch_size > 0:
+            try:
+                # Compute embeddings
+                embeddings_batch = get_batch_embeddings(
+                    list(sequences[:current_batch_size]), model, tokenizer, device
+                )
+
+                # Update the database
+                update_protein_embeddings_in_db(
+                    db, list(accessions[:current_batch_size]), embeddings_batch
+                )
+
+                # Move to the next batch
+                break  # Successful execution, move to the next batch
+
+            except torch.cuda.OutOfMemoryError:
+                torch.cuda.empty_cache()
+                current_batch_size = max(
+                    1, current_batch_size // 2
+                )  # Reduce batch size
+                logger.warning(
+                    f"Reduced batch size to {current_batch_size} due to OOM error."
+                )
+
+    # Free memory
+    del model
+    torch.cuda.empty_cache()
+
+
+def load_model_and_tokenizer(
+    model_name: str,
+    device: torch.device,
+) -> Tuple[Any, Union[Any, None], torch.device]:
+    """
+    Loads the model and assigns it to a specific GPU.
+
+    Args:
+        model_name (str): The model name.
+        device (str): The specific GPU device.
 
     Returns:
-        Tuple of (model, tokenizer, device)
+        Tuple: (model, tokenizer, device)
     """
     token = get_hf_token()
     # Default device is the first CUDA device if available, else CPU.
@@ -67,6 +121,9 @@ def load_model_and_tokenizer(
         model = model.to(device)
     elif "esm3-sm-open-v1" in model_name.lower():
         model: Any = ESM3.from_pretrained("esm3_sm_open_v1").to(device)
+
+    tokenizer = None
+
     else:
         full_model_name = (
             model_name
@@ -81,7 +138,6 @@ def load_model_and_tokenizer(
     # if torch.cuda.device_count() > 1 and device.type == "cuda":
     #     logger.info(f"Using {torch.cuda.device_count()} GPUs for parallel inference.")
     #     model = torch.nn.DataParallel(model)
-
     return model, tokenizer, device
 
 
@@ -113,17 +169,17 @@ def get_batch_embeddings(
         List of embeddings as NumPy arrays.
     """
     # First, determine the base model type
-    # base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+    base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
 
-    if isinstance(model, ESMC):
+    if isinstance(base_model, ESMC):
         # For ESMC models
         embedding_list = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
                 # Use the model directly - DataParallel handles internal distribution
-                protein_tensor = model.encode(protein)
-                logits_output = model.logits(
+                protein_tensor = base_model.encode(protein)
+                logits_output = base_model.logits(
                     protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
                 )
                 if logits_output.embeddings is None:
@@ -135,14 +191,15 @@ def get_batch_embeddings(
                     embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
         return embedding_list
-    elif isinstance(model, ESM3):
+      
+    elif isinstance(base_model, ESM3):
         # For ESM3 models
         embedding_list = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
-                sequence_encoding = model.encode(protein)
-                result = model.forward_and_sample(
+                sequence_encoding = base_model.encode(protein)
+                result = base_model.forward_and_sample(
                     sequence_encoding,
                     SamplingConfig(return_per_residue_embeddings=True),
                 )
@@ -174,7 +231,9 @@ def get_batch_embeddings(
 
 
 def calculate_single_sequence_embedding_last_hidden_state(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str,
+    device: torch.device,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence.
@@ -186,12 +245,14 @@ def calculate_single_sequence_embedding_last_hidden_state(
     Returns:
         NDArray[np.float64]: Normalized embedding vector for the sequence
     """
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
     return get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
 
 
 def calculate_single_sequence_embedding_all_layers(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str,
+    device: torch.device,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
     Calculates embeddings for a single sequence across all layers.
@@ -203,7 +264,7 @@ def calculate_single_sequence_embedding_all_layers(
     Returns:
         NDArray[np.float64]: A numpy array containing layer embeddings for the sequence.
     """
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
     return get_single_embedding_all_layers(sequence, model, tokenizer, device)
 
 

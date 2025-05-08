@@ -162,6 +162,28 @@ class PairwiseAligner:
         total_pairs = len(pairs)
         all_alignments = []
 
+        query = """
+        MATCH (p1:Protein)-[:PAIRWISE_ALIGNED]->(p2:Protein)
+        RETURN p1.accession_id AS Protein1_ID, p2.accession_id AS Protein2_ID
+        """
+
+        # Fetch results properly as a list of tuples
+        existing_pairs = set()
+        if db is not None:
+            existing_pairs = set(
+                tuple(sorted((row["Protein1_ID"], row["Protein2_ID"])))
+                for row in db.execute_write(query)
+            )
+
+        # Filter new pairs that are not in existing_pairs
+        new_pairs = [
+            pair for pair in pairs if tuple(sorted(pair)) not in existing_pairs
+        ]
+
+        print(f"Number of existing pairs: {len(existing_pairs)}")
+        print(f"Number of total pairs: {len(pairs)}")
+        print(f"Number of pairs to align: {len(new_pairs)}")
+
         with Progress() as progress:
             align_task = progress.add_task(
                 f"⛓️ Aligning {total_pairs} sequence pairs...", total=total_pairs
@@ -170,7 +192,7 @@ class PairwiseAligner:
                 "📥 Inserting alignment results to database...", total=total_pairs
             )
 
-            for pair_chunk in chunks(pairs, batch_size):
+            for pair_chunk in chunks(new_pairs, batch_size):
                 # Align the pairs in the current chunk
                 alignments = Parallel(n_jobs=num_cores, prefer="processes")(
                     delayed(self.align_pairwise)(
