@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyeed"
-version = "0.4.2"
+version = "0.4.3"
 description = "Toolkit to create, annotate, and analyze sequence data"
 authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
 license = "MIT"
