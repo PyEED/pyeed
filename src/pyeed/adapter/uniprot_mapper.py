@@ -15,8 +15,8 @@ from pyeed.model import (
     Molecule,
     Organism,
     Protein,
-    Region,
     Reaction,
+    Region,
     Site,
 )
 
@@ -158,17 +158,18 @@ class UniprotToPyeed(PrimaryDBMapper):
         try:
             for reference in record["comments"]:
                 if reference["type"] == "CATALYTIC_ACTIVITY":
-                    catalytic_annotation = CatalyticActivity.get_or_save(
-                        catalytic_id=int(reference["id"])
-                        if reference.get("id")
-                        else None,
-                        name=reference["reaction"]["name"],
+                    catalytic_annotation = Reaction.get_or_save(
+                        rhea_id=str(reference["id"]) if reference.get("id") else None,
+                        # Optionally, you can add name=reference["reaction"]["name"] if Reaction supports it
                     )
-                    protein.catalytic_annotation.connect(catalytic_annotation)
+                    # If protein has a reaction relationship, connect it
+                    if hasattr(protein, "reaction"):
+                        protein.reaction.connect(catalytic_annotation)
 
         except Exception as e:
             logger.error(
                 f"Error saving catalytic activity for {protein.accession_id}: {e}"
+            )
 
     def get_substrates_and_products_from_rhea(
         self, rhea_id: str

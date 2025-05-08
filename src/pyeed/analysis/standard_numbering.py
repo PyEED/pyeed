@@ -13,7 +13,6 @@ Dependencies:
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
-
 from pyeed.analysis.sequence_alignment import PairwiseAligner
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.model import StandardNumbering

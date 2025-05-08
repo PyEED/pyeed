@@ -1,22 +1,23 @@
 import gc
-import logging
 import os
-from typing import Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import numpy as np
 import torch
 from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
+from esm.sdk.api import ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
 from loguru import logger
 from numpy.typing import NDArray
-from torch.nn import DataParallel, Module
 from transformers import EsmModel, EsmTokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from esm.models.esm3 import ESM3
+    from esm.models.esmc import ESMC
+    from transformers import EsmModel
 
 
 def get_hf_token() -> str:
@@ -39,7 +40,7 @@ def get_hf_token() -> str:
 def process_batches_on_gpu(
     data: list[tuple[str, str]],
     batch_size: int,
-    model: Module,
+    model: Union["EsmModel", "ESMC", torch.nn.DataParallel, "ESM3"],
     tokenizer: EsmTokenizer,
     db: DatabaseConnector,
     device: torch.device,
@@ -57,8 +58,9 @@ def process_batches_on_gpu(
     """
     logger.debug(f"Processing {len(data)} sequences on {device}.")
 
-    model = model.to(device)
-
+    # Only call .to(device) if the model is ESMC or DataParallel
+    if isinstance(model, (ESMC, torch.nn.DataParallel)):
+        model = model.to(device)
     # Split data into smaller batches
     for batch_start in range(0, len(data), batch_size):
         batch_end = min(batch_start + batch_size, len(data))
@@ -120,10 +122,8 @@ def load_model_and_tokenizer(
         model: Any = ESMC.from_pretrained(model_name)
         model = model.to(device)
     elif "esm3-sm-open-v1" in model_name.lower():
-        model: Any = ESM3.from_pretrained("esm3_sm_open_v1").to(device)
-
-    tokenizer = None
-
+        model: Any = ESM3.from_pretrained("esm3_sm_open_v1")
+        model = model.to(device)
     else:
         full_model_name = (
             model_name
@@ -147,7 +147,6 @@ def get_batch_embeddings(
         EsmModel,
         ESMC,
         torch.nn.DataParallel,
-        ESM3InferenceClient,
         ESM3,
     ],
     tokenizer_or_alphabet: Union[EsmTokenizer, None],
@@ -269,12 +268,12 @@ def calculate_single_sequence_embedding_all_layers(
 
 
 def calculate_single_sequence_embedding_first_layer(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str, device: torch.device, model_name: str = "facebook/esm2_t33_650M_UR50D"
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence using the first layer.
     """
-    model, tokenizer, device = load_model_and_tokenizer(model_name)
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
     return get_single_embedding_first_layer(sequence, model, tokenizer, device)
 
 
@@ -284,7 +283,6 @@ def get_single_embedding_first_layer(
     """
     Generates normalized embeddings for each token in the sequence across all layers.
     """
-    embeddings_list = []
 
     with torch.no_grad():
         if isinstance(model, ESMC):
@@ -419,7 +417,6 @@ def get_single_embedding_all_layers(
         NDArray[np.float64]: A numpy array containing the normalized token embeddings
         concatenated across all layers.
     """
-    embeddings_list = []
     with torch.no_grad():
         if isinstance(model, ESMC):
             # For ESM-3: Use ESMProtein and request hidden states via LogitsConfig
@@ -440,12 +437,14 @@ def get_single_embedding_all_layers(
                 )
 
             # logits_output.hidden_states should be a tuple of tensors: (layer, batch, seq_len, hidden_dim)
+            embeddings_list = []
             for layer_tensor in logits_output.hidden_states:
                 # Remove batch dimension and (if applicable) any special tokens
                 emb = layer_tensor[0].to(torch.float32).cpu().numpy()
                 # If your model adds special tokens, adjust the slicing (e.g., emb[1:-1])
                 emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
                 embeddings_list.append(emb)
+            return np.array(embeddings_list)
 
         elif isinstance(model, ESM3):
             raise NotImplementedError("ESM3 is not supported for all layers")
@@ -457,13 +456,11 @@ def get_single_embedding_all_layers(
             hidden_states = (
                 outputs.hidden_states
             )  # Tuple: (layer0, layer1, ..., layerN)
-            for layer_tensor in hidden_states:
-                # Remove batch dimension and special tokens ([CLS] and [SEP])
-                emb = layer_tensor[0, 1:-1, :].detach().cpu().numpy()
-                emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
-                embeddings_list.append(emb)
-
-    return np.array(embeddings_list)
+            # Remove the unused variable 'embeddings_list' and directly return the result
+            return np.array([
+                layer_tensor[0, 1:-1, :].detach().cpu().numpy() / np.linalg.norm(layer_tensor[0, 1:-1, :].detach().cpu().numpy(), axis=1, keepdims=True)
+                for layer_tensor in hidden_states
+            ])
 
 
 # The rest of your existing functions will need to be adapted in a similar way
