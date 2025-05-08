@@ -32,66 +32,44 @@ def get_hf_token() -> str:
     else:
         raise RuntimeError("Failed to get Hugging Face token")
 
-
-def process_batches_on_gpu(
-    data: list[tuple[str, str]],
-    batch_size: int,
-    model: Module,
-    tokenizer: EsmTokenizer,
-    db: DatabaseConnector,
-    device: torch.device,
-) -> None:
+def process_batches_on_gpu(gpu_data, batch_size, model, tokenizer, device, db):
     """
-    Splits data into batches and processes them on a single GPU.
+    Processes batches of sequences on a specific GPU, updating the database with embeddings.
 
     Args:
-        data (list): List of (accession_id, sequence) tuples.
-        batch_size (int): Size of each batch.
-        model: The model instance for this GPU.
-        tokenizer: The tokenizer for the model.
-        device (str): The assigned GPU device.
+        gpu_data (list): List of (accession, sequence) tuples assigned to this GPU.
+        batch_size (int): Batch size for processing.
+        model: Model instance.
+        tokenizer: Tokenizer instance (if applicable).
+        device (str): GPU or CPU device string.
         db: Database connection.
     """
-    logger.debug(f"Processing {len(data)} sequences on {device}.")
+    accessions, sequences = zip(*gpu_data)
 
-    model = model.to(device)
+    total_sequences = len(sequences)
+    logger.debug(f"GPU {device} processing {total_sequences} sequences.")
 
-    # Split data into smaller batches
-    for batch_start in range(0, len(data), batch_size):
-        batch_end = min(batch_start + batch_size, len(data))
-        batch = data[batch_start:batch_end]
+    for batch_start in range(0, total_sequences, batch_size):
+        batch_end = min(batch_start + batch_size, total_sequences)
+        batch_sequences = sequences[batch_start:batch_end]
+        batch_accessions = accessions[batch_start:batch_end]
+        logger.debug(f"GPU {device} processing batch {batch_start // batch_size + 1}")
 
-        accessions, sequences = zip(*batch)
+        # Compute embeddings
+        embeddings_batch = get_batch_embeddings(batch_sequences, model, tokenizer, device)
 
-        current_batch_size = len(sequences)
+        # Update the database with embeddings
+        update_protein_embeddings_in_db(db, batch_accessions, embeddings_batch)
 
-        while current_batch_size > 0:
-            try:
-                # Compute embeddings
-                embeddings_batch = get_batch_embeddings(
-                    list(sequences[:current_batch_size]), model, tokenizer, device
-                )
+        # **Memory Cleanup**
+        del embeddings_batch
+        torch.cuda.empty_cache()
+        gc.collect()
 
-                # Update the database
-                update_protein_embeddings_in_db(
-                    db, list(accessions[:current_batch_size]), embeddings_batch
-                )
-
-                # Move to the next batch
-                break  # Successful execution, move to the next batch
-
-            except torch.cuda.OutOfMemoryError:
-                torch.cuda.empty_cache()
-                current_batch_size = max(
-                    1, current_batch_size // 2
-                )  # Reduce batch size
-                logger.warning(
-                    f"Reduced batch size to {current_batch_size} due to OOM error."
-                )
-
-    # Free memory
+    # Free memory after GPU is done
     del model
     torch.cuda.empty_cache()
+    gc.collect()
 
 
 def load_model_and_tokenizer(

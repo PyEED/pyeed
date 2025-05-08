@@ -288,9 +288,7 @@ class Pyeed:
                 future.result()  # Wait for all threads to complete
 
         end_time = time.time()
-        logger.info(
-            f"Total embedding calculation time: {end_time - start_time:.2f} seconds"
-        )
+        logger.info(f"Total embedding calculation time: {end_time - start_time:.2f} seconds")
 
         # Cleanup
         for model, _, _ in models_and_tokenizers:
