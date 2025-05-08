@@ -401,11 +401,10 @@ class StandardNumberingTool:
         if node_type == "DNA" and region_ids_neo4j is not None:
             query = """
             MATCH (s:StandardNumbering {name: $name})
-            MATCH (r:Region)
+            MATCH (d:DNA)-[e:HAS_REGION]-(r:Region)-[:HAS_STANDARD_NUMBERING]-(s)
             WHERE id(r) IN $region_ids_neo4j
-            MATCH (r:Region)<-[:HAS_STANDARD_NUMBERING]-(s)
-            WHERE r.accession_id IN $list_of_seq_ids
-            RETURN r.accession_id AS accession_id
+            AND d.accession_id IN $list_of_seq_ids
+            RETURN d.accession_id AS accession_id
             """
 
             results = db.execute_read(
@@ -442,8 +441,7 @@ class StandardNumberingTool:
         logger.info(f"Pairs: {pairs}")
 
         # Run the pairwise alignment using the PairwiseAligner.
-        pairwise_aligner = PairwiseAligner()
-
+        pairwise_aligner = PairwiseAligner(node_type=node_type)
         input = (list_of_seq_ids or []) + [base_sequence_id]
         if not input:
             raise ValueError("No input sequences provided")
@@ -458,7 +456,7 @@ class StandardNumberingTool:
             region_ids_neo4j=region_ids_neo4j,
         )
 
-        logger.info(f"Pairwise alignment results: {results_pairwise}")
+        # logger.info(f"Pairwise alignment results: {results_pairwise}")
 
         if results_pairwise is None:
             raise ValueError("Pairwise alignment failed - no results returned")
@@ -483,8 +481,6 @@ class StandardNumberingTool:
         positions = self.run_numbering_algorithm_pairwise(
             base_sequence_id, converted_alignment
         )
-
-        logger.info(f"Positions: {positions}")
 
         # Ensure the standard numbering node exists in the database.
         StandardNumbering.get_or_save(
