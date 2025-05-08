@@ -19,43 +19,20 @@ class PairwiseAligner:
     def __init__(
         self,
         mode: str = "global",
-        match: float = 1.0,
-        mismatch: float = -1.0,
-        gap_open: float = -10.0,
-        gap_extend: float = -0.5,
+        match: int = 1,
+        mismatch: int = -1,
+        gap_open: int = -1,
+        gap_exted: int = 0,
+        substitution_matrix: str = "None",
         node_type: str = "Protein",
     ) -> None:
-        """Initialize the PairwiseAligner.
-
-        Args:
-            mode (str): Alignment mode ('global' or 'local'). Defaults to 'global'.
-            match (float): Match score for DNA. Defaults to 1.0.
-            mismatch (float): Mismatch penalty for DNA. Defaults to -1.0.
-            gap_open (float): Gap opening penalty. Defaults to -10.0.
-            gap_extend (float): Gap extension penalty. Defaults to -0.5.
-            sequence_type (str): Type of sequence ('protein' or 'dna'). Defaults to 'protein'.
-            node_type (str): Type of node in database. Defaults to 'Protein'.
-        """
-        self.node_type = node_type
-
         self.mode = mode
-
-        # Set parameters based on sequence type
-        if self.node_type == "DNA":
-            # DNA-specific parameters
-            self.match = 1.0
-            self.mismatch = -1.0
-            self.gap_open = -5.0
-            self.gap_extend = -2.0
-            self.substitution_matrix = "None"
-        else:  # protein
-            # Protein-specific parameters with BLOSUM62
-            self.match = None  # Not used when using substitution matrix
-            self.mismatch = None  # Not used when using substitution matrix
-            self.gap_open = -10.0
-            self.gap_extend = -0.5
-            self.substitution_matrix = "BLOSUM62"
-
+        self.match = match
+        self.mismatch = mismatch
+        self.gap_open = gap_open
+        self.gap_extend = gap_exted
+        self.substitution_matrix = substitution_matrix
+        self.node_type = node_type
     def _align(
         self,
         seq1: Dict[str, str],
@@ -270,18 +247,13 @@ class PairwiseAligner:
         from the class instance."""
         aligner = BioPairwiseAligner()  # type: ignore
         aligner.mode = self.mode
-
-        if self.node_type == "DNA":
-            aligner.match_score = self.match
-            aligner.mismatch_score = self.mismatch
-        else:  # protein
-            # Load BLOSUM62 matrix for proteins
-            from Bio.Align import substitution_matrices
-
-            aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
-
+        aligner.match_score = self.match
+        aligner.mismatch_score = self.mismatch
         aligner.open_gap_score = self.gap_open
         aligner.extend_gap_score = self.gap_extend
+
+        if self.substitution_matrix != "None":
+            aligner.substitution_matrix = self._load_substitution_matrix()
 
         return aligner
 
@@ -341,11 +313,13 @@ class PairwiseAligner:
             if region_ids_neo4j is not None:
                 query = f"""
                 MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-                WHERE id(r) IN {region_ids_neo4j} AND p.accession_id IN {ids}
+                WHERE id(r) IN $region_ids_neo4j AND p.accession_id IN $ids
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
-                nodes = db.execute_read(query)
-
+                nodes = db.execute_read(
+                    query,
+                    parameters={"region_ids_neo4j": region_ids_neo4j, "ids": ids},
+                )
             else:
                 query = f"""
                 MATCH (p:{node_type})
