@@ -352,6 +352,7 @@ class EmbeddingTool:
         db: DatabaseConnector,
         index_name: str = "embedding_index",
         number_of_neighbors: int = 50,
+        skip: int = 0,
     ) -> list[tuple[str, float]]:
         """
         This function finds the nearest neighbors of a query protein based on the vector index.
@@ -412,6 +413,7 @@ class EmbeddingTool:
         YIELD node AS fprotein, score
         WHERE score > 0.95
         RETURN fprotein.accession_id, score
+        SKIP {skip}
         """
         results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [

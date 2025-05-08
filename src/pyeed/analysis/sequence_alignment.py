@@ -24,6 +24,7 @@ class PairwiseAligner:
         gap_open: int = -1,
         gap_exted: int = 0,
         substitution_matrix: str = "None",
+        node_type: str = "Protein",
     ) -> None:
         self.mode = mode
         self.match = match
@@ -31,6 +32,7 @@ class PairwiseAligner:
         self.gap_open = gap_open
         self.gap_extend = gap_exted
         self.substitution_matrix = substitution_matrix
+        self.node_type = node_type
 
     def _align(
         self,
