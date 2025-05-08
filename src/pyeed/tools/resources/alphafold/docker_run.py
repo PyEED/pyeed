@@ -214,7 +214,7 @@ def main(argv):  # type: ignore
         mount, target_path = _create_mount(f"fasta_path_{i}", fasta_path)
         mounts.append(mount)
         target_fasta_paths.append(target_path)
-    command_args.append(f'--fasta_paths={",".join(target_fasta_paths)}')
+    command_args.append(f"--fasta_paths={','.join(target_fasta_paths)}")
 
     database_paths = [
         ("uniref90_database_path", uniref90_database_path),

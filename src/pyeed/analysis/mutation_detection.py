@@ -17,23 +17,24 @@ class MutationDetection:
         node_type: str = "Protein",
         region_ids_neo4j: Optional[list[int]] = None,
     ) -> tuple[dict[str, str], dict[str, list[str]]]:
-        """Fetch sequence and position data for two sequences from the database.
+        """
+        Fetch sequence and standard numbering position data for two sequences from the database.
 
         Args:
-            sequence_id1: First sequence accession ID
-            sequence_id2: Second sequence accession ID
-            db: Database connection instance
-            standard_numbering_tool_name: Name of standard numbering tool to use
-            node_type: Type of node to use (default: "Protein")
-            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
+            sequence_id1 (str): Accession ID of the first sequence.
+            sequence_id2 (str): Accession ID of the second sequence.
+            db (DatabaseConnector): Database connection instance.
+            standard_numbering_tool_name (str): Name of the standard numbering tool to use.
+            node_type (str, optional): Type of node to use (default: "Protein").
+            region_ids_neo4j (Optional[list[int]], optional): List of region IDs for region-based sequence extraction.
 
         Returns:
-            tuple containing:
-                - dict[str, str]: Mapping of sequence IDs to sequences
-                - dict[str, list[str]]: Mapping of sequence IDs to position lists
+            tuple[dict[str, str], dict[str, list[str]]]:
+                - Mapping of sequence IDs to sequences.
+                - Mapping of sequence IDs to position lists.
 
         Raises:
-            ValueError: If standard numbering positions not found for both sequences
+            ValueError: If standard numbering positions are not found for both sequences.
         """
         if region_ids_neo4j is not None:
             query = f"""
@@ -84,20 +85,21 @@ class MutationDetection:
         pos1: list[str],
         pos2: list[str],
     ) -> dict[str, Any]:
-        """Compare two sequences and identify mutations between them.
+        """
+        Compare two sequences and identify mutations between them using standard numbering positions.
 
         Args:
-            seq1: First amino acid sequence
-            seq2: Second amino acid sequence
-            pos1: Standard numbering positions for first sequence
-            pos2: Standard numbering positions for second sequence
+            seq1 (str): First amino acid sequence.
+            seq2 (str): Second amino acid sequence.
+            pos1 (list[str]): Standard numbering positions for the first sequence.
+            pos2 (list[str]): Standard numbering positions for the second sequence.
 
         Returns:
-            dict containing mutation information:
-                - from_positions: List[int] - Source positions (1-based)
-                - to_positions: List[int] - Target positions (1-based)
-                - from_monomers: List[str] - Source amino acids
-                - to_monomers: List[str] - Target amino acids
+            dict[str, Any]: Dictionary containing mutation information:
+                - from_positions (List[int]): Source positions (1-based).
+                - to_positions (List[int]): Target positions (1-based).
+                - from_monomers (List[str]): Source amino acids.
+                - to_monomers (List[str]): Target amino acids.
         """
         pos_to_idx1 = {pos: idx for idx, pos in enumerate(pos1)}
         pos_to_idx2 = {pos: idx for idx, pos in enumerate(pos2)}
@@ -134,19 +136,20 @@ class MutationDetection:
         node_type: str = "Protein",
         region_ids_neo4j: Optional[list[int]] = None,
     ) -> None:
-        """Save detected mutations to the database.
+        """
+        Save detected mutations to the database as relationships between nodes.
 
         Args:
-            mutations: Dictionary containing mutation information:
-                - from_positions: List[int] - Source positions
-                - to_positions: List[int] - Target positions
-                - from_monomers: List[str] - Source amino acids
-                - to_monomers: List[str] - Target amino acids
-            db: Database connection instance
-            sequence_id1: First sequence accession ID
-            sequence_id2: Second sequence accession ID
-            node_type: Type of node to use (default: "Protein")
-            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
+            mutations (dict[str, list[int | str]]): Dictionary containing mutation information:
+                - from_positions (List[int]): Source positions.
+                - to_positions (List[int]): Target positions.
+                - from_monomers (List[str]): Source amino acids.
+                - to_monomers (List[str]): Target amino acids.
+            db (DatabaseConnector): Database connection instance.
+            sequence_id1 (str): Accession ID of the first sequence.
+            sequence_id2 (str): Accession ID of the second sequence.
+            node_type (str, optional): Type of node to use (default: "Protein").
+            region_ids_neo4j (Optional[list[int]], optional): List of region IDs for region-based sequence extraction.
         """
         # Check if a mutation relationship already exists between these proteins
         if region_ids_neo4j is not None:
@@ -237,30 +240,30 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
-        debug: bool = False,
         node_type: str = "Protein",
         region_ids_neo4j: Optional[list[int]] = None,
     ) -> dict[str, list[int | str]]:
-        """Get mutations between two sequences using standard numbering.
+        """
+        Get mutations between two sequences using standard numbering and optionally save them to the database.
 
         Args:
-            sequence_id1: First sequence accession ID
-            sequence_id2: Second sequence accession ID
-            db: Database connection instance
-            standard_numbering_tool_name: Name of standard numbering tool to use
-            save_to_db: Whether to save mutations to database (default: True)
-            node_type: Type of node to use (default: "Protein")
-            region_ids_neo4j: List of region IDs for the sequence cuting based on region_based_sequence.
+            sequence_id1 (str): Accession ID of the first sequence.
+            sequence_id2 (str): Accession ID of the second sequence.
+            db (DatabaseConnector): Database connection instance.
+            standard_numbering_tool_name (str): Name of the standard numbering tool to use.
+            save_to_db (bool, optional): Whether to save mutations to the database (default: True).
+            node_type (str, optional): Type of node to use (default: "Protein").
+            region_ids_neo4j (Optional[list[int]], optional): List of region IDs for region-based sequence extraction.
 
         Returns:
-            dict containing mutation information:
-                - from_positions: List[int] - Source positions (1-based)
-                - to_positions: List[int] - Target positions (1-based)
-                - from_monomers: List[str] - Source amino acids
-                - to_monomers: List[str] - Target amino acids
+            dict[str, list[int | str]]: Dictionary containing mutation information:
+                - from_positions (List[int]): Source positions (1-based).
+                - to_positions (List[int]): Target positions (1-based).
+                - from_monomers (List[str]): Source amino acids.
+                - to_monomers (List[str]): Target amino acids.
 
         Raises:
-            ValueError: If standard numbering positions not found for both sequences
+            ValueError: If standard numbering positions are not found for both sequences.
         """
         sequences, positions = self.get_sequence_data(
             sequence_id1,
@@ -271,8 +274,7 @@ class MutationDetection:
             region_ids_neo4j,
         )
 
-        if debug:
-            logger.info(f"Debug mode output: {sequences} and {positions}")
+        logger.debug(f"Debug mode output: {sequences} and {positions}")
 
         mutations = self.find_mutations(
             sequences[sequence_id1],
