@@ -190,7 +190,7 @@ def get_batch_embeddings(
                     embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
         return embedding_list
-      
+
     elif isinstance(base_model, ESM3):
         # For ESM3 models
         embedding_list = []
@@ -268,7 +268,9 @@ def calculate_single_sequence_embedding_all_layers(
 
 
 def calculate_single_sequence_embedding_first_layer(
-    sequence: str, device: torch.device, model_name: str = "facebook/esm2_t33_650M_UR50D"
+    sequence: str,
+    device: torch.device,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence using the first layer.
@@ -457,10 +459,17 @@ def get_single_embedding_all_layers(
                 outputs.hidden_states
             )  # Tuple: (layer0, layer1, ..., layerN)
             # Remove the unused variable 'embeddings_list' and directly return the result
-            return np.array([
-                layer_tensor[0, 1:-1, :].detach().cpu().numpy() / np.linalg.norm(layer_tensor[0, 1:-1, :].detach().cpu().numpy(), axis=1, keepdims=True)
-                for layer_tensor in hidden_states
-            ])
+            return np.array(
+                [
+                    layer_tensor[0, 1:-1, :].detach().cpu().numpy()
+                    / np.linalg.norm(
+                        layer_tensor[0, 1:-1, :].detach().cpu().numpy(),
+                        axis=1,
+                        keepdims=True,
+                    )
+                    for layer_tensor in hidden_states
+                ]
+            )
 
 
 # The rest of your existing functions will need to be adapted in a similar way
