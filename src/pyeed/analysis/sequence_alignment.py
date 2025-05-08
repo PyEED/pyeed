@@ -33,6 +33,7 @@ class PairwiseAligner:
         self.gap_extend = gap_exted
         self.substitution_matrix = substitution_matrix
         self.node_type = node_type
+
     def _align(
         self,
         seq1: Dict[str, str],

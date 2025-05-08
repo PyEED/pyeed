@@ -292,4 +292,3 @@ class MutationDetection:
             )
 
         return mutations
-    
