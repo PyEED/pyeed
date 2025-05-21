@@ -69,7 +69,7 @@ class UniprotToPyeed(PrimaryDBMapper):
 
         self.add_sites(record, protein)
         self.add_regions(record, protein)
-        self.add_catalytic_activity(record, protein)
+        #self.add_catalytic_activity(record, protein)
         self.add_go(record, protein)
 
     def add_sites(self, record: dict[str, Any], protein: Protein) -> None:
@@ -157,23 +157,26 @@ class UniprotToPyeed(PrimaryDBMapper):
 
             protein.region.connect(region, {"start": positions[0], "end": positions[1]})
 
-    def add_catalytic_activity(self, record: dict[str, Any], protein: Protein) -> None:
-        """Add catalytic activity information from UniProt record to the protein."""
-        for comment in record.get("comments", []):
-            if comment.get("type") != "CATALYTIC_ACTIVITY":
-                continue
-                
-            reaction_data = comment.get("reaction", {})
-            for db_ref in reaction_data.get("dbReferences", []):
-                if not db_ref.get("id", "").startswith("RHEA:"):
-                    continue
+    # def add_catalytic_activity(self, record: dict[str, Any], protein: Protein) -> None:
+    #     """Add catalytic activity information from UniProt record to the protein."""
+    #     try:
+    #         for comment in record.get("comments", []):
+    #             if comment.get("type") != "CATALYTIC_ACTIVITY":
+    #                 continue
                     
-                rhea_id = db_ref["id"]
-                try:
-                    catalytic_annotation = Reaction.get_or_save(rhea_id=rhea_id)
-                    protein.reaction.connect(catalytic_annotation)
-                except Exception as e:
-                    logger.error(f"Failed to connect reaction {rhea_id} to protein {protein.accession_id}: {e}")
+    #             reaction_data = comment.get("reaction", {})
+    #             for db_ref in reaction_data.get("dbReferences", []):
+    #                 if not db_ref.get("id", "").startswith("RHEA:"):
+    #                     continue
+                        
+    #                 rhea_id = db_ref["id"]
+    #                 try:
+    #                     catalytic_annotation = Reaction.get_or_save(rhea_id=rhea_id)
+    #                     protein.reaction.connect(catalytic_annotation)
+    #                 except Exception as e:
+    #                     logger.error(f"Failed to connect reaction {rhea_id} to protein {protein.accession_id}: {e}")
+    #     except KeyError as e:
+    #         logger.error(f"No Reaction for {protein.accession_id}: {e}")
 
     def get_substrates_and_products_from_rhea(
         self, 
@@ -277,21 +280,25 @@ class UniprotToPyeed(PrimaryDBMapper):
             return None
 
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
-        for reference in record.get("comments", []):  # Safe retrieval with .get()
-            if reference.get("type") == "CATALYTIC_ACTIVITY":
-                rhea_id = None  # Default value
+        try:
+            for reference in record.get("comments", []):  # Safe retrieval with .get()
+                if reference.get("type") == "CATALYTIC_ACTIVITY":
+                    rhea_id = None  # Default value
 
-                for db_ref in reference.get("reaction", {}).get("dbReferences", []):
-                    if db_ref.get("id", "").startswith("RHEA:"):
-                        rhea_id = db_ref["id"]
-                        break  # Stop after finding the first match
+                    for db_ref in reference.get("reaction", {}).get("dbReferences", []):
+                        if db_ref.get("id", "").startswith("RHEA:"):
+                            rhea_id = db_ref["id"]
+                            break  # Stop after finding the first match
 
-                catalytic_annotation = Reaction.get_or_save(
-                    rhea_id=rhea_id,
-                )
-                if rhea_id is not None:
-                    self.add_molecule(rhea_id, catalytic_annotation)
-                    protein.reaction.connect(catalytic_annotation)
+                    if rhea_id is not None:
+                        catalytic_annotation = Reaction.get_or_save(
+                        rhea_id=rhea_id,
+                        )
+                        self.add_molecule(rhea_id, catalytic_annotation)
+                        protein.reaction.connect(catalytic_annotation)
+                        
+        except KeyError as e:
+            logger.error(f"No Reaction for {protein.accession_id}: {e}")
 
     def add_molecule(self, rhea_id: str, reaction: Reaction) -> None:
         chebi = self.get_substrates_and_products_from_rhea(rhea_id)
