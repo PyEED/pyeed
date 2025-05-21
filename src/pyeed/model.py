@@ -49,6 +49,7 @@ class StrictStructuredNode(StructuredNode):  # type: ignore
                     FloatProperty,
                     ArrayProperty,
                     UniqueIdProperty,
+                    BooleanProperty,
                 ),
             )
         }
@@ -419,20 +420,20 @@ class Molecule(StrictStructuredNode):
     A node representing a molecule in the database.
     """
 
-    chebi_id = StringProperty(unique_index=True, required=True)
+    molecule_id = StringProperty(unique_index=True, required=True)
     rhea_compound_id = StringProperty()
     smiles = StringProperty()
 
     @classmethod
     def get_or_save(cls, **kwargs: Any) -> "Molecule":
-        chebi_id = kwargs.get("chebi_id")
+        molecule_id = kwargs.get("chebi_id")
         smiles = kwargs.get("smiles")
         try:
-            molecule = cast(Molecule, cls.nodes.get(chebi_id=chebi_id))
+            molecule = cast(Molecule, cls.nodes.get(molecule_id=molecule_id))
             return molecule
         except cls.DoesNotExist:
             try:
-                molecule = cls(chebi_id=chebi_id, smiles=smiles)
+                molecule = cls(molecule_id=molecule_id, smiles=smiles)
                 molecule.save()
                 return molecule
             except Exception as e:
@@ -546,6 +547,8 @@ class Protein(StrictStructuredNode):
     """A protein sequence node in the database."""
 
     accession_id = StringProperty(unique_index=True, required=True)
+    uniprot_id = StringProperty()
+    uniprot = BooleanProperty(default=False)
     sequence = StringProperty(required=True)
     name = StringProperty()
     seq_length = IntegerProperty(required=True)

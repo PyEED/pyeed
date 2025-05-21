@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup, Tag
 from httpx import Response
 from loguru import logger
 from SPARQLWrapper import JSON, SPARQLWrapper
+import re
+import requests
 
 from pyeed.adapter.primary_db_adapter import PrimaryDBMapper
 from pyeed.model import (
@@ -49,6 +51,7 @@ class UniprotToPyeed(PrimaryDBMapper):
             try:
                 protein = Protein.get_or_save(
                     accession_id=record["accession"],
+                    uniprot=True,
                     sequence=record["sequence"]["sequence"],
                     mol_weight=float(record["sequence"]["mass"]),
                     ec_number=ec_number,
@@ -155,24 +158,26 @@ class UniprotToPyeed(PrimaryDBMapper):
             protein.region.connect(region, {"start": positions[0], "end": positions[1]})
 
     def add_catalytic_activity(self, record: dict[str, Any], protein: Protein) -> None:
-        try:
-            for reference in record["comments"]:
-                if reference["type"] == "CATALYTIC_ACTIVITY":
-                    catalytic_annotation = Reaction.get_or_save(
-                        rhea_id=str(reference["id"]) if reference.get("id") else None,
-                        # Optionally, you can add name=reference["reaction"]["name"] if Reaction supports it
-                    )
-                    # If protein has a reaction relationship, connect it
-                    if hasattr(protein, "reaction"):
-                        protein.reaction.connect(catalytic_annotation)
-
-        except Exception as e:
-            logger.error(
-                f"Error saving catalytic activity for {protein.accession_id}: {e}"
-            )
+        """Add catalytic activity information from UniProt record to the protein."""
+        for comment in record.get("comments", []):
+            if comment.get("type") != "CATALYTIC_ACTIVITY":
+                continue
+                
+            reaction_data = comment.get("reaction", {})
+            for db_ref in reaction_data.get("dbReferences", []):
+                if not db_ref.get("id", "").startswith("RHEA:"):
+                    continue
+                    
+                rhea_id = db_ref["id"]
+                try:
+                    catalytic_annotation = Reaction.get_or_save(rhea_id=rhea_id)
+                    protein.reaction.connect(catalytic_annotation)
+                except Exception as e:
+                    logger.error(f"Failed to connect reaction {rhea_id} to protein {protein.accession_id}: {e}")
 
     def get_substrates_and_products_from_rhea(
-        self, rhea_id: str
+        self, 
+        rhea_id: str
     ) -> dict[str, List[str]]:
         """Fetch substrates and products from Rhea by parsing the side URI (_L = substrate, _R = product).
 
@@ -229,34 +234,47 @@ class UniprotToPyeed(PrimaryDBMapper):
                 products.add(chebi_uri)
 
         return {"substrates": sorted(substrates), "products": sorted(products)}
-
-    def get_smiles_from_chebi_web(self, chebi_url: str) -> Optional[str]:
+    
+    def get_smiles_from_chebi(self, chebi_url: str) -> Optional[str]:
         """
-        Extract SMILES from the official ChEBI page using HTML scraping.
+        Extract the SMILES string from a ChEBI compound page using the official XML API.
+
+        Args:
+            chebi_url (str): e.g. "https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI_12345"
+
+        Returns:
+            str or None: The SMILES string, or None if not found or error occurs.
         """
-        chebi_id = chebi_url.split("_")[-1]
-        url = f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:{chebi_id}"
+        try:
+            # Convert to proper CHEBI ID format
+            
+            chebi_id = chebi_url.split("_")[-1]
+            if not chebi_id.startswith("CHEBI:"):
+                chebi_id = f"CHEBI:{chebi_id}"
 
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
+            # Query the official ChEBI SOAP service
+            url = f"https://www.ebi.ac.uk/webservices/chebi/2.0/test/getCompleteEntity?chebiId={chebi_id}"
+            response = requests.get(url)
+            response.raise_for_status()
+        
+            # Extract only the relevant XML block
+            match = re.search(r"<getCompleteEntityResponse.*?</getCompleteEntityResponse>", response.text, re.DOTALL)
+        
+            if not match:
+                return None
 
-        # Look for table rows that contain the SMILES label
-        for table in soup.find_all("table", class_="chebiTableContent"):
-            if not isinstance(table, Tag):
-                continue
-            for row in table.find_all("tr"):
-                if not isinstance(row, Tag):
-                    continue
-                headers = row.find_all("td", class_="chebiDataHeader")
-                if (
-                    headers
-                    and isinstance(headers[0], Tag)
-                    and "SMILES" in headers[0].text
-                ):
-                    data_cells = row.find_all("td")
-                    if data_cells:
-                        return f"{data_cells[-1].text.strip()}"
-        return None
+            xml_fragment = match.group(0)
+
+            # Extract SMILES using regex (lightweight parsing)
+            smiles_match = re.search(r"<smiles>(.*?)</smiles>", xml_fragment)
+            
+            if smiles_match:
+                return smiles_match.group(1).strip()
+
+            return None
+        except Exception:
+            logger.error(f"Failed to fetch or parse SMILES for {chebi_id}")
+            return None
 
     def add_reaction(self, record: dict[str, Any], protein: Protein) -> None:
         for reference in record.get("comments", []):  # Safe retrieval with .get()
@@ -280,9 +298,9 @@ class UniprotToPyeed(PrimaryDBMapper):
 
         substrate_ids = chebi["substrates"]
         product_ids = chebi["products"]
-
+        
         for i in substrate_ids:
-            smiles = self.get_smiles_from_chebi_web(i)
+            smiles = self.get_smiles_from_chebi(i)
 
             chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
@@ -293,7 +311,7 @@ class UniprotToPyeed(PrimaryDBMapper):
             reaction.substrate.connect(substrate)
 
         for i in product_ids:
-            smiles = self.get_smiles_from_chebi_web(i)
+            smiles = self.get_smiles_from_chebi(i)
 
             chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"

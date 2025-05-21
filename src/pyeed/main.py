@@ -6,6 +6,7 @@ from typing import Any, Literal
 import nest_asyncio
 import torch
 from loguru import logger
+import os 
 
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
 from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
@@ -221,6 +222,13 @@ class Pyeed:
         """
 
         # Get the available GPUs
+        os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        
+        print("CUDA available:", torch.cuda.is_available())
+        print("Device count:", torch.cuda.device_count())
+        print("Torch CUDA version:", torch.version.cuda)
+        print("Torch version:", torch.__version__)
+        
         available_gpus = torch.cuda.device_count()
         if num_gpus is None or num_gpus > available_gpus:
             num_gpus = available_gpus
