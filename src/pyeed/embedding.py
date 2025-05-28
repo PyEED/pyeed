@@ -96,7 +96,7 @@ def process_batches_on_gpu(
 
 def load_model_and_tokenizer(
     model_name: str,
-    device: torch.device,
+    device: torch.device = torch.device("cuda:0"),
 ) -> Tuple[Any, Union[Any, None], torch.device]:
     """
     Loads the model and assigns it to a specific GPU.
@@ -218,7 +218,7 @@ def get_batch_embeddings(
 
 def calculate_single_sequence_embedding_last_hidden_state(
     sequence: str,
-    device: torch.device,
+    device: torch.device = torch.device("cuda:0"),
     model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
@@ -369,10 +369,74 @@ def get_single_embedding_all_layers(
 
     return np.array(embeddings_list)
 
+def calculate_single_sequence_embedding_first_layer(
+    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D", device: torch.device = torch.device("cuda:0"),
+) -> NDArray[np.float64]:
+    """
+    Calculates an embedding for a single sequence using the first layer.
+    """
+    model, tokenizer, device = load_model_and_tokenizer(model_name, device)
+    return get_single_embedding_first_layer(sequence, model, tokenizer, device)
+
 
 # The rest of your existing functions will need to be adapted in a similar way
 # if they interact with the model or tokenizer directly
+def get_single_embedding_first_layer(
+    sequence: str, model: Any, tokenizer: Any, device: torch.device
+) -> NDArray[np.float64]:
+    """
+    Generates normalized embeddings for each token in the sequence across all layers.
+    """
+    embeddings_list = []
 
+    with torch.no_grad():
+        if isinstance(model, ESMC):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, LogitsConfig
+
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            logits_output = model.logits(
+                protein_tensor,
+                LogitsConfig(
+                    sequence=True,
+                    return_embeddings=True,
+                    return_hidden_states=True,
+                ),
+            )
+            if logits_output.hidden_states is None:
+                raise ValueError(
+                    "Model did not return hidden states. Check LogitsConfig settings."
+                )
+            embedding = (
+                logits_output.hidden_states[0][0].to(torch.float32).cpu().numpy()
+            )
+
+        elif isinstance(model, ESM3):
+            # ESM-3 logic
+            from esm.sdk.api import ESMProtein, SamplingConfig
+
+            protein = ESMProtein(sequence=sequence)
+            protein_tensor = model.encode(protein)
+            embedding = model.forward_and_sample(
+                protein_tensor,
+                SamplingConfig(return_per_residue_embeddings=True),
+            )
+            if embedding is None or embedding.per_residue_embedding is None:
+                raise ValueError("Model did not return embeddings")
+            embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
+
+        else:
+            # ESM-2 logic
+            inputs = tokenizer(sequence, return_tensors="pt").to(device)
+            outputs = model(**inputs, output_hidden_states=True)
+            # Get the first layer's hidden states for all residues (excluding special tokens)
+            embedding = outputs.hidden_states[0][0, 1:-1, :].detach().cpu().numpy()
+
+    # Ensure embedding is a numpy array and normalize it
+    embedding = np.asarray(embedding, dtype=np.float64)
+    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
+    return embedding
 
 def free_memory() -> None:
     """

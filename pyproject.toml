@@ -40,6 +40,7 @@ crc64iso = "0.0.2"
 SPARQLWrapper = "2.0.0"
 pysam = "0.23.0"
 types-requests = "2.32.0.20250328"
+ipywidgets = "^8.1.7"
 
 [tool.poetry.group.dev.dependencies]
 mkdocstrings = {extras = ["python"], version = "^0.26.2"}
