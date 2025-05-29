@@ -1,5 +1,6 @@
 import gc
 import os
+import re
 from typing import Any, Tuple, Union
 
 import numpy as np
@@ -11,7 +12,7 @@ from huggingface_hub import HfFolder, login
 from loguru import logger
 from numpy.typing import NDArray
 from torch.nn import DataParallel, Module
-from transformers import EsmModel, EsmTokenizer
+from transformers import EsmModel, EsmTokenizer, T5Model, T5Tokenizer
 
 from pyeed.dbconnect import DatabaseConnector
 
@@ -36,8 +37,8 @@ def get_hf_token() -> str:
 def process_batches_on_gpu(
     data: list[tuple[str, str]],
     batch_size: int,
-    model: Module,
-    tokenizer: EsmTokenizer,
+    model: Union[EsmModel, ESMC, ESM3, T5Model, DataParallel[Module]],
+    tokenizer: Union[EsmTokenizer, T5Tokenizer, None],
     db: DatabaseConnector,
     device: torch.device,
 ) -> None:
@@ -97,7 +98,7 @@ def process_batches_on_gpu(
 def load_model_and_tokenizer(
     model_name: str,
     device: torch.device = torch.device("cuda:0"),
-) -> Tuple[Any, Union[Any, None], torch.device]:
+) -> Tuple[Union[EsmModel, ESMC, ESM3, T5Model], Union[EsmTokenizer, T5Tokenizer, None], torch.device]:
     """
     Loads the model and assigns it to a specific GPU.
 
@@ -113,8 +114,20 @@ def load_model_and_tokenizer(
 
     if "esmc" in model_name.lower():
         model = ESMC.from_pretrained(model_name)
+        model = model.to(device)
     elif "esm3-sm-open-v1" in model_name.lower():
         model = ESM3.from_pretrained("esm3_sm_open_v1")
+        model = model.to(device)
+    elif "prot_t5" in model_name.lower() or "prott5" in model_name.lower():
+        # ProtT5 models
+        full_model_name = (
+            model_name
+            if model_name.startswith("Rostlab/")
+            else f"Rostlab/{model_name}"
+        )
+        model = T5Model.from_pretrained(full_model_name, use_auth_token=token)
+        tokenizer = T5Tokenizer.from_pretrained(full_model_name, use_auth_token=token, do_lower_case=False)
+        model = model.to(device)
     else:
         full_model_name = (
             model_name
@@ -123,9 +136,24 @@ def load_model_and_tokenizer(
         )
         model = EsmModel.from_pretrained(full_model_name, use_auth_token=token)
         tokenizer = EsmTokenizer.from_pretrained(full_model_name, use_auth_token=token)
+        model = model.to(device)
 
-    model = model.to(device)
     return model, tokenizer, device
+
+
+def preprocess_sequence_for_prott5(sequence: str) -> str:
+    """
+    Preprocesses a protein sequence for ProtT5 models.
+    
+    Args:
+        sequence: Raw protein sequence
+        
+    Returns:
+        Preprocessed sequence with spaces between amino acids and rare AAs mapped to X
+    """
+    # Map rare amino acids to X and add spaces between amino acids
+    sequence = re.sub(r"[UZOB]", "X", sequence.upper())
+    return " ".join(list(sequence))
 
 
 def get_batch_embeddings(
@@ -134,16 +162,16 @@ def get_batch_embeddings(
         EsmModel,
         ESMC,
         DataParallel[Module],
-        ESM3InferenceClient,
         ESM3,
+        T5Model,
     ],
-    tokenizer_or_alphabet: Union[EsmTokenizer, None],
+    tokenizer_or_alphabet: Union[EsmTokenizer, T5Tokenizer, None],
     device: torch.device,
     pool_embeddings: bool = True,
 ) -> list[NDArray[np.float64]]:
     """
     Generates mean-pooled embeddings for a batch of sequences.
-    Supports ESM++, ESM-2 and ESM-3 models.
+    Supports ESM++, ESM-2, ESM-3 and ProtT5 models.
 
     Args:
         batch_sequences (list[str]): List of sequence strings.
@@ -198,14 +226,64 @@ def get_batch_embeddings(
                     embeddings = embeddings.mean(axis=0)
                 embedding_list.append(embeddings)
         return embedding_list
+    elif isinstance(base_model, T5Model):
+        # For ProtT5 models
+        assert tokenizer_or_alphabet is not None, "Tokenizer required for ProtT5 models"
+        assert isinstance(tokenizer_or_alphabet, T5Tokenizer), "T5Tokenizer required for ProtT5 models"
+        
+        # Preprocess sequences for ProtT5
+        processed_sequences = [preprocess_sequence_for_prott5(seq) for seq in batch_sequences]
+        
+        inputs = tokenizer_or_alphabet.batch_encode_plus(
+            processed_sequences, 
+            add_special_tokens=True, 
+            padding="longest",
+            return_tensors="pt"
+        )
+        
+        # Move inputs to device
+        input_ids = inputs['input_ids'].to(device)
+        attention_mask = inputs['attention_mask'].to(device)
+        
+        with torch.no_grad():
+            # For ProtT5, use encoder embeddings for feature extraction
+            # Create dummy decoder inputs (just the pad token)
+            batch_size = input_ids.shape[0]
+            decoder_input_ids = torch.full(
+                (batch_size, 1), 
+                tokenizer_or_alphabet.pad_token_id or 0, 
+                dtype=torch.long,
+                device=device
+            )
+            
+            outputs = base_model(input_ids=input_ids, 
+                          attention_mask=attention_mask,
+                          decoder_input_ids=decoder_input_ids)
+            
+            # Get encoder last hidden state (encoder embeddings)
+            hidden_states = outputs.encoder_last_hidden_state.cpu().numpy()
+
+        if pool_embeddings:
+            # Mean pooling across sequence length, excluding padding tokens
+            embedding_list = []
+            for i, hidden_state in enumerate(hidden_states):
+                # Get actual sequence length (excluding padding)
+                attention_mask_np = attention_mask[i].cpu().numpy()
+                seq_len = attention_mask_np.sum()
+                # Pool only over actual sequence tokens
+                pooled_embedding = hidden_state[:seq_len].mean(axis=0)
+                embedding_list.append(pooled_embedding)
+            return embedding_list
+        return list(hidden_states)
     else:
         # ESM-2 logic
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ESM-2 models"
+        assert isinstance(tokenizer_or_alphabet, EsmTokenizer), "EsmTokenizer required for ESM-2 models"
         inputs = tokenizer_or_alphabet(
             batch_sequences, padding=True, truncation=True, return_tensors="pt"
         ).to(device)
         with torch.no_grad():
-            outputs = model(**inputs, output_hidden_states=True)
+            outputs = base_model(**inputs, output_hidden_states=True)
 
         # Get last hidden state for each sequence
         hidden_states = outputs.last_hidden_state.cpu().numpy()
@@ -294,14 +372,37 @@ def get_single_embedding_last_hidden_state(
             embedding = (
                 logits_output.hidden_states[-1][0].to(torch.float32).cpu().numpy()
             )
+        elif isinstance(model, T5Model):
+            # ProtT5 logic
+            processed_sequence = preprocess_sequence_for_prott5(sequence)
+            inputs = tokenizer.encode_plus(
+                processed_sequence,
+                add_special_tokens=True,
+                return_tensors="pt"
+            )
+            
+            input_ids = inputs['input_ids'].to(device)
+            attention_mask = inputs['attention_mask'].to(device)
+            
+            # Create dummy decoder inputs
+            decoder_input_ids = torch.full(
+                (1, 1), 
+                tokenizer.pad_token_id or 0, 
+                dtype=torch.long,
+                device=device
+            )
+            
+            outputs = model(input_ids=input_ids, 
+                          attention_mask=attention_mask,
+                          decoder_input_ids=decoder_input_ids)
+            
+            # Get encoder last hidden state including special tokens
+            embedding = outputs.encoder_last_hidden_state[0].detach().cpu().numpy()
         else:
             # ESM-2 logic
             inputs = tokenizer(sequence, return_tensors="pt").to(device)
             outputs = model(**inputs)
             embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
-
-    # normalize the embedding
-    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
 
     return embedding  # type: ignore
 
@@ -315,6 +416,7 @@ def get_single_embedding_all_layers(
     For ESM-3 (ESMC) models, it assumes that passing
     LogitsConfig(return_hidden_states=True) returns a collection of layer embeddings.
     For ESM-2 models, it sets output_hidden_states=True.
+    For ProtT5 models, it gets encoder hidden states.
 
     Args:
         sequence (str): The protein sequence to embed.
@@ -354,6 +456,39 @@ def get_single_embedding_all_layers(
                 emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
                 embeddings_list.append(emb)
 
+        elif isinstance(model, T5Model):
+            # For ProtT5: Get encoder hidden states
+            processed_sequence = preprocess_sequence_for_prott5(sequence)
+            inputs = tokenizer.encode_plus(
+                processed_sequence,
+                add_special_tokens=True,
+                return_tensors="pt"
+            )
+            
+            input_ids = inputs['input_ids'].to(device)
+            attention_mask = inputs['attention_mask'].to(device)
+            
+            # Create dummy decoder inputs
+            decoder_input_ids = torch.full(
+                (1, 1), 
+                tokenizer.pad_token_id or 0, 
+                dtype=torch.long,
+                device=device
+            )
+            
+            outputs = model(input_ids=input_ids, 
+                          attention_mask=attention_mask,
+                          decoder_input_ids=decoder_input_ids,
+                          output_hidden_states=True)
+            
+            # Get all encoder hidden states
+            encoder_hidden_states = outputs.encoder_hidden_states
+            for layer_tensor in encoder_hidden_states:
+                # Remove batch dimension but keep special tokens
+                emb = layer_tensor[0].detach().cpu().numpy()
+                emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+                embeddings_list.append(emb)
+
         else:
             # For ESM-2: Get hidden states with output_hidden_states=True
             inputs = tokenizer(sequence, return_tensors="pt").to(device)
@@ -379,13 +514,11 @@ def calculate_single_sequence_embedding_first_layer(
     return get_single_embedding_first_layer(sequence, model, tokenizer, device)
 
 
-# The rest of your existing functions will need to be adapted in a similar way
-# if they interact with the model or tokenizer directly
 def get_single_embedding_first_layer(
     sequence: str, model: Any, tokenizer: Any, device: torch.device
 ) -> NDArray[np.float64]:
     """
-    Generates normalized embeddings for each token in the sequence across all layers.
+    Generates normalized embeddings for each token in the sequence using the first layer.
     """
     embeddings_list = []
 
@@ -425,6 +558,34 @@ def get_single_embedding_first_layer(
             if embedding is None or embedding.per_residue_embedding is None:
                 raise ValueError("Model did not return embeddings")
             embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
+
+        elif isinstance(model, T5Model):
+            # ProtT5 logic - get first layer embedding
+            processed_sequence = preprocess_sequence_for_prott5(sequence)
+            inputs = tokenizer.encode_plus(
+                processed_sequence,
+                add_special_tokens=True,
+                return_tensors="pt"
+            )
+            
+            input_ids = inputs['input_ids'].to(device)
+            attention_mask = inputs['attention_mask'].to(device)
+            
+            # Create dummy decoder inputs
+            decoder_input_ids = torch.full(
+                (1, 1), 
+                tokenizer.pad_token_id or 0, 
+                dtype=torch.long,
+                device=device
+            )
+            
+            outputs = model(input_ids=input_ids, 
+                          attention_mask=attention_mask,
+                          decoder_input_ids=decoder_input_ids,
+                          output_hidden_states=True)
+            
+            # Get first encoder hidden state including special tokens
+            embedding = outputs.encoder_hidden_states[0][0].detach().cpu().numpy()
 
         else:
             # ESM-2 logic
