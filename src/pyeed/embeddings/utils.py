@@ -48,12 +48,28 @@ def preprocess_sequence_for_prott5(sequence: str) -> str:
 def free_memory() -> None:
     """
     Frees up memory by invoking garbage collection and clearing GPU caches.
+    This function performs a more thorough cleanup by:
+    1. Running garbage collection multiple times
+    2. Clearing CUDA/MPS caches
+    3. Resetting peak memory stats
+    4. Synchronizing CUDA operations
     """
-    gc.collect()
+    # Run garbage collection multiple times to ensure thorough cleanup
+    for _ in range(3):
+        gc.collect()
+    
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
     elif torch.cuda.is_available():
+        # Clear CUDA cache
         torch.cuda.empty_cache()
+        # Reset peak memory stats
+        torch.cuda.reset_peak_memory_stats()
+        # Synchronize CUDA operations
+        torch.cuda.synchronize()
+    
+    # Force garbage collection one final time
+    gc.collect()
 
 
 def determine_model_type(model_name: str) -> str:

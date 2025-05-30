@@ -447,12 +447,42 @@ class EmbeddingProcessor:
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 
+    def remove_model(self, model_name: str, device: Optional[torch.device] = None) -> None:
+        """
+        Remove a specific model from the processor's cache and clean up its resources.
+        
+        Args:
+            model_name: Name of the model to remove
+            device: Specific device the model is on (optional)
+        """
+        if device is None:
+            # Remove model from all devices
+            keys_to_remove = [k for k in self._models.keys() if model_name in k]
+        else:
+            key = f"{model_name}_{device}"
+            keys_to_remove = [key] if key in self._models else []
+
+        for key in keys_to_remove:
+            if key in self._models:
+                # Clean up the model's resources
+                self._models[key].cleanup()
+                del self._models[key]
+                logger.info(f"Removed model {key} from processor cache")
+
+        # Force memory cleanup
+        free_memory()
+
     def cleanup(self) -> None:
         """Clean up all models and free memory."""
         for model in self._models.values():
             model.cleanup()
         self._models.clear()
         free_memory()
+        # Additional cleanup to ensure GPU memory is freed
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.synchronize()
 
 
 # Global processor instance
