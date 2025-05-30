@@ -28,16 +28,16 @@ from .utils import free_memory
 class EmbeddingProcessor:
     """
     Main processor for handling protein embedding operations.
-    
+
     Automatically manages device selection, model loading, and provides
     simplified interfaces for all embedding operations.
     """
-    
+
     def __init__(self) -> None:
         self._models: Dict[str, BaseEmbeddingModel] = {}
         self._devices: List[torch.device] = []
         self._initialize_devices()
-    
+
     def _initialize_devices(self) -> None:
         """Initialize available devices for computation."""
         if torch.cuda.is_available():
@@ -47,26 +47,24 @@ class EmbeddingProcessor:
         else:
             self._devices = [torch.device("cpu")]
             logger.warning("No GPU available, using CPU.")
-    
+
     def get_available_devices(self) -> List[torch.device]:
         """Get list of available devices."""
         return self._devices.copy()
-    
+
     def get_or_create_model(
-        self, 
-        model_name: str, 
-        device: Optional[torch.device] = None
+        self, model_name: str, device: Optional[torch.device] = None
     ) -> BaseEmbeddingModel:
         """Get existing model or create new one on specified or best available device."""
         if device is None:
             device = self._devices[0]  # Use first available device
-        
+
         key = f"{model_name}_{device}"
         if key not in self._models:
             self._models[key] = ModelFactory.create_model(model_name, device)
             logger.info(f"Loaded model {model_name} on {device}")
         return self._models[key]
-    
+
     def calculate_batch_embeddings(
         self,
         data: List[tuple[str, str]],
@@ -74,11 +72,13 @@ class EmbeddingProcessor:
         batch_size: int = 16,
         num_gpus: Optional[int] = None,
         db: Optional[DatabaseConnector] = None,
-        embedding_type: Literal["last_hidden_state", "all_layers", "first_layer", "final_embeddings"] = "last_hidden_state"
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "last_hidden_state",
     ) -> Optional[List[NDArray[np.float64]]]:
         """
         Calculate embeddings for a batch of sequences with automatic device management.
-        
+
         Args:
             data: List of (accession_id, sequence) tuples
             model_name: Name of the model to use
@@ -87,35 +87,35 @@ class EmbeddingProcessor:
             db: Database connector for storing results (optional)
             embedding_type: Type of embedding to calculate:
                 - "last_hidden_state": Use last hidden state (most common)
-                - "all_layers": Average across all transformer layers  
+                - "all_layers": Average across all transformer layers
                 - "first_layer": Use first layer embedding
                 - "final_embeddings": Robust option that works across all models (recommended for compatibility)
-            
+
         Returns:
             List of embeddings if db is None, otherwise None (results stored in DB)
         """
         # Disable tqdm to prevent threading issues with multiple GPUs
-        os.environ['DISABLE_TQDM'] = 'True'
-        
+        os.environ["DISABLE_TQDM"] = "True"
+
         if not data:
             logger.info("No sequences to process.")
             return []
-        
+
         # Determine number of GPUs to use
-        available_gpus = len([d for d in self._devices if d.type == 'cuda'])
+        available_gpus = len([d for d in self._devices if d.type == "cuda"])
         if num_gpus is None:
             num_gpus = available_gpus
         else:
             num_gpus = min(num_gpus, available_gpus)
-        
+
         if num_gpus == 0:
             devices_to_use = [torch.device("cpu")]
             num_gpus = 1
         else:
             devices_to_use = [torch.device(f"cuda:{i}") for i in range(num_gpus)]
-        
+
         logger.info(f"Processing {len(data)} sequences using {num_gpus} device(s)")
-        
+
         # Load models for each device
         models = []
         for device in devices_to_use:
@@ -124,7 +124,9 @@ class EmbeddingProcessor:
                 models.append(model)
             except Exception as e:
                 if "tqdm" in str(e).lower() or "_lock" in str(e).lower():
-                    logger.warning(f"Model loading failed on {device} due to threading issue. Reducing to single GPU mode.")
+                    logger.warning(
+                        f"Model loading failed on {device} due to threading issue. Reducing to single GPU mode."
+                    )
                     # Fall back to single GPU mode to avoid threading issues
                     devices_to_use = [devices_to_use[0]]
                     num_gpus = 1
@@ -132,15 +134,13 @@ class EmbeddingProcessor:
                     break
                 else:
                     raise e
-        
+
         # Split data across devices
-        gpu_batches = [
-            data[i::num_gpus] for i in range(num_gpus)
-        ]
-        
+        gpu_batches = [data[i::num_gpus] for i in range(num_gpus)]
+
         start_time = time.time()
         all_embeddings = []
-        
+
         if num_gpus == 1:
             # Single device processing
             embeddings = self._process_batch_single_device(
@@ -154,7 +154,7 @@ class EmbeddingProcessor:
                 for i, gpu_data in enumerate(gpu_batches):
                     if not gpu_data:
                         continue
-                    
+
                     futures.append(
                         executor.submit(
                             self._process_batch_single_device,
@@ -162,37 +162,39 @@ class EmbeddingProcessor:
                             models[i],
                             batch_size,
                             db,
-                            embedding_type
+                            embedding_type,
                         )
                     )
-                
+
                 for future in futures:
                     embeddings = future.result()
                     all_embeddings.extend(embeddings)
-        
+
         end_time = time.time()
-        logger.info(f"Batch processing completed in {end_time - start_time:.2f} seconds")
-        
+        logger.info(
+            f"Batch processing completed in {end_time - start_time:.2f} seconds"
+        )
+
         return all_embeddings if db is None else None
-    
+
     def _process_batch_single_device(
         self,
         data: List[tuple[str, str]],
         model: BaseEmbeddingModel,
         batch_size: int,
         db: Optional[DatabaseConnector] = None,
-        embedding_type: str = "last_hidden_state"
+        embedding_type: str = "last_hidden_state",
     ) -> List[NDArray[np.float64]]:
         """Process batch on a single device."""
         all_embeddings = []
-        
+
         for batch_start in range(0, len(data), batch_size):
             batch_end = min(batch_start + batch_size, len(data))
             batch = data[batch_start:batch_end]
-            
+
             accessions, sequences = zip(*batch)
             current_batch_size = len(sequences)
-            
+
             while current_batch_size > 0:
                 try:
                     # Calculate embeddings based on type
@@ -219,44 +221,48 @@ class EmbeddingProcessor:
                         ]
                     else:
                         raise ValueError(f"Unknown embedding_type: {embedding_type}")
-                    
+
                     # Store in database if provided
                     if db is not None:
                         update_protein_embeddings_in_db(
                             db, list(accessions[:current_batch_size]), embeddings_batch
                         )
-                    
+
                     all_embeddings.extend(embeddings_batch)
                     break  # Successful execution
-                
+
                 except torch.cuda.OutOfMemoryError:
                     torch.cuda.empty_cache()
                     current_batch_size = max(1, current_batch_size // 2)
-                    logger.warning(f"Reduced batch size to {current_batch_size} due to OOM error.")
-        
+                    logger.warning(
+                        f"Reduced batch size to {current_batch_size} due to OOM error."
+                    )
+
         return all_embeddings
-    
+
     def calculate_single_embedding(
         self,
         sequence: str,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        embedding_type: Literal["last_hidden_state", "all_layers", "first_layer", "final_embeddings"] = "last_hidden_state",
-        device: Optional[torch.device] = None
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "last_hidden_state",
+        device: Optional[torch.device] = None,
     ) -> NDArray[np.float64]:
         """
         Calculate embedding for a single sequence.
-        
+
         Args:
             sequence: Protein sequence
             model_name: Name of the model to use
             embedding_type: Type of embedding to calculate
             device: Specific device to use (optional)
-            
+
         Returns:
             Embedding as numpy array
         """
         model = self.get_or_create_model(model_name, device)
-        
+
         if embedding_type == "last_hidden_state":
             return model.get_single_embedding_last_hidden_state(sequence)
         elif embedding_type == "all_layers":
@@ -267,18 +273,20 @@ class EmbeddingProcessor:
             return model.get_final_embeddings(sequence)
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
-    
+
     def calculate_database_embeddings(
         self,
         db: DatabaseConnector,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         num_gpus: Optional[int] = None,
-        embedding_type: Literal["last_hidden_state", "all_layers", "first_layer", "final_embeddings"] = "last_hidden_state"
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "last_hidden_state",
     ) -> None:
         """
         Calculate embeddings for all sequences in database that don't have embeddings.
-        
+
         Args:
             db: Database connector
             batch_size: Batch size for processing
@@ -294,13 +302,13 @@ class EmbeddingProcessor:
         """
         results = db.execute_read(query)
         data = [(result["accession"], result["sequence"]) for result in results]
-        
+
         if not data:
             logger.info("No sequences to process.")
             return
-        
+
         logger.info(f"Found {len(data)} sequences without embeddings")
-        
+
         # Process using batch embedding method
         self.calculate_batch_embeddings(
             data=data,
@@ -308,9 +316,9 @@ class EmbeddingProcessor:
             batch_size=batch_size,
             num_gpus=num_gpus,
             db=db,
-            embedding_type=embedding_type
+            embedding_type=embedding_type,
         )
-    
+
     # Legacy compatibility methods (for backward compatibility with existing processor.py)
     def process_batches_on_gpu(
         self,
@@ -322,19 +330,19 @@ class EmbeddingProcessor:
         device: torch.device,
     ) -> None:
         """Legacy method for backward compatibility."""
-        logger.warning("Using legacy process_batches_on_gpu method. Consider using calculate_batch_embeddings instead.")
-        
+        logger.warning(
+            "Using legacy process_batches_on_gpu method. Consider using calculate_batch_embeddings instead."
+        )
+
         # Convert to new interface
         accessions, sequences = zip(*data)
         embedding_data = list(zip(accessions, sequences))
-        
+
         # Use new method
         self.calculate_batch_embeddings(
-            data=embedding_data,
-            batch_size=batch_size,
-            db=db
+            data=embedding_data, batch_size=batch_size, db=db
         )
-    
+
     def get_batch_embeddings_unified(
         self,
         batch_sequences: List[str],
@@ -345,15 +353,15 @@ class EmbeddingProcessor:
     ) -> List[NDArray[np.float64]]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_batch_embeddings_unified method.")
-        
+
         # Determine model type from the actual model instance
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-        
+
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
         embedding_model.tokenizer = tokenizer
         return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
-    
+
     def calculate_single_sequence_embedding_last_hidden_state(
         self,
         sequence: str,
@@ -361,8 +369,10 @@ class EmbeddingProcessor:
         model_name: str = "facebook/esm2_t33_650M_UR50D",
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
-        return self.calculate_single_embedding(sequence, model_name, "last_hidden_state", device)
-    
+        return self.calculate_single_embedding(
+            sequence, model_name, "last_hidden_state", device
+        )
+
     def calculate_single_sequence_embedding_all_layers(
         self,
         sequence: str,
@@ -370,8 +380,10 @@ class EmbeddingProcessor:
         model_name: str = "facebook/esm2_t33_650M_UR50D",
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
-        return self.calculate_single_embedding(sequence, model_name, "all_layers", device)
-    
+        return self.calculate_single_embedding(
+            sequence, model_name, "all_layers", device
+        )
+
     def calculate_single_sequence_embedding_first_layer(
         self,
         sequence: str,
@@ -379,57 +391,53 @@ class EmbeddingProcessor:
         device: torch.device = torch.device("cuda:0"),
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
-        return self.calculate_single_embedding(sequence, model_name, "first_layer", device)
-    
+        return self.calculate_single_embedding(
+            sequence, model_name, "first_layer", device
+        )
+
     def get_single_embedding_last_hidden_state(
-        self, 
-        sequence: str, 
-        model: Any, 
-        tokenizer: Any, 
-        device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_last_hidden_state method.")
-        return self._get_single_embedding_legacy(sequence, model, tokenizer, device, "last_hidden_state")
-    
+        return self._get_single_embedding_legacy(
+            sequence, model, tokenizer, device, "last_hidden_state"
+        )
+
     def get_single_embedding_all_layers(
-        self, 
-        sequence: str, 
-        model: Any, 
-        tokenizer: Any, 
-        device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_all_layers method.")
-        return self._get_single_embedding_legacy(sequence, model, tokenizer, device, "all_layers")
-    
+        return self._get_single_embedding_legacy(
+            sequence, model, tokenizer, device, "all_layers"
+        )
+
     def get_single_embedding_first_layer(
-        self, 
-        sequence: str, 
-        model: Any, 
-        tokenizer: Any, 
-        device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_first_layer method.")
-        return self._get_single_embedding_legacy(sequence, model, tokenizer, device, "first_layer")
-    
+        return self._get_single_embedding_legacy(
+            sequence, model, tokenizer, device, "first_layer"
+        )
+
     def _get_single_embedding_legacy(
-        self, 
-        sequence: str, 
-        model: Any, 
-        tokenizer: Any, 
+        self,
+        sequence: str,
+        model: Any,
+        tokenizer: Any,
         device: torch.device,
-        embedding_type: str
+        embedding_type: str,
     ) -> NDArray[np.float64]:
         """Helper method for legacy single embedding methods."""
         # Determine model type and create appropriate embedding model
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-        
+
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
         embedding_model.tokenizer = tokenizer
-        
+
         if embedding_type == "last_hidden_state":
             return embedding_model.get_single_embedding_last_hidden_state(sequence)
         elif embedding_type == "all_layers":
@@ -438,7 +446,7 @@ class EmbeddingProcessor:
             return embedding_model.get_single_embedding_first_layer(sequence)
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
-    
+
     def cleanup(self) -> None:
         """Clean up all models and free memory."""
         for model in self._models.values():
@@ -453,4 +461,4 @@ _processor = EmbeddingProcessor()
 
 def get_processor() -> EmbeddingProcessor:
     """Get the global embedding processor instance."""
-    return _processor 
+    return _processor

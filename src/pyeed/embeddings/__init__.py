@@ -41,16 +41,17 @@ DeviceType = torch.device
 
 # Re-export functions from processor
 __all__ = [
-    'load_model_and_tokenizer',
-    'process_batches_on_gpu',
-    'get_batch_embeddings',
-    'calculate_single_sequence_embedding_last_hidden_state',
-    'calculate_single_sequence_embedding_all_layers',
-    'calculate_single_sequence_embedding_first_layer',
-    'get_single_embedding_last_hidden_state',
-    'get_single_embedding_all_layers',
-    'get_single_embedding_first_layer',
+    "load_model_and_tokenizer",
+    "process_batches_on_gpu",
+    "get_batch_embeddings",
+    "calculate_single_sequence_embedding_last_hidden_state",
+    "calculate_single_sequence_embedding_all_layers",
+    "calculate_single_sequence_embedding_first_layer",
+    "get_single_embedding_last_hidden_state",
+    "get_single_embedding_all_layers",
+    "get_single_embedding_first_layer",
 ]
+
 
 # Function implementations
 def load_model_and_tokenizer(
@@ -60,7 +61,10 @@ def load_model_and_tokenizer(
     """Load model and tokenizer."""
     if device is None:
         device = torch.device("cuda:0")
-    return cast(Tuple[ModelType, TokenizerType, DeviceType], ModelFactory.load_model_and_tokenizer(model_name, device))
+    return cast(
+        Tuple[ModelType, TokenizerType, DeviceType],
+        ModelFactory.load_model_and_tokenizer(model_name, device),
+    )
 
 
 def process_batches_on_gpu(
@@ -138,7 +142,9 @@ def get_single_embedding_last_hidden_state(
 ) -> NDArray[np.float64]:
     """Get single embedding using last hidden state."""
     processor = get_processor()
-    return processor.get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
+    return processor.get_single_embedding_last_hidden_state(
+        sequence, model, tokenizer, device
+    )
 
 
 def get_single_embedding_all_layers(
@@ -160,53 +166,57 @@ def get_single_embedding_first_layer(
 ) -> NDArray[np.float64]:
     """Get single embedding using first layer."""
     processor = get_processor()
-    return processor.get_single_embedding_first_layer(sequence, model, tokenizer, device)
+    return processor.get_single_embedding_first_layer(
+        sequence, model, tokenizer, device
+    )
+
 
 # Public API
 load_model_and_tokenizer = load_model_and_tokenizer
 process_batches_on_gpu = process_batches_on_gpu
 get_batch_embeddings = get_batch_embeddings
-calculate_single_sequence_embedding_last_hidden_state = calculate_single_sequence_embedding_last_hidden_state
-calculate_single_sequence_embedding_all_layers = calculate_single_sequence_embedding_all_layers
-calculate_single_sequence_embedding_first_layer = calculate_single_sequence_embedding_first_layer
+calculate_single_sequence_embedding_last_hidden_state = (
+    calculate_single_sequence_embedding_last_hidden_state
+)
+calculate_single_sequence_embedding_all_layers = (
+    calculate_single_sequence_embedding_all_layers
+)
+calculate_single_sequence_embedding_first_layer = (
+    calculate_single_sequence_embedding_first_layer
+)
 get_single_embedding_last_hidden_state = get_single_embedding_last_hidden_state
 get_single_embedding_all_layers = get_single_embedding_all_layers
 get_single_embedding_first_layer = get_single_embedding_first_layer
 
 __all__ = [
     # Base classes and types
-    'BaseEmbeddingModel',
-    'ModelType',
-    'normalize_embedding',
-    
+    "BaseEmbeddingModel",
+    "ModelType",
+    "normalize_embedding",
     # Factory and processor
-    'ModelFactory',
-    'EmbeddingProcessor',
-    'get_processor',
-    
+    "ModelFactory",
+    "EmbeddingProcessor",
+    "get_processor",
     # Utilities
-    'get_hf_token',
-    'preprocess_sequence_for_prott5',
-    'free_memory',
-    'determine_model_type',
-    
+    "get_hf_token",
+    "preprocess_sequence_for_prott5",
+    "free_memory",
+    "determine_model_type",
     # Database operations
-    'update_protein_embeddings_in_db',
-    
+    "update_protein_embeddings_in_db",
     # Model implementations
-    'ESM2EmbeddingModel',
-    'ESMCEmbeddingModel',
-    'ESM3EmbeddingModel',
-    'ProtT5EmbeddingModel',
-    
+    "ESM2EmbeddingModel",
+    "ESMCEmbeddingModel",
+    "ESM3EmbeddingModel",
+    "ProtT5EmbeddingModel",
     # Backward compatibility functions
-    'load_model_and_tokenizer',
-    'process_batches_on_gpu',
-    'get_batch_embeddings',
-    'calculate_single_sequence_embedding_last_hidden_state',
-    'calculate_single_sequence_embedding_all_layers',
-    'calculate_single_sequence_embedding_first_layer',
-    'get_single_embedding_last_hidden_state',
-    'get_single_embedding_all_layers',
-    'get_single_embedding_first_layer',
-] 
+    "load_model_and_tokenizer",
+    "process_batches_on_gpu",
+    "get_batch_embeddings",
+    "calculate_single_sequence_embedding_last_hidden_state",
+    "calculate_single_sequence_embedding_all_layers",
+    "calculate_single_sequence_embedding_first_layer",
+    "get_single_embedding_last_hidden_state",
+    "get_single_embedding_all_layers",
+    "get_single_embedding_first_layer",
+]

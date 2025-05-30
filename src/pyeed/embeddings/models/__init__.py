@@ -10,8 +10,8 @@ from .esmc import ESMCEmbeddingModel
 from .prott5 import ProtT5EmbeddingModel
 
 __all__ = [
-    'ESM2EmbeddingModel',
-    'ESMCEmbeddingModel', 
-    'ESM3EmbeddingModel',
-    'ProtT5EmbeddingModel',
-] 
+    "ESM2EmbeddingModel",
+    "ESMCEmbeddingModel",
+    "ESM3EmbeddingModel",
+    "ProtT5EmbeddingModel",
+]

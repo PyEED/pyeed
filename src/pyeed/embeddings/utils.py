@@ -1,7 +1,7 @@
 """
 Utility functions for embedding operations.
 
-Contains helper functions for token management, memory management, 
+Contains helper functions for token management, memory management,
 and sequence preprocessing.
 """
 
@@ -33,10 +33,10 @@ def get_hf_token() -> str:
 def preprocess_sequence_for_prott5(sequence: str) -> str:
     """
     Preprocesses a protein sequence for ProtT5 models.
-    
+
     Args:
         sequence: Raw protein sequence
-        
+
     Returns:
         Preprocessed sequence with spaces between amino acids and rare AAs mapped to X
     """
@@ -59,15 +59,15 @@ def free_memory() -> None:
 def determine_model_type(model_name: str) -> str:
     """
     Determine the model type based on model name.
-    
+
     Args:
         model_name: Name of the model
-        
+
     Returns:
         Model type string
     """
     model_name_lower = model_name.lower()
-    
+
     if "esmc" in model_name_lower:
         return "esmc"
     elif "esm3" in model_name_lower:
@@ -75,4 +75,4 @@ def determine_model_type(model_name: str) -> str:
     elif "prot_t5" in model_name_lower or "prott5" in model_name_lower:
         return "prott5"
     else:
-        return "esm2"  # Default to ESM-2 for other facebook/esm models 
+        return "esm2"  # Default to ESM-2 for other facebook/esm models

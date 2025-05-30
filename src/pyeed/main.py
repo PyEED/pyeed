@@ -203,7 +203,9 @@ class Pyeed:
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         num_gpus: int = 1,  # Number of GPUs to use
-        embedding_type: Literal["last_hidden_state", "all_layers", "first_layer", "final_embeddings"] = "final_embeddings"
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "final_embeddings",
     ) -> None:
         """
         Calculates embeddings for all sequences in the database that do not have embeddings,
@@ -217,14 +219,14 @@ class Pyeed:
         """
         # Get the embedding processor
         processor = get_processor()
-        
+
         # Use the simplified interface
         processor.calculate_database_embeddings(
             db=self.db,
             batch_size=batch_size,
             model_name=model_name,
             num_gpus=num_gpus,
-            embedding_type=embedding_type
+            embedding_type=embedding_type,
         )
 
         # free memory
@@ -473,30 +475,30 @@ class Pyeed:
         self,
         sequence: str,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        embedding_type: Literal["last_hidden_state", "all_layers", "first_layer", "final_embeddings"] = "last_hidden_state"
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "last_hidden_state",
     ) -> Any:
         """
         Calculate embedding for a single protein sequence.
-        
+
         Args:
             sequence: Protein sequence string
             model_name: Model to use for embedding calculation
             embedding_type: Type of embedding to calculate
-            
+
         Returns:
             Numpy array containing the embedding
         """
         processor = get_processor()
         return processor.calculate_single_embedding(
-            sequence=sequence,
-            model_name=model_name,
-            embedding_type=embedding_type
+            sequence=sequence, model_name=model_name, embedding_type=embedding_type
         )
-    
+
     def get_available_devices(self) -> list[str]:
         """
         Get list of available devices for embedding computation.
-        
+
         Returns:
             List of available device names
         """

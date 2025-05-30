@@ -98,7 +98,11 @@ def process_batches_on_gpu(
 def load_model_and_tokenizer(
     model_name: str,
     device: torch.device = torch.device("cuda:0"),
-) -> Tuple[Union[EsmModel, ESMC, ESM3, T5Model], Union[EsmTokenizer, T5Tokenizer, None], torch.device]:
+) -> Tuple[
+    Union[EsmModel, ESMC, ESM3, T5Model],
+    Union[EsmTokenizer, T5Tokenizer, None],
+    torch.device,
+]:
     """
     Loads the model and assigns it to a specific GPU.
 
@@ -121,12 +125,12 @@ def load_model_and_tokenizer(
     elif "prot_t5" in model_name.lower() or "prott5" in model_name.lower():
         # ProtT5 models
         full_model_name = (
-            model_name
-            if model_name.startswith("Rostlab/")
-            else f"Rostlab/{model_name}"
+            model_name if model_name.startswith("Rostlab/") else f"Rostlab/{model_name}"
         )
         model = T5Model.from_pretrained(full_model_name, use_auth_token=token)
-        tokenizer = T5Tokenizer.from_pretrained(full_model_name, use_auth_token=token, do_lower_case=False)
+        tokenizer = T5Tokenizer.from_pretrained(
+            full_model_name, use_auth_token=token, do_lower_case=False
+        )
         model = model.to(device)
     else:
         full_model_name = (
@@ -144,10 +148,10 @@ def load_model_and_tokenizer(
 def preprocess_sequence_for_prott5(sequence: str) -> str:
     """
     Preprocesses a protein sequence for ProtT5 models.
-    
+
     Args:
         sequence: Raw protein sequence
-        
+
     Returns:
         Preprocessed sequence with spaces between amino acids and rare AAs mapped to X
     """
@@ -229,37 +233,43 @@ def get_batch_embeddings(
     elif isinstance(base_model, T5Model):
         # For ProtT5 models
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ProtT5 models"
-        assert isinstance(tokenizer_or_alphabet, T5Tokenizer), "T5Tokenizer required for ProtT5 models"
-        
+        assert isinstance(
+            tokenizer_or_alphabet, T5Tokenizer
+        ), "T5Tokenizer required for ProtT5 models"
+
         # Preprocess sequences for ProtT5
-        processed_sequences = [preprocess_sequence_for_prott5(seq) for seq in batch_sequences]
-        
+        processed_sequences = [
+            preprocess_sequence_for_prott5(seq) for seq in batch_sequences
+        ]
+
         inputs = tokenizer_or_alphabet.batch_encode_plus(
-            processed_sequences, 
-            add_special_tokens=True, 
+            processed_sequences,
+            add_special_tokens=True,
             padding="longest",
-            return_tensors="pt"
+            return_tensors="pt",
         )
-        
+
         # Move inputs to device
-        input_ids = inputs['input_ids'].to(device)
-        attention_mask = inputs['attention_mask'].to(device)
-        
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs["attention_mask"].to(device)
+
         with torch.no_grad():
             # For ProtT5, use encoder embeddings for feature extraction
             # Create dummy decoder inputs (just the pad token)
             batch_size = input_ids.shape[0]
             decoder_input_ids = torch.full(
-                (batch_size, 1), 
-                tokenizer_or_alphabet.pad_token_id or 0, 
+                (batch_size, 1),
+                tokenizer_or_alphabet.pad_token_id or 0,
                 dtype=torch.long,
-                device=device
+                device=device,
             )
-            
-            outputs = base_model(input_ids=input_ids, 
-                          attention_mask=attention_mask,
-                          decoder_input_ids=decoder_input_ids)
-            
+
+            outputs = base_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+            )
+
             # Get encoder last hidden state (encoder embeddings)
             hidden_states = outputs.encoder_last_hidden_state.cpu().numpy()
 
@@ -278,7 +288,9 @@ def get_batch_embeddings(
     else:
         # ESM-2 logic
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ESM-2 models"
-        assert isinstance(tokenizer_or_alphabet, EsmTokenizer), "EsmTokenizer required for ESM-2 models"
+        assert isinstance(
+            tokenizer_or_alphabet, EsmTokenizer
+        ), "EsmTokenizer required for ESM-2 models"
         inputs = tokenizer_or_alphabet(
             batch_sequences, padding=True, truncation=True, return_tensors="pt"
         ).to(device)
@@ -376,26 +388,23 @@ def get_single_embedding_last_hidden_state(
             # ProtT5 logic
             processed_sequence = preprocess_sequence_for_prott5(sequence)
             inputs = tokenizer.encode_plus(
-                processed_sequence,
-                add_special_tokens=True,
-                return_tensors="pt"
+                processed_sequence, add_special_tokens=True, return_tensors="pt"
             )
-            
-            input_ids = inputs['input_ids'].to(device)
-            attention_mask = inputs['attention_mask'].to(device)
-            
+
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs["attention_mask"].to(device)
+
             # Create dummy decoder inputs
             decoder_input_ids = torch.full(
-                (1, 1), 
-                tokenizer.pad_token_id or 0, 
-                dtype=torch.long,
-                device=device
+                (1, 1), tokenizer.pad_token_id or 0, dtype=torch.long, device=device
             )
-            
-            outputs = model(input_ids=input_ids, 
-                          attention_mask=attention_mask,
-                          decoder_input_ids=decoder_input_ids)
-            
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+            )
+
             # Get encoder last hidden state including special tokens
             embedding = outputs.encoder_last_hidden_state[0].detach().cpu().numpy()
         else:
@@ -465,27 +474,24 @@ def get_single_embedding_all_layers(
             # For ProtT5: Get encoder hidden states
             processed_sequence = preprocess_sequence_for_prott5(sequence)
             inputs = tokenizer.encode_plus(
-                processed_sequence,
-                add_special_tokens=True,
-                return_tensors="pt"
+                processed_sequence, add_special_tokens=True, return_tensors="pt"
             )
-            
-            input_ids = inputs['input_ids'].to(device)
-            attention_mask = inputs['attention_mask'].to(device)
-            
+
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs["attention_mask"].to(device)
+
             # Create dummy decoder inputs
             decoder_input_ids = torch.full(
-                (1, 1), 
-                tokenizer.pad_token_id or 0, 
-                dtype=torch.long,
-                device=device
+                (1, 1), tokenizer.pad_token_id or 0, dtype=torch.long, device=device
             )
-            
-            outputs = model(input_ids=input_ids, 
-                          attention_mask=attention_mask,
-                          decoder_input_ids=decoder_input_ids,
-                          output_hidden_states=True)
-            
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+                output_hidden_states=True,
+            )
+
             # Get all encoder hidden states
             encoder_hidden_states = outputs.encoder_hidden_states
             for layer_tensor in encoder_hidden_states:
@@ -509,8 +515,11 @@ def get_single_embedding_all_layers(
 
     return np.array(embeddings_list)
 
+
 def calculate_single_sequence_embedding_first_layer(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D", device: torch.device = torch.device("cuda:0"),
+    sequence: str,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
+    device: torch.device = torch.device("cuda:0"),
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence using the first layer.
@@ -568,27 +577,24 @@ def get_single_embedding_first_layer(
             # ProtT5 logic - get first layer embedding
             processed_sequence = preprocess_sequence_for_prott5(sequence)
             inputs = tokenizer.encode_plus(
-                processed_sequence,
-                add_special_tokens=True,
-                return_tensors="pt"
+                processed_sequence, add_special_tokens=True, return_tensors="pt"
             )
-            
-            input_ids = inputs['input_ids'].to(device)
-            attention_mask = inputs['attention_mask'].to(device)
-            
+
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs["attention_mask"].to(device)
+
             # Create dummy decoder inputs
             decoder_input_ids = torch.full(
-                (1, 1), 
-                tokenizer.pad_token_id or 0, 
-                dtype=torch.long,
-                device=device
+                (1, 1), tokenizer.pad_token_id or 0, dtype=torch.long, device=device
             )
-            
-            outputs = model(input_ids=input_ids, 
-                          attention_mask=attention_mask,
-                          decoder_input_ids=decoder_input_ids,
-                          output_hidden_states=True)
-            
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                decoder_input_ids=decoder_input_ids,
+                output_hidden_states=True,
+            )
+
             # Get first encoder hidden state including special tokens
             embedding = outputs.encoder_hidden_states[0][0].detach().cpu().numpy()
 
@@ -605,6 +611,7 @@ def get_single_embedding_first_layer(
     norm[norm == 0] = 1.0  # Handle zero norm case
     normalized_embedding = embedding / norm
     return np.asarray(normalized_embedding, dtype=np.float64)
+
 
 def free_memory() -> None:
     """

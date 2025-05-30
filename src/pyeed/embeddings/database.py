@@ -40,4 +40,4 @@ def update_protein_embeddings_in_db(
     """
 
     # Execute the update query with parameters
-    db.execute_write(query, {"updates": updates}) 
+    db.execute_write(query, {"updates": updates})

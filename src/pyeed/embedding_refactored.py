@@ -31,6 +31,7 @@ from pyeed.embeddings.utils import (
 # Original function signatures maintained for backward compatibility
 # ============================================================================
 
+
 def get_hf_token() -> str:
     """Get or request Hugging Face token."""
     return _get_hf_token()
@@ -62,7 +63,11 @@ def process_batches_on_gpu(
 def load_model_and_tokenizer(
     model_name: str,
     device: torch.device = torch.device("cuda:0"),
-) -> Tuple[Union[EsmModel, ESMC, ESM3, T5Model], Union[EsmTokenizer, T5Tokenizer, None], torch.device]:
+) -> Tuple[
+    Union[EsmModel, ESMC, ESM3, T5Model],
+    Union[EsmTokenizer, T5Tokenizer, None],
+    torch.device,
+]:
     """
     Loads the model and assigns it to a specific GPU.
 
@@ -79,10 +84,10 @@ def load_model_and_tokenizer(
 def preprocess_sequence_for_prott5(sequence: str) -> str:
     """
     Preprocesses a protein sequence for ProtT5 models.
-    
+
     Args:
         sequence: Raw protein sequence
-        
+
     Returns:
         Preprocessed sequence with spaces between amino acids and rare AAs mapped to X
     """
@@ -179,7 +184,9 @@ def get_single_embedding_last_hidden_state(
         np.ndarray: Normalized embeddings for each token in the sequence
     """
     processor = get_processor()
-    return processor.get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
+    return processor.get_single_embedding_last_hidden_state(
+        sequence, model, tokenizer, device
+    )
 
 
 def get_single_embedding_all_layers(
@@ -208,13 +215,17 @@ def get_single_embedding_all_layers(
 
 
 def calculate_single_sequence_embedding_first_layer(
-    sequence: str, model_name: str = "facebook/esm2_t33_650M_UR50D", device: torch.device = torch.device("cuda:0"),
+    sequence: str,
+    model_name: str = "facebook/esm2_t33_650M_UR50D",
+    device: torch.device = torch.device("cuda:0"),
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence using the first layer.
     """
     processor = get_processor()
-    return processor.calculate_single_sequence_embedding_first_layer(sequence, model_name, device)
+    return processor.calculate_single_sequence_embedding_first_layer(
+        sequence, model_name, device
+    )
 
 
 def get_single_embedding_first_layer(
@@ -224,7 +235,9 @@ def get_single_embedding_first_layer(
     Generates normalized embeddings for each token in the sequence using the first layer.
     """
     processor = get_processor()
-    return processor.get_single_embedding_first_layer(sequence, model, tokenizer, device)
+    return processor.get_single_embedding_first_layer(
+        sequence, model, tokenizer, device
+    )
 
 
 def free_memory() -> None:
@@ -247,4 +260,4 @@ def update_protein_embeddings_in_db(
         accessions (list[str]): The accessions of the proteins to update.
         embeddings_batch (list[NDArray[np.float64]]): The embeddings to update.
     """
-    _update_protein_embeddings_in_db(db, accessions, embeddings_batch) 
+    _update_protein_embeddings_in_db(db, accessions, embeddings_batch)
