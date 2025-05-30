@@ -57,7 +57,7 @@ def free_memory() -> None:
     # Run garbage collection multiple times to ensure thorough cleanup
     for _ in range(3):
         gc.collect()
-    
+
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
     elif torch.cuda.is_available():
@@ -67,7 +67,7 @@ def free_memory() -> None:
         torch.cuda.reset_peak_memory_stats()
         # Synchronize CUDA operations
         torch.cuda.synchronize()
-    
+
     # Force garbage collection one final time
     gc.collect()
 

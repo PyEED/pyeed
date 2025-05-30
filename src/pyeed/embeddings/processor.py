@@ -447,10 +447,12 @@ class EmbeddingProcessor:
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 
-    def remove_model(self, model_name: str, device: Optional[torch.device] = None) -> None:
+    def remove_model(
+        self, model_name: str, device: Optional[torch.device] = None
+    ) -> None:
         """
         Remove a specific model from the processor's cache and clean up its resources.
-        
+
         Args:
             model_name: Name of the model to remove
             device: Specific device the model is on (optional)
