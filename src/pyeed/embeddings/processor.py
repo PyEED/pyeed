@@ -5,7 +5,7 @@ Provides high-level interfaces for batch processing, single sequence processing,
 and database operations with automatic device management and model loading.
 """
 
-from typing import List, Union, Any, Literal, Optional
+from typing import List, Union, Any, Literal, Optional, Dict, Type
 import torch
 from torch.nn import DataParallel, Module
 from loguru import logger
@@ -31,8 +31,8 @@ class EmbeddingProcessor:
     simplified interfaces for all embedding operations.
     """
     
-    def __init__(self):
-        self._models: dict[str, BaseEmbeddingModel] = {}
+    def __init__(self) -> None:
+        self._models: Dict[str, BaseEmbeddingModel] = {}
         self._devices: List[torch.device] = []
         self._initialize_devices()
     
@@ -348,25 +348,10 @@ class EmbeddingProcessor:
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
         model_type = type(base_model).__name__
         
-        # Map model class names to our model types
-        if "ESMC" in model_type:
-            embedding_model = ESMCEmbeddingModel("", device)
-            embedding_model.model = base_model
-            return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
-        elif "ESM3" in model_type:
-            embedding_model = ESM3EmbeddingModel("", device)
-            embedding_model.model = base_model
-            return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
-        elif "T5Model" in model_type:
-            embedding_model = ProtT5EmbeddingModel("", device)
-            embedding_model.model = base_model
-            embedding_model.tokenizer = tokenizer
-            return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
-        else:  # ESM-2 and other ESM models
-            embedding_model = ESM2EmbeddingModel("", device)
-            embedding_model.model = base_model
-            embedding_model.tokenizer = tokenizer
-            return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
+        embedding_model = ESM2EmbeddingModel("", device)
+        embedding_model.model = base_model
+        embedding_model.tokenizer = tokenizer
+        return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
     
     def calculate_single_sequence_embedding_last_hidden_state(
         self,
@@ -441,20 +426,9 @@ class EmbeddingProcessor:
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
         model_type = type(base_model).__name__
         
-        if "ESMC" in model_type:
-            embedding_model = ESMCEmbeddingModel("", device)
-            embedding_model.model = base_model
-        elif "ESM3" in model_type:
-            embedding_model = ESM3EmbeddingModel("", device)
-            embedding_model.model = base_model
-        elif "T5Model" in model_type:
-            embedding_model = ProtT5EmbeddingModel("", device)
-            embedding_model.model = base_model
-            embedding_model.tokenizer = tokenizer
-        else:  # ESM-2 and other ESM models
-            embedding_model = ESM2EmbeddingModel("", device)
-            embedding_model.model = base_model
-            embedding_model.tokenizer = tokenizer
+        embedding_model = ESM2EmbeddingModel("", device)
+        embedding_model.model = base_model
+        embedding_model.tokenizer = tokenizer
         
         if embedding_type == "last_hidden_state":
             return embedding_model.get_single_embedding_last_hidden_state(sequence)

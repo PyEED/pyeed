@@ -144,7 +144,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         
         # Get encoder last hidden state including special tokens
         embedding = outputs.encoder_last_hidden_state[0].detach().cpu().numpy()
-        return embedding
+        return np.asarray(embedding, dtype=np.float64)
     
     def get_single_embedding_all_layers(
         self, 
@@ -238,4 +238,20 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         
         # Normalize the embedding
         embedding = normalize_embedding(embedding)
-        return embedding 
+        return embedding
+    
+    def get_final_embeddings(
+        self, 
+        sequence: str
+    ) -> NDArray[np.float64]:
+        """
+        Get final embeddings for ProtT5 with robust fallback.
+        """
+        try:
+            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            if embeddings and len(embeddings) > 0:
+                return np.asarray(embeddings[0], dtype=np.float64)
+            else:
+                raise ValueError("Batch embeddings method returned empty results")
+        except Exception as e:
+            raise ValueError(f"ProtT5 embedding extraction failed: {e}") 

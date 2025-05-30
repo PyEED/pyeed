@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from loguru import logger
 from esm.models.esm3 import ESM3
-from esm.sdk.api import ESMProtein, SamplingConfig
+from esm.sdk.api import ESMProtein, SamplingConfig, LogitsConfig
 
 from ..base import BaseEmbeddingModel, normalize_embedding
 
@@ -153,39 +153,35 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
     ) -> NDArray[np.float64]:
         """
         Get final embeddings for ESM3 with robust fallback.
-        
-        ESM3 has different API structure, so this provides a more robust
-        embedding extraction that works reliably across different ESM3 versions.
         """
         try:
-            # Try to get the standard per-residue embedding
-            return self.get_single_embedding_last_hidden_state(sequence)
+            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            if embeddings and len(embeddings) > 0:
+                return np.asarray(embeddings[0], dtype=np.float64)
+            else:
+                raise ValueError("Batch embeddings method returned empty results")
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "out of memory" in str(e).lower():
+                torch.cuda.empty_cache()
+                try:
+                    if self.model is None:
+                        self.load_model()
+                    model = cast(ESM3, self.model)
+                    with torch.no_grad():
+                        protein = self.preprocess_sequence(sequence)
+                        protein_tensor = model.encode(protein)
+                        logits_output = model.logits(
+                            protein_tensor, 
+                            LogitsConfig(sequence=True, return_embeddings=True)
+                        )
+                        if logits_output.embeddings is None:
+                            raise ValueError("Model did not return embeddings")
+                        embeddings = logits_output.embeddings.cpu().numpy()
+                        pooled_embedding = embeddings.mean(axis=1)[0]
+                        return np.asarray(pooled_embedding, dtype=np.float64)
+                except Exception as minimal_error:
+                    raise ValueError(f"ESM3 embedding extraction failed with OOM: {minimal_error}")
+            else:
+                raise e
         except Exception as e:
-            # If that fails, try alternative method
-            logger.warning(f"Standard embedding method failed for ESM3: {e}. Trying alternative method.")
-            try:
-                if self.model is None:
-                    self.load_model()
-                
-                model = cast(ESM3, self.model)
-                
-                with torch.no_grad():
-                    protein = self.preprocess_sequence(sequence)
-                    sequence_encoding = model.encode(protein)
-                    # Try with minimal sampling config
-                    result = model.forward_and_sample(
-                        sequence_encoding,
-                        SamplingConfig()
-                    )
-                    
-                    # Extract any available embedding
-                    if hasattr(result, 'per_residue_embedding') and result.per_residue_embedding is not None:
-                        embedding = result.per_residue_embedding.to(torch.float32).cpu().numpy()
-                        return embedding
-                    else:
-                        # Last resort: use a simple mean-pooled sequence representation
-                        logger.warning("No per-residue embeddings available, using basic fallback")
-                        raise ValueError("Could not extract any embeddings from ESM3 model")
-            except Exception as fallback_error:
-                logger.error(f"All embedding extraction methods failed for ESM3: {fallback_error}")
-                raise ValueError(f"ESM3 embedding extraction failed: {fallback_error}") 
+            raise ValueError(f"ESM3 embedding extraction failed: {e}") 

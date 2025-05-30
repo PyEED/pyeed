@@ -91,7 +91,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         
         # Remove batch dimension and special tokens ([CLS] and [SEP])
         embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
-        return embedding
+        return np.asarray(embedding, dtype=np.float64)
     
     def get_single_embedding_all_layers(
         self, 
@@ -150,23 +150,13 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         sequence: str
     ) -> NDArray[np.float64]:
         """
-        Get final embeddings for ESM-2 with robust fallback.
-        
-        Provides a more robust embedding extraction that prioritizes
-        batch processing for better performance.
+        Get final embeddings for ESM2 with robust fallback.
         """
         try:
-            # For ESM-2, batch processing is more efficient
             embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
             if embeddings and len(embeddings) > 0:
-                return embeddings[0]
+                return np.asarray(embeddings[0], dtype=np.float64)
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:
-            logger.warning(f"Batch embeddings method failed for ESM-2: {e}. Trying single sequence method.")
-            try:
-                # Fallback to single sequence method
-                return self.get_single_embedding_last_hidden_state(sequence)
-            except Exception as fallback_error:
-                logger.error(f"All embedding extraction methods failed for ESM-2: {fallback_error}")
-                raise ValueError(f"ESM-2 embedding extraction failed: {fallback_error}") 
+            raise ValueError(f"ESM2 embedding extraction failed: {e}") 

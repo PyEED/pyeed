@@ -94,7 +94,8 @@ class BaseEmbeddingModel(ABC):
         It falls back gracefully if certain layer-specific methods are not available.
         Default implementation uses last hidden state, but can be overridden.
         """
-        return self.get_single_embedding_last_hidden_state(sequence)
+        result = self.get_single_embedding_last_hidden_state(sequence)
+        return np.asarray(result, dtype=np.float64)
     
     def move_to_device(self) -> None:
         """Move model to the specified device."""
@@ -105,7 +106,10 @@ class BaseEmbeddingModel(ABC):
         """Clean up model resources."""
         if self._model is not None:
             self._model = None
-        torch.cuda.empty_cache() if torch.cuda.is_available() else None
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        # Explicit return None
+        return None
 
 
 class ModelType:
@@ -118,4 +122,8 @@ class ModelType:
 
 def normalize_embedding(embedding: NDArray[np.float64]) -> NDArray[np.float64]:
     """Normalize embeddings using L2 normalization."""
-    return embedding / np.linalg.norm(embedding, axis=1, keepdims=True) 
+    norm = np.linalg.norm(embedding, axis=1, keepdims=True)
+    # Handle zero norm case to avoid division by zero
+    norm[norm == 0] = 1.0
+    normalized = embedding / norm
+    return np.asarray(normalized, dtype=np.float64) 

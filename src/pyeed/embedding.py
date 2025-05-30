@@ -1,7 +1,7 @@
 import gc
 import os
 import re
-from typing import Any, Tuple, Union
+from typing import Any, Tuple, Union, List
 
 import numpy as np
 import torch
@@ -188,7 +188,7 @@ def get_batch_embeddings(
 
     if isinstance(base_model, ESMC):
         # For ESMC models
-        embedding_list = []
+        embedding_list: List[NDArray[np.float64]] = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
@@ -208,7 +208,7 @@ def get_batch_embeddings(
         return embedding_list
     elif isinstance(base_model, ESM3):
         # For ESM3 models
-        embedding_list = []
+        embedding_list_esm3: List[NDArray[np.float64]] = []
         with torch.no_grad():
             for sequence in batch_sequences:
                 protein = ESMProtein(sequence=sequence)
@@ -224,8 +224,8 @@ def get_batch_embeddings(
                 )
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=0)
-                embedding_list.append(embeddings)
-        return embedding_list
+                embedding_list_esm3.append(embeddings)
+        return embedding_list_esm3
     elif isinstance(base_model, T5Model):
         # For ProtT5 models
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ProtT5 models"
@@ -265,15 +265,15 @@ def get_batch_embeddings(
 
         if pool_embeddings:
             # Mean pooling across sequence length, excluding padding tokens
-            embedding_list = []
+            prott5_embedding_list: List[NDArray[np.float64]] = []
             for i, hidden_state in enumerate(hidden_states):
                 # Get actual sequence length (excluding padding)
                 attention_mask_np = attention_mask[i].cpu().numpy()
                 seq_len = attention_mask_np.sum()
                 # Pool only over actual sequence tokens
                 pooled_embedding = hidden_state[:seq_len].mean(axis=0)
-                embedding_list.append(pooled_embedding)
-            return embedding_list
+                prott5_embedding_list.append(pooled_embedding)
+            return prott5_embedding_list
         return list(hidden_states)
     else:
         # ESM-2 logic
@@ -404,7 +404,12 @@ def get_single_embedding_last_hidden_state(
             outputs = model(**inputs)
             embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
 
-    return embedding  # type: ignore
+    # Ensure embedding is a numpy array with proper dtype and normalize it
+    embedding = np.asarray(embedding, dtype=np.float64)
+    norm = np.linalg.norm(embedding, axis=1, keepdims=True)
+    norm[norm == 0] = 1.0  # Handle zero norm case
+    normalized_embedding = embedding / norm
+    return np.asarray(normalized_embedding, dtype=np.float64)
 
 
 def get_single_embedding_all_layers(
@@ -428,7 +433,7 @@ def get_single_embedding_all_layers(
         NDArray[np.float64]: A numpy array containing the normalized token embeddings
         concatenated across all layers.
     """
-    embeddings_list = []
+    embeddings_list: List[NDArray[np.float64]] = []
     with torch.no_grad():
         if isinstance(model, ESMC):
             # For ESM-3: Use ESMProtein and request hidden states via LogitsConfig
@@ -520,7 +525,7 @@ def get_single_embedding_first_layer(
     """
     Generates normalized embeddings for each token in the sequence using the first layer.
     """
-    embeddings_list = []
+    embedding: NDArray[np.float64]
 
     with torch.no_grad():
         if isinstance(model, ESMC):
@@ -551,13 +556,13 @@ def get_single_embedding_first_layer(
 
             protein = ESMProtein(sequence=sequence)
             protein_tensor = model.encode(protein)
-            embedding = model.forward_and_sample(
+            result = model.forward_and_sample(
                 protein_tensor,
                 SamplingConfig(return_per_residue_embeddings=True),
             )
-            if embedding is None or embedding.per_residue_embedding is None:
+            if result is None or result.per_residue_embedding is None:
                 raise ValueError("Model did not return embeddings")
-            embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
+            embedding = result.per_residue_embedding.to(torch.float32).cpu().numpy()
 
         elif isinstance(model, T5Model):
             # ProtT5 logic - get first layer embedding
@@ -594,10 +599,12 @@ def get_single_embedding_first_layer(
             # Get the first layer's hidden states for all residues (excluding special tokens)
             embedding = outputs.hidden_states[0][0, 1:-1, :].detach().cpu().numpy()
 
-    # Ensure embedding is a numpy array and normalize it
+    # Ensure embedding is a numpy array with proper dtype and normalize it
     embedding = np.asarray(embedding, dtype=np.float64)
-    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
-    return embedding
+    norm = np.linalg.norm(embedding, axis=1, keepdims=True)
+    norm[norm == 0] = 1.0  # Handle zero norm case
+    normalized_embedding = embedding / norm
+    return np.asarray(normalized_embedding, dtype=np.float64)
 
 def free_memory() -> None:
     """

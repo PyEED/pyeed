@@ -228,7 +228,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
             # For ESMC, batch embeddings with pooling is more reliable and memory efficient
             embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
             if embeddings and len(embeddings) > 0:
-                return embeddings[0]
+                return np.asarray(embeddings[0], dtype=np.float64)
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -260,7 +260,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         # Pool across sequence dimension to get single vector
                         pooled_embedding = embeddings.mean(axis=1)[0]
                         
-                        return pooled_embedding
+                        return np.asarray(pooled_embedding, dtype=np.float64)
                         
                 except Exception as minimal_error:
                     logger.error(f"Minimal embedding extraction also failed for ESMC: {minimal_error}")
