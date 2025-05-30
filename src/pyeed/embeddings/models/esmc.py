@@ -97,6 +97,8 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         "Model did not return embeddings. Check LogitsConfig settings."
                     )
                 embeddings = logits_output.embeddings.cpu().numpy()
+                # drop the special tokens
+                embeddings = embeddings[:, 1:-1, :]
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=1)
                 embedding_list.append(embeddings[0])
@@ -130,8 +132,9 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                     "Model did not return hidden states. Check LogitsConfig settings."
                 )
 
+            # remove special tokens
             embedding = (
-                logits_output.hidden_states[-1][0].to(torch.float32).cpu().numpy()
+                logits_output.hidden_states[-1][0][1:-1].to(torch.float32).cpu().numpy()
             )
 
         # Normalize the embedding
@@ -252,6 +255,8 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         
                         # Get embeddings and pool them properly
                         embeddings = logits_output.embeddings.cpu().numpy()
+                        logger.info(f"Embeddings shape: {embeddings.shape}")
+                        
                         # Pool across sequence dimension to get single vector
                         pooled_embedding = embeddings.mean(axis=1)[0]
                         
