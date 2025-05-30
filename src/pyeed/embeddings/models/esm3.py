@@ -2,13 +2,13 @@
 ESM-3 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, Optional, cast
-import torch
+from typing import List, Tuple, cast
+
 import numpy as np
-from numpy.typing import NDArray
-from loguru import logger
+import torch
 from esm.models.esm3 import ESM3
-from esm.sdk.api import ESMProtein, SamplingConfig, LogitsConfig
+from esm.sdk.api import ESMProtein, LogitsConfig, SamplingConfig
+from numpy.typing import NDArray
 
 from ..base import BaseEmbeddingModel, normalize_embedding
 

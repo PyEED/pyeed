@@ -5,9 +5,10 @@ Defines the common interface that all embedding model implementations should fol
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Union, Tuple, Optional
-import torch
+from typing import Any, List, Optional, Tuple, Union
+
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 

@@ -5,8 +5,10 @@ Handles storing and updating protein embeddings in the database.
 """
 
 from typing import List
+
 import numpy as np
 from numpy.typing import NDArray
+
 from pyeed.dbconnect import DatabaseConnector
 
 

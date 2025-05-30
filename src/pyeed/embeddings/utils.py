@@ -8,8 +8,9 @@ and sequence preprocessing.
 import gc
 import os
 import re
-from huggingface_hub import HfFolder, login
+
 import torch
+from huggingface_hub import HfFolder, login
 
 
 def get_hf_token() -> str:

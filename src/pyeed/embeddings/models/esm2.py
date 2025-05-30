@@ -2,12 +2,12 @@
 ESM-2 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, Optional, Any, cast
-import torch
+from typing import List, Tuple, cast
+
 import numpy as np
+import torch
 from numpy.typing import NDArray
 from transformers import EsmModel, EsmTokenizer
-from loguru import logger
 
 from ..base import BaseEmbeddingModel, normalize_embedding
 from ..utils import get_hf_token

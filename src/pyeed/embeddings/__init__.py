@@ -5,24 +5,35 @@ This module provides both the new organized structure and backward compatibility
 with the original embedding.py interface.
 """
 
-from typing import Any, Tuple, Union, List, Optional, cast
-import torch
-from torch.nn import DataParallel, Module
-from numpy.typing import NDArray
+from typing import List, Optional, Tuple, Union, cast
+
 import numpy as np
-from transformers import EsmModel, EsmTokenizer, T5Model, T5Tokenizer
-from esm.models.esmc import ESMC
+import torch
 from esm.models.esm3 import ESM3
+from esm.models.esmc import ESMC
+from numpy.typing import NDArray
+from torch.nn import DataParallel, Module
+from transformers import EsmModel, EsmTokenizer, T5Model, T5Tokenizer
+
+from pyeed.dbconnect import DatabaseConnector
 
 # New organized structure
 from .base import BaseEmbeddingModel, ModelType, normalize_embedding
-from .factory import ModelFactory
-from .processor import EmbeddingProcessor, get_processor
-from .utils import get_hf_token, preprocess_sequence_for_prott5, free_memory, determine_model_type
 from .database import update_protein_embeddings_in_db
-from .models import ESM2EmbeddingModel, ESMCEmbeddingModel, ESM3EmbeddingModel, ProtT5EmbeddingModel
-
-from pyeed.dbconnect import DatabaseConnector
+from .factory import ModelFactory
+from .models import (
+    ESM2EmbeddingModel,
+    ESM3EmbeddingModel,
+    ESMCEmbeddingModel,
+    ProtT5EmbeddingModel,
+)
+from .processor import EmbeddingProcessor, get_processor
+from .utils import (
+    determine_model_type,
+    free_memory,
+    get_hf_token,
+    preprocess_sequence_for_prott5,
+)
 
 # Type aliases for better readability
 TokenizerType = Union[EsmTokenizer, T5Tokenizer, None]

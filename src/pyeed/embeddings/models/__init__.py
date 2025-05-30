@@ -5,8 +5,8 @@ Contains specific implementations for ESM-2, ESMC, ESM-3, and ProtT5 models.
 """
 
 from .esm2 import ESM2EmbeddingModel
-from .esmc import ESMCEmbeddingModel
 from .esm3 import ESM3EmbeddingModel
+from .esmc import ESMCEmbeddingModel
 from .prott5 import ProtT5EmbeddingModel
 
 __all__ = [

@@ -1,10 +1,7 @@
 import asyncio
-import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
 import nest_asyncio
-import torch
 from loguru import logger
 
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
@@ -14,7 +11,7 @@ from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.embeddings import get_processor, free_memory
+from pyeed.embeddings import free_memory, get_processor
 
 
 class Pyeed:

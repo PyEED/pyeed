@@ -2,9 +2,10 @@
 ProtT5 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, Optional, cast
-import torch
+from typing import List, Tuple, cast
+
 import numpy as np
+import torch
 from numpy.typing import NDArray
 from transformers import T5Model, T5Tokenizer
 

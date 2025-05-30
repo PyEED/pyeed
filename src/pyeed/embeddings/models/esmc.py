@@ -2,13 +2,14 @@
 ESMC model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, Optional, cast
-import torch
+from typing import List, Tuple, cast
+
 import numpy as np
-from numpy.typing import NDArray
-from loguru import logger
+import torch
 from esm.models.esmc import ESMC
 from esm.sdk.api import ESMProtein, LogitsConfig
+from loguru import logger
+from numpy.typing import NDArray
 
 from ..base import BaseEmbeddingModel, normalize_embedding
 
@@ -38,7 +39,6 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 logger.warning(f"ESMC model loading failed due to tqdm threading issue: {e}. Retrying with threading workaround...")
                 
                 # Try alternative approach with threading lock
-                import threading
                 import time
                 
                 # Add a small delay and retry
@@ -50,7 +50,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         import tqdm
                         if hasattr(tqdm.tqdm, '_lock'):
                             delattr(tqdm.tqdm, '_lock')
-                    except:
+                    except (AttributeError, ImportError):
                         pass
                     
                     model = ESMC.from_pretrained(self.model_name)

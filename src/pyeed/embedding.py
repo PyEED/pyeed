@@ -1,13 +1,13 @@
 import gc
 import os
 import re
-from typing import Any, Tuple, Union, List
+from typing import Any, List, Tuple, Union
 
 import numpy as np
 import torch
 from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
+from esm.sdk.api import ESMProtein, LogitsConfig, SamplingConfig
 from huggingface_hub import HfFolder, login
 from loguru import logger
 from numpy.typing import NDArray

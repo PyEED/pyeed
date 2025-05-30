@@ -5,28 +5,27 @@ This module provides the same interface as the original embedding.py while
 using the new organized structure with model classes, factory, and processor.
 """
 
-import gc
-import os
-import re
 from typing import Any, Tuple, Union
 
 import numpy as np
 import torch
 from esm.models.esm3 import ESM3
 from esm.models.esmc import ESMC
-from esm.sdk.api import ESM3InferenceClient, ESMProtein, LogitsConfig, SamplingConfig
-from huggingface_hub import HfFolder, login
-from loguru import logger
 from numpy.typing import NDArray
 from torch.nn import DataParallel, Module
 from transformers import EsmModel, EsmTokenizer, T5Model, T5Tokenizer
 
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.embeddings.processor import get_processor
+from pyeed.embeddings.database import (
+    update_protein_embeddings_in_db as _update_protein_embeddings_in_db,
+)
 from pyeed.embeddings.factory import ModelFactory
-from pyeed.embeddings.database import update_protein_embeddings_in_db as _update_protein_embeddings_in_db
-from pyeed.embeddings.utils import get_hf_token as _get_hf_token, preprocess_sequence_for_prott5 as _preprocess_sequence_for_prott5, free_memory as _free_memory
-
+from pyeed.embeddings.processor import get_processor
+from pyeed.embeddings.utils import free_memory as _free_memory
+from pyeed.embeddings.utils import get_hf_token as _get_hf_token
+from pyeed.embeddings.utils import (
+    preprocess_sequence_for_prott5 as _preprocess_sequence_for_prott5,
+)
 
 # ============================================================================
 # Original function signatures maintained for backward compatibility

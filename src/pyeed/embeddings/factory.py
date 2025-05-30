@@ -5,12 +5,18 @@ Provides a centralized way to create different types of embedding models
 based on model names and automatically handles device assignment.
 """
 
-from typing import Union, Tuple, Any
+from typing import Any, Tuple, Union
+
 import torch
 from torch.nn import DataParallel, Module
 
 from .base import BaseEmbeddingModel
-from .models import ESM2EmbeddingModel, ESMCEmbeddingModel, ESM3EmbeddingModel, ProtT5EmbeddingModel
+from .models import (
+    ESM2EmbeddingModel,
+    ESM3EmbeddingModel,
+    ESMCEmbeddingModel,
+    ProtT5EmbeddingModel,
+)
 from .utils import determine_model_type
 
 

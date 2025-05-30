@@ -5,22 +5,24 @@ Provides high-level interfaces for batch processing, single sequence processing,
 and database operations with automatic device management and model loading.
 """
 
-from typing import List, Union, Any, Literal, Optional, Dict, Type
-import torch
-from torch.nn import DataParallel, Module
-from loguru import logger
-import numpy as np
-from numpy.typing import NDArray
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-import os
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from .factory import ModelFactory
-from .base import BaseEmbeddingModel
-from .models import ESM2EmbeddingModel, ESMCEmbeddingModel, ESM3EmbeddingModel, ProtT5EmbeddingModel
-from .database import update_protein_embeddings_in_db
-from .utils import free_memory
+import numpy as np
+import torch
+from loguru import logger
+from numpy.typing import NDArray
+from torch.nn import DataParallel, Module
+
 from pyeed.dbconnect import DatabaseConnector
+
+from .base import BaseEmbeddingModel
+from .database import update_protein_embeddings_in_db
+from .factory import ModelFactory
+from .models import ESM2EmbeddingModel
+from .utils import free_memory
 
 
 class EmbeddingProcessor:
@@ -346,7 +348,6 @@ class EmbeddingProcessor:
         
         # Determine model type from the actual model instance
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-        model_type = type(base_model).__name__
         
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
@@ -424,7 +425,6 @@ class EmbeddingProcessor:
         """Helper method for legacy single embedding methods."""
         # Determine model type and create appropriate embedding model
         base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-        model_type = type(base_model).__name__
         
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
