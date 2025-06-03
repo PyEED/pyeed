@@ -55,20 +55,24 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         model = cast(EsmModel, self.model)
         tokenizer = cast(EsmTokenizer, self.tokenizer)
 
-        inputs = tokenizer(
-            sequences, padding=True, truncation=True, return_tensors="pt"
-        ).to(self.device)
+        embeddings = []
+        for sequence in sequences:
+            inputs = tokenizer(
+                sequence, padding=True, truncation=True, return_tensors="pt"
+            ).to(self.device)
 
-        with torch.no_grad():
-            outputs = model(**inputs, output_hidden_states=True)
+            with torch.no_grad():
+                outputs = model(**inputs, output_hidden_states=True)
 
-        # Get last hidden state for each sequence
-        hidden_states = outputs.last_hidden_state.cpu().numpy()
+            # Get last hidden state for each sequence
+            hidden_states = outputs.last_hidden_state.cpu().numpy()
 
-        if pool_embeddings:
-            # Mean pooling across sequence length
-            return [embedding.mean(axis=0) for embedding in hidden_states]
-        return list(hidden_states)
+            if pool_embeddings:
+                # Mean pooling across sequence length
+                embeddings.append(hidden_states.mean(axis=0))
+            else:
+                embeddings.append(hidden_states)
+        return embeddings
 
     def get_single_embedding_last_hidden_state(
         self, sequence: str
