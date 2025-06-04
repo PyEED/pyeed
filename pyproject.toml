@@ -42,6 +42,7 @@ pysam = "0.23.0"
 types-requests = "2.32.0.20250328"
 ipywidgets = "^8.1.7"
 sentencepiece = "^0.2.0"
+umap = "^0.1.1"
 
 [tool.poetry.group.dev.dependencies]
 mkdocstrings = {extras = ["python"], version = "^0.26.2"}

@@ -7,7 +7,6 @@ from typing import List, Tuple, cast
 import numpy as np
 import torch
 from numpy.typing import NDArray
-from loguru import logger
 from transformers import EsmModel, EsmTokenizer
 
 from ..base import BaseEmbeddingModel, normalize_embedding
