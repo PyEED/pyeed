@@ -194,6 +194,7 @@ class EmbeddingProcessor:
 
             accessions, sequences = zip(*batch)
             current_batch_size = len(sequences)
+            logger.info(f"Processing {len(sequences)} sequences")
 
             while current_batch_size > 0:
                 try:

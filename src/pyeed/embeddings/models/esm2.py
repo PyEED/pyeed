@@ -7,6 +7,7 @@ from typing import List, Tuple, cast
 import numpy as np
 import torch
 from numpy.typing import NDArray
+from loguru import logger
 from transformers import EsmModel, EsmTokenizer
 
 from ..base import BaseEmbeddingModel, normalize_embedding
@@ -56,6 +57,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         tokenizer = cast(EsmTokenizer, self.tokenizer)
 
         embeddings = []
+
         for sequence in sequences:
             inputs = tokenizer(
                 sequence, padding=True, truncation=True, return_tensors="pt"
@@ -68,8 +70,8 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
             hidden_states = outputs.last_hidden_state.cpu().numpy()
 
             if pool_embeddings:
-                # Mean pooling across sequence length
-                embeddings.append(hidden_states.mean(axis=0))
+                # Mean pooling across sequence length (axis=1)
+                embeddings.append(hidden_states.mean(axis=1)[0])
             else:
                 embeddings.append(hidden_states)
         return embeddings
