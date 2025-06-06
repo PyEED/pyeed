@@ -1,10 +1,7 @@
 import asyncio
-import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
 import nest_asyncio
-import torch
 from loguru import logger
 
 from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
@@ -14,10 +11,7 @@ from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
 from pyeed.adapter.uniprot_mapper import UniprotToPyeed
 from pyeed.dbchat import DBChat
 from pyeed.dbconnect import DatabaseConnector
-from pyeed.embedding import (
-    load_model_and_tokenizer,
-    process_batches_on_gpu,
-)
+from pyeed.embeddings import free_memory, get_processor
 
 
 class Pyeed:
@@ -209,92 +203,34 @@ class Pyeed:
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         num_gpus: int = 1,  # Number of GPUs to use
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "final_embeddings",
     ) -> None:
         """
         Calculates embeddings for all sequences in the database that do not have embeddings,
-        distributing the workload across available GPUs.
+        using the new EmbeddingProcessor with automatic device management.
 
         Args:
             batch_size (int): Number of sequences to process in each batch.
             model_name (str): Model used for calculating embeddings.
             num_gpus (int, optional): Number of GPUs to use. If None, use all available GPUs.
+            embedding_type (str): Type of embedding to calculate ("last_hidden_state", "all_layers", "first_layer", "final_embeddings").
         """
+        # Get the embedding processor
+        processor = get_processor()
 
-        # Get the available GPUs
-        available_gpus = torch.cuda.device_count()
-        if num_gpus is None or num_gpus > available_gpus:
-            num_gpus = available_gpus
-
-        if num_gpus == 0:
-            logger.warning("No GPU available! Running on CPU.")
-
-        # Load separate models for each GPU
-        devices = (
-            [torch.device(f"cuda:{i}") for i in range(num_gpus)]
-            if num_gpus > 0
-            else [torch.device("cpu")]
+        # Use the simplified interface
+        processor.calculate_database_embeddings(
+            db=self.db,
+            batch_size=batch_size,
+            model_name=model_name,
+            num_gpus=num_gpus,
+            embedding_type=embedding_type,
         )
 
-        models_and_tokenizers = [
-            load_model_and_tokenizer(model_name, device) for device in devices
-        ]
-
-        # Retrieve sequences without embeddings
-        query = """
-        MATCH (p:Protein)
-        WHERE p.embedding IS NULL AND p.sequence IS NOT NULL
-        RETURN p.accession_id AS accession, p.sequence AS sequence
-        """
-        results = self.db.execute_read(query)
-        data = [(result["accession"], result["sequence"]) for result in results]
-
-        if not data:
-            logger.info("No sequences to process.")
-            return
-
-        accessions, sequences = zip(*data)
-        total_sequences = len(sequences)
-        logger.debug(f"Total sequences to process: {total_sequences}")
-
-        # Split the data into num_gpus chunks
-        gpu_batches = [
-            list(zip(accessions[i::num_gpus], sequences[i::num_gpus]))
-            for i in range(num_gpus)
-        ]
-
-        start_time = time.time()
-
-        # Process batches in parallel across GPUs
-        with ThreadPoolExecutor(max_workers=num_gpus) as executor:
-            futures = []
-            for i, gpu_data in enumerate(gpu_batches):
-                if not gpu_data:
-                    continue  # Skip empty GPU batches
-
-                model, tokenizer, device = models_and_tokenizers[i]
-                futures.append(
-                    executor.submit(
-                        process_batches_on_gpu,
-                        gpu_data,
-                        batch_size,
-                        model,
-                        tokenizer,
-                        self.db,
-                        device,
-                    )
-                )
-
-            for future in futures:
-                future.result()  # Wait for all threads to complete
-
-        end_time = time.time()
-        logger.info(
-            f"Total embedding calculation time: {end_time - start_time:.2f} seconds"
-        )
-
-        # Cleanup
-        for model, _, _ in models_and_tokenizers:
-            del model
+        # free memory
+        free_memory()
 
     def get_proteins(self, accession_ids: list[str]) -> list[dict[str, Any]]:
         """
@@ -534,3 +470,38 @@ class Pyeed:
         """
         result = self.db.execute_read(count_query)
         logger.info(f"Created {result[0]['region_count']} coding sequence regions")
+
+    def calculate_single_sequence_embedding(
+        self,
+        sequence: str,
+        model_name: str = "facebook/esm2_t33_650M_UR50D",
+        embedding_type: Literal[
+            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
+        ] = "last_hidden_state",
+    ) -> Any:
+        """
+        Calculate embedding for a single protein sequence.
+
+        Args:
+            sequence: Protein sequence string
+            model_name: Model to use for embedding calculation
+            embedding_type: Type of embedding to calculate
+
+        Returns:
+            Numpy array containing the embedding
+        """
+        processor = get_processor()
+        return processor.calculate_single_embedding(
+            sequence=sequence, model_name=model_name, embedding_type=embedding_type
+        )
+
+    def get_available_devices(self) -> list[str]:
+        """
+        Get list of available devices for embedding computation.
+
+        Returns:
+            List of available device names
+        """
+        processor = get_processor()
+        devices = processor.get_available_devices()
+        return [str(device) for device in devices]
