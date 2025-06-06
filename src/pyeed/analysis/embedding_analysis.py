@@ -329,22 +329,29 @@ class EmbeddingTool:
         - ef_construction parameter: 512 it specifies the size of the dynamic list for the nearest neighbors
 
         """
+        
+        result = db.execute_read("SHOW INDEXES YIELD name RETURN name")
+        existing_index_names = {record["name"] for record in result}
 
-        query_create_index = f"""
-            CREATE VECTOR INDEX {index_name}
-            FOR (p:Protein) ON (p.embedding)
-            OPTIONS {{
-            indexProvider: 'vector-2.0',
-            indexConfig: {{
-                `vector.similarity_function`: '{similarity_function}',
-                `vector.dimensions`: {dimensions},
-                `vector.hnsw.m`: {m},
-                `vector.hnsw.ef_construction`: {ef_construction},
-                `vector.quantization.enabled`: False
-            }}
-            }};
-        """
-        db.execute_write(query_create_index)
+        if index_name in existing_index_names:
+            print(f"Index '{index_name}' already exists. Skipping creation.")
+            
+        else: 
+            query_create_index = f"""
+                CREATE VECTOR INDEX {index_name}
+                FOR (p:Protein) ON (p.embedding)
+                OPTIONS {{
+                indexProvider: 'vector-2.0',
+                indexConfig: {{
+                    `vector.similarity_function`: '{similarity_function}',
+                    `vector.dimensions`: {dimensions},
+                    `vector.hnsw.m`: {m},
+                    `vector.hnsw.ef_construction`: {ef_construction},
+                    `vector.quantization.enabled`: False
+                }}
+                }};
+            """
+            db.execute_write(query_create_index)
 
     def find_nearest_neighbors_based_on_vector_index(
         self,

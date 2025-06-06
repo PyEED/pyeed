@@ -1,0 +1,427 @@
+{
+    "style": {
+        "node-color": "#ffffff",
+        "border-color": "#000000",
+        "caption-color": "#000000",
+        "arrow-color": "#000000",
+        "label-background-color": "#ffffff",
+        "directionality": "directed",
+        "arrow-width": 5
+    },
+    "nodes": [
+        {
+            "id": "n0",
+            "position": {
+                "x": 0,
+                "y": 0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "StrictStructuredNode"
+            ],
+            "properties": {}
+        },
+        {
+            "id": "n1",
+            "position": {
+                "x": 346.4101615137755,
+                "y": 199.99999999999997
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Organism"
+            ],
+            "properties": {
+                "taxonomy_id": "int - required",
+                "name": "str"
+            }
+        },
+        {
+            "id": "n2",
+            "position": {
+                "x": 2.4492935982947064e-14,
+                "y": 400.0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Site"
+            ],
+            "properties": {
+                "site_id": "id - unique",
+                "name": "str",
+                "annotation": "str - required"
+            }
+        },
+        {
+            "id": "n3",
+            "position": {
+                "x": -346.4101615137754,
+                "y": 200.00000000000014
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Region"
+            ],
+            "properties": {
+                "region_id": "id - unique",
+                "name": "str",
+                "annotation": "str - required",
+                "sequence_id": "str"
+            }
+        },
+        {
+            "id": "n4",
+            "position": {
+                "x": -346.4101615137755,
+                "y": -199.9999999999999
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Reaction"
+            ],
+            "properties": {
+                "rhea_id": "str - required",
+                "chebi_id": "list[str]"
+            }
+        },
+        {
+            "id": "n5",
+            "position": {
+                "x": -7.347880794884119e-14,
+                "y": -400.0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Molecule"
+            ],
+            "properties": {
+                "molecule_id": "str - required",
+                "rhea_compound_id": "str",
+                "smiles": "str"
+            }
+        },
+        {
+            "id": "n6",
+            "position": {
+                "x": 346.41016151377534,
+                "y": -200.00000000000017
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "StandardNumbering"
+            ],
+            "properties": {
+                "name": "str - required",
+                "definition": "str - required"
+            }
+        },
+        {
+            "id": "n7",
+            "position": {
+                "x": 1146.4101615137754,
+                "y": 0
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "GOAnnotation"
+            ],
+            "properties": {
+                "go_id": "str - required",
+                "term": "str",
+                "definition": "str"
+            }
+        },
+        {
+            "id": "n8",
+            "position": {
+                "x": -399.99999999999983,
+                "y": 692.820323027551
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "Protein"
+            ],
+            "properties": {
+                "accession_id": "str - required",
+                "uniprot_id": "str",
+                "uniprot": "bool",
+                "sequence": "str - required",
+                "name": "str",
+                "seq_length": "int - required",
+                "mol_weight": "float",
+                "ec_number": "str",
+                "nucleotide_id": "str",
+                "nucleotide_start": "int",
+                "nucleotide_end": "int",
+                "locus_tag": "str",
+                "structure_ids": "list[str]",
+                "go_terms": "list[str]",
+                "rhea_id": "list[str]",
+                "chebi_id": "list[str]",
+                "embedding": "list[float]",
+                "TBT": "str",
+                "PCL": "str",
+                "BHET": "str",
+                "PET_powder": "str"
+            }
+        },
+        {
+            "id": "n9",
+            "position": {
+                "x": -800.0,
+                "y": 4.5324311181183836e-13
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "DNA"
+            ],
+            "properties": {
+                "accession_id": "str - required",
+                "sequence": "str - required",
+                "name": "str",
+                "seq_length": "int - required",
+                "go_terms": "list[str]",
+                "embedding": "list[float]",
+                "gc_content": "float"
+            }
+        },
+        {
+            "id": "n10",
+            "position": {
+                "x": -400.00000000000034,
+                "y": -692.8203230275507
+            },
+            "caption": "",
+            "style": {},
+            "labels": [
+                "OntologyObject"
+            ],
+            "properties": {
+                "name": "str - required",
+                "description": "str",
+                "label": "str",
+                "synonyms": "list[str]"
+            }
+        }
+    ],
+    "relationships": [
+        {
+            "id": "e0",
+            "type": "MUTATION",
+            "style": {},
+            "properties": {},
+            "fromId": "n3",
+            "toId": "n3"
+        },
+        {
+            "id": "e1",
+            "type": "HAS_STANDARD_NUMBERING",
+            "style": {},
+            "properties": {},
+            "fromId": "n3",
+            "toId": "n6"
+        },
+        {
+            "id": "e2",
+            "type": "SUBSTRATE",
+            "style": {},
+            "properties": {},
+            "fromId": "n4",
+            "toId": "n5"
+        },
+        {
+            "id": "e3",
+            "type": "PRODUCT",
+            "style": {},
+            "properties": {},
+            "fromId": "n4",
+            "toId": "n5"
+        },
+        {
+            "id": "e4",
+            "type": "HAS_STANDARD_NUMBERING",
+            "style": {},
+            "properties": {},
+            "fromId": "n6",
+            "toId": "n8"
+        },
+        {
+            "id": "e5",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n1"
+        },
+        {
+            "id": "e6",
+            "type": "HAS_SITE",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n2"
+        },
+        {
+            "id": "e7",
+            "type": "HAS_REGION",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n3"
+        },
+        {
+            "id": "e8",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n7"
+        },
+        {
+            "id": "e9",
+            "type": "HAS_REACTION",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n4"
+        },
+        {
+            "id": "e10",
+            "type": "SUBSTRATE",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n5"
+        },
+        {
+            "id": "e11",
+            "type": "PRODUCT",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n5"
+        },
+        {
+            "id": "e12",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n10"
+        },
+        {
+            "id": "e13",
+            "type": "MUTATION",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n8"
+        },
+        {
+            "id": "e14",
+            "type": "PAIRWISE_ALIGNED",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n8"
+        },
+        {
+            "id": "e15",
+            "type": "HAS_STANDARD_NUMBERING",
+            "style": {},
+            "properties": {},
+            "fromId": "n8",
+            "toId": "n6"
+        },
+        {
+            "id": "e16",
+            "type": "ORIGINATES_FROM",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n1"
+        },
+        {
+            "id": "e17",
+            "type": "HAS_SITE",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n2"
+        },
+        {
+            "id": "e18",
+            "type": "HAS_REGION",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n3"
+        },
+        {
+            "id": "e19",
+            "type": "ASSOCIATED_WITH",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n7"
+        },
+        {
+            "id": "e20",
+            "type": "MUTATION",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n9"
+        },
+        {
+            "id": "e21",
+            "type": "ENCODES",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n8"
+        },
+        {
+            "id": "e22",
+            "type": "PAIRWISE_ALIGNED",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n9"
+        },
+        {
+            "id": "e23",
+            "type": "HAS_STANDARD_NUMBERING",
+            "style": {},
+            "properties": {},
+            "fromId": "n9",
+            "toId": "n6"
+        },
+        {
+            "id": "e24",
+            "type": "SUBCLASS_OF",
+            "style": {},
+            "properties": {},
+            "fromId": "n10",
+            "toId": "n10"
+        },
+        {
+            "id": "e25",
+            "type": "CUSTOM_RELATIONSHIP",
+            "style": {},
+            "properties": {},
+            "fromId": "n10",
+            "toId": "n10"
+        }
+    ]
+}

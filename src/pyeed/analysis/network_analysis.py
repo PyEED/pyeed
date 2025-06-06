@@ -87,12 +87,36 @@ class NetworkAnalysis:
             base_query += "WHERE type(r) IN $relationships "
 
         # Return both nodes and relationships in a single query
-        base_query += """
-        RETURN 
-            collect(DISTINCT {id: ID(n), labels: labels(n), properties: properties(n)}) as nodes,
-            collect(DISTINCT {source: ID(n), target: ID(m), type: type(r), properties: properties(r)}) as relationships
-        """
+        # base_query += """
+        # RETURN 
+        #     collect(DISTINCT {id: ID(n), labels: labels(n), properties: properties(n)}) as nodes,
+        #     collect(DISTINCT {source: ID(n), target: ID(m), type: type(r), properties: properties(r)}) as relationships
+        # """
 
+        # add a promt to the query to ensure that only the similyrity is returned from the pairwise alignment 
+        if "PAIRWISE_ALIGNED" in relationships: 
+            # For PAIRWISE_ALIGNED, only include similarity property in relationship properties
+            base_query += """
+            RETURN 
+                collect(DISTINCT {id: ID(n), labels: labels(n),  accession_id: n.accession_id, properties: properties(n)}) as nodes,
+                collect(DISTINCT {
+                    source: ID(n), 
+                    target: ID(m), 
+                    type: type(r), 
+                    properties: CASE WHEN type(r) = 'PAIRWISE_ALIGNED' 
+                                THEN {similarity: r.similarity} 
+                                ELSE properties(r) 
+                                END
+                }) as relationships
+            """
+        
+        else: 
+            base_query += """
+            RETURN 
+                collect(DISTINCT {id: ID(n), accession_id = n.accession_id, labels: labels(n), properties: properties(n)}) as nodes,
+                collect(DISTINCT {source: ID(n), target: ID(m), type: type(r), properties: properties(r)}) as relationships
+            """
+        
         logger.info("Executing combined query for nodes and relationships")
         results = self.db.execute_read(
             base_query,
@@ -107,7 +131,7 @@ class NetworkAnalysis:
         nodes_data = results[0]["nodes"]
         for node in nodes_data:
             self.graph.add_node(
-                node["id"], labels=node["labels"], properties=node["properties"]
+                node["id"], accession_id=node["accession_id"], labels=node["labels"], properties=node["properties"]
             )
         logger.info(f"Added {len(nodes_data)} nodes to the graph")
 

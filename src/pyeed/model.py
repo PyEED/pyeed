@@ -146,11 +146,13 @@ class Annotation(Enum):
     DNA = "DNA"
     DOMAIN = "domain"
     FAMILY = "family"
+    MOLECULE = "molecule"
     MOTIVE = "motive"
     PROTEIN = "protein"
     TURN = "turn"
     SIGNAL = "signal"
     PROPEP = "propep"
+    REACTION = "reaction"
 
 
 class Organism(StrictStructuredNode):
@@ -443,7 +445,7 @@ class Molecule(StrictStructuredNode):
     @property
     def label(self) -> str:
         """The label of the molecule."""
-        return f"{self.chebi_id}"
+        return f"{self.molecule_id}"
 
 
 class StandardNumbering(StrictStructuredNode):

@@ -101,53 +101,35 @@ class UniprotToPyeed(PrimaryDBMapper):
         data_list: list[tuple[str, tuple[int, int]]] = []
 
         for feature in record.get("features", []):
-            if feature["type"] == "HELIX":
+            if feature["type"] in {"HELIX", "STRAND", "TURN", "SIGNAL", "PROPEP"}:
+                try:
+                    begin = int(feature["begin"])
+                    end = int(feature["end"])
+                except (ValueError, TypeError):
+                    print(f"Skipped region with invalid position: begin={feature['begin']}, end={feature['end']}")
+                    continue  # überspringe ungültige Einträge
+
                 data_list.append(
                     (
-                        feature["category"] + "$helix",
-                        (int(feature["begin"]), int(feature["end"])),
-                    )
-                )
-            elif feature["type"] == "STRAND":
-                data_list.append(
-                    (
-                        feature["category"] + "$strand",
-                        (int(feature["begin"]), int(feature["end"])),
-                    )
-                )
-            elif feature["type"] == "TURN":
-                data_list.append(
-                    (
-                        feature["category"] + "$turn",
-                        (int(feature["begin"]), int(feature["end"])),
-                    )
-                )
-            elif feature["type"] == "SIGNAL":
-                data_list.append(
-                    (
-                        feature["category"] + "$signal",
-                        (int(feature["begin"]), int(feature["end"])),
-                    )
-                )
-            elif feature["type"] == "PROPEP":
-                data_list.append(
-                    (
-                        feature["category"] + "$propep",
-                        (int(feature["begin"]), int(feature["end"])),
+                        feature["category"] + f"${feature['type'].lower()}",
+                        (begin, end),
                     )
                 )
 
         for name, positions in data_list:
-            if name.split("$")[1] == "helix":
+            region_type = name.split("$")[1]
+            if region_type == "helix":
                 annotation = Annotation.ALPHAHELIX.value
-            elif name.split("$")[1] == "strand":
+            elif region_type == "strand":
                 annotation = Annotation.BETASTRAND.value
-            elif name.split("$")[1] == "turn":
+            elif region_type == "turn":
                 annotation = Annotation.TURN.value
-            elif name.split("$")[1] == "signal":
+            elif region_type == "signal":
                 annotation = Annotation.SIGNAL.value
-            elif name.split("$")[1] == "propep":
+            elif region_type == "propep":
                 annotation = Annotation.PROPEP.value
+            else:
+                continue  # falls etwas Unerwartetes durchkommt
 
             region = Region(
                 name=name,
@@ -235,8 +217,14 @@ class UniprotToPyeed(PrimaryDBMapper):
                 substrates.add(chebi_uri)
             elif side_uri.endswith("_R"):
                 products.add(chebi_uri)
+                
+        if None in substrates or None in products:
+            print(f"Warning: Found None in substrates or products for Rhea ID {rhea_id}")
 
-        return {"substrates": sorted(substrates), "products": sorted(products)}
+        return {
+            "substrates": sorted([s for s in substrates if s is not None]),
+            "products": sorted([p for p in products if p is not None])
+        }
     
     def get_smiles_from_chebi(self, chebi_url: str) -> Optional[str]:
         """

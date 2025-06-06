@@ -201,19 +201,17 @@ def get_batch_embeddings(
     else:
         # ESM-2 logic
         assert tokenizer_or_alphabet is not None, "Tokenizer required for ESM-2 models"
-        inputs = tokenizer_or_alphabet(
-            batch_sequences, padding=True, truncation=True, return_tensors="pt"
-        ).to(device)
+        embedding_list = []
         with torch.no_grad():
-            outputs = model(**inputs, output_hidden_states=True)
-
-        # Get last hidden state for each sequence
-        hidden_states = outputs.last_hidden_state.cpu().numpy()
-
-        if pool_embeddings:
-            # Mean pooling across sequence length
-            return [embedding.mean(axis=0) for embedding in hidden_states]
-        return list(hidden_states)
+            for sequence in batch_sequences:
+                inputs = tokenizer_or_alphabet(sequence, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+                embeddings = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
+                
+                if pool_embeddings:
+                    embeddings = embeddings.mean(axis=0)
+                embedding_list.append(embeddings)
+        return embedding_list
 
 
 def calculate_single_sequence_embedding_last_hidden_state(
