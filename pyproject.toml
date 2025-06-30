@@ -30,7 +30,6 @@ shapely = "^2.0.6"
 torch = "^2.4.1"
 transformers = "^4.45.2"
 scikit-learn = "^1.5.2"
-numpy = ">=1.14.5,<2.0"
 openai = "^1.52.2"
 esm = "^3.1.3"
 rdflib = "^6.0.0"
@@ -42,7 +41,7 @@ pysam = "0.23.0"
 types-requests = "2.32.0.20250328"
 ipywidgets = "^8.1.7"
 sentencepiece = "^0.2.0"
-umap = "^0.1.1"
+umap-learn = "^0.5.7"
 
 [tool.poetry.group.dev.dependencies]
 mkdocstrings = {extras = ["python"], version = "^0.26.2"}
