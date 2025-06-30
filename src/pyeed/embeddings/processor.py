@@ -75,6 +75,7 @@ class EmbeddingProcessor:
         embedding_type: Literal[
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
+        normalize: bool = True,
     ) -> Optional[List[NDArray[np.float64]]]:
         """
         Calculate embeddings for a batch of sequences with automatic device management.
@@ -90,6 +91,7 @@ class EmbeddingProcessor:
                 - "all_layers": Average across all transformer layers
                 - "first_layer": Use first layer embedding
                 - "final_embeddings": Robust option that works across all models (recommended for compatibility)
+            normalize: Whether to normalize the embeddings (default: True)
 
         Returns:
             List of embeddings if db is None, otherwise None (results stored in DB)
@@ -144,7 +146,7 @@ class EmbeddingProcessor:
         if num_gpus == 1:
             # Single device processing
             embeddings = self._process_batch_single_device(
-                gpu_batches[0], models[0], batch_size, db, embedding_type
+                gpu_batches[0], models[0], batch_size, db, embedding_type, normalize
             )
             all_embeddings.extend(embeddings)
         else:
@@ -163,6 +165,7 @@ class EmbeddingProcessor:
                             batch_size,
                             db,
                             embedding_type,
+                            normalize,
                         )
                     )
 
@@ -184,6 +187,7 @@ class EmbeddingProcessor:
         batch_size: int,
         db: Optional[DatabaseConnector] = None,
         embedding_type: str = "last_hidden_state",
+        normalize: bool = True,
     ) -> List[NDArray[np.float64]]:
         """Process batch on a single device."""
         all_embeddings = []
@@ -202,22 +206,22 @@ class EmbeddingProcessor:
                     if embedding_type == "last_hidden_state":
                         # no batching for last hidden state
                         embeddings_batch = [
-                            model.get_single_embedding_last_hidden_state(seq)
+                            model.get_single_embedding_last_hidden_state(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "all_layers":
                         embeddings_batch = [
-                            model.get_single_embedding_all_layers(seq)
+                            model.get_single_embedding_all_layers(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "first_layer":
                         embeddings_batch = [
-                            model.get_single_embedding_first_layer(seq)
+                            model.get_single_embedding_first_layer(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "final_embeddings":
                         embeddings_batch = [
-                            model.get_final_embeddings(seq)
+                            model.get_final_embeddings(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     else:
@@ -249,6 +253,7 @@ class EmbeddingProcessor:
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
         device: Optional[torch.device] = None,
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """
         Calculate embedding for a single sequence.
@@ -258,6 +263,7 @@ class EmbeddingProcessor:
             model_name: Name of the model to use
             embedding_type: Type of embedding to calculate
             device: Specific device to use (optional)
+            normalize: Whether to normalize the embeddings (default: True)
 
         Returns:
             Embedding as numpy array
@@ -265,13 +271,13 @@ class EmbeddingProcessor:
         model = self.get_or_create_model(model_name, device)
 
         if embedding_type == "last_hidden_state":
-            return model.get_single_embedding_last_hidden_state(sequence)
+            return model.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
         elif embedding_type == "all_layers":
-            return model.get_single_embedding_all_layers(sequence)
+            return model.get_single_embedding_all_layers(sequence, normalize=normalize)
         elif embedding_type == "first_layer":
-            return model.get_single_embedding_first_layer(sequence)
+            return model.get_single_embedding_first_layer(sequence, normalize=normalize)
         elif embedding_type == "final_embeddings":
-            return model.get_final_embeddings(sequence)
+            return model.get_final_embeddings(sequence, normalize=normalize)
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 
@@ -284,6 +290,7 @@ class EmbeddingProcessor:
         embedding_type: Literal[
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
+        normalize: bool = True,
     ) -> None:
         """
         Calculate embeddings for all sequences in database that don't have embeddings.
@@ -294,6 +301,7 @@ class EmbeddingProcessor:
             model_name: Name of the model to use
             num_gpus: Number of GPUs to use (None = use all available)
             embedding_type: Type of embedding to calculate
+            normalize: Whether to normalize the embeddings (default: True)
         """
         # Retrieve sequences without embeddings
         query = """
@@ -318,6 +326,7 @@ class EmbeddingProcessor:
             num_gpus=num_gpus,
             db=db,
             embedding_type=embedding_type,
+            normalize=normalize,
         )
 
     # Legacy compatibility methods (for backward compatibility with existing processor.py)
@@ -329,6 +338,7 @@ class EmbeddingProcessor:
         tokenizer: Union[Any, None],
         db: DatabaseConnector,
         device: torch.device,
+        normalize: bool = True,
     ) -> None:
         """Legacy method for backward compatibility."""
         logger.warning(
@@ -341,7 +351,7 @@ class EmbeddingProcessor:
 
         # Use new method
         self.calculate_batch_embeddings(
-            data=embedding_data, batch_size=batch_size, db=db
+            data=embedding_data, batch_size=batch_size, db=db, normalize=normalize
         )
 
     def get_batch_embeddings_unified(
@@ -351,6 +361,7 @@ class EmbeddingProcessor:
         tokenizer: Union[Any, None],
         device: torch.device = torch.device("cuda:0"),
         pool_embeddings: bool = True,
+        normalize: bool = True,
     ) -> List[NDArray[np.float64]]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_batch_embeddings_unified method.")
@@ -361,17 +372,18 @@ class EmbeddingProcessor:
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
         embedding_model.tokenizer = tokenizer
-        return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings)
+        return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings, normalize=normalize)
 
     def calculate_single_sequence_embedding_last_hidden_state(
         self,
         sequence: str,
         device: torch.device = torch.device("cuda:0"),
         model_name: str = "facebook/esm2_t33_650M_UR50D",
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         return self.calculate_single_embedding(
-            sequence, model_name, "last_hidden_state", device
+            sequence, model_name, "last_hidden_state", device, normalize=normalize
         )
 
     def calculate_single_sequence_embedding_all_layers(
@@ -379,10 +391,11 @@ class EmbeddingProcessor:
         sequence: str,
         device: torch.device,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         return self.calculate_single_embedding(
-            sequence, model_name, "all_layers", device
+            sequence, model_name, "all_layers", device, normalize=normalize
         )
 
     def calculate_single_sequence_embedding_first_layer(
@@ -390,37 +403,38 @@ class EmbeddingProcessor:
         sequence: str,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         device: torch.device = torch.device("cuda:0"),
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         return self.calculate_single_embedding(
-            sequence, model_name, "first_layer", device
+            sequence, model_name, "first_layer", device, normalize=normalize
         )
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_last_hidden_state method.")
         return self._get_single_embedding_legacy(
-            sequence, model, tokenizer, device, "last_hidden_state"
+            sequence, model, tokenizer, device, "last_hidden_state", normalize=normalize
         )
 
     def get_single_embedding_all_layers(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_all_layers method.")
         return self._get_single_embedding_legacy(
-            sequence, model, tokenizer, device, "all_layers"
+            sequence, model, tokenizer, device, "all_layers", normalize=normalize
         )
 
     def get_single_embedding_first_layer(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device
+        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_first_layer method.")
         return self._get_single_embedding_legacy(
-            sequence, model, tokenizer, device, "first_layer"
+            sequence, model, tokenizer, device, "first_layer", normalize=normalize
         )
 
     def _get_single_embedding_legacy(
@@ -430,6 +444,7 @@ class EmbeddingProcessor:
         tokenizer: Any,
         device: torch.device,
         embedding_type: str,
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Helper method for legacy single embedding methods."""
         # Determine model type and create appropriate embedding model
@@ -440,11 +455,11 @@ class EmbeddingProcessor:
         embedding_model.tokenizer = tokenizer
 
         if embedding_type == "last_hidden_state":
-            return embedding_model.get_single_embedding_last_hidden_state(sequence)
+            return embedding_model.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
         elif embedding_type == "all_layers":
-            return embedding_model.get_single_embedding_all_layers(sequence)
+            return embedding_model.get_single_embedding_all_layers(sequence, normalize=normalize)
         elif embedding_type == "first_layer":
-            return embedding_model.get_single_embedding_first_layer(sequence)
+            return embedding_model.get_single_embedding_first_layer(sequence, normalize=normalize)
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 

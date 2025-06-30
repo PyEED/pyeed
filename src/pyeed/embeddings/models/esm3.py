@@ -33,7 +33,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
         return ESMProtein(sequence=sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True
+        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
     ) -> List[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESM3."""
         if self.model is None:
@@ -58,11 +58,13 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 )
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=0)
+                if normalize:
+                    embeddings = normalize_embedding(embeddings.reshape(1, -1))[0]
                 embedding_list.append(embeddings)
         return embedding_list
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str
+        self, sequence: str, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Get last hidden state embedding for a single sequence."""
         if self.model is None:
@@ -82,11 +84,13 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 raise ValueError("Model did not return embeddings")
             embedding = embedding.per_residue_embedding.to(torch.float32).cpu().numpy()
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
+        if normalize:
+            embedding = normalize_embedding(embedding)
         return embedding
 
-    def get_single_embedding_all_layers(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_all_layers(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embeddings from all layers for a single sequence."""
         # ESM3 doesn't support all layers extraction in the same way
         # This is a simplified implementation - might need enhancement based on ESM3 capabilities
@@ -109,12 +113,15 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
             # For ESM3, we return the per-residue embedding as a single layer
             # This might need adjustment based on actual ESM3 API capabilities
             embedding = result.per_residue_embedding.to(torch.float32).cpu().numpy()
-            embedding = normalize_embedding(embedding)
+            if normalize:
+                embedding = normalize_embedding(embedding)
 
         # Return as a single layer array for consistency with other models
         return np.array([embedding])
 
-    def get_single_embedding_first_layer(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_first_layer(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get first layer embedding for a single sequence."""
         # For ESM3, this is the same as the per-residue embedding
         if self.model is None:
@@ -134,16 +141,18 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 raise ValueError("Model did not return embeddings")
             embedding = result.per_residue_embedding.to(torch.float32).cpu().numpy()
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
+        if normalize:
+            embedding = normalize_embedding(embedding)
         return embedding
 
-    def get_final_embeddings(self, sequence: str) -> NDArray[np.float64]:
+    def get_final_embeddings(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """
         Get final embeddings for ESM3 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
             if embeddings and len(embeddings) > 0:
                 return np.asarray(embeddings[0], dtype=np.float64)
             else:
@@ -166,6 +175,8 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                             raise ValueError("Model did not return embeddings")
                         embeddings = logits_output.embeddings.cpu().numpy()
                         pooled_embedding = embeddings.mean(axis=1)[0]
+                        if normalize:
+                            pooled_embedding = normalize_embedding(pooled_embedding.reshape(1, -1))[0]
                         return np.asarray(pooled_embedding, dtype=np.float64)
                 except Exception as minimal_error:
                     raise ValueError(

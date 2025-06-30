@@ -80,7 +80,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
         return ESMProtein(sequence=sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True
+        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
     ) -> List[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESMC."""
         if self.model is None:
@@ -107,11 +107,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 embeddings = embeddings[:, 1:-1, :]
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=1)
+                if normalize:
+                    embeddings = normalize_embedding(embeddings)
                 embedding_list.append(embeddings[0])
         return embedding_list
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str
+        self, sequence: str, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Get last hidden state embedding for a single sequence."""
         if self.model is None:
@@ -142,11 +144,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 logits_output.hidden_states[-1][0][1:-1].to(torch.float32).cpu().numpy()
             )
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
+        if normalize:
+            embedding = normalize_embedding(embedding)
         return embedding
 
-    def get_single_embedding_all_layers(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_all_layers(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embeddings from all layers for a single sequence."""
         if self.model is None:
             self.load_model()
@@ -177,12 +181,15 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 # Remove batch dimension and (if applicable) any special tokens
                 emb = layer_tensor[0].to(torch.float32).cpu().numpy()
                 # If your model adds special tokens, adjust the slicing (e.g., emb[1:-1])
-                emb = normalize_embedding(emb)
+                if normalize:
+                    emb = normalize_embedding(emb)
                 embeddings_list.append(emb)
 
         return np.array(embeddings_list)
 
-    def get_single_embedding_first_layer(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_first_layer(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get first layer embedding for a single sequence."""
         if self.model is None:
             self.load_model()
@@ -209,11 +216,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 logits_output.hidden_states[0][0].to(torch.float32).cpu().numpy()
             )
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
+        if normalize:
+            embedding = normalize_embedding(embedding)
         return embedding
 
-    def get_final_embeddings(self, sequence: str) -> NDArray[np.float64]:
+    def get_final_embeddings(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """
         Get final embeddings for ESMC with robust fallback.
 
@@ -222,7 +231,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
         """
         try:
             # For ESMC, batch embeddings with pooling is more reliable and memory efficient
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
             if embeddings and len(embeddings) > 0:
                 return np.asarray(embeddings[0], dtype=np.float64)
             else:
@@ -250,25 +259,17 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         )
                         if logits_output.embeddings is None:
                             raise ValueError("Model did not return embeddings")
-
-                        # Get embeddings and pool them properly
                         embeddings = logits_output.embeddings.cpu().numpy()
-                        logger.info(f"Embeddings shape: {embeddings.shape}")
-
-                        # Pool across sequence dimension to get single vector
-                        pooled_embedding = embeddings.mean(axis=1)[0]
-
-                        return np.asarray(pooled_embedding, dtype=np.float64)
-
+                        # Drop special tokens and pool
+                        embeddings = embeddings[:, 1:-1, :].mean(axis=1)[0]
+                        if normalize:
+                            embeddings = normalize_embedding(embeddings.reshape(1, -1))[0]
+                        return np.asarray(embeddings, dtype=np.float64)
                 except Exception as minimal_error:
-                    logger.error(
-                        f"Minimal embedding extraction also failed for ESMC: {minimal_error}"
-                    )
                     raise ValueError(
                         f"ESMC embedding extraction failed with OOM: {minimal_error}"
                     )
             else:
                 raise e
         except Exception as e:
-            logger.error(f"All embedding extraction methods failed for ESMC: {e}")
             raise ValueError(f"ESMC embedding extraction failed: {e}")
