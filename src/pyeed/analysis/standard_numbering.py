@@ -63,7 +63,7 @@ class StandardNumberingTool:
         if region_ids_neo4j:
             query = f"""
             MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-            WHERE id(r) IN $region_ids_neo4j
+            WHERE elementId(r) IN $region_ids_neo4j
             WHERE p.accession_id = '{base_sequence_id}'
             RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
             """
@@ -113,7 +113,7 @@ class StandardNumberingTool:
             if region_ids_neo4j:
                 query = f"""
                     MATCH (p:{node_type} {{accession_id: '{protein_id}'}})-[e:HAS_REGION]->(r:Region)
-                    WHERE id(r) IN $region_ids_neo4j
+                    WHERE elementId(r) IN $region_ids_neo4j
                     MATCH (s:StandardNumbering {{name: '{self.name}'}})
                     MERGE (r)-[rel:HAS_STANDARD_NUMBERING]->(s)
                     SET rel.positions = {str(positions[protein_id])}
@@ -402,7 +402,7 @@ class StandardNumberingTool:
             query = """
             MATCH (s:StandardNumbering {name: $name})
             MATCH (d:DNA)-[e:HAS_REGION]-(r:Region)-[:HAS_STANDARD_NUMBERING]-(s)
-            WHERE id(r) IN $region_ids_neo4j
+            WHERE elementId(r) IN $region_ids_neo4j
             AND d.accession_id IN $list_of_seq_ids
             RETURN d.accession_id AS accession_id
             """
@@ -442,11 +442,12 @@ class StandardNumberingTool:
 
         # Run the pairwise alignment using the PairwiseAligner.
         pairwise_aligner = PairwiseAligner(node_type=node_type)
-        input = (list_of_seq_ids or []) + [base_sequence_id]
+        input = list_of_seq_ids + [base_sequence_id]
         if not input:
             raise ValueError("No input sequences provided")
 
-        logger.info(f"Input: {input}")
+        logger.info(f"Input: {input} with length of {len(input)}")
+        logger.info(f"Length of region ids: {len(region_ids_neo4j)}")
 
         results_pairwise = pairwise_aligner.align_multipairwise(
             ids=input,  # Combine ids for alignment
@@ -551,7 +552,7 @@ class StandardNumberingTool:
             # get the region objects for each of the nodes as well
             query = f"""
             MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-            WHERE id(r) IN $region_ids_neo4j
+            WHERE elementId(r) IN $region_ids_neo4j
             WHERE p.accession_id IN $list_of_seq_ids
             RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
             """

@@ -15,7 +15,7 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[int]] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> tuple[dict[str, str], dict[str, list[str]]]:
         """
         Fetch sequence and standard numbering position data for two sequences from the database.
@@ -39,7 +39,7 @@ class MutationDetection:
         if region_ids_neo4j is not None:
             query = f"""
             MATCH (p:{node_type})-[rel:HAS_REGION]->(r:Region)
-            WHERE id(r) IN $region_ids_neo4j
+            WHERE elementId(r) IN $region_ids_neo4j
             MATCH (r)-[rel2:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
             WHERE p.accession_id IN ['{sequence_id1}', '{sequence_id2}'] 
             AND s.name = '{standard_numbering_tool_name}'
@@ -134,7 +134,7 @@ class MutationDetection:
         sequence_id1: str,
         sequence_id2: str,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[int]] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> None:
         """
         Save detected mutations to the database as relationships between nodes.
@@ -155,9 +155,9 @@ class MutationDetection:
         if region_ids_neo4j is not None:
             query = f"""
             MATCH (p1:{node_type} {{accession_id: $sequence_id1}})-[rel:HAS_REGION]->(r1:Region)
-            WHERE id(r1) IN $region_ids_neo4j
+            WHERE elementId(r1) IN $region_ids_neo4j
             MATCH (r1)-[rel_mutation:MUTATION]->(r2:Region)
-            WHERE id(r2) IN $region_ids_neo4j
+            WHERE elementId(r2) IN $region_ids_neo4j
             MATCH (r2)<-[:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
             RETURN rel_mutation
             """
@@ -188,10 +188,10 @@ class MutationDetection:
             # saving the mutation between the regions
             query = f"""
             MATCH (r1:Region)
-            WHERE id(r1) IN $region_ids_neo4j
+            WHERE elementId(r1) IN $region_ids_neo4j
             MATCH (r1)<-[:HAS_REGION]-(p1:{node_type} {{accession_id: $sequence_id1}})
             MATCH (r2:Region)
-            WHERE id(r2) IN $region_ids_neo4j
+            WHERE elementId(r2) IN $region_ids_neo4j
             MATCH (r2)<-[:HAS_REGION]-(p2:{node_type} {{accession_id: $sequence_id2}})
             CREATE (r1)-[r:MUTATION]->(r2)
             SET r.from_positions = $from_positions,
@@ -241,7 +241,7 @@ class MutationDetection:
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[int]] = None,
+        region_ids_neo4j: Optional[list[str]] = None,
     ) -> dict[str, list[int | str]]:
         """
         Get mutations between two sequences using standard numbering and optionally save them to the database.
@@ -273,8 +273,6 @@ class MutationDetection:
             node_type,
             region_ids_neo4j,
         )
-
-        logger.debug(f"Debug mode output: {sequences} and {positions}")
 
         mutations = self.find_mutations(
             sequences[sequence_id1],
