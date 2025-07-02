@@ -128,7 +128,7 @@ class MMSeqs(BaseModel):
                     description="Running MMSeqs2 clustering...", total=None
                 )
             response = httpx.post(
-                "http://localhost:8001/cluster",
+                "http://129.69.129.130:8001/cluster",
                 json={"query": query, "params": self.model_dump()},
                 timeout=timeout,
             )
