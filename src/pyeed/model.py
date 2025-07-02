@@ -425,17 +425,19 @@ class Molecule(StrictStructuredNode):
     molecule_id = StringProperty(unique_index=True, required=True)
     rhea_compound_id = StringProperty()
     smiles = StringProperty()
+    name = StringProperty()
 
     @classmethod
     def get_or_save(cls, **kwargs: Any) -> "Molecule":
         molecule_id = kwargs.get("chebi_id")
         smiles = kwargs.get("smiles")
+        name = kwargs.get("name")
         try:
             molecule = cast(Molecule, cls.nodes.get(molecule_id=molecule_id))
             return molecule
         except cls.DoesNotExist:
             try:
-                molecule = cls(molecule_id=molecule_id, smiles=smiles)
+                molecule = cls(molecule_id=molecule_id, smiles=smiles, name=name)
                 molecule.save()
                 return molecule
             except Exception as e:
@@ -570,6 +572,9 @@ class Protein(StrictStructuredNode):
         index_type="hnsw",
         distance_metric="COSINE",
     )
+    km = ArrayProperty(StringProperty())
+    kcat = ArrayProperty(StringProperty())
+    subunit = StringProperty()
     TBT = StringProperty()
     PCL = StringProperty()
     BHET = StringProperty()

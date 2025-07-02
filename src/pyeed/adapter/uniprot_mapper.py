@@ -1,8 +1,9 @@
 import json
 from collections import defaultdict
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 import requests
+import re
 from bs4 import BeautifulSoup, Tag
 from httpx import Response
 from loguru import logger
@@ -47,6 +48,63 @@ class UniprotToPyeed(PrimaryDBMapper):
             ) or protein_data.get("submittedName", [{}])[0].get("fullName", {}).get(
                 "value"
             )
+            
+            km = []
+            kcat = []
+
+            for comment in record["comments"]:
+                if comment["type"] == "BIOPHYSICOCHEMICAL_PROPERTIES" and "kinetics" in comment:
+                    kinetics = comment["kinetics"]
+
+                    # KM values
+                    if "km" in kinetics and isinstance(kinetics["km"], list):
+                        for km_entry in kinetics["km"]:
+                            if "value" in km_entry:
+                                value = km_entry["value"]
+                                references = []
+                                if "evidences" in km_entry and isinstance(km_entry["evidences"], list):
+                                    references = [
+                                        ev["source"]["id"]
+                                        for ev in km_entry["evidences"]
+                                        if "source" in ev and "name" in ev["source"] and ev["source"]["name"] == "PubMed"
+                                    ]
+                                ref_str = f" [PMID: {', '.join(references)}]" if references else ""
+                                km.append(f"{value}{ref_str}")
+
+                    # kcat values
+                    if "text" in kinetics and isinstance(kinetics["text"], list):
+                        for text_entry in kinetics["text"]:
+                            if "value" in text_entry:
+                                text_value = text_entry["value"]
+
+                                references = []
+                                if "evidences" in text_entry and isinstance(text_entry["evidences"], list):
+                                    references = [
+                                        ev["source"]["id"]
+                                        for ev in text_entry["evidences"]
+                                        if "source" in ev and "name" in ev["source"] and ev["source"]["name"] == "PubMed"
+                                    ]
+
+                                ref_str = f" [PMID: {', '.join(references)}]" if references else ""
+
+                                matches = re.findall(r"(kcat.*?substrate.*?\))", text_value, re.IGNORECASE)
+                                for match in matches:
+                                    kcat.append(f"{match}{ref_str}")
+
+            subunit_type = None
+            oligomer_keywords = ["monomer", "dimer", "trimer", "tetramer", "pentamer", "hexamer", "octamer"]
+
+            for comment in record["comments"]:
+                if comment["type"] == "SUBUNIT" and "text" in comment and isinstance(comment["text"], list):
+                    for entry in comment["text"]:
+                        if "value" in entry:
+                            text = entry["value"].lower()
+                            for keyword in oligomer_keywords:
+                                if keyword in text:
+                                    subunit_type = keyword
+                                    break
+                    if subunit_type:
+                        break
 
             try:
                 protein = Protein.get_or_save(
@@ -57,6 +115,9 @@ class UniprotToPyeed(PrimaryDBMapper):
                     ec_number=ec_number,
                     name=name,
                     seq_length=len(record["sequence"]["sequence"]),
+                    km=km,
+                    kcat=kcat,
+                    subunit=subunit_type
                 )
             except KeyError as e:
                 logger.warning(
@@ -65,11 +126,11 @@ class UniprotToPyeed(PrimaryDBMapper):
                 return
 
             protein.organism.connect(organism)
+            #print(record)
             self.add_reaction(record, protein)
 
         self.add_sites(record, protein)
         self.add_regions(record, protein)
-        #self.add_catalytic_activity(record, protein)
         self.add_go(record, protein)
 
     def add_sites(self, record: dict[str, Any], protein: Protein) -> None:
@@ -139,27 +200,6 @@ class UniprotToPyeed(PrimaryDBMapper):
 
             protein.region.connect(region, {"start": positions[0], "end": positions[1]})
 
-    # def add_catalytic_activity(self, record: dict[str, Any], protein: Protein) -> None:
-    #     """Add catalytic activity information from UniProt record to the protein."""
-    #     try:
-    #         for comment in record.get("comments", []):
-    #             if comment.get("type") != "CATALYTIC_ACTIVITY":
-    #                 continue
-                    
-    #             reaction_data = comment.get("reaction", {})
-    #             for db_ref in reaction_data.get("dbReferences", []):
-    #                 if not db_ref.get("id", "").startswith("RHEA:"):
-    #                     continue
-                        
-    #                 rhea_id = db_ref["id"]
-    #                 try:
-    #                     catalytic_annotation = Reaction.get_or_save(rhea_id=rhea_id)
-    #                     protein.reaction.connect(catalytic_annotation)
-    #                 except Exception as e:
-    #                     logger.error(f"Failed to connect reaction {rhea_id} to protein {protein.accession_id}: {e}")
-    #     except KeyError as e:
-    #         logger.error(f"No Reaction for {protein.accession_id}: {e}")
-
     def get_substrates_and_products_from_rhea(
         self, 
         rhea_id: str
@@ -226,7 +266,7 @@ class UniprotToPyeed(PrimaryDBMapper):
             "products": sorted([p for p in products if p is not None])
         }
     
-    def get_smiles_from_chebi(self, chebi_url: str) -> Optional[str]:
+    def get_smiles_from_chebi(self, chebi_url: str) -> Optional[Tuple[str,str]]:
         """
         Extract the SMILES string from a ChEBI compound page using the official XML API.
 
@@ -258,11 +298,12 @@ class UniprotToPyeed(PrimaryDBMapper):
 
             # Extract SMILES using regex (lightweight parsing)
             smiles_match = re.search(r"<smiles>(.*?)</smiles>", xml_fragment)
+            smiles = smiles_match.group(1).strip() if smiles_match else None
             
-            if smiles_match:
-                return smiles_match.group(1).strip()
+            name_match = re.search(r"<chebiAsciiName>(.*?)</chebiAsciiName>", xml_fragment)
+            name = name_match.group(1).strip() if name_match else None
 
-            return None
+            return (smiles,name)
         except Exception:
             logger.error(f"Failed to fetch or parse SMILES for {chebi_id}")
             return None
@@ -295,24 +336,28 @@ class UniprotToPyeed(PrimaryDBMapper):
         product_ids = chebi["products"]
         
         for i in substrate_ids:
-            smiles = self.get_smiles_from_chebi(i)
+            smiles,name = self.get_smiles_from_chebi(i)
 
             chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
+            
             substrate = Molecule.get_or_save(
                 chebi_id=chebi_id,
                 smiles=smiles,
+                name=name,
             )
             reaction.substrate.connect(substrate)
 
         for i in product_ids:
-            smiles = self.get_smiles_from_chebi(i)
+            smiles,name = self.get_smiles_from_chebi(i)
 
             chebi_id = i.split("_")[-1]
             chebi_id = f"CHEBI:{chebi_id}"
+
             product = Molecule.get_or_save(
                 chebi_id=chebi_id,
                 smiles=smiles,
+                name=name,
             )
             reaction.product.connect(product)
 
