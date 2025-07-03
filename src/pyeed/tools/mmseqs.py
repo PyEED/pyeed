@@ -5,6 +5,8 @@ import httpx
 from loguru import logger
 from pydantic import BaseModel, Field
 from rich.progress import Progress, SpinnerColumn, TextColumn
+import json
+import logging
 
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.datamodels.mmseqs import Cluster
@@ -99,6 +101,7 @@ class MMSeqs(BaseModel):
         Returns:
             Clustering results in Cluster objects
         """
+        print("Test")
         query = self._dict_to_multifasta(sequences)
         response = self._run_mmseqs_service(query)
         sanitized = self._sanitize_response(response)
@@ -138,18 +141,22 @@ class MMSeqs(BaseModel):
             logger.error(f"Connection error: {e}")
             raise httpx.ConnectError("PyEED Docker Service not running") from e
 
+    def _check_clustering_success(self, response):
+        if response.status_code != 200:
+            # Dump raw body for debugging
+            logging.error(f"MMSeqs service returned {response.status_code}: {response.text!r}")
+            try:
+                err = response.json()
+            except json.JSONDecodeError:
+                err = response.text or "<no body>"
+            raise ValueError(f"MMSeqs clustering failed: {err}")
+    
     @staticmethod
     def _sanitize_response(response: httpx.Response) -> str:
         """Sanitize the response to remove any unwanted characters."""
         stripped = response.text.strip('"')
         decoded = stripped.encode("utf-8").decode("unicode_escape")
         return decoded
-
-    @staticmethod
-    def _check_clustering_success(response: httpx.Response) -> None:
-        """Check if the response is successful."""
-        if not response.status_code == 200:
-            raise ValueError(f"MMSeqs clustering failed: {response.json()}")
 
     @staticmethod
     def _parse_clustering_output(cluster_string: str) -> List[Cluster]:

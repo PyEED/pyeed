@@ -12,6 +12,8 @@ RUN apt-get update --allow-releaseinfo-change && \
 
 RUN pip3 install fastapi uvicorn python-multipart
 
+RUN mkdir -p /app/tmp
+
 # Copy the FastAPI app to the container
 COPY app.py /usr/local/bin/app.py
 
