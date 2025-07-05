@@ -108,6 +108,7 @@ class ModelType:
     ESMC = "esmc"
     ESM3 = "esm3"
     PROTT5 = "prott5"
+    SAPROT = "saprot"
 
 
 def normalize_embedding(embedding: NDArray[np.float64]) -> NDArray[np.float64]:

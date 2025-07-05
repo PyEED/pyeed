@@ -5,9 +5,10 @@ from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
+from rich.progress import Progress
+
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.utility import chunks
-from rich.progress import Progress
 
 
 class PairwiseAligner:

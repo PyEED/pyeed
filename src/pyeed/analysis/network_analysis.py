@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 import networkx as nx
 from loguru import logger
+
 from pyeed.dbconnect import DatabaseConnector
 
 

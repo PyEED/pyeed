@@ -16,6 +16,7 @@ from .models import (
     ESM3EmbeddingModel,
     ESMCEmbeddingModel,
     ProtT5EmbeddingModel,
+    SaProtEmbeddingModel,
 )
 from .utils import determine_model_type
 
@@ -43,6 +44,8 @@ class ModelFactory:
             return ESMCEmbeddingModel(model_name, device)
         elif model_type == "esm3":
             return ESM3EmbeddingModel(model_name, device)
+        elif model_type == "saprot":
+            return SaProtEmbeddingModel(model_name, device)
         elif model_type == "prott5":
             return ProtT5EmbeddingModel(model_name, device)
         else:  # Default to ESM-2

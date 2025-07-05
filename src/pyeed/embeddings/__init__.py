@@ -26,6 +26,8 @@ from .models import (
     ESM3EmbeddingModel,
     ESMCEmbeddingModel,
     ProtT5EmbeddingModel,
+    SaProtEmbeddingModel,
+    SaProtFoldseekMutationModel,
 )
 from .processor import EmbeddingProcessor, get_processor
 from .utils import (
@@ -209,6 +211,8 @@ __all__ = [
     "ESMCEmbeddingModel",
     "ESM3EmbeddingModel",
     "ProtT5EmbeddingModel",
+    "SaProtEmbeddingModel",
+    "SaProtFoldseekMutationModel",
     # Backward compatibility functions
     "load_model_and_tokenizer",
     "process_batches_on_gpu",
