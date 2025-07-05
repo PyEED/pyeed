@@ -88,6 +88,8 @@ def determine_model_type(model_name: str) -> str:
         return "esmc"
     elif "esm3" in model_name_lower:
         return "esm3"
+    elif "saprot" in model_name_lower:
+        return "saprot"
     elif "prot_t5" in model_name_lower or "prott5" in model_name_lower:
         return "prott5"
     else:
