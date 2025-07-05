@@ -431,10 +431,11 @@ class StandardNumberingTool:
             for row in results:
                 if row is not None:
                     if row.get("accession_id"):
-                        pairs.remove((base_sequence_id, row["accession_id"]))
                         logger.info(
-                            f"Pair {base_sequence_id} and {row['accession_id']} already exists under the same standard numbering node"
+                            f"Pair {base_sequence_id} and {row['accession_id']} already exists under the same standard numbering node \n Removing x from the list: {(base_sequence_id, row['accession_id'])}"
                         )
+                        pairs.remove((base_sequence_id, row["accession_id"]))
+                        break
 
         # remove double pairs in the list of pairs
         pairs = list(set(pairs))
