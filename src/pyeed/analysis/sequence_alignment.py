@@ -1,5 +1,4 @@
 from itertools import combinations
-from re import L
 from typing import Any, Dict, Optional
 
 from Bio.Align import Alignment as Alignment
