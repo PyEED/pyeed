@@ -8,10 +8,14 @@ from .esm2 import ESM2EmbeddingModel
 from .esm3 import ESM3EmbeddingModel
 from .esmc import ESMCEmbeddingModel
 from .prott5 import ProtT5EmbeddingModel
+from .saprot import SaProtEmbeddingModel
+from .saprot_foldseek_mutation import SaProtFoldseekMutationModel
 
 __all__ = [
     "ESM2EmbeddingModel",
     "ESMCEmbeddingModel",
     "ESM3EmbeddingModel",
     "ProtT5EmbeddingModel",
+    "SaProtEmbeddingModel",
+    "SaProtFoldseekMutationModel",
 ]
