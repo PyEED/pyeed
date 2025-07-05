@@ -101,7 +101,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
                 if pool_embeddings:
                     actual_embedding = actual_embedding.mean(axis=0)
                 if normalize:
-                    actual_embedding = normalize_embedding(actual_embedding)
+                    actual_embedding = normalize_embedding(actual_embedding.reshape(1, -1))
                 embedding_list.append(actual_embedding)
             return embedding_list
 
