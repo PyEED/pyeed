@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict
 
 from pyeed.dbconnect import DatabaseConnector
 from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
@@ -126,7 +126,7 @@ class OntologyAdapter:
     def _process_restriction(
         self,
         g: Graph,
-        restriction_node,
+        restriction_node: Any,
         subclass: str,
         db: DatabaseConnector,
         dicts_labels: Dict[str, str],

@@ -89,7 +89,9 @@ class BaseEmbeddingModel(ABC):
         It falls back gracefully if certain layer-specific methods are not available.
         Default implementation uses last hidden state, but can be overridden.
         """
-        result = self.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
+        result = self.get_single_embedding_last_hidden_state(
+            sequence, normalize=normalize
+        )
         return np.asarray(result, dtype=np.float64)
 
     def move_to_device(self) -> None:

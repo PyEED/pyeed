@@ -96,12 +96,12 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         with torch.no_grad():
             outputs = model(**inputs)
 
-        # Remove batch dimension and special tokens ([CLS] and [SEP])
+            # Remove batch dimension and special tokens ([CLS] and [SEP])
         embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
-        
+
         if normalize:
             embedding = normalize_embedding(embedding)
-        return np.asarray(embedding, dtype=np.float64)
+        return cast(NDArray[np.float64], embedding)
 
     def get_single_embedding_all_layers(
         self, sequence: str, normalize: bool = True
@@ -129,7 +129,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
                 emb = normalize_embedding(emb)
             embeddings_list.append(emb)
 
-        return np.array(embeddings_list)
+        return cast(NDArray[np.float64], np.array(embeddings_list, dtype=np.float64))
 
     def get_single_embedding_first_layer(
         self, sequence: str, normalize: bool = True
@@ -152,7 +152,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_final_embeddings(
         self, sequence: str, normalize: bool = True
@@ -161,9 +161,13 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         Get final embeddings for ESM2 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:

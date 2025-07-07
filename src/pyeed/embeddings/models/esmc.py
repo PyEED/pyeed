@@ -146,7 +146,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_single_embedding_all_layers(
         self, sequence: str, normalize: bool = True
@@ -185,7 +185,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                     emb = normalize_embedding(emb)
                 embeddings_list.append(emb)
 
-        return np.array(embeddings_list)
+        return np.array(embeddings_list, dtype=np.float64)
 
     def get_single_embedding_first_layer(
         self, sequence: str, normalize: bool = True
@@ -218,7 +218,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_final_embeddings(
         self, sequence: str, normalize: bool = True
@@ -231,9 +231,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
         """
         try:
             # For ESMC, batch embeddings with pooling is more reliable and memory efficient
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -263,8 +267,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         # Drop special tokens and pool
                         embeddings = embeddings[:, 1:-1, :].mean(axis=1)[0]
                         if normalize:
-                            embeddings = normalize_embedding(embeddings.reshape(1, -1))[0]
-                        return np.asarray(embeddings, dtype=np.float64)
+                            embeddings = normalize_embedding(embeddings.reshape(1, -1))[
+                                0
+                            ]
+                        return cast(
+                            NDArray[np.float64],
+                            np.asarray(embeddings, dtype=np.float64),
+                        )
                 except Exception as minimal_error:
                     raise ValueError(
                         f"ESMC embedding extraction failed with OOM: {minimal_error}"

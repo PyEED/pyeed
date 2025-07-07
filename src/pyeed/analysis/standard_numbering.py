@@ -448,7 +448,9 @@ class StandardNumberingTool:
             raise ValueError("No input sequences provided")
 
         logger.info(f"Input: {input} with length of {len(input)}")
-        logger.info(f"Length of region ids: {len(region_ids_neo4j)}")
+        logger.info(
+            f"Length of region ids: {len(region_ids_neo4j) if region_ids_neo4j else 0}"
+        )
 
         results_pairwise = pairwise_aligner.align_multipairwise(
             ids=input,  # Combine ids for alignment

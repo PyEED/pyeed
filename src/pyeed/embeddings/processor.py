@@ -206,17 +206,23 @@ class EmbeddingProcessor:
                     if embedding_type == "last_hidden_state":
                         # no batching for last hidden state
                         embeddings_batch = [
-                            model.get_single_embedding_last_hidden_state(seq, normalize=normalize)
+                            model.get_single_embedding_last_hidden_state(
+                                seq, normalize=normalize
+                            )
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "all_layers":
                         embeddings_batch = [
-                            model.get_single_embedding_all_layers(seq, normalize=normalize)
+                            model.get_single_embedding_all_layers(
+                                seq, normalize=normalize
+                            )
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "first_layer":
                         embeddings_batch = [
-                            model.get_single_embedding_first_layer(seq, normalize=normalize)
+                            model.get_single_embedding_first_layer(
+                                seq, normalize=normalize
+                            )
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "final_embeddings":
@@ -271,7 +277,9 @@ class EmbeddingProcessor:
         model = self.get_or_create_model(model_name, device)
 
         if embedding_type == "last_hidden_state":
-            return model.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
+            return model.get_single_embedding_last_hidden_state(
+                sequence, normalize=normalize
+            )
         elif embedding_type == "all_layers":
             return model.get_single_embedding_all_layers(sequence, normalize=normalize)
         elif embedding_type == "first_layer":
@@ -372,7 +380,9 @@ class EmbeddingProcessor:
         embedding_model = ESM2EmbeddingModel("", device)
         embedding_model.model = base_model
         embedding_model.tokenizer = tokenizer
-        return embedding_model.get_batch_embeddings(batch_sequences, pool_embeddings, normalize=normalize)
+        return embedding_model.get_batch_embeddings(
+            batch_sequences, pool_embeddings, normalize=normalize
+        )
 
     def calculate_single_sequence_embedding_last_hidden_state(
         self,
@@ -411,7 +421,12 @@ class EmbeddingProcessor:
         )
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
+        self,
+        sequence: str,
+        model: Any,
+        tokenizer: Any,
+        device: torch.device,
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_last_hidden_state method.")
@@ -420,7 +435,12 @@ class EmbeddingProcessor:
         )
 
     def get_single_embedding_all_layers(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
+        self,
+        sequence: str,
+        model: Any,
+        tokenizer: Any,
+        device: torch.device,
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_all_layers method.")
@@ -429,7 +449,12 @@ class EmbeddingProcessor:
         )
 
     def get_single_embedding_first_layer(
-        self, sequence: str, model: Any, tokenizer: Any, device: torch.device, normalize: bool = True
+        self,
+        sequence: str,
+        model: Any,
+        tokenizer: Any,
+        device: torch.device,
+        normalize: bool = True,
     ) -> NDArray[np.float64]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_single_embedding_first_layer method.")
@@ -455,11 +480,17 @@ class EmbeddingProcessor:
         embedding_model.tokenizer = tokenizer
 
         if embedding_type == "last_hidden_state":
-            return embedding_model.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
+            return embedding_model.get_single_embedding_last_hidden_state(
+                sequence, normalize=normalize
+            )
         elif embedding_type == "all_layers":
-            return embedding_model.get_single_embedding_all_layers(sequence, normalize=normalize)
+            return embedding_model.get_single_embedding_all_layers(
+                sequence, normalize=normalize
+            )
         elif embedding_type == "first_layer":
-            return embedding_model.get_single_embedding_first_layer(sequence, normalize=normalize)
+            return embedding_model.get_single_embedding_first_layer(
+                sequence, normalize=normalize
+            )
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 

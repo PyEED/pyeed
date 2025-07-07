@@ -101,7 +101,9 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
                 if pool_embeddings:
                     actual_embedding = actual_embedding.mean(axis=0)
                 if normalize:
-                    actual_embedding = normalize_embedding(actual_embedding.reshape(1, -1))
+                    actual_embedding = normalize_embedding(
+                        actual_embedding.reshape(1, -1)
+                    )
                 embedding_list.append(actual_embedding)
             return embedding_list
 
@@ -146,7 +148,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         embedding = embedding[:seq_len]
         if normalize:
             embedding = normalize_embedding(embedding)
-        return np.asarray(embedding, dtype=np.float64)
+        return cast(NDArray[np.float64], embedding)
 
     def get_single_embedding_all_layers(
         self, sequence: str, normalize: bool = True
@@ -235,7 +237,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_final_embeddings(
         self, sequence: str, normalize: bool = True
@@ -244,9 +246,13 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         Get final embeddings for ProtT5 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:

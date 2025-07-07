@@ -5,10 +5,10 @@ from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
+from loguru import logger
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.utility import chunks
 from rich.progress import Progress
-from loguru import logger
 
 
 class PairwiseAligner:
@@ -327,7 +327,9 @@ class PairwiseAligner:
                 logger.info(f" Full query: {query}")
                 logger.info(f"The ids are: {ids}")
                 logger.info(f"The region ids are: {region_ids_neo4j}")
-                logger.info(f"Length of nodes (run query of type both region and ids): {len(nodes)}")
+                logger.info(
+                    f"Length of nodes (run query of type both region and ids): {len(nodes)}"
+                )
             else:
                 query = f"""
                 MATCH (p:{node_type})
@@ -350,7 +352,7 @@ class PairwiseAligner:
                     parameters={
                         "region_ids_neo4j": region_ids_neo4j,
                     },
-                )#
+                )  #
 
                 logger.info(f"Length of nodes (run query of type region): {len(nodes)}")
             else:

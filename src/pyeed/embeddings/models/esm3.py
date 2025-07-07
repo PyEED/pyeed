@@ -86,7 +86,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_single_embedding_all_layers(
         self, sequence: str, normalize: bool = True
@@ -117,7 +117,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 embedding = normalize_embedding(embedding)
 
         # Return as a single layer array for consistency with other models
-        return np.array([embedding])
+        return cast(NDArray[np.float64], np.array([embedding], dtype=np.float64))
 
     def get_single_embedding_first_layer(
         self, sequence: str, normalize: bool = True
@@ -143,7 +143,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
 
         if normalize:
             embedding = normalize_embedding(embedding)
-        return embedding
+        return cast(NDArray[np.float64], embedding)
 
     def get_final_embeddings(
         self, sequence: str, normalize: bool = True
@@ -152,9 +152,13 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
         Get final embeddings for ESM3 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True, normalize=normalize)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -176,8 +180,13 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                         embeddings = logits_output.embeddings.cpu().numpy()
                         pooled_embedding = embeddings.mean(axis=1)[0]
                         if normalize:
-                            pooled_embedding = normalize_embedding(pooled_embedding.reshape(1, -1))[0]
-                        return np.asarray(pooled_embedding, dtype=np.float64)
+                            pooled_embedding = normalize_embedding(
+                                pooled_embedding.reshape(1, -1)
+                            )[0]
+                        return cast(
+                            NDArray[np.float64],
+                            np.asarray(pooled_embedding, dtype=np.float64),
+                        )
                 except Exception as minimal_error:
                     raise ValueError(
                         f"ESM3 embedding extraction failed with OOM: {minimal_error}"
