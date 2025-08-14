@@ -458,6 +458,7 @@ class StandardNumberingTool:
             pairs=pairs,  # List of sequence pairs to be aligned
             node_type=node_type,
             region_ids_neo4j=region_ids_neo4j,
+            num_cores=1,
         )
 
         # logger.info(f"Pairwise alignment results: {results_pairwise}")
