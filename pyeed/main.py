@@ -505,3 +505,7 @@ class Pyeed:
         processor = get_processor()
         devices = processor.get_available_devices()
         return [str(device) for device in devices]
+
+
+if __name__ == "__main__":
+    print("fr")
