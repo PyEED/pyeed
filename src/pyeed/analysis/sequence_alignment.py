@@ -5,6 +5,7 @@ from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
+from loguru import logger
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.utility import chunks
 from rich.progress import Progress
@@ -157,9 +158,11 @@ class PairwiseAligner:
             pair for pair in pairs if tuple(sorted(pair)) not in existing_pairs
         ]
 
-        print(f"Number of existing pairs: {len(existing_pairs)}")
-        print(f"Number of total pairs: {len(pairs)}")
-        print(f"Number of pairs to align: {len(new_pairs)}")
+        logger.info(f"Number of existing pairs: {len(existing_pairs)}")
+        logger.info(f"Number of total pairs: {len(pairs)}")
+        logger.info(f"Number of pairs to align: {len(new_pairs)}")
+
+        logger.info(f"Length of sequences: {len(sequences)}")
 
         with Progress() as progress:
             align_task = progress.add_task(
@@ -226,7 +229,7 @@ class PairwiseAligner:
             UNWIND $alignments AS alignment
             MATCH (p1:{node_type} {{accession_id: alignment.query_id}})-[rel1:HAS_REGION]->(r1:Region)
             MATCH (p2:{node_type} {{accession_id: alignment.target_id}})-[rel2:HAS_REGION]->(r2:Region)
-            WHERE id(r1) IN $region_ids_neo4j AND id(r2) IN $region_ids_neo4j
+            WHERE elementId(r1) IN $region_ids_neo4j AND elementId(r2) IN $region_ids_neo4j
             MERGE (r1)-[r:PAIRWISE_ALIGNED]->(r2)
             SET r.similarity = alignment.identity,
             r.mismatches = alignment.mismatches,
@@ -313,13 +316,19 @@ class PairwiseAligner:
         if ids != []:
             if region_ids_neo4j is not None:
                 query = f"""
-                MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-                WHERE id(r) IN $region_ids_neo4j AND p.accession_id IN $ids
+                MATCH (p:{node_type})-[e:HAS_REGION]-(r:Region)
+                WHERE elementId(r) IN $region_ids_neo4j AND p.accession_id IN $ids
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
                 nodes = db.execute_read(
                     query,
                     parameters={"region_ids_neo4j": region_ids_neo4j, "ids": ids},
+                )
+                logger.info(f" Full query: {query}")
+                logger.info(f"The ids are: {ids}")
+                logger.info(f"The region ids are: {region_ids_neo4j}")
+                logger.info(
+                    f"Length of nodes (run query of type both region and ids): {len(nodes)}"
                 )
             else:
                 query = f"""
@@ -329,11 +338,13 @@ class PairwiseAligner:
                 """
                 nodes = db.execute_read(query, parameters={"ids": ids})
 
+                logger.info(f"Length of nodes (run query of type ids): {len(nodes)}")
+
         else:
             if region_ids_neo4j is not None:
                 query = f"""
                 MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
-                WHERE id(r) IN $region_ids_neo4j
+                WHERE elementId(r) IN $region_ids_neo4j
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
                 nodes = db.execute_read(
@@ -341,13 +352,17 @@ class PairwiseAligner:
                     parameters={
                         "region_ids_neo4j": region_ids_neo4j,
                     },
-                )
+                )  #
+
+                logger.info(f"Length of nodes (run query of type region): {len(nodes)}")
             else:
                 query = f"""
                 MATCH (p:{node_type})
                 RETURN p.accession_id AS accession_id, p.sequence AS sequence
                 """
                 nodes = db.execute_read(query)
+
+                logger.info(f"Length of nodes (run query of type): {len(nodes)}")
 
         if region_ids_neo4j is not None:
             return {

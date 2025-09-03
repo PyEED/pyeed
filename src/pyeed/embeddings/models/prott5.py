@@ -47,7 +47,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         return preprocess_sequence_for_prott5(sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True
+        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
     ) -> List[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ProtT5."""
         if self.model is None or self.tokenizer is None:
@@ -89,23 +89,26 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
             )
 
             # Get encoder last hidden state (encoder embeddings)
+            # remove special pad tokens
             hidden_states = outputs.encoder_last_hidden_state.cpu().numpy()
-
-        if pool_embeddings:
-            # Mean pooling across sequence length, excluding padding tokens
             embedding_list = []
+
             for i, hidden_state in enumerate(hidden_states):
                 # Get actual sequence length (excluding padding)
-                attention_mask_np = attention_mask[i].cpu().numpy()
-                seq_len = attention_mask_np.sum()
+                seq_len = attention_mask[i].cpu().numpy().sum()
                 # Pool only over actual sequence tokens
-                pooled_embedding = hidden_state[:seq_len].mean(axis=0)
-                embedding_list.append(pooled_embedding)
+                actual_embedding = hidden_state[:seq_len]
+                if pool_embeddings:
+                    actual_embedding = actual_embedding.mean(axis=0)
+                if normalize:
+                    actual_embedding = normalize_embedding(
+                        actual_embedding.reshape(1, -1)
+                    )
+                embedding_list.append(actual_embedding)
             return embedding_list
-        return list(hidden_states)
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str
+        self, sequence: str, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Get last hidden state embedding for a single sequence."""
         if self.model is None or self.tokenizer is None:
@@ -140,9 +143,16 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
 
         # Get encoder last hidden state including special tokens
         embedding = outputs.encoder_last_hidden_state[0].detach().cpu().numpy()
-        return np.asarray(embedding, dtype=np.float64)
+        # remove special pad tokens
+        seq_len = attention_mask.cpu().numpy().sum()
+        embedding = embedding[:seq_len]
+        if normalize:
+            embedding = normalize_embedding(embedding)
+        return cast(NDArray[np.float64], embedding)
 
-    def get_single_embedding_all_layers(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_all_layers(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embeddings from all layers for a single sequence."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -181,12 +191,15 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         for layer_tensor in encoder_hidden_states:
             # Remove batch dimension but keep special tokens
             emb = layer_tensor[0].detach().cpu().numpy()
-            emb = normalize_embedding(emb)
+            if normalize:
+                emb = normalize_embedding(emb)
             embeddings_list.append(emb)
 
         return np.array(embeddings_list)
 
-    def get_single_embedding_first_layer(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_first_layer(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get first layer embedding for a single sequence."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -222,18 +235,24 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         # Get first encoder hidden state including special tokens
         embedding = outputs.encoder_hidden_states[0][0].detach().cpu().numpy()
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
-        return embedding
+        if normalize:
+            embedding = normalize_embedding(embedding)
+        return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(self, sequence: str) -> NDArray[np.float64]:
+    def get_final_embeddings(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """
         Get final embeddings for ProtT5 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:

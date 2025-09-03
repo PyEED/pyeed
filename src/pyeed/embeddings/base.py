@@ -53,29 +53,35 @@ class BaseEmbeddingModel(ABC):
 
     @abstractmethod
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True
+        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
     ) -> List[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences."""
         pass
 
     @abstractmethod
     def get_single_embedding_last_hidden_state(
-        self, sequence: str
+        self, sequence: str, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Get embedding from the last hidden state for a single sequence."""
         pass
 
     @abstractmethod
-    def get_single_embedding_all_layers(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_all_layers(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embeddings from all layers for a single sequence."""
         pass
 
     @abstractmethod
-    def get_single_embedding_first_layer(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_first_layer(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embedding from the first layer for a single sequence."""
         pass
 
-    def get_final_embeddings(self, sequence: str) -> NDArray[np.float64]:
+    def get_final_embeddings(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """
         Get final embeddings for a single sequence.
 
@@ -83,7 +89,9 @@ class BaseEmbeddingModel(ABC):
         It falls back gracefully if certain layer-specific methods are not available.
         Default implementation uses last hidden state, but can be overridden.
         """
-        result = self.get_single_embedding_last_hidden_state(sequence)
+        result = self.get_single_embedding_last_hidden_state(
+            sequence, normalize=normalize
+        )
         return np.asarray(result, dtype=np.float64)
 
     def move_to_device(self) -> None:

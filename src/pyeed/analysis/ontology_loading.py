@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict
 
 from pyeed.dbconnect import DatabaseConnector
 from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
@@ -105,26 +105,28 @@ class OntologyAdapter:
         for s, p, o in g.triples((None, RDFS.subClassOf, None)):
             subclass = str(s)
 
-            if (o, RDF.type, OWL.Class) in g:
-                # Handle direct subclass relationships
-                superclass = str(o)
-                db.execute_write(
-                    """
-                    MATCH (sub:OntologyObject {name: $subclass}),
-                          (super:OntologyObject {name: $superclass})
-                    CREATE (sub)-[:SUBCLASS_OF]->(super)
-                    """,
-                    parameters={"subclass": subclass, "superclass": superclass},
-                )
-
-            elif (o, RDF.type, OWL.Restriction) in g:
+            # Check for the more specific owl:Restriction first.
+            if (o, RDF.type, OWL.Restriction) in g:
                 # Handle OWL restrictions (e.g., RO_ in CARD)
-                self._process_restriction(g, str(o), subclass, db, dicts_labels)
+                self._process_restriction(g, o, subclass, db, dicts_labels)
+            # Only if it's not a restriction, check if it's a direct superclass.
+            elif (o, RDF.type, OWL.Class) in g:
+                # Ensure we are linking to a named class, not a blank node
+                if isinstance(o, URIRef):
+                    superclass = str(o)
+                    db.execute_write(
+                        """
+                        MATCH (sub:OntologyObject {name: $subclass}),
+                              (super:OntologyObject {name: $superclass})
+                        CREATE (sub)-[:SUBCLASS_OF]->(super)
+                        """,
+                        parameters={"subclass": subclass, "superclass": superclass},
+                    )
 
     def _process_restriction(
         self,
         g: Graph,
-        restriction_node: str,
+        restriction_node: Any,
         subclass: str,
         db: DatabaseConnector,
         dicts_labels: Dict[str, str],
@@ -133,32 +135,28 @@ class OntologyAdapter:
         on_property = None
         some_values_from = None
 
-        # Convert restriction_node string to RDFLib URIRef
-        restriction = URIRef(restriction_node)
-
         # Extract onProperty
-        for _, _, prop in g.triples((restriction, OWL.onProperty, None)):
+        for _, _, prop in g.triples((restriction_node, OWL.onProperty, None)):
             on_property = str(prop)
 
         # Extract someValuesFrom
-        for _, _, value in g.triples((restriction, OWL.someValuesFrom, None)):
+        for _, _, value in g.triples((restriction_node, OWL.someValuesFrom, None)):
             some_values_from = str(value)
 
         if on_property and some_values_from:
+            rel_type = dicts_labels.get(on_property, "RELATED_TO")
+            rel_type = rel_type.replace(" ", "_").replace("-", "_").upper()
+
             query_params = {
                 "subclass": subclass,
                 "some_values_from": some_values_from,
                 "on_property": on_property,
-                "description": dicts_labels.get(on_property, ""),
             }
 
-            query = """
-                MATCH (sub:OntologyObject {name: $subclass}),
-                      (super:OntologyObject {name: $some_values_from})
-                CREATE (sub)-[:CustomRelationship {
-                    name: $on_property,
-                    description: $description
-                }]->(super)
+            query = f"""
+                MATCH (sub:OntologyObject {{name: $subclass}}),
+                      (super:OntologyObject {{name: $some_values_from}})
+                CREATE (sub)-[:`{rel_type}` {{uri: $on_property}}]->(super)
             """
 
             db.execute_write(query, parameters=query_params)

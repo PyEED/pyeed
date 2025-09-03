@@ -45,7 +45,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         return sequence
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True
+        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
     ) -> List[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESM-2."""
         if self.model is None or self.tokenizer is None:
@@ -70,13 +70,18 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
 
             if pool_embeddings:
                 # Mean pooling across sequence length (axis=1)
-                embeddings.append(hidden_states.mean(axis=1)[0])
+                embedding = hidden_states.mean(axis=1)[0]
+                if normalize:
+                    embedding = normalize_embedding(embedding.reshape(1, -1))[0]
+                embeddings.append(embedding)
             else:
+                if normalize:
+                    hidden_states = normalize_embedding(hidden_states)
                 embeddings.append(hidden_states)
         return embeddings
 
     def get_single_embedding_last_hidden_state(
-        self, sequence: str
+        self, sequence: str, normalize: bool = True
     ) -> NDArray[np.float64]:
         """Get last hidden state embedding for a single sequence."""
         if self.model is None or self.tokenizer is None:
@@ -91,11 +96,16 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         with torch.no_grad():
             outputs = model(**inputs)
 
-        # Remove batch dimension and special tokens ([CLS] and [SEP])
+            # Remove batch dimension and special tokens ([CLS] and [SEP])
         embedding = outputs.last_hidden_state[0, 1:-1, :].detach().cpu().numpy()
-        return np.asarray(embedding, dtype=np.float64)
 
-    def get_single_embedding_all_layers(self, sequence: str) -> NDArray[np.float64]:
+        if normalize:
+            embedding = normalize_embedding(embedding)
+        return cast(NDArray[np.float64], embedding)
+
+    def get_single_embedding_all_layers(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get embeddings from all layers for a single sequence."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -115,12 +125,15 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         for layer_tensor in hidden_states:
             # Remove batch dimension and special tokens ([CLS] and [SEP])
             emb = layer_tensor[0, 1:-1, :].detach().cpu().numpy()
-            emb = normalize_embedding(emb)
+            if normalize:
+                emb = normalize_embedding(emb)
             embeddings_list.append(emb)
 
-        return np.array(embeddings_list)
+        return cast(NDArray[np.float64], np.array(embeddings_list, dtype=np.float64))
 
-    def get_single_embedding_first_layer(self, sequence: str) -> NDArray[np.float64]:
+    def get_single_embedding_first_layer(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """Get first layer embedding for a single sequence."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -137,18 +150,24 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         # Get the first layer's hidden states for all residues (excluding special tokens)
         embedding = outputs.hidden_states[0][0, 1:-1, :].detach().cpu().numpy()
 
-        # Normalize the embedding
-        embedding = normalize_embedding(embedding)
-        return embedding
+        if normalize:
+            embedding = normalize_embedding(embedding)
+        return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(self, sequence: str) -> NDArray[np.float64]:
+    def get_final_embeddings(
+        self, sequence: str, normalize: bool = True
+    ) -> NDArray[np.float64]:
         """
         Get final embeddings for ESM2 with robust fallback.
         """
         try:
-            embeddings = self.get_batch_embeddings([sequence], pool_embeddings=True)
+            embeddings = self.get_batch_embeddings(
+                [sequence], pool_embeddings=True, normalize=normalize
+            )
             if embeddings and len(embeddings) > 0:
-                return np.asarray(embeddings[0], dtype=np.float64)
+                return cast(
+                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
+                )
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:
