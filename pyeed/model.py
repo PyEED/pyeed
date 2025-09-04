@@ -1,11 +1,32 @@
 """Data models for the Pyeed system using Pydantic v2."""
 
+import re
 import warnings
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+
+
+@dataclass(frozen=True)
+class NodeHint:
+    """Neo4j-specific metadata for model fields."""
+
+    unique: bool = False
+    index: bool = False
+    vector_index: bool = False
+
+
+@dataclass(frozen=True)
+class EdgeHint:
+    """Neo4j-specific metadata for model fields."""
+
+    name: str
+    target_class_name: str  # Use string instead of actual class type
+    source_key: str
+    target_key: str
 
 
 class AnnotationType(str, Enum):
@@ -38,14 +59,82 @@ class BaseNode(BaseModel):
     )
     _id: str = PrivateAttr(default_factory=lambda: str(uuid4()))
 
+    @field_validator("custom")
+    @classmethod
+    def validate_custom_keys(cls, v: dict[str, Any], info: Any) -> dict[str, Any]:
+        """Validate that custom keys don't conflict with existing attributes."""
+        if not v:
+            return v
+
+        # Get all field names from the current class and its parents
+        field_names = set()
+        current_class = info.data.get("__class__", cls)
+
+        # Collect field names from current class and all parent classes
+        while current_class and current_class != BaseModel:
+            field_names.update(current_class.model_fields.keys())
+            current_class = (
+                current_class.__bases__[0] if current_class.__bases__ else None
+            )
+
+        # Check for conflicts
+        conflicting_keys = []
+        invalid_keys = []
+
+        # Regex pattern for valid Python variable names
+        valid_var_pattern = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+        for key, value in v.items():
+            # Check for conflicts with existing attributes
+            if key in field_names:
+                conflicting_keys.append(key)
+            elif key == "custom":
+                conflicting_keys.append(key)
+
+            # Check if key is a valid Python variable name
+            if not valid_var_pattern.match(key):
+                invalid_keys.append(key)
+
+            # Check for nested dictionaries (not allowed)
+            if isinstance(value, dict):
+                raise ValueError(
+                    f"Nested dictionaries are not allowed in custom fields. "
+                    f"Key '{key}' contains a dictionary value."
+                )
+
+        if conflicting_keys:
+            raise ValueError(
+                f"Custom field keys cannot conflict with existing attributes or be 'custom': {conflicting_keys}"
+            )
+
+        if invalid_keys:
+            raise ValueError(
+                f"Invalid custom field keys: {invalid_keys}. "
+                f"Keys must start with a letter or underscore and contain only letters, digits, or underscores."
+            )
+
+        return v
+
+    def get_unique_id(self) -> str:
+        """Return the value of the field marked with NodeHint(unique=True), else fallback to _id."""
+        for field_name, field_info in type(self).model_fields.items():
+            # Check for NodeHint metadata in Annotated fields
+            for meta in getattr(field_info, "metadata", ()):
+                if isinstance(meta, NodeHint) and meta.unique:
+                    val = getattr(self, field_name, None)
+                    if val is not None:
+                        return str(val)
+                    break
+
+        return self._id
+
 
 class Organism(BaseNode):
     """Organism information."""
 
-    taxonomy_id: int = Field(
+    taxonomy_id: Annotated[int, NodeHint(unique=True)] = Field(
         ...,
         description="NCBI taxonomy ID",
-        json_schema_extra={"neo4j": {"unique": True}},
     )
     name: Optional[str] = Field(
         None,
@@ -63,7 +152,15 @@ class Organism(BaseNode):
 class SequenceAnnotation(BaseNode):
     """Sequence annotation with positions and metadata."""
 
-    accession_id: str = Field(
+    accession_id: Annotated[
+        str,
+        EdgeHint(
+            name="HAS_ANNOTATION",
+            target_class_name="Protein",
+            source_key="accession_id",
+            target_key="accession_id",
+        ),
+    ] = Field(
         ...,
         description="Protein accession identifier",
     )
@@ -87,7 +184,7 @@ class SequenceAnnotation(BaseNode):
 class Molecule(BaseNode):
     """Chemical molecule information."""
 
-    chebi_id: str = Field(
+    chebi_id: Annotated[str, NodeHint(unique=True)] = Field(
         ...,
         description="ChEBI identifier",
     )
@@ -95,25 +192,48 @@ class Molecule(BaseNode):
         None,
         description="RHEA compound identifier",
     )
-    smiles: Optional[str] = Field(None, description="SMILES representation")
+    smiles: Optional[str] = Field(
+        None,
+        description="SMILES representation",
+    )
+    embedding: Optional[List[float]] = Field(
+        None,
+        description="Embedding vector",
+    )
 
 
 class Reaction(BaseNode):
     """Chemical reaction information."""
 
+    accession_id: Annotated[
+        str,
+        EdgeHint(
+            name="HAS_REACTION",
+            target_class_name="Protein",
+            source_key="accession_id",
+            target_key="accession_id",
+        ),
+    ] = Field(
+        ...,
+        description="Protein accession identifier that can catalyze the reaction",
+    )
     rhea_id: str = Field(
         ...,
         description="RHEA reaction identifier",
     )
-    participants: List[str] = Field(
+    substrate: Annotated[
+        List[Molecule],
+        EdgeHint(
+            name="HAS_SUBSTRATE",
+            target_class_name="Molecule",
+            source_key="rhea_id",
+            target_key="chebi_id",
+        ),
+    ] = Field(
         default_factory=list,
         description="List of ChEBI identifiers",
     )
-    educts: List[str] = Field(
-        default_factory=list,
-        description="List of ChEBI identifiers",
-    )
-    products: List[str] = Field(
+    products: List[Molecule] = Field(
         default_factory=list,
         description="List of ChEBI identifiers",
     )
@@ -123,26 +243,12 @@ class Reaction(BaseNode):
     )
 
 
-class StandardNumbering(BaseNode):
-    """Standard numbering scheme for proteins."""
-
-    name: str = Field(
-        ...,
-        description="Standard numbering name",
-    )
-    definition: str = Field(
-        ...,
-        description="Definition of the numbering scheme",
-    )
-
-
 class GOAnnotation(BaseNode):
     """Gene Ontology annotation."""
 
-    go_id: str = Field(
+    go_id: Annotated[str, NodeHint(unique=True)] = Field(
         ...,
         description="Gene Ontology identifier",
-        json_schema_extra={"neo4j": {"unique": True}},
     )
     term: Optional[str] = Field(
         None,
@@ -153,11 +259,34 @@ class GOAnnotation(BaseNode):
         description="GO term definition",
     )
 
+    # For GO annotations, we need a way to link them to proteins
+    # This will be used when creating GO-Protein relationships
+    protein_accession_id: Annotated[
+        Optional[str],
+        EdgeHint(
+            name="HAS_GO_ANNOTATION",
+            target_class_name="Protein",
+            source_key="go_id",
+            target_key="accession_id",
+        ),
+    ] = Field(
+        None,
+        description="Protein accession identifier (for relationship creation)",
+    )
+
 
 class Embedding(BaseNode):
     """Metadata about an embedding."""
 
-    accession_id: str = Field(
+    accession_id: Annotated[
+        str,
+        EdgeHint(
+            name="HAS_EMBEDDING",
+            target_class_name="Protein",
+            source_key="accession_id",
+            target_key="accession_id",
+        ),
+    ] = Field(
         ...,
         description="Protein accession identifier",
     )
@@ -169,14 +298,20 @@ class Embedding(BaseNode):
         ...,
         description="Name of the embedding model",
     )
+    layer_index: int = Field(
+        default=-1,
+        description="Model layer number embedding matrix was extracted prior to pooling.",
+    )
     pooling_method: str = Field(
         ...,
         description="Pooling method",
     )
-    vector: List[float] = Field(
+    vector: Annotated[
+        List[float],
+        NodeHint(vector_index=True),
+    ] = Field(
         ...,
         description="The embedding vector",
-        json_schema_extra={"neo4j": {"vector_index": True}},
     )
     n_dims: int = Field(
         ...,
@@ -187,10 +322,12 @@ class Embedding(BaseNode):
 class Protein(BaseNode):
     """Protein sequence and metadata."""
 
-    accession_id: str = Field(
+    accession_id: Annotated[
+        str,
+        NodeHint(unique=True),
+    ] = Field(
         ...,
         description="Protein accession identifier",
-        json_schema_extra={"neo4j": {"unique": True}},
     )
     sequence: str = Field(
         ...,
@@ -233,7 +370,7 @@ class Protein(BaseNode):
         default_factory=list,
         description="Structure identifiers",
     )
-    go_terms: List[str] = Field(
+    go_terms: List[GOAnnotation] = Field(
         default_factory=list,
         description="GO term identifiers",
     )
@@ -241,12 +378,10 @@ class Protein(BaseNode):
         default_factory=list,
         description="RHEA reaction identifiers",
     )
-
     embeddings: Dict[str, Embedding] = Field(
         default_factory=dict,
         description="Embeddings from different models",
     )
-
     annotations: Dict[str, SequenceAnnotation] = Field(
         default_factory=dict,
         description="Sequence annotations",
@@ -333,11 +468,11 @@ class Protein(BaseNode):
         """Add or replace annotation for a specific type.
 
         Args:
-            annotation: SequenceAnnotation object to add.
-            replace: If False, raises if annotation exists; if True, replaces existing.
+                    annotation: SequenceAnnotation object to add.
+                    replace: If False, raises if annotation exists; if True, replaces existing.
 
-        Raises:
-            ValueError: If annotation exists and replace is False.
+                Raises:
+                    ValueError: If annotation exists and replace is False.
         """
         # check that accession_id is the same as the annotation
         if annotation.accession_id != self.accession_id:
@@ -439,25 +574,6 @@ class Relationships(BaseModel):
     rel_name: str = Field(..., description="Relationship name")
 
 
-RELATIONSHIPS = [
-    Relationships(
-        from_class="Protein",
-        to_class="Organism",
-        rel_name="originates_from",
-    ),
-    Relationships(
-        from_class="Protein",
-        to_class="SequenceAnnotation",
-        rel_name="has_annotation",
-    ),
-    Relationships(
-        from_class="Protein",
-        to_class="Embedding",
-        rel_name="has_embedding",
-    ),
-]
-
-
 # Example usage
 if __name__ == "__main__":
     from rich import print
@@ -479,6 +595,7 @@ if __name__ == "__main__":
                 "doi:10.1016/j.xinn.2025.100345",
             ],
             "already_characterized": False,
+            "dictd": 123,
         },
     )
 
@@ -535,3 +652,6 @@ if __name__ == "__main__":
     )
 
     print(prot)
+
+    for embedding in prot.embeddings.values():
+        print(embedding._id)
