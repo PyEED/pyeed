@@ -24,9 +24,8 @@ class EdgeHint:
     """Neo4j-specific metadata for model fields."""
 
     name: str
-    target_class_name: str  # Use string instead of actual class type
-    source_key: str
-    target_key: str
+    outgoing_class_name: str  # Use string instead of actual class type
+    outgoing_attr_name: str
 
 
 class AnnotationType(str, Enum):
@@ -128,11 +127,43 @@ class BaseNode(BaseModel):
 
         return self._id
 
+    def get_unique_field_name(self) -> str:
+        """Return the name of the field marked with NodeHint(unique=True), else fallback to '_id'."""
+        for field_name, field_info in type(self).model_fields.items():
+            # Check for NodeHint metadata in Annotated fields
+            for meta in getattr(field_info, "metadata", ()):
+                if isinstance(meta, NodeHint) and meta.unique:
+                    return field_name
+
+        return "_id"
+
+    @classmethod
+    def get_unique_field_name_for_class(cls) -> str:
+        """Return the name of the unique field for this class."""
+        for field_name, field_info in cls.model_fields.items():
+            # Check for NodeHint metadata in Annotated fields
+            for meta in getattr(field_info, "metadata", ()):
+                if isinstance(meta, NodeHint) and meta.unique:
+                    return field_name
+
+        return "_id"
+
 
 class Organism(BaseNode):
     """Organism information."""
 
-    taxonomy_id: Annotated[int, NodeHint(unique=True)] = Field(
+    accession_id: Annotated[
+        str,
+        EdgeHint(
+            name="ORIGINATES_FROM",
+            outgoing_class_name="Protein",
+            outgoing_attr_name="accession_id",
+        ),
+    ] = Field(
+        ...,
+        description="Organism accession identifier",
+    )
+    tax_id: Annotated[int, NodeHint(unique=True)] = Field(
         ...,
         description="NCBI taxonomy ID",
     )
@@ -141,9 +172,9 @@ class Organism(BaseNode):
         description="Organism name",
     )
 
-    @field_validator("taxonomy_id")
+    @field_validator("tax_id")
     @classmethod
-    def validate_taxonomy_id(cls, v: int) -> int:
+    def validate_tax_id(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("Taxonomy ID must be positive")
         return v
@@ -156,9 +187,8 @@ class SequenceAnnotation(BaseNode):
         str,
         EdgeHint(
             name="HAS_ANNOTATION",
-            target_class_name="Protein",
-            source_key="accession_id",
-            target_key="accession_id",
+            outgoing_class_name="Protein",
+            outgoing_attr_name="accession_id",
         ),
     ] = Field(
         ...,
@@ -209,9 +239,8 @@ class Reaction(BaseNode):
         str,
         EdgeHint(
             name="HAS_REACTION",
-            target_class_name="Protein",
-            source_key="accession_id",
-            target_key="accession_id",
+            outgoing_class_name="Protein",
+            outgoing_attr_name="accession_id",
         ),
     ] = Field(
         ...,
@@ -225,9 +254,8 @@ class Reaction(BaseNode):
         List[Molecule],
         EdgeHint(
             name="HAS_SUBSTRATE",
-            target_class_name="Molecule",
-            source_key="rhea_id",
-            target_key="chebi_id",
+            outgoing_class_name="Molecule",
+            outgoing_attr_name="accession_id",
         ),
     ] = Field(
         default_factory=list,
@@ -265,9 +293,8 @@ class GOAnnotation(BaseNode):
         Optional[str],
         EdgeHint(
             name="HAS_GO_ANNOTATION",
-            target_class_name="Protein",
-            source_key="go_id",
-            target_key="accession_id",
+            outgoing_class_name="Protein",
+            outgoing_attr_name="accession_id",
         ),
     ] = Field(
         None,
@@ -282,9 +309,8 @@ class Embedding(BaseNode):
         str,
         EdgeHint(
             name="HAS_EMBEDDING",
-            target_class_name="Protein",
-            source_key="accession_id",
-            target_key="accession_id",
+            outgoing_class_name="Protein",
+            outgoing_attr_name="accession_id",
         ),
     ] = Field(
         ...,
@@ -340,6 +366,10 @@ class Protein(BaseNode):
     seq_length: Optional[int] = Field(
         None,
         description="Sequence length",
+    )
+    organisms: List[Organism] = Field(
+        default_factory=list,
+        description="Organisms the protein originates from",
     )
     mol_weight: Optional[float] = Field(
         None,
@@ -504,6 +534,22 @@ class Protein(BaseNode):
         """Check if protein has annotation of specified type."""
         return annotation_type.value in self.annotations
 
+    def add_organism(self, organism: Organism) -> None:
+        """Add organism to protein."""
+        if organism.accession_id != self.accession_id:
+            raise ValueError(
+                f"Organism accession_id {organism.accession_id} does not match protein accession_id {self.accession_id}"
+            )
+        if organism.tax_id in [o.tax_id for o in self.organisms]:
+            raise ValueError(
+                f"Organism with tax_id {organism.tax_id} already exists in protein {self.accession_id}"
+            )
+        self.organisms.append(organism)
+
+    def remove_organism(self, organism: Organism) -> None:
+        """Remove organism from protein."""
+        self.organisms.remove(organism)
+
 
 class DNA(BaseNode):
     """DNA sequence and metadata."""
@@ -554,24 +600,6 @@ class DNA(BaseNode):
         if v is not None and (v < 0 or v > 100):
             raise ValueError("GC content must be between 0 and 100")
         return v
-
-
-class OntologyObject(BaseNode):
-    """Ontology object representation."""
-
-    name: str = Field(..., description="Ontology object name")
-    description: Optional[str] = Field(None, description="Object description")
-    label: Optional[str] = Field(None, description="Object label")
-    synonyms: List[str] = Field(default_factory=list, description="Object synonyms")
-
-
-# Relationship Storage - Simple dictionaries for easy graph serialization
-class Relationships(BaseModel):
-    """Defines a relationship between two classes."""
-
-    from_class: str = Field(..., description="From class")
-    to_class: str = Field(..., description="To class")
-    rel_name: str = Field(..., description="Relationship name")
 
 
 # Example usage
