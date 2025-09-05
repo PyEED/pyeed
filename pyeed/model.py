@@ -1,36 +1,63 @@
-"""Data models for the Pyeed system using Pydantic v2."""
-
 import re
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, Iterable, List, Optional, Tuple, Type
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from typing_extensions import get_args, get_origin
 
 
 @dataclass(frozen=True)
 class NodeHint:
-    """Neo4j-specific metadata for model fields."""
-
     unique: bool = False
     index: bool = False
     vector_index: bool = False
 
 
-@dataclass(frozen=True)
-class EdgeHint:
-    """Neo4j-specific metadata for model fields."""
+def node_label(cls: Type[BaseModel]) -> str:
+    return cls.__name__
 
-    name: str
-    outgoing_class_name: str  # Use string instead of actual class type
-    outgoing_attr_name: str
+
+def extract_label_key_map(models: Iterable[Type[BaseModel]]) -> dict[str, str]:
+    """{Label: unique_key} (first field marked unique=True per model)."""
+    out: dict[str, str] = {}
+    for m in models:
+        for name, ann in m.model_fields.items():  # pydantic v2
+            tp = ann.annotation
+            if get_origin(tp) is Annotated:
+                base, *meta = get_args(tp)
+                for x in meta:
+                    if isinstance(x, NodeHint) and x.unique:
+                        out[node_label(m)] = name
+                        break
+                if node_label(m) in out:
+                    break
+    return out
+
+
+def extract_indexes(
+    models: Iterable[Type[BaseModel]],
+) -> list[tuple[str, str, NodeHint]]:
+    """[(Label, prop, hint)] for index/vector_index flags."""
+    out = []
+    for m in models:
+        lbl = node_label(m)
+        for name, ann in m.model_fields.items():
+            tp = ann.annotation
+            if get_origin(tp) is Annotated:
+                base, *meta = get_args(tp)
+                for x in meta:
+                    if isinstance(x, NodeHint) and (x.index or x.vector_index):
+                        out.append((lbl, name, x))
+    return out
 
 
 class AnnotationType(str, Enum):
     """Protein and DNA annotation types."""
 
+    SITE = "site"
     ACTIVE_SITE = "active_site"
     ALLOSTERIC_SITE = "allosteric_site"
     ALPHAHELIX = "alpha_helix"
@@ -51,12 +78,13 @@ class AnnotationType(str, Enum):
 class BaseNode(BaseModel):
     """Base class for all nodes in the system."""
 
-    model_config = ConfigDict(frozen=False, validate_assignment=True)
+    model_config = ConfigDict(
+        frozen=False, validate_assignment=True, use_enum_values=True
+    )
 
     custom: dict[str, Any] = Field(
         default_factory=dict, description="Arbitrary custom data as key-value pairs"
     )
-    _id: str = PrivateAttr(default_factory=lambda: str(uuid4()))
 
     @field_validator("custom")
     @classmethod
@@ -114,61 +142,86 @@ class BaseNode(BaseModel):
 
         return v
 
-    def get_unique_id(self) -> str:
-        """Return the value of the field marked with NodeHint(unique=True), else fallback to _id."""
+    def to_dict(self) -> dict[str, Any]:
+        """Flattens "custom" field to the top level of the dictionary"""
+        nested_dict = self.model_dump(exclude_none=True, exclude_unset=True)
+        custom = nested_dict.get("custom", {})
+        if custom:
+            nested_dict.pop("custom")
+            return {**nested_dict, **custom}
+        return nested_dict
+
+    def get_unique_model_field(self) -> str:
+        """Returns the name of the field marked with NodeHint(unique=True)"""
+        print("getting unique model field for", type(self))
         for field_name, field_info in type(self).model_fields.items():
-            # Check for NodeHint metadata in Annotated fields
-            for meta in getattr(field_info, "metadata", ()):
-                if isinstance(meta, NodeHint) and meta.unique:
-                    val = getattr(self, field_name, None)
-                    if val is not None:
-                        return str(val)
-                    break
+            print(field_name, field_info)
+            if not field_info.metadata:
+                continue
+            if (
+                isinstance(field_info.metadata[0], NodeHint)
+                and field_info.metadata[0].unique
+            ):
+                print("found unique field", field_name)
+                return field_name
 
-        return self._id
+        raise ValueError(
+            f"No unique field found. No field of {type(self)} is marked with NodeHint(unique=True)"
+        )
 
-    def get_unique_field_name(self) -> str:
-        """Return the name of the field marked with NodeHint(unique=True), else fallback to '_id'."""
-        for field_name, field_info in type(self).model_fields.items():
-            # Check for NodeHint metadata in Annotated fields
-            for meta in getattr(field_info, "metadata", ()):
-                if isinstance(meta, NodeHint) and meta.unique:
-                    return field_name
+    def graphify(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Flatten this node and all nested BaseNode values into nodes & edges."""
+        nodes: List[Dict[str, Any]] = []
+        edges: List[Dict[str, Any]] = []
 
-        return "_id"
+        def emit_node(obj: BaseNode) -> Dict[str, Any]:
+            label = obj.__class__.__name__
+            unique_field = obj.get_unique_model_field()
+            unique_value = getattr(obj, unique_field)
+            props = obj.to_dict()
+            return {"label": label, "key": (unique_field, unique_value), "props": props}
 
-    @classmethod
-    def get_unique_field_name_for_class(cls) -> str:
-        """Return the name of the unique field for this class."""
-        for field_name, field_info in cls.model_fields.items():
-            # Check for NodeHint metadata in Annotated fields
-            for meta in getattr(field_info, "metadata", ()):
-                if isinstance(meta, NodeHint) and meta.unique:
-                    return field_name
+        def recurse(parent: BaseNode, fname: str, val: Any) -> None:
+            if isinstance(val, BaseNode):
+                nodes.append(emit_node(val))
+                edges.append(
+                    {
+                        "type": fname.upper(),
+                        "src": (
+                            parent.__class__.__name__,
+                            parent.get_unique_model_field(),
+                            getattr(parent, parent.get_unique_model_field()),
+                        ),
+                        "dst": (
+                            val.__class__.__name__,
+                            val.get_unique_model_field(),
+                            getattr(val, val.get_unique_model_field()),
+                        ),
+                    }
+                )
+            elif isinstance(val, Iterable) and not isinstance(val, (str, bytes)):
+                for item in val:
+                    recurse(parent, fname, item)
 
-        return "_id"
+        # Root node
+        nodes.append(emit_node(self))
+
+        # Process all fields
+        for fname in self.model_dump().keys():
+            recurse(self, fname, getattr(self, fname, None))
+
+        return nodes, edges
 
 
 class Organism(BaseNode):
     """Organism information."""
 
-    accession_id: Annotated[
-        str,
-        EdgeHint(
-            name="ORIGINATES_FROM",
-            outgoing_class_name="Protein",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
-        ...,
-        description="Organism accession identifier",
-    )
     tax_id: Annotated[int, NodeHint(unique=True)] = Field(
         ...,
         description="NCBI taxonomy ID",
     )
     name: Optional[str] = Field(
-        None,
+        default=None,
         description="Organism name",
     )
 
@@ -180,19 +233,12 @@ class Organism(BaseNode):
         return v
 
 
-class SequenceAnnotation(BaseNode):
+class Annotation(BaseNode):
     """Sequence annotation with positions and metadata."""
 
-    accession_id: Annotated[
-        str,
-        EdgeHint(
-            name="HAS_ANNOTATION",
-            outgoing_class_name="Protein",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
-        ...,
-        description="Protein accession identifier",
+    id: Annotated[str, NodeHint(unique=True)] = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Annotation identifier",
     )
     annotation_type: AnnotationType = Field(
         ...,
@@ -201,6 +247,10 @@ class SequenceAnnotation(BaseNode):
     positions: List[int] = Field(
         ...,
         description="Sorted list of positions",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Description of the annotation",
     )
 
     @field_validator("positions")
@@ -218,13 +268,17 @@ class Molecule(BaseNode):
         ...,
         description="ChEBI identifier",
     )
-    rhea_compound_id: Optional[str] = Field(
+    name: Optional[str] = Field(
         None,
-        description="RHEA compound identifier",
+        description="Molecule name",
     )
     smiles: Optional[str] = Field(
         None,
         description="SMILES representation",
+    )
+    inchi: Optional[str] = Field(
+        None,
+        description="InChI representation",
     )
     embedding: Optional[List[float]] = Field(
         None,
@@ -235,29 +289,15 @@ class Molecule(BaseNode):
 class Reaction(BaseNode):
     """Chemical reaction information."""
 
-    accession_id: Annotated[
-        str,
-        EdgeHint(
-            name="HAS_REACTION",
-            outgoing_class_name="Protein",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
-        ...,
-        description="Protein accession identifier that can catalyze the reaction",
-    )
-    rhea_id: str = Field(
+    rhea_id: Annotated[str, NodeHint(unique=True)] = Field(
         ...,
         description="RHEA reaction identifier",
     )
-    substrate: Annotated[
-        List[Molecule],
-        EdgeHint(
-            name="HAS_SUBSTRATE",
-            outgoing_class_name="Molecule",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
+    description: Optional[str] = Field(
+        None,
+        description="Reaction description",
+    )
+    substrates: List[Molecule] = Field(
         default_factory=list,
         description="List of ChEBI identifiers",
     )
@@ -287,39 +327,10 @@ class GOAnnotation(BaseNode):
         description="GO term definition",
     )
 
-    # For GO annotations, we need a way to link them to proteins
-    # This will be used when creating GO-Protein relationships
-    protein_accession_id: Annotated[
-        Optional[str],
-        EdgeHint(
-            name="HAS_GO_ANNOTATION",
-            outgoing_class_name="Protein",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
-        None,
-        description="Protein accession identifier (for relationship creation)",
-    )
-
 
 class Embedding(BaseNode):
     """Metadata about an embedding."""
 
-    accession_id: Annotated[
-        str,
-        EdgeHint(
-            name="HAS_EMBEDDING",
-            outgoing_class_name="Protein",
-            outgoing_attr_name="accession_id",
-        ),
-    ] = Field(
-        ...,
-        description="Protein accession identifier",
-    )
-    description: str = Field(
-        ...,
-        description="Description of the embedding",
-    )
     model_name: str = Field(
         ...,
         description="Name of the embedding model",
@@ -343,6 +354,50 @@ class Embedding(BaseNode):
         ...,
         description="Embedding vector length",
     )
+    id: Annotated[str, NodeHint(unique=True)] = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Embedding identifier",
+    )
+
+    @field_validator("model_name")
+    @classmethod
+    def model_name_slug(cls, v: str) -> str:
+        # Convert to lowercase and replace non [a-z0-9_] with underscores
+        v_clean = re.sub(r"[^a-z0-9_]", "_", v.lower())
+        return v_clean
+
+    @field_validator("pooling_method")
+    @classmethod
+    def pooling_method_slug(cls, v: str) -> str:
+        # Convert to lowercase and replace non [a-z0-9_] with underscores
+        v_clean = re.sub(r"[^a-z0-9_]", "_", v.lower())
+        return v_clean
+
+    @field_validator("vector")
+    @classmethod
+    def _check_vector_len(cls, v: List[float], info: ValidationInfo) -> List[float]:
+        # Access n_dims via info.data (other fields that have already been validated)
+        n_dims = info.data.get("n_dims")
+        if n_dims is not None and n_dims != len(v):
+            raise ValueError(f"n_dims={n_dims} != len(vector)={len(v)}")
+        return v
+
+    @property
+    def neo4j_vector_prop(self) -> str:
+        """Dynamic property to write into Neo4j (one ANN index per property)"""
+        return f"vec__{self.model_name}__{self.pooling_method}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        For DB write: flatten 'custom' onto root, and rename 'vector' to the dynamic
+        property (vec__{model}__{pool}). Keep other fields as-is.
+        """
+        d = self.model_dump()
+        custom = d.pop("custom", {}) or {}
+        vector_value = d.pop("vector")
+        vector_dict = {self.neo4j_vector_prop: vector_value}
+
+        return {**d, **custom, **vector_dict}
 
 
 class Protein(BaseNode):
@@ -375,26 +430,9 @@ class Protein(BaseNode):
         None,
         description="Molecular weight in Daltons",
     )
-    ec_number: Optional[str] = Field(
+    ec_numbers: Optional[List[str]] = Field(
         None,
-        description="Enzyme Commission number",
-        pattern="^\d{1,5}\.\d{1,5}\.\d{1,5}\.\d{1,5}$",
-    )
-    nucleotide_id: Optional[str] = Field(
-        None,
-        description="Associated nucleotide ID",
-    )
-    nucleotide_start: Optional[int] = Field(
-        None,
-        description="Nucleotide start position",
-    )
-    nucleotide_end: Optional[int] = Field(
-        None,
-        description="Nucleotide end position",
-    )
-    locus_tag: Optional[str] = Field(
-        None,
-        description="Locus tag",
+        description="Enzyme Commission numbers associated with the protein",
     )
     structure_ids: List[str] = Field(
         default_factory=list,
@@ -408,12 +446,12 @@ class Protein(BaseNode):
         default_factory=list,
         description="RHEA reaction identifiers",
     )
-    embeddings: Dict[str, Embedding] = Field(
-        default_factory=dict,
+    embeddings: List[Embedding] = Field(
+        default_factory=list,
         description="Embeddings from different models",
     )
-    annotations: Dict[str, SequenceAnnotation] = Field(
-        default_factory=dict,
+    annotations: List[Annotation] = Field(
+        default_factory=list,
         description="Sequence annotations",
     )
 
@@ -453,152 +491,9 @@ class Protein(BaseNode):
 
     @field_validator("annotations")
     @classmethod
-    def validate_annotations(
-        cls, v: Dict[str, SequenceAnnotation]
-    ) -> Dict[str, SequenceAnnotation]:
-        """Ensure each annotation type occurs only once."""
-        seen_types = set()
-        for annotation in v.values():
-            if annotation.annotation_type in seen_types:
-                raise ValueError(
-                    f"Annotation type {annotation.annotation_type} appears multiple times"
-                )
-            seen_types.add(annotation.annotation_type)
-        return v
-
-    def add_embedding(self, embedding: Embedding, replace: bool = False) -> None:
-        """Add or replace embedding for a specific model.
-
-        Args:
-            embedding: Embedding object to add.
-            replace: If False, raises if embedding exists; if True, replaces existing.
-
-        Raises:
-            ValueError: If embedding exists and replace is False.
-        """
-        if embedding.accession_id != self.accession_id:
-            raise ValueError(
-                f"Embedding accession_id {embedding.accession_id} does not match protein accession_id {self.accession_id}"
-            )
-
-        if embedding.description in self.embeddings and not replace:
-            raise ValueError(
-                f"Embedding for model '{embedding.description}' already exists. "
-                "Set replace=True to overwrite."
-            )
-        self.embeddings[embedding.description] = embedding
-
-    def remove_embedding(self, model_name: str) -> None:
-        """Remove embedding for a specific model."""
-        self.embeddings.pop(model_name, None)
-
-    def add_annotation(
-        self, annotation: SequenceAnnotation, replace: bool = False
-    ) -> None:
-        """Add or replace annotation for a specific type.
-
-        Args:
-                    annotation: SequenceAnnotation object to add.
-                    replace: If False, raises if annotation exists; if True, replaces existing.
-
-                Raises:
-                    ValueError: If annotation exists and replace is False.
-        """
-        # check that accession_id is the same as the annotation
-        if annotation.accession_id != self.accession_id:
-            raise ValueError(
-                f"Annotation accession_id {annotation.accession_id} does not match protein accession_id {self.accession_id}"
-            )
-
-        annotation_type = annotation.annotation_type.value
-
-        if annotation_type in self.annotations and not replace:
-            raise ValueError(
-                f"Annotation for type '{annotation_type}' already exists. "
-                "Set replace=True to overwrite."
-            )
-
-        self.annotations[annotation_type] = annotation
-
-    def remove_annotation(self, annotation_type: AnnotationType) -> None:
-        """Remove annotation of specified type."""
-        self.annotations.pop(annotation_type.value, None)
-
-    def get_annotation(
-        self, annotation_type: AnnotationType
-    ) -> Optional[SequenceAnnotation]:
-        """Get annotation of specified type."""
-        return self.annotations.get(annotation_type.value)
-
-    def has_annotation_type(self, annotation_type: AnnotationType) -> bool:
-        """Check if protein has annotation of specified type."""
-        return annotation_type.value in self.annotations
-
-    def add_organism(self, organism: Organism) -> None:
-        """Add organism to protein."""
-        if organism.accession_id != self.accession_id:
-            raise ValueError(
-                f"Organism accession_id {organism.accession_id} does not match protein accession_id {self.accession_id}"
-            )
-        if organism.tax_id in [o.tax_id for o in self.organisms]:
-            raise ValueError(
-                f"Organism with tax_id {organism.tax_id} already exists in protein {self.accession_id}"
-            )
-        self.organisms.append(organism)
-
-    def remove_organism(self, organism: Organism) -> None:
-        """Remove organism from protein."""
-        self.organisms.remove(organism)
-
-
-class DNA(BaseNode):
-    """DNA sequence and metadata."""
-
-    accession_id: str = Field(
-        ...,
-        description="DNA accession identifier",
-    )
-    sequence: str = Field(
-        ...,
-        description="DNA sequence",
-    )
-    name: Optional[str] = Field(
-        None,
-        description="DNA name",
-    )
-    seq_length: int = Field(
-        ...,
-        description="Sequence length",
-    )
-    go_terms: List[str] = Field(
-        default_factory=list,
-        description="GO term identifiers",
-    )
-    embedding: List[float] = Field(
-        default_factory=list,
-        description="DNA embedding vector",
-    )
-    gc_content: Optional[float] = Field(
-        None,
-        description="GC content percentage",
-    )
-
-    @field_validator("sequence")
-    @classmethod
-    def validate_sequence(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Sequence cannot be empty")
-        if not all(c in "ACGTN" for c in v):
-            warnings.warn(
-                f"Sequence contains non-standard characters: {set(v) - set('ACGTN')}"
-            )
-        return v
-
-    @field_validator("gc_content")
-    @classmethod
-    def validate_gc_content(cls, v: Optional[float]) -> Optional[float]:
-        if v is not None and (v < 0 or v > 100):
-            raise ValueError("GC content must be between 0 and 100")
+    def validate_annotations(cls, v: List[Annotation]) -> List[Annotation]:
+        """Validate annotations list."""
+        # No need for uniqueness validation - multiple annotations of same type are allowed
         return v
 
 
@@ -612,11 +507,7 @@ if __name__ == "__main__":
         name="Test Protein",
         seq_length=24,
         mol_weight=1000,
-        ec_number="1.2.3.4",
-        nucleotide_id="N01234",
-        nucleotide_start=1,
-        nucleotide_end=25,
-        locus_tag="L01234",
+        ec_numbers=["1.2.3.4"],
         custom={
             "mentioned_in": [
                 "doi:10.1016/j.xinn.2025.100344",
@@ -627,30 +518,26 @@ if __name__ == "__main__":
         },
     )
 
-    prot.add_annotation(
-        SequenceAnnotation(
-            accession_id="P01234",
+    prot.annotations.append(
+        Annotation(
             annotation_type=AnnotationType.ACTIVE_SITE,
             positions=[1, 2, 3],
             custom={"my_custom_evidence": "literature", "validated": True},
-        )
+        ),
     )
 
     # add second annotation
-    prot.add_annotation(
-        SequenceAnnotation(
-            accession_id="P01234",
+    prot.annotations.append(
+        Annotation(
             annotation_type=AnnotationType.BINDING_SITE,
             positions=[4, 5, 6],
-        )
+        ),
     )
 
     # add embedding
-    prot.add_embedding(
+    prot.embeddings.append(
         Embedding(
-            accession_id="P01234",
-            description="esm2_mean_pooled",
-            model_name="esm2-t33-650M-UR50S",
+            model_name="esm2_t33_650M_UR50S",
             pooling_method="mean",
             vector=[0.1, 0.2, 0.3],
             n_dims=3,
@@ -658,20 +545,16 @@ if __name__ == "__main__":
     )
 
     # add another embedding
-    prot.add_embedding(
+    prot.embeddings.append(
         Embedding(
-            accession_id="P01234",
-            description="esm2_mean_pooled_last_hidden_state",
-            model_name="esm2-t33-650M-UR50S",
+            model_name="esm2_t33_650M_UR50S",
             pooling_method="mean",
             vector=[0.4, 0.5, 0.6],
             n_dims=3,
         ),
     )
-    prot.add_embedding(
+    prot.embeddings.append(
         Embedding(
-            accession_id="P01234",
-            description="esm2_range_pooled",
             model_name="esm2-t33-650M-UR50S",
             pooling_method="range",
             vector=[0.4, 0.5, 0.6, 0.7, 0.8],
@@ -679,7 +562,4 @@ if __name__ == "__main__":
         ),
     )
 
-    print(prot)
-
-    for embedding in prot.embeddings.values():
-        print(embedding._id)
+    print(prot.graphify())

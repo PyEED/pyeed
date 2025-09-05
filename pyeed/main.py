@@ -1,511 +1,254 @@
 import asyncio
-from typing import Any, Literal
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
-import nest_asyncio
-from loguru import logger
+from neo4j import GraphDatabase
 
-from pyeed.adapter.ncbi_dna_mapper import NCBIDNAToPyeed
-from pyeed.adapter.ncbi_protein_mapper import NCBIProteinToPyeed
-from pyeed.adapter.ncbi_to_uniprot_mapper import NCBIToUniprotMapper
-from pyeed.adapter.primary_db_adapter import PrimaryDBAdapter
-from pyeed.adapter.uniprot_mapper import UniprotToPyeed
-from pyeed.dbchat import DBChat
-from pyeed.dbconnect import DatabaseConnector
-from pyeed.embeddings import free_memory, get_processor
+from .fetch.uniprot import get_proteins_from_uniprot_batched
+from .model import Protein
+from .neo4j_integration import PyeedNeo4jWriter
+
+logger = logging.getLogger(__name__)
 
 
-class Pyeed:
+async def from_uniprot(
+    ids: List[str],
+    neo4j_uri: Optional[str] = None,
+    neo4j_user: Optional[str] = None,
+    neo4j_password: Optional[str] = None,
+    output_file: Optional[str] = None,
+    batch_size: int = 100,
+    max_concurrent: int = 5,
+    check_existing: bool = True,
+) -> Dict[str, Any]:
     """
-    Main class to interact with the pyeed graph database.
+    High-performance method to fetch proteins from UniProt and optionally store in Neo4j.
+
+    Args:
+        ids: List of UniProt accession IDs
+        neo4j_uri: Neo4j database URI (if None, saves to file)
+        neo4j_user: Neo4j username
+        neo4j_password: Neo4j password
+        output_file: Output file path (default: proteins_{count}_records.json)
+        batch_size: Number of IDs to process per batch
+        max_concurrent: Maximum concurrent requests
+        check_existing: Whether to check for existing proteins in Neo4j
+
+    Returns:
+        Dictionary with processing results
     """
+    if all([neo4j_uri is None, neo4j_user is None, neo4j_password is None]):
+        to_db = False
+    else:
+        to_db = True
+    logger.info(f"Processing {len(ids)} UniProt IDs")
 
-    def __init__(
-        self,
-        uri: str,
-        user: str | None = None,
-        password: str | None = None,
-    ):
-        self.db = DatabaseConnector(uri, user, password)
+    # Determine IDs to fetch
+    ids_to_fetch = set(ids)
+    existing_count = 0
 
-    def chat(
-        self, question: str, openai_key: str, retry: bool = False
-    ) -> list[dict[str, Any]]:
-        """Query the database using natural language via OpenAI's GPT-4 model.
+    # Check existing proteins in Neo4j if database provided
+    if neo4j_uri and check_existing:
+        logger.info("Checking for existing proteins in Neo4j...")
+        existing_ids = await _check_existing_proteins(
+            ids, neo4j_uri, neo4j_user, neo4j_password
+        )
+        existing_count = len(existing_ids)
+        ids_to_fetch = ids_to_fetch - existing_ids
+        logger.info(
+            f"Found {existing_count} existing proteins, fetching {len(ids_to_fetch)} new ones"
+        )
 
-        Args:
-            question (str): Question to ask the database.
-            openai_key (str): OpenAI API key.
-            retry (bool, optional): Whether to retry once if the query if it fails.
-                Defaults to False.
+    # Fetch proteins from UniProt in batches
+    proteins = []
+    if ids_to_fetch:
+        logger.info(f"Fetching {len(ids_to_fetch)} proteins from UniProt...")
+        proteins = await get_proteins_from_uniprot_batched(
+            list(ids_to_fetch), batch_size=batch_size, max_concurrent=max_concurrent
+        )
+        logger.info(f"Successfully fetched {len(proteins)} proteins")
 
-        Returns:
-            list[dict]: List of responses from the database.
-        """
-        chat = DBChat(self.db)
-        return chat.run(question=question, openai_key=openai_key, retry=retry)
+    # Store results
+    result = {
+        "total_requested": len(ids),
+        "existing_in_db": existing_count,
+        "fetched_from_uniprot": len(proteins),
+        "proteins_processed": len(proteins),
+        "failed": len(ids_to_fetch) - len(proteins),
+    }
 
-    def fetch_from_primary_db(
-        self,
-        ids: list[str],
-        db: Literal["uniprot", "ncbi_protein", "ncbi_nucleotide"],
-    ) -> None:
-        """
-        Fetches sequences and corresponding annotations from primary sequence databases
-        and adds them to local database.
-
-        Args:
-            ids (list[str]): List of sequence IDs to fetch from the primary database.
-            db (str): Name of the primary database to fetch from. Options are "uniprot",
-                "ncbi_protein", and "ncbi_nucleotide".
-        """
-        dbs = ("uniprot", "ncbi_protein", "ncbi_nucleotide")
-
-        nest_asyncio.apply()
-
-        if isinstance(ids, str):
-            ids = [ids]
-
-        # Remove accessions that are already in the database
-        if db.lower() == "ncbi_nucleotide":
-            query = """
-            MATCH (p:DNA)
-            RETURN collect(p.accession_id) as accessions
-            """
+    if proteins:
+        if neo4j_uri:
+            # Store in Neo4j
+            logger.info(f"Storing {len(proteins)} proteins in Neo4j...")
+            neo4j_results = await _store_proteins_neo4j(
+                proteins, neo4j_uri, neo4j_user, neo4j_password, batch_size
+            )
+            result.update(neo4j_results)
         else:
-            query = """
-            MATCH (p:Protein)
-            RETURN collect(p.accession_id) as accessions
-            """
+            # Store in file
+            output_path = output_file or f"proteins_{len(proteins)}_records.json"
+            await _store_proteins_file(proteins, output_path)
+            result["output_file"] = output_path
+            logger.info(f"Saved {len(proteins)} proteins to {output_path}")
 
-        accessions = self.db.execute_read(query)[0]["accessions"]
-        ids = [id for id in ids if id not in accessions]
-        # count how many sequences are already in the database
-        logger.info(f"Found {len(accessions)} sequences in the database.")
+    return result
 
-        logger.info(f"Fetching {len(ids)} sequences from {db}.")
-        if db.lower() == "uniprot":
-            self.fetch_uniprot(ids)
 
-        elif db.lower() == "ncbi_protein":
-            self.fetch_ncbi_protein(ids)
+async def _check_existing_proteins(
+    ids: List[str], uri: str, user: str, password: str
+) -> Set[str]:
+    """Check which protein IDs already exist in Neo4j."""
+    existing_ids = set()
 
-        elif db.lower() == "ncbi_nucleotide":
-            self.fetch_ncbi_nucleotide(ids)
+    try:
+        driver = GraphDatabase.driver(uri, auth=(user, password))
 
-        else:
-            raise ValueError(
-                f"Invalid database name '{db}'. Options are {', '.join(dbs)}."
+        # Query in batches to avoid large parameter lists
+        batch_size = 1000
+        for i in range(0, len(ids), batch_size):
+            batch_ids = ids[i : i + batch_size]
+
+            with driver.session() as session:
+                cypher = """
+                UNWIND $ids as protein_id
+                MATCH (p:Protein {accession_id: protein_id})
+                RETURN p.accession_id as accession_id
+                """
+                result = session.run(cypher, {"ids": batch_ids})
+
+                for record in result:
+                    existing_ids.add(record["accession_id"])
+
+        driver.close()
+
+    except Exception as e:
+        logger.warning(f"Could not check existing proteins: {e}")
+        # Continue without checking - better to have duplicates than miss data
+
+    return existing_ids
+
+
+async def _store_proteins_neo4j(
+    proteins: List[Protein], uri: str, user: str, password: str, batch_size: int = 100
+) -> Dict[str, Any]:
+    """Store proteins in Neo4j using batch transactions."""
+    logger.info(
+        f"Storing {len(proteins)} proteins in Neo4j with batch size {batch_size}"
+    )
+
+    writer = PyeedNeo4jWriter(uri, user, password)
+
+    try:
+        # Setup database constraints first
+        writer.setup_database()
+
+        # Process proteins in batches
+        results = {"neo4j_success": 0, "neo4j_failed": 0, "neo4j_errors": []}
+
+        for i in range(0, len(proteins), batch_size):
+            batch = proteins[i : i + batch_size]
+            logger.info(
+                f"Processing Neo4j batch {i//batch_size + 1}/{(len(proteins)-1)//batch_size + 1}"
             )
 
-    def fetch_uniprot(self, ids: list[str]) -> None:
-        """
-        Fetches protein sequences from UniProt and adds them to the local database.
-        """
-        params_template = {
-            "format": "json",
-        }
-
-        # set up UniProt adapter
-        adapter = PrimaryDBAdapter(
-            ids=ids,
-            id_param_name="accession",
-            url="https://www.ebi.ac.uk/proteins/api/proteins",
-            rate_limit=10,
-            max_concurrent=5,
-            batch_size=5,
-            data_mapper=UniprotToPyeed(),
-            progress=None,
-            task_id=None,
-            request_params=params_template,
-        )
-
-        # Fix: call nest_asyncio.apply() first, then run the adapter's coroutine
-        nest_asyncio.apply()
-        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
-
-    def fetch_ncbi_protein(self, ids: list[str]) -> None:
-        """
-        Fetches protein sequences from NCBI and adds them to the local database.
-
-        Args:
-            ids (list[str]): List of protein IDs to fetch from NCBI.
-        """
-
-        params_template = {
-            "retmode": "text",
-            "rettype": "genbank",
-            "db": "protein",
-        }
-
-        adapter = PrimaryDBAdapter(
-            ids=ids,
-            id_param_name="id",
-            url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-            rate_limit=2,
-            max_concurrent=5,
-            batch_size=10,
-            data_mapper=NCBIProteinToPyeed(),
-            progress=None,
-            task_id=None,
-            request_params=params_template,
-        )
-
-        # Fix: use run_until_complete instead of asyncio.run
-        nest_asyncio.apply()
-        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
-
-    def fetch_ncbi_nucleotide(self, ids: list[str]) -> None:
-        """
-        Fetches nucleotide sequences from NCBI and adds them to the local database.
-
-        Args:
-            ids (list[str]): List of nucleotide IDs to fetch from NCBI.
-        """
-
-        params_template = {
-            "retmode": "text",
-            "rettype": "genbank",
-            "db": "nuccore",
-        }
-
-        adapter = PrimaryDBAdapter(
-            ids=ids,
-            id_param_name="id",
-            url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-            rate_limit=2,
-            max_concurrent=5,
-            batch_size=10,
-            data_mapper=NCBIDNAToPyeed(),
-            progress=None,
-            task_id=None,
-            request_params=params_template,
-        )
-
-        # Fix: apply nest_asyncio and then run the coroutine with the event loop
-        nest_asyncio.apply()
-        asyncio.get_event_loop().run_until_complete(adapter.execute_requests())
-
-    def database_id_mapper(self, ids: list[str], file: str) -> None:
-        """
-        Maps IDs from one database to another using the UniProt ID mapping service
-
-        Args:
-            ids (list[str]): List of IDs to map.
-        """
-
-        mapper = NCBIToUniprotMapper(ids, file)
-        mapper.execute_request()
-
-        nest_asyncio.apply()
-
-    def calculate_sequence_embeddings(
-        self,
-        batch_size: int = 16,
-        model_name: str = "facebook/esm2_t33_650M_UR50D",
-        num_gpus: int = 1,  # Number of GPUs to use
-        embedding_type: Literal[
-            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
-        ] = "final_embeddings",
-    ) -> None:
-        """
-        Calculates embeddings for all sequences in the database that do not have embeddings,
-        using the new EmbeddingProcessor with automatic device management.
-
-        Args:
-            batch_size (int): Number of sequences to process in each batch.
-            model_name (str): Model used for calculating embeddings.
-            num_gpus (int, optional): Number of GPUs to use. If None, use all available GPUs.
-            embedding_type (str): Type of embedding to calculate ("last_hidden_state", "all_layers", "first_layer", "final_embeddings").
-        """
-        # Get the embedding processor
-        processor = get_processor()
-
-        # Use the simplified interface
-        processor.calculate_database_embeddings(
-            db=self.db,
-            batch_size=batch_size,
-            model_name=model_name,
-            num_gpus=num_gpus,
-            embedding_type=embedding_type,
-        )
-
-        # free memory
-        free_memory()
-
-    def get_proteins(self, accession_ids: list[str]) -> list[dict[str, Any]]:
-        """
-        Fetches a protein from the database by accession ID.
-        """
-
-        if isinstance(accession_ids, str):
-            accession_ids = [accession_ids]
-
-        query = """
-        MATCH (p:Protein)
-        WHERE p.accession_id IN $accession_ids
-        RETURN p
-        """
-        return self.db.execute_read(query, {"accession_ids": accession_ids})
-
-    def get_dnas(self, accession_ids: list[str]) -> list[dict[str, Any]]:
-        """
-        Fetches a DNA sequence from the database by accession ID.
-
-        Args:
-            accession_ids (list[str]): List of DNA sequence accession IDs to fetch.
-        """
-
-        if isinstance(accession_ids, str):
-            accession_ids = [accession_ids]
-
-        query = """
-        MATCH (p:DNA)
-        WHERE p.accession_id IN $accession_ids
-        RETURN p
-        """
-        return self.db.execute_read(query, {"accession_ids": accession_ids})
-
-    def fetch_dna_entries_for_proteins(self, ids: list[str] | None = None) -> None:
-        """
-        Fetches DNA sequences for proteins that have a nucleotide id, set in the database.
-        The fetching is done from NCBI nucleotide database in batches.
-
-        Args:
-            ids (list[str], optional): List of protein IDs to fetch DNA sequences for.
-                Defaults to None.
-        """
-        BATCH_SIZE = 100
-
-        # Get all proteins and a list of coding sequences ids
-        if ids is None:
-            query = """
-            MATCH (p:Protein) 
-            WHERE p.nucleotide_id IS NOT NULL
-            RETURN p.nucleotide_id AS nucleotide_id
-            """
-            response = self.db.execute_read(query)
-        else:
-            query = """
-            MATCH (p:Protein) 
-            WHERE p.nucleotide_id IS NOT NULL AND p.accession_id IN $ids
-            RETURN p.nucleotide_id AS nucleotide_id
-            """
-            response = self.db.execute_read(query, {"ids": ids})
-
-        nucleotide_ids = [str(record["nucleotide_id"]) for record in response]
-
-        logger.info(f"Found {len(nucleotide_ids)} coding sequences.")
-
-        # Process nucleotide IDs in batches to check which ones are already in DB
-        all_existing_sequences = set()
-        for i in range(0, len(nucleotide_ids), BATCH_SIZE):
-            batch_ids = nucleotide_ids[i : i + BATCH_SIZE]
-            try:
-                query = """
-                MATCH (n:DNA)
-                WHERE n.accession_id IN $nucleotide_ids
-                RETURN n.accession_id AS accession_id
-                """
-                coding_sequences_resp = self.db.execute_read(
-                    query, {"nucleotide_ids": batch_ids}
-                )
-                batch_existing = {
-                    str(record["accession_id"]) for record in coding_sequences_resp
-                }
-                all_existing_sequences.update(batch_existing)
-            except Exception as e:
-                logger.error(
-                    f"Error checking existing sequences for batch {i}: {str(e)}"
-                )
-                continue
-
-        # Filter out existing sequences
-        nucleotide_ids = [
-            id for id in nucleotide_ids if id not in all_existing_sequences
-        ]
-
-        logger.info(f"Fetching {len(nucleotide_ids)} new coding sequences.")
-
-        # Fetch coding sequences in batches
-        for i in range(0, len(nucleotide_ids), BATCH_SIZE):
-            try:
-                batch_ids = nucleotide_ids[i : i + BATCH_SIZE]
-                self.fetch_ncbi_nucleotide(batch_ids)
-                logger.info(f"Successfully fetched batch {i // BATCH_SIZE + 1}")
-            except Exception as e:
-                logger.error(f"Error fetching batch {i // BATCH_SIZE + 1}: {str(e)}")
-                continue
-
-        # Process protein-DNA relationships in batches
-        if ids is None:
-            query = """
-            MATCH (p:Protein)
-            WHERE p.nucleotide_id IS NOT NULL
-            RETURN p
-            """
-            proteins = self.db.execute_read(query)
-        else:
-            query = """
-            MATCH (p:Protein)
-            WHERE p.nucleotide_id IS NOT NULL AND p.accession_id IN $ids
-            RETURN p
-            """
-            proteins = self.db.execute_read(query, {"ids": ids})
-
-        for i in range(0, len(proteins), BATCH_SIZE):
-            try:
-                batch_proteins = proteins[i : i + BATCH_SIZE]
-
-                # Build batch query for checking existing relationships
-                batch_check_query = """
-                UNWIND $proteins AS protein
-                MATCH (p:Protein {accession_id: protein.p.accession_id})
-                MATCH (d:DNA {accession_id: protein.p.nucleotide_id})
-                RETURN 
-                    protein.p.accession_id AS protein_id,
-                    protein.p.nucleotide_id AS dna_id,
-                    EXISTS((d)-[:ENCODES]->(p)) AS exists,
-                    protein.p.nucleotide_start AS start,
-                    protein.p.nucleotide_end AS end
-                """
-
-                results = self.db.execute_read(
-                    batch_check_query, {"proteins": batch_proteins}
-                )
-
-                # Filter relationships that need to be created
-                new_relationships = []
-                for result in results:
-                    if not result["exists"]:
-                        new_relationships.append(
+            for protein in batch:
+                try:
+                    result = writer.add_protein(protein)
+                    if result["success"]:
+                        results["neo4j_success"] += 1
+                    else:
+                        results["neo4j_failed"] += 1
+                        results["neo4j_errors"].append(
                             {
-                                "protein_id": result["protein_id"],
-                                "dna_id": result["dna_id"],
-                                "start": result["start"],
-                                "end": result["end"],
+                                "protein_id": protein.accession_id,
+                                "error": result.get("error", "Unknown error"),
                             }
                         )
-                    else:
-                        logger.info(
-                            f"Connection between {result['protein_id']} and {result['dna_id']} already exists."
-                        )
-
-                if new_relationships:
-                    # Create new relationships in batch
-                    batch_create_query = """
-                    UNWIND $relationships AS rel
-                    MATCH (p:Protein {accession_id: rel.protein_id})
-                    MATCH (d:DNA {accession_id: rel.dna_id})
-                    MERGE (d)-[r:ENCODES]->(p)
-                    SET r.start = rel.start, r.end = rel.end
-                    """
-                    self.db.execute_write(
-                        batch_create_query, {"relationships": new_relationships}
+                except Exception as e:
+                    results["neo4j_failed"] += 1
+                    results["neo4j_errors"].append(
+                        {"protein_id": protein.accession_id, "error": str(e)}
                     )
-                    logger.info(
-                        f"Successfully processed relationship batch {i // BATCH_SIZE + 1}"
-                    )
-            except Exception as e:
-                logger.error(
-                    f"Error processing relationship batch {i // BATCH_SIZE + 1}: {str(e)}"
-                )
-                continue
+                    logger.error(f"Failed to store protein {protein.accession_id}: {e}")
 
-    def create_coding_sequences_regions(self) -> None:
-        """
-        Creates coding sequences regions for all proteins in the database.
+        logger.info(
+            f"Neo4j storage complete: {results['neo4j_success']} success, {results['neo4j_failed']} failed"
+        )
+        return results
 
-        It finds the nucleotide start and end positions and create a Region object for the corresponding DNA sequence.
-        Create the region object with the right annotation. And then connect it to the DNA sequence.
-        """
+    finally:
+        writer.close()
 
-        # in case of multiple DNA entires per Protein we need to create a Region for each DNA entry
-        # some of the DNA entries might even not have start and end vlaues on the ENCODES endge, in this case please take the entire sequence length
-        """
-        This Cypher query creates coding sequence regions for DNA sequences that don't already have them.
-        
-        The query:
-        1. Finds all Protein-DNA pairs connected by an ENCODES relationship
-        2. Filters for cases where the DNA doesn't already have a coding sequence Region for that protein
-        3. Creates a new Region node with 'coding sequence' annotation and the protein's ID
-        4. Creates a HAS_REGION relationship from the DNA to the new Region
-        5. Sets the start position to either:
-           - The start value from the ENCODES relationship if it exists
-           - 0 (beginning of sequence) if no start value is specified
-        6. Sets the end position to either:
-           - The end value from the ENCODES relationship if it exists
-           - The full DNA sequence length minus 1 if no end value is specified
-        """
-        query = """
-        MATCH (d:DNA)-[rel_encode:ENCODES]->(p:Protein)
-        WHERE NOT EXISTS((d)-[:HAS_REGION]->(:Region {annotation: 'coding sequence', sequence_id: p.accession_id}))
-        CREATE (r:Region {annotation: 'coding sequence', sequence_id: p.accession_id})
-        CREATE (d)-[rel:HAS_REGION {
-            start: CASE 
-                WHEN rel_encode.start IS NOT NULL THEN rel_encode.start - 1
-                ELSE 0 
-            END, 
-            end: CASE 
-                WHEN rel_encode.end IS NOT NULL THEN rel_encode.end - 1
-                ELSE size(d.sequence) - 1 
-            END
-        }]->(r)
-        """
-        self.db.execute_write(query)
 
-        # for dna where ther is no protein encoded and no Region with coding sequence annotation, create a Region with the entire sequence length
-        # make the start at 0 and the end at the sequence length minus 1
-        query = """
-        MATCH (d:DNA)
-        WHERE NOT EXISTS((d)-[:HAS_REGION]->(:Region {annotation: 'coding sequence', sequence_id: d.accession_id}))
-        CREATE (r:Region {annotation: 'coding sequence', sequence_id: d.accession_id})
-        CREATE (d)-[:HAS_REGION {start: 0, end: size(d.sequence) - 1}]->(r)
-        """
-        self.db.execute_write(query)
+async def _store_proteins_file(proteins: List[Protein], output_path: str) -> None:
+    """Store proteins as JSON file."""
+    data = [protein.model_dump() for protein in proteins]
 
-        # Log the number of regions created
-        count_query = """
-        MATCH (d:DNA)-[:HAS_REGION]->(r:Region {annotation: 'coding sequence'})
-        RETURN count(r) as region_count
-        """
-        result = self.db.execute_read(count_query)
-        logger.info(f"Created {result[0]['region_count']} coding sequence regions")
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    def calculate_single_sequence_embedding(
-        self,
-        sequence: str,
-        model_name: str = "facebook/esm2_t33_650M_UR50D",
-        embedding_type: Literal[
-            "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
-        ] = "last_hidden_state",
-    ) -> Any:
-        """
-        Calculate embedding for a single protein sequence.
-
-        Args:
-            sequence: Protein sequence string
-            model_name: Model to use for embedding calculation
-            embedding_type: Type of embedding to calculate
-
-        Returns:
-            Numpy array containing the embedding
-        """
-        processor = get_processor()
-        return processor.calculate_single_embedding(
-            sequence=sequence, model_name=model_name, embedding_type=embedding_type
+    with open(output_file, "w") as f:
+        json.dump(
+            {
+                "metadata": {
+                    "count": len(proteins),
+                    "source": "UniProt",
+                    "format": "Pyeed Protein objects",
+                },
+                "proteins": data,
+            },
+            f,
+            indent=2,
         )
 
-    def get_available_devices(self) -> list[str]:
-        """
-        Get list of available devices for embedding computation.
 
-        Returns:
-            List of available device names
-        """
-        processor = get_processor()
-        devices = processor.get_available_devices()
-        return [str(device) for device in devices]
-
-
+# Example usage and CLI interface
 if __name__ == "__main__":
-    print("fr")
+    import sys
+
+    # Simple CLI interface
+    if len(sys.argv) < 2:
+        print(
+            "Usage: python -m pyeed.main <ids...> [--neo4j-uri URI] [--output file.json]"
+        )
+        print(
+            "Example: python -m pyeed.main P69905 P21802 --neo4j-uri bolt://localhost:7687"
+        )
+        print("Example: python -m pyeed.main P69905 P21802 --output my_proteins.json")
+        sys.exit(1)
+
+    # Parse arguments
+    ids = []
+    neo4j_uri = None
+    output_file = None
+
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == "--neo4j-uri" and i + 1 < len(sys.argv):
+            neo4j_uri = sys.argv[i + 1]
+            i += 2
+        elif arg == "--output" and i + 1 < len(sys.argv):
+            output_file = sys.argv[i + 1]
+            i += 2
+        elif not arg.startswith("--"):
+            ids.append(arg)
+            i += 1
+        else:
+            i += 1
+
+    # Run the main function
+    async def main():
+        result = await from_uniprot(
+            ids=ids,
+            neo4j_uri=neo4j_uri,
+            neo4j_user="neo4j" if neo4j_uri else None,
+            neo4j_password="12345678" if neo4j_uri else None,
+            output_file=output_file,
+        )
+        print(f"Processing complete: {result}")
+
+    asyncio.run(main())

@@ -6,8 +6,9 @@ import numpy as np
 import scipy.spatial as sp
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
-from pyeed.dbconnect import DatabaseConnector
 from scipy.spatial.distance import cosine
+
+from pyeed.dbconnect import DatabaseConnector
 
 logger = logging.getLogger(__name__)
 
@@ -421,21 +422,3 @@ class EmbeddingTool:
             for record in results
         ]
         return neighbors
-
-    def drop_vector_index(
-        self,
-        db: DatabaseConnector,
-        index_name: str = "embedding_index",
-    ) -> None:
-        """
-        This function drops the vector index for the embedding property in the Protein node.
-
-        Args:
-            db (DatabaseConnector): The database connector object
-            index_name (str): The name of the vector index
-        """
-
-        logger.info(f"Dropping vector index {index_name}")
-
-        query_drop_index = f"DROP INDEX {index_name} IF EXISTS;"
-        db.execute_write(query_drop_index)

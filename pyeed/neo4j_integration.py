@@ -1,5 +1,4 @@
-"""Generic Neo4j integration for Pyeed models using NodeHint and EdgeHint metadata."""
-
+import asyncio
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, TypeVar
@@ -7,7 +6,16 @@ from typing import Any, Dict, List, Optional, Set, TypeVar
 from neo4j import GraphDatabase
 from pydantic import BaseModel
 
-from .model import BaseNode, EdgeHint, NodeHint
+from .model import (
+    BaseNode,
+    Embedding,
+    GOAnnotation,
+    NodeHint,
+    Organism,
+    Protein,
+    Reaction,
+    SequenceAnnotation,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -45,20 +53,7 @@ def extract_node_hints(model: type[BaseModel]) -> Dict[str, NodeHint]:
     return hints
 
 
-def extract_edge_hints(model: type[BaseModel]) -> Dict[str, EdgeHint]:
-    """Extract EdgeHint metadata from model fields."""
-    hints: Dict[str, EdgeHint] = {}
-    logger.debug(f"Extracting EdgeHints from model: {model.__name__}")
-
-    for field_name, field_info in model.model_fields.items():
-        for meta in getattr(field_info, "metadata", ()):
-            if isinstance(meta, EdgeHint):
-                hints[field_name] = meta
-                logger.debug(f"Found EdgeHint for field '{field_name}': {meta}")
-                break
-
-    logger.debug(f"Extracted {len(hints)} EdgeHints: {hints}")
-    return hints
+# EdgeHint functionality removed - using manual edge creation instead
 
 
 def get_model_class_by_name(class_name: str) -> Optional[type[BaseNode]]:
@@ -230,14 +225,14 @@ class PyeedNeo4jMapper:
         logger.debug(f"Created Neo4jNode: {node}")
         return node
 
-    def create_relationships(
-        self, source_model: BaseNode, target_models: List[BaseNode], edge_hint: EdgeHint
+    def create_relationships_manual(
+        self, source_model: BaseNode, target_models: List[BaseNode], rel_type: str
     ) -> List[Neo4jRelationship]:
-        """Create relationships based on EdgeHint metadata."""
+        """Create relationships manually without EdgeHint metadata."""
         logger.debug(
-            f"Creating relationships from {source_model.__class__.__name__} to {len(target_models)} targets"
+            f"Creating manual relationships from {source_model.__class__.__name__} to {len(target_models)} targets"
         )
-        logger.debug(f"EdgeHint: {edge_hint}")
+        logger.debug(f"Relationship type: {rel_type}")
 
         relationships = []
 
@@ -254,17 +249,17 @@ class PyeedNeo4jMapper:
                 f"Target model {i+1} {target_model.__class__.__name__} unique_id: {target_id}"
             )
 
-            # Create relationship properties
+            # Create simple relationship properties
             rel_properties = {
-                "source_key": getattr(source_model, edge_hint.outgoing_attr_name, None),
-                "target_key": getattr(target_model, edge_hint.outgoing_attr_name, None),
+                "source_id": source_id,
+                "target_id": target_id,
             }
             logger.debug(f"Relationship properties: {rel_properties}")
 
             rel = Neo4jRelationship(
                 start_node_id=source_id,
                 end_node_id=target_id,
-                rel_type=edge_hint.name.upper(),
+                rel_type=rel_type.upper(),
                 properties=rel_properties,
             )
             logger.debug(f"Created relationship: {rel}")
@@ -274,7 +269,7 @@ class PyeedNeo4jMapper:
         return relationships
 
     def map_model_to_neo4j(self, model: BaseNode) -> Dict[str, Any]:
-        """Map any BaseNode model to Neo4j nodes and relationships."""
+        """Map any BaseNode model to Neo4j nodes and relationships using manual mapping."""
         logger.debug(f"Mapping model to Neo4j: {model.__class__.__name__}")
         result: Dict[str, Any] = {"nodes": [], "relationships": []}
 
@@ -284,164 +279,76 @@ class PyeedNeo4jMapper:
         result["nodes"].append(main_node)
         logger.debug(f"Added main node: {main_node}")
 
-        # Check ALL fields for nested BaseNode objects, not just those with EdgeHints
-        logger.debug("Scanning all fields for nested BaseNode objects...")
+        # Manual relationship mapping based on known model structure
+        if hasattr(model, "annotations") and model.annotations:
+            logger.debug(f"Processing {len(model.annotations)} sequence annotations")
+            for annotation in model.annotations:
+                annotation_node = self.create_node(annotation)
+                result["nodes"].append(annotation_node)
+                logger.debug(f"Added annotation node: {annotation_node}")
 
-        for field_name, field_info in type(model).model_fields.items():
-            field_value = getattr(model, field_name, None)
-            logger.debug(f"Checking field '{field_name}': {type(field_value)}")
+            # Create relationships from protein to annotations
+            relationships = self.create_relationships_manual(
+                model, model.annotations, "HAS_ANNOTATION"
+            )
+            result["relationships"].extend(relationships)
+            logger.debug(f"Added {len(relationships)} annotation relationships")
 
-            if field_value is None:
-                logger.debug(f"Field {field_name} is None, skipping")
-                continue
+        if hasattr(model, "go_terms") and model.go_terms:
+            logger.debug(f"Processing {len(model.go_terms)} GO terms")
+            for go_term in model.go_terms:
+                go_node = self.create_node(go_term)
+                result["nodes"].append(go_node)
+                logger.debug(f"Added GO term node: {go_node}")
 
-            # Check for lists of BaseNode objects
-            if isinstance(field_value, list) and field_value:
-                logger.debug(
-                    f"Found list field: {field_name} with {len(field_value)} items"
-                )
+            # Create relationships from protein to GO terms
+            relationships = self.create_relationships_manual(
+                model, model.go_terms, "HAS_GO_ANNOTATION"
+            )
+            result["relationships"].extend(relationships)
+            logger.debug(f"Added {len(relationships)} GO term relationships")
 
-                if all(isinstance(item, BaseNode) for item in field_value):
-                    logger.debug(f"All items in {field_name} are BaseNode instances")
+        if hasattr(model, "organisms") and model.organisms:
+            logger.debug(f"Processing {len(model.organisms)} organisms")
+            for organism in model.organisms:
+                organism_node = self.create_node(organism)
+                result["nodes"].append(organism_node)
+                logger.debug(f"Added organism node: {organism_node}")
 
-                    # Create nodes for each related model
-                    for i, related_model in enumerate(field_value):
-                        logger.debug(
-                            f"Creating node {i+1} for related model: {related_model.__class__.__name__}"
-                        )
-                        related_node = self.create_node(related_model)
-                        result["nodes"].append(related_node)
-                        logger.debug(f"Added related node: {related_node}")
+            # Create relationships from protein to organisms
+            relationships = self.create_relationships_manual(
+                model, model.organisms, "ORIGINATES_FROM"
+            )
+            result["relationships"].extend(relationships)
+            logger.debug(f"Added {len(relationships)} organism relationships")
 
-                    # Check if there's an EdgeHint for this field to create relationships
-                    edge_hints = extract_edge_hints(type(model))
-                    if field_name in edge_hints:
-                        edge_hint = edge_hints[field_name]
-                        logger.debug(
-                            f"Creating relationships for list field: {field_name} using EdgeHint"
-                        )
-                        relationships = self.create_relationships(
-                            model, field_value, edge_hint
-                        )
-                        result["relationships"].extend(relationships)
-                        logger.debug(f"Added {len(relationships)} relationships")
-                    else:
-                        # Use EdgeHints from the satellite models (reverse direction)
-                        logger.debug(
-                            "No EdgeHint in parent, checking satellite models for reverse relationships"
-                        )
-                        for related_model in field_value:
-                            satellite_edge_hints = extract_edge_hints(
-                                type(related_model)
-                            )
-                            for (
-                                sat_field_name,
-                                sat_edge_hint,
-                            ) in satellite_edge_hints.items():
-                                if (
-                                    sat_edge_hint.outgoing_class_name
-                                    == model.__class__.__name__
-                                ):
-                                    logger.debug(
-                                        f"Found reverse EdgeHint: {sat_edge_hint}"
-                                    )
-                                    # Create reverse relationship: parent -> satellite
-                                    # The EdgeHint in the satellite points TO the parent
-                                    # So we create: parent -> satellite
-                                    rel_properties = {
-                                        "source_key": getattr(
-                                            model,
-                                            sat_edge_hint.outgoing_attr_name,
-                                            None,
-                                        ),
-                                        "target_key": getattr(
-                                            related_model,
-                                            sat_edge_hint.outgoing_attr_name,
-                                            None,
-                                        ),
-                                    }
-                                    rel = Neo4jRelationship(
-                                        start_node_id=model.get_unique_id(),
-                                        end_node_id=related_model.get_unique_id(),
-                                        rel_type=sat_edge_hint.name.upper(),
-                                        properties=rel_properties,
-                                    )
-                                    result["relationships"].append(rel)
-                                    logger.debug(f"Added reverse relationship: {rel}")
+        if hasattr(model, "embeddings") and model.embeddings:
+            logger.debug(f"Processing {len(model.embeddings)} embeddings")
+            for embedding in model.embeddings.values():
+                embedding_node = self.create_node(embedding)
+                result["nodes"].append(embedding_node)
+                logger.debug(f"Added embedding node: {embedding_node}")
 
-            # Check for dicts of BaseNode objects
-            elif isinstance(field_value, dict) and field_value:
-                logger.debug(
-                    f"Found dict field: {field_name} with {len(field_value)} items"
-                )
+            # Create relationships from protein to embeddings
+            relationships = self.create_relationships_manual(
+                model, list(model.embeddings.values()), "HAS_EMBEDDING"
+            )
+            result["relationships"].extend(relationships)
+            logger.debug(f"Added {len(relationships)} embedding relationships")
 
-                if all(isinstance(item, BaseNode) for item in field_value.values()):
-                    logger.debug(f"All values in {field_name} are BaseNode instances")
+        if hasattr(model, "reactions") and model.reactions:
+            logger.debug(f"Processing {len(model.reactions)} reactions")
+            for reaction in model.reactions:
+                reaction_node = self.create_node(reaction)
+                result["nodes"].append(reaction_node)
+                logger.debug(f"Added reaction node: {reaction_node}")
 
-                    # Create nodes for each related model
-                    for key, related_model in field_value.items():
-                        logger.debug(
-                            f"Creating node for key '{key}': {related_model.__class__.__name__}"
-                        )
-                        related_node = self.create_node(related_model)
-                        result["nodes"].append(related_node)
-                        logger.debug(f"Added related node: {related_node}")
-
-                    # Check if there's an EdgeHint for this field to create relationships
-                    edge_hints = extract_edge_hints(type(model))
-                    if field_name in edge_hints:
-                        edge_hint = edge_hints[field_name]
-                        logger.debug(
-                            f"Creating relationships for dict field: {field_name} using EdgeHint"
-                        )
-                        relationships = self.create_relationships(
-                            model, list(field_value.values()), edge_hint
-                        )
-                        result["relationships"].extend(relationships)
-                        logger.debug(f"Added {len(relationships)} relationships")
-                    else:
-                        # Use EdgeHints from the satellite models (reverse direction)
-                        logger.debug(
-                            "No EdgeHint in parent, checking satellite models for reverse relationships"
-                        )
-                        for related_model in field_value.values():
-                            satellite_edge_hints = extract_edge_hints(
-                                type(related_model)
-                            )
-                            for (
-                                sat_field_name,
-                                sat_edge_hint,
-                            ) in satellite_edge_hints.items():
-                                if (
-                                    sat_edge_hint.outgoing_class_name
-                                    == model.__class__.__name__
-                                ):
-                                    logger.debug(
-                                        f"Found reverse EdgeHint: {sat_edge_hint}"
-                                    )
-                                    # Create reverse relationship: parent -> satellite
-                                    # The EdgeHint in the satellite points TO the parent
-                                    # So we create: parent -> satellite
-                                    rel_properties = {
-                                        "source_key": getattr(
-                                            model,
-                                            sat_edge_hint.outgoing_attr_name,
-                                            None,
-                                        ),
-                                        "target_key": getattr(
-                                            related_model,
-                                            sat_edge_hint.outgoing_attr_name,
-                                            None,
-                                        ),
-                                    }
-                                    rel = Neo4jRelationship(
-                                        start_node_id=model.get_unique_id(),
-                                        end_node_id=related_model.get_unique_id(),
-                                        rel_type=sat_edge_hint.name.upper(),
-                                        properties=rel_properties,
-                                    )
-                                    result["relationships"].append(rel)
-                                    logger.debug(f"Added reverse relationship: {rel}")
+            # Create relationships from protein to reactions
+            relationships = self.create_relationships_manual(
+                model, model.reactions, "HAS_REACTION"
+            )
+            result["relationships"].extend(relationships)
+            logger.debug(f"Added {len(relationships)} reaction relationships")
 
         logger.debug(
             f"Final mapping result: {len(result['nodes'])} nodes, {len(result['relationships'])} relationships"
@@ -534,216 +441,102 @@ class PyeedNeo4jWriter:
         self.driver.close()
         logger.info("Neo4j driver connection closed")
 
-    def create(self, model: BaseNode) -> Dict[str, Any]:
-        """Create a new node in Neo4j for any BaseNode model with automatic relationship handling."""
-        logger.info(f"Creating {model.__class__.__name__} in Neo4j")
+    def _create_node(self, model: BaseNode) -> Dict[str, Any]:
+        """Helper method to create a single node in Neo4j."""
+        logger.debug(f"Creating node for {model.__class__.__name__}")
+
+        with self.driver.session() as session:
+            neo4j_node = self.mapper.create_node(model)
+
+            # Always try to match first, then create if needed using MERGE
+            labels_str = ":".join(neo4j_node.labels)
+            unique_field = model.get_unique_field_name()
+            unique_value = model.get_unique_id()
+
+            # Use MERGE to match existing or create new node
+            cypher = f"""
+            MERGE (n:{labels_str} {{{unique_field}: $unique_value}})
+            ON CREATE SET n = $properties
+            ON MATCH SET n += $properties
+            RETURN n
+            """
+
+            logger.debug(f"Cypher: {cypher}")
+            logger.debug(f"Properties: {neo4j_node.properties}")
+            logger.debug(f"Unique field: {unique_field}, value: {unique_value}")
+
+            result = session.run(
+                cypher,
+                {"unique_value": unique_value, "properties": neo4j_node.properties},
+            )
+            created_node = result.single()
+
+            if not created_node:
+                logger.error(f"Failed to merge node: {neo4j_node}")
+                return {"success": False, "error": "Failed to merge node"}
+
+            neo4j_id = str(created_node["n"].element_id)
+            logger.info(f"Merged node {neo4j_node.labels} with Neo4j ID {neo4j_id}")
+
+            return {"success": True, "neo4j_id": neo4j_id}
+
+    def add_protein(self, protein: Protein) -> Dict[str, Any]:
+        """Add a protein with all its nested objects to Neo4j."""
+
+        if not isinstance(protein, Protein):
+            return {"success": False, "error": "Object must be a Protein instance"}
+
+        logger.info(f"Adding protein {protein.accession_id} to Neo4j")
+
         try:
             with self.driver.session() as session:
-                # First, create the main node
-                logger.debug(f"Creating main node for {model.__class__.__name__}")
-                neo4j_node = self.mapper.create_node(model)
+                # Create the main protein node
+                protein_result = self._create_node(protein)
+                if not protein_result["success"]:
+                    return protein_result
 
-                # Create/merge the node in Neo4j using unique constraint
-                labels_str = ":".join(neo4j_node.labels)
-                unique_field = model.get_unique_field_name()
-                unique_value = model.get_unique_id()
+                total_nodes = 1
+                total_relationships = 0
 
-                # Use MERGE on unique field to avoid duplicates
-                cypher = f"""
-                MERGE (n:{labels_str} {{{unique_field}: $unique_value}})
-                SET n += $properties
-                RETURN n
-                """
+                # Add all organisms
+                for organism in protein.organisms:
+                    org_result = self.add_organism(protein.accession_id, organism)
+                    if org_result["success"]:
+                        total_nodes += 1
+                        total_relationships += 1
 
-                logger.debug(f"Cypher: {cypher}")
-                logger.debug(f"Properties: {neo4j_node.properties}")
-                logger.debug(f"Unique field: {unique_field}, value: {unique_value}")
-
-                result = session.run(
-                    cypher,
-                    {"unique_value": unique_value, "properties": neo4j_node.properties},
-                )
-                created_node = result.single()
-
-                if not created_node:
-                    logger.error(f"Failed to create node: {neo4j_node}")
-                    return {"success": False, "error": "Failed to create node"}
-
-                neo4j_id = str(created_node["n"].element_id)
-                logger.info(
-                    f"Created node {neo4j_node.labels} with Neo4j ID {neo4j_id}"
-                )
-
-                # Check if this model has EdgeHints that point to existing nodes
-                edge_hints = extract_edge_hints(type(model))
-                relationships_created = 0
-
-                if edge_hints:
-                    logger.debug(
-                        f"Found {len(edge_hints)} EdgeHints, checking for existing target nodes"
+                # Add all sequence annotations
+                for annotation in protein.annotations:
+                    ann_result = self.add_sequence_annotation(
+                        protein.accession_id, annotation
                     )
+                    if ann_result["success"]:
+                        total_nodes += 1
+                        total_relationships += 1
 
-                    for field_name, edge_hint in edge_hints.items():
-                        logger.debug(f"Processing EdgeHint for field: {field_name}")
+                # Add all GO annotations
+                for go_term in protein.go_terms:
+                    go_result = self.add_go_annotation(protein.accession_id, go_term)
+                    if go_result["success"]:
+                        total_nodes += 1
+                        total_relationships += 1
 
-                        # Get the value that should link to the target
-                        source_value = getattr(
-                            model, edge_hint.outgoing_attr_name, None
-                        )
-                        if not source_value:
-                            logger.debug(
-                                f"No value for outgoing_attr_name {edge_hint.outgoing_attr_name}, skipping"
-                            )
-                            continue
+                # Add all embeddings
+                for embedding in protein.embeddings.values():
+                    emb_result = self.add_embedding(protein.accession_id, embedding)
+                    if emb_result["success"]:
+                        total_nodes += 1
+                        total_relationships += 1
 
-                        logger.debug(
-                            f"Looking for existing {edge_hint.outgoing_class_name} with {edge_hint.outgoing_attr_name} = {source_value}"
-                        )
-
-                        # Check if target node exists
-                        target_cypher = f"MATCH (target:{edge_hint.outgoing_class_name} {{{edge_hint.outgoing_attr_name}: $target_value}}) RETURN target"
-                        target_result = session.run(
-                            target_cypher, {"target_value": source_value}
-                        )
-                        target_node = target_result.single()
-
-                        if target_node:
-                            logger.debug(
-                                "Found existing target node, creating relationship"
-                            )
-
-                            # Create relationship TO the target class using elementId()
-                            # The EdgeHint is on the field that connects TO the target
-                            rel_cypher = f"""
-                            MATCH (target:{edge_hint.outgoing_class_name} {{{edge_hint.outgoing_attr_name}: $target_value}})
-                            MATCH (source:{model.__class__.__name__}) WHERE elementId(source) = $source_element_id
-                            MERGE (target)-[r:{edge_hint.name}]->(source)
-                            SET r += {{source_key: $target_value, target_key: $source_unique_id}}
-                            RETURN r
-                            """
-
-                            logger.debug(f"Relationship cypher: {rel_cypher}")
-                            rel_result = session.run(
-                                rel_cypher,
-                                {
-                                    "target_value": source_value,
-                                    "source_element_id": neo4j_id,  # Use the elementId from node creation
-                                    "source_unique_id": model.get_unique_id(),
-                                },
-                            )
-
-                            if rel_result.single():
-                                relationships_created += 1
-                                logger.info(
-                                    f"Created relationship {edge_hint.name} from {model.__class__.__name__} to {edge_hint.outgoing_class_name}"
-                                )
-                            else:
-                                logger.warning(
-                                    f"Failed to create relationship for field {field_name}"
-                                )
-                        else:
-                            logger.debug(
-                                f"No existing {edge_hint.outgoing_class_name} found with {edge_hint.outgoing_attr_name} = {source_value}"
-                            )
-
-                # Also handle any nested models if this is a complex model with lists/dicts of BaseNode objects
-                nested_nodes_created = 0
-                nested_relationships_created = 0
-
-                # Map the model to check for nested structures
-                neo4j_structure = self.mapper.map_model_to_neo4j(model)
-                if len(neo4j_structure["nodes"]) > 1:  # More than just the main node
-                    logger.debug(
-                        f"Found {len(neo4j_structure['nodes']) - 1} nested nodes to create"
-                    )
-
-                    # Create nested nodes (skip the first one which is the main node we already created)
-                    node_id_mapping = {neo4j_node.unique_id: neo4j_id}
-
-                    for nested_node in neo4j_structure["nodes"][1:]:
-                        nested_labels_str = ":".join(nested_node.labels)
-
-                        # Find unique field for nested node (we need to determine its class)
-                        # Extract class name from labels (assume single label per node)
-                        nested_class_name = list(nested_node.labels)[0]
-                        nested_unique_field = "_id"  # Default fallback
-                        nested_unique_value = nested_node.unique_id
-
-                        # Try to get proper unique field from class
-                        try:
-                            import sys
-
-                            from .model import BaseNode
-
-                            base_module = sys.modules.get("pyeed.model")
-                            if base_module:
-                                nested_model_class = getattr(
-                                    base_module, nested_class_name, None
-                                )
-                                if nested_model_class and issubclass(
-                                    nested_model_class, BaseNode
-                                ):
-                                    nested_unique_field = nested_model_class.get_unique_field_name_for_class()
-                        except Exception as e:
-                            logger.debug(
-                                f"Could not determine unique field for {nested_class_name}, using _id: {e}"
-                            )
-
-                        nested_cypher = f"""
-                        MERGE (n:{nested_labels_str} {{{nested_unique_field}: $unique_value}})
-                        SET n += $properties
-                        RETURN n
-                        """
-
-                        nested_result = session.run(
-                            nested_cypher,
-                            {
-                                "unique_value": nested_unique_value,
-                                "properties": nested_node.properties,
-                            },
-                        )
-                        nested_created = nested_result.single()
-
-                        if nested_created:
-                            nested_neo4j_id = str(nested_created["n"].element_id)
-                            node_id_mapping[nested_node.unique_id] = nested_neo4j_id
-                            nested_nodes_created += 1
-                            logger.info(
-                                f"Created nested node {nested_node.labels} with Neo4j ID {nested_neo4j_id}"
-                            )
-
-                    # Create relationships for nested structures
-                    for rel in neo4j_structure["relationships"]:
-                        start_neo4j_id = node_id_mapping.get(rel.start_node_id)
-                        end_neo4j_id = node_id_mapping.get(rel.end_node_id)
-
-                        if start_neo4j_id and end_neo4j_id:
-                            rel_cypher = (
-                                f"MATCH (a), (b) "
-                                f"WHERE elementId(a) = $start_id AND elementId(b) = $end_id "
-                                f"MERGE (a)-[r:{rel.rel_type}]->(b) "
-                                f"SET r += $properties "
-                                f"RETURN r"
-                            )
-
-                            session.run(
-                                rel_cypher,
-                                {
-                                    "start_id": start_neo4j_id,
-                                    "end_id": end_neo4j_id,
-                                    "properties": rel.properties,
-                                },
-                            )
-                            nested_relationships_created += 1
-                            logger.info(f"Created nested relationship {rel.rel_type}")
-
-                total_nodes = 1 + nested_nodes_created
-                total_relationships = (
-                    relationships_created + nested_relationships_created
-                )
+                # Add all reactions
+                for reaction in protein.reactions:
+                    react_result = self.add_reaction(protein.accession_id, reaction)
+                    if react_result["success"]:
+                        total_nodes += 1
+                        total_relationships += 1
 
                 logger.info(
-                    f"Successfully created {total_nodes} nodes and {total_relationships} relationships"
+                    f"Successfully added protein {protein.accession_id} with {total_nodes} nodes and {total_relationships} relationships"
                 )
                 return {
                     "success": True,
@@ -752,8 +545,226 @@ class PyeedNeo4jWriter:
                 }
 
         except Exception as e:
-            logger.error(f"Error creating {model.__class__.__name__} in Neo4j: {e}")
+            logger.error(f"Error adding protein {protein.accession_id} to Neo4j: {e}")
             logger.exception("Full traceback:")
+            return {"success": False, "error": str(e)}
+
+    def add_organism(
+        self, protein_accession_id: str, organism: Organism
+    ) -> Dict[str, Any]:
+        """Add an organism to Neo4j and link it to a protein."""
+        from .model import Organism
+
+        if not isinstance(organism, Organism):
+            return {"success": False, "error": "Object must be an Organism instance"}
+
+        logger.info(
+            f"Adding organism {organism.tax_id} and linking to protein {protein_accession_id}"
+        )
+
+        try:
+            with self.driver.session() as session:
+                # Create the organism node
+                org_result = self._create_node(organism)
+                if not org_result["success"]:
+                    return org_result
+
+                # Create relationship to protein
+                rel_cypher = """
+                MATCH (p:Protein {accession_id: $protein_id})
+                MATCH (o:Organism {tax_id: $organism_id})
+                MERGE (p)-[r:ORIGINATES_FROM]->(o)
+                RETURN r
+                """
+
+                session.run(
+                    rel_cypher,
+                    {
+                        "protein_id": protein_accession_id,
+                        "organism_id": organism.tax_id,
+                    },
+                )
+
+                logger.info(
+                    f"Created relationship between protein {protein_accession_id} and organism {organism.tax_id}"
+                )
+                return {"success": True, "relationship_created": True}
+
+        except Exception as e:
+            logger.error(f"Error adding organism: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_sequence_annotation(
+        self, protein_accession_id: str, annotation: SequenceAnnotation
+    ) -> Dict[str, Any]:
+        """Add a sequence annotation to Neo4j and link it to a protein."""
+
+        if not isinstance(annotation, SequenceAnnotation):
+            return {
+                "success": False,
+                "error": "Object must be a SequenceAnnotation instance",
+            }
+
+        logger.info(
+            f"Adding sequence annotation and linking to protein {protein_accession_id}"
+        )
+
+        try:
+            with self.driver.session() as session:
+                # Create the annotation node
+                ann_result = self._create_node(annotation)
+                if not ann_result["success"]:
+                    return ann_result
+
+                # Create relationship to protein
+                rel_cypher = """
+                MATCH (p:Protein {accession_id: $protein_id})
+                MATCH (a:SequenceAnnotation) WHERE elementId(a) = $annotation_id
+                MERGE (p)-[r:HAS_ANNOTATION]->(a)
+                RETURN r
+                """
+
+                session.run(
+                    rel_cypher,
+                    {
+                        "protein_id": protein_accession_id,
+                        "annotation_id": ann_result["neo4j_id"],
+                    },
+                )
+
+                logger.info(
+                    f"Created relationship between protein {protein_accession_id} and sequence annotation"
+                )
+                return {"success": True, "relationship_created": True}
+
+        except Exception as e:
+            logger.error(f"Error adding sequence annotation: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_go_annotation(
+        self, protein_accession_id: str, go_annotation: GOAnnotation
+    ) -> Dict[str, Any]:
+        """Add a GO annotation to Neo4j and link it to a protein."""
+
+        if not isinstance(go_annotation, GOAnnotation):
+            return {"success": False, "error": "Object must be a GOAnnotation instance"}
+
+        logger.info(
+            f"Adding GO annotation {go_annotation.go_id} and linking to protein {protein_accession_id}"
+        )
+
+        try:
+            with self.driver.session() as session:
+                # Create the GO annotation node
+                go_result = self._create_node(go_annotation)
+                if not go_result["success"]:
+                    return go_result
+
+                # Create relationship to protein
+                rel_cypher = """
+                MATCH (p:Protein {accession_id: $protein_id})
+                MATCH (g:GOAnnotation {go_id: $go_id})
+                MERGE (p)-[r:HAS_GO_ANNOTATION]->(g)
+                RETURN r
+                """
+
+                session.run(
+                    rel_cypher,
+                    {"protein_id": protein_accession_id, "go_id": go_annotation.go_id},
+                )
+
+                logger.info(
+                    f"Created relationship between protein {protein_accession_id} and GO annotation {go_annotation.go_id}"
+                )
+                return {"success": True, "relationship_created": True}
+
+        except Exception as e:
+            logger.error(f"Error adding GO annotation: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_embedding(
+        self, protein_accession_id: str, embedding: Embedding
+    ) -> Dict[str, Any]:
+        """Add an embedding to Neo4j and link it to a protein."""
+
+        if not isinstance(embedding, Embedding):
+            return {"success": False, "error": "Object must be an Embedding instance"}
+
+        logger.info(
+            f"Adding embedding {embedding.description} and linking to protein {protein_accession_id}"
+        )
+
+        try:
+            with self.driver.session() as session:
+                # Create the embedding node
+                emb_result = self._create_node(embedding)
+                if not emb_result["success"]:
+                    return emb_result
+
+                # Create relationship to protein
+                rel_cypher = """
+                MATCH (p:Protein {accession_id: $protein_id})
+                MATCH (e:Embedding) WHERE elementId(e) = $embedding_id
+                MERGE (p)-[r:HAS_EMBEDDING]->(e)
+                RETURN r
+                """
+
+                session.run(
+                    rel_cypher,
+                    {
+                        "protein_id": protein_accession_id,
+                        "embedding_id": emb_result["neo4j_id"],
+                    },
+                )
+
+                logger.info(
+                    f"Created relationship between protein {protein_accession_id} and embedding {embedding.description}"
+                )
+                return {"success": True, "relationship_created": True}
+
+        except Exception as e:
+            logger.error(f"Error adding embedding: {e}")
+            return {"success": False, "error": str(e)}
+
+    def add_reaction(
+        self, protein_accession_id: str, reaction: Reaction
+    ) -> Dict[str, Any]:
+        """Add a reaction to Neo4j and link it to a protein."""
+
+        if not isinstance(reaction, Reaction):
+            return {"success": False, "error": "Object must be a Reaction instance"}
+
+        logger.info(
+            f"Adding reaction {reaction.rhea_id} and linking to protein {protein_accession_id}"
+        )
+
+        try:
+            with self.driver.session() as session:
+                # Create the reaction node
+                react_result = self._create_node(reaction)
+                if not react_result["success"]:
+                    return react_result
+
+                # Create relationship to protein
+                rel_cypher = """
+                MATCH (p:Protein {accession_id: $protein_id})
+                MATCH (r:Reaction {rhea_id: $rhea_id})
+                MERGE (p)-[rel:HAS_REACTION]->(r)
+                RETURN rel
+                """
+
+                session.run(
+                    rel_cypher,
+                    {"protein_id": protein_accession_id, "rhea_id": reaction.rhea_id},
+                )
+
+                logger.info(
+                    f"Created relationship between protein {protein_accession_id} and reaction {reaction.rhea_id}"
+                )
+                return {"success": True, "relationship_created": True}
+
+        except Exception as e:
+            logger.error(f"Error adding reaction: {e}")
             return {"success": False, "error": str(e)}
 
     def update(self, model: BaseNode) -> Dict[str, Any]:
@@ -822,71 +833,31 @@ class PyeedNeo4jWriter:
 # Example usage
 if __name__ == "__main__":
     logger.info("Starting Neo4j integration test")
-    from .model import AnnotationType, Embedding, Organism, Protein, SequenceAnnotation
-
     # Create a test protein
+    import asyncio
 
-    prot = Protein(
-        accession_id="P01234",
-        sequence="MALWMRLLPLLALLALWGPDPAAA",
-        name="Test Protein",
-        seq_length=24,
-        mol_weight=1000,
-        ec_number="1.2.3.4",
-        nucleotide_id="N01234",
-        nucleotide_start=1,
-        nucleotide_end=25,
-        locus_tag="L01234",
-        custom={
-            "mentioned_in": [
-                "doi:10.1016/j.xinn.2025.100344",
-                "doi:10.1016/j.xinn.2025.100345",
-            ],
-            "already_characterized": False,
-            "test": 123,
-        },
-    )
+    from pyeed.fetch.uniprot import get_proteins_from_uniprot
 
-    prot.add_annotation(
-        SequenceAnnotation(
-            accession_id="P01234",
-            annotation_type=AnnotationType.ACTIVE_SITE,
-            positions=[1, 2, 3],
-            custom={"my_custom_evidence": "literature", "validated": True},
-        )
-    )
+    from .model import Embedding
 
-    prot.add_embedding(
-        Embedding(
-            accession_id="P01234",
-            description="esm2_mean_pooled",
-            model_name="esm2-t33-650M-UR50S",
-            pooling_method="mean",
-            vector=[0.1, 0.2, 0.3],
-            n_dims=3,
-        ),
-    )
+    ids = ["P07486", "P69905", "P12345", "P00360"]
 
-    prot.add_organism(
-        Organism(
-            accession_id="P01234",
-            tax_id=123456,
-            name="Test Organism",
-        )
-    )
-
-    # Solution 1: Add new embedding to the existing protein first
-    new_embed = Embedding(
-        accession_id="P01234",
-        description="esm2_mean_pooled_last_hidden_state",
-        model_name="esm2-t33-650M-UR50S",
-        pooling_method="mean",
-        vector=[1.4, 1.5, 1.6],
-        n_dims=3,
-    )
+    proteins = asyncio.run(get_proteins_from_uniprot(ids))
 
     # Add the new embedding to the protein BEFORE creating it in Neo4j
-    prot.add_embedding(new_embed)
+    new_embed = Embedding(
+        description="esm2_mean_pooled",
+        model_name="esm2-t33-650M-UR50S",
+        pooling_method="mean",
+        vector=[0.1, 0.2, 0.3],
+        n_dims=3,
+    )
+    # Find the P69905 protein specifically
+    p69905_protein = next((p for p in proteins if p.accession_id == "P69905"), None)
+    if p69905_protein:
+        p69905_protein.add_embedding("P69905", new_embed)
+    else:
+        proteins[0].add_embedding(proteins[0].accession_id, new_embed)
 
     bd_cred = {
         "uri": "bolt://127.0.0.1:7687",
@@ -898,23 +869,10 @@ if __name__ == "__main__":
     mapper = PyeedNeo4jMapper(writer.driver)
     mapper.create_constraints_and_indexes()
 
-    # Now create everything at once - this will create the relationships automatically
-    result = writer.create(prot)
-    print("Main creation result:", result)
-
-    # Example of adding a new embedding to an EXISTING protein (simplified!)
-    print("\n--- Adding to existing protein ---")
-    third_embed = Embedding(
-        accession_id="P01234",  # This EdgeHint will automatically link to existing protein
-        description="anotherone",
-        model_name="UR50S",
-        pooling_method="cls",
-        vector=[2.1, 2.2, 2.3],
-        n_dims=3,
-    )
-
-    # Just create the embedding - it will automatically connect to the protein!
-    add_result = writer.create(third_embed)
-    print("Add embedding result:", add_result)
+    # Now add proteins using the new add_protein method
+    results = []
+    for protein in proteins:
+        results.append(writer.add_protein(protein))
+    print("Main creation result:", results)
 
     writer.close()
