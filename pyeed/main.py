@@ -1,254 +1,143 @@
+from __future__ import annotations
+
 import asyncio
-import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Iterable, List, Optional
 
-from neo4j import GraphDatabase
+import httpx
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
-from .fetch.uniprot import get_proteins_from_uniprot_batched
-from .model import Protein
-from .neo4j_integration import PyeedNeo4jWriter
+from .database import GraphDatabase
+from .fetch.uniprotadapter import UniProtAdapter
+from .model import MODEL_CLASSES, Protein
 
 logger = logging.getLogger(__name__)
 
 
-async def from_uniprot(
-    ids: List[str],
-    neo4j_uri: Optional[str] = None,
-    neo4j_user: Optional[str] = None,
-    neo4j_password: Optional[str] = None,
-    output_file: Optional[str] = None,
-    batch_size: int = 100,
-    max_concurrent: int = 5,
-    check_existing: bool = True,
-) -> Dict[str, Any]:
-    """
-    High-performance method to fetch proteins from UniProt and optionally store in Neo4j.
+async def ingest_uniprot(
+    db: GraphDatabase,
+    accessions: Iterable[str],
+    chunk_size: int = 30,
+    page_size: int = 30,
+    batch_size: int = 200,
+    sync_schema: bool = False,
+) -> None:
+    """Ingests proteins from UniProt by accession IDs.
 
     Args:
-        ids: List of UniProt accession IDs
-        neo4j_uri: Neo4j database URI (if None, saves to file)
-        neo4j_user: Neo4j username
-        neo4j_password: Neo4j password
-        output_file: Output file path (default: proteins_{count}_records.json)
-        batch_size: Number of IDs to process per batch
-        max_concurrent: Maximum concurrent requests
-        check_existing: Whether to check for existing proteins in Neo4j
-
-    Returns:
-        Dictionary with processing results
+        db: GraphDatabase
+        accessions: Iterable[str]
+        chunk_size: int = 30
+        page_size: int = 30
+        batch_size: int = 200
+        schema_synced: bool = False
     """
-    if all([neo4j_uri is None, neo4j_user is None, neo4j_password is None]):
-        to_db = False
-    else:
-        to_db = True
-    logger.info(f"Processing {len(ids)} UniProt IDs")
+    accessions = list(accessions)
 
-    # Determine IDs to fetch
-    ids_to_fetch = set(ids)
-    existing_count = 0
+    if not sync_schema:
+        await db.sync_schema(MODEL_CLASSES)
 
-    # Check existing proteins in Neo4j if database provided
-    if neo4j_uri and check_existing:
-        logger.info("Checking for existing proteins in Neo4j...")
-        existing_ids = await _check_existing_proteins(
-            ids, neo4j_uri, neo4j_user, neo4j_password
-        )
-        existing_count = len(existing_ids)
-        ids_to_fetch = ids_to_fetch - existing_ids
-        logger.info(
-            f"Found {existing_count} existing proteins, fetching {len(ids_to_fetch)} new ones"
-        )
+    # filter out already-present proteins
+    query = """
+    MATCH (p:Protein)
+    WHERE p.accession_id IN $accessions
+    RETURN p.accession_id AS accession_id
+    """
+    async with db.driver.session() as session:
+        result = await session.run(query, accessions=accessions)
+        existing = set(await result.value("accession_id"))
 
-    # Fetch proteins from UniProt in batches
-    proteins = []
-    if ids_to_fetch:
-        logger.info(f"Fetching {len(ids_to_fetch)} proteins from UniProt...")
-        proteins = await get_proteins_from_uniprot_batched(
-            list(ids_to_fetch), batch_size=batch_size, max_concurrent=max_concurrent
-        )
-        logger.info(f"Successfully fetched {len(proteins)} proteins")
+    to_fetch = [a for a in accessions if a not in existing]
+    if not to_fetch:
+        return
 
-    # Store results
-    result = {
-        "total_requested": len(ids),
-        "existing_in_db": existing_count,
-        "fetched_from_uniprot": len(proteins),
-        "proteins_processed": len(proteins),
-        "failed": len(ids_to_fetch) - len(proteins),
-    }
+    queue: asyncio.Queue[Optional[Protein]] = asyncio.Queue(maxsize=batch_size * 2)
+    adapter = UniProtAdapter()
 
-    if proteins:
-        if neo4j_uri:
-            # Store in Neo4j
-            logger.info(f"Storing {len(proteins)} proteins in Neo4j...")
-            neo4j_results = await _store_proteins_neo4j(
-                proteins, neo4j_uri, neo4j_user, neo4j_password, batch_size
-            )
-            result.update(neo4j_results)
-        else:
-            # Store in file
-            output_path = output_file or f"proteins_{len(proteins)}_records.json"
-            await _store_proteins_file(proteins, output_path)
-            result["output_file"] = output_path
-            logger.info(f"Saved {len(proteins)} proteins to {output_path}")
-
-    return result
-
-
-async def _check_existing_proteins(
-    ids: List[str], uri: str, user: str, password: str
-) -> Set[str]:
-    """Check which protein IDs already exist in Neo4j."""
-    existing_ids = set()
-
-    try:
-        driver = GraphDatabase.driver(uri, auth=(user, password))
-
-        # Query in batches to avoid large parameter lists
-        batch_size = 1000
-        for i in range(0, len(ids), batch_size):
-            batch_ids = ids[i : i + batch_size]
-
-            with driver.session() as session:
-                cypher = """
-                UNWIND $ids as protein_id
-                MATCH (p:Protein {accession_id: protein_id})
-                RETURN p.accession_id as accession_id
-                """
-                result = session.run(cypher, {"ids": batch_ids})
-
-                for record in result:
-                    existing_ids.add(record["accession_id"])
-
-        driver.close()
-
-    except Exception as e:
-        logger.warning(f"Could not check existing proteins: {e}")
-        # Continue without checking - better to have duplicates than miss data
-
-    return existing_ids
-
-
-async def _store_proteins_neo4j(
-    proteins: List[Protein], uri: str, user: str, password: str, batch_size: int = 100
-) -> Dict[str, Any]:
-    """Store proteins in Neo4j using batch transactions."""
-    logger.info(
-        f"Storing {len(proteins)} proteins in Neo4j with batch size {batch_size}"
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[bold]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        transient=False,
     )
 
-    writer = PyeedNeo4jWriter(uri, user, password)
+    async def producer(fetch_task_id: TaskID) -> None:
+        async with httpx.AsyncClient() as client:
+            async for rec in adapter.fetch_accessions(
+                client, to_fetch, chunk_size=chunk_size, size_per_page=page_size
+            ):
+                prot = adapter.map(rec)
+                await queue.put(prot)
+                progress.update(fetch_task_id, advance=1)
+        # signal done
+        await queue.put(None)
 
-    try:
-        # Setup database constraints first
-        writer.setup_database()
+    async def consumer(upsert_task_id: TaskID) -> None:
+        batch: List[Protein] = []
+        while True:
+            item = await queue.get()
+            if item is None:
+                if batch:
+                    await db.upsert_nodes(batch)
+                    progress.update(upsert_task_id, advance=len(batch))
+                break
+            batch.append(item)
+            if len(batch) >= batch_size:
+                await db.upsert_nodes(batch)
+                progress.update(upsert_task_id, advance=len(batch))
+                batch.clear()
 
-        # Process proteins in batches
-        results = {"neo4j_success": 0, "neo4j_failed": 0, "neo4j_errors": []}
+    with progress:
+        fetch_task = progress.add_task("Fetch/Map", total=len(to_fetch))
+        upsert_task = progress.add_task("Upsert", total=len(to_fetch))
 
-        for i in range(0, len(proteins), batch_size):
-            batch = proteins[i : i + batch_size]
-            logger.info(
-                f"Processing Neo4j batch {i//batch_size + 1}/{(len(proteins)-1)//batch_size + 1}"
-            )
-
-            for protein in batch:
-                try:
-                    result = writer.add_protein(protein)
-                    if result["success"]:
-                        results["neo4j_success"] += 1
-                    else:
-                        results["neo4j_failed"] += 1
-                        results["neo4j_errors"].append(
-                            {
-                                "protein_id": protein.accession_id,
-                                "error": result.get("error", "Unknown error"),
-                            }
-                        )
-                except Exception as e:
-                    results["neo4j_failed"] += 1
-                    results["neo4j_errors"].append(
-                        {"protein_id": protein.accession_id, "error": str(e)}
-                    )
-                    logger.error(f"Failed to store protein {protein.accession_id}: {e}")
-
-        logger.info(
-            f"Neo4j storage complete: {results['neo4j_success']} success, {results['neo4j_failed']} failed"
-        )
-        return results
-
-    finally:
-        writer.close()
-
-
-async def _store_proteins_file(proteins: List[Protein], output_path: str) -> None:
-    """Store proteins as JSON file."""
-    data = [protein.model_dump() for protein in proteins]
-
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_file, "w") as f:
-        json.dump(
-            {
-                "metadata": {
-                    "count": len(proteins),
-                    "source": "UniProt",
-                    "format": "Pyeed Protein objects",
-                },
-                "proteins": data,
-            },
-            f,
-            indent=2,
+        await asyncio.gather(
+            producer(fetch_task),
+            consumer(upsert_task),
         )
 
 
-# Example usage and CLI interface
 if __name__ == "__main__":
-    import sys
+    import asyncio
 
-    # Simple CLI interface
-    if len(sys.argv) < 2:
-        print(
-            "Usage: python -m pyeed.main <ids...> [--neo4j-uri URI] [--output file.json]"
-        )
-        print(
-            "Example: python -m pyeed.main P69905 P21802 --neo4j-uri bolt://localhost:7687"
-        )
-        print("Example: python -m pyeed.main P69905 P21802 --output my_proteins.json")
-        sys.exit(1)
+    # load accessions from ids.tsv (3rd column or whole line fallback)
+    ids: List[str] = []
+    path = "ids.tsv"
+    with open(path, "r") as f:
+        next(f, None)
+        for line in f:
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            parts = s.split("\t")
+            ids.append(parts[2] if len(parts) > 2 else parts[0])
 
-    # Parse arguments
-    ids = []
-    neo4j_uri = None
-    output_file = None
+    print(f"Ingesting {len(ids)} proteins")
 
-    i = 1
-    while i < len(sys.argv):
-        arg = sys.argv[i]
-        if arg == "--neo4j-uri" and i + 1 < len(sys.argv):
-            neo4j_uri = sys.argv[i + 1]
-            i += 2
-        elif arg == "--output" and i + 1 < len(sys.argv):
-            output_file = sys.argv[i + 1]
-            i += 2
-        elif not arg.startswith("--"):
-            ids.append(arg)
-            i += 1
-        else:
-            i += 1
-
-    # Run the main function
-    async def main():
-        result = await from_uniprot(
-            ids=ids,
-            neo4j_uri=neo4j_uri,
-            neo4j_user="neo4j" if neo4j_uri else None,
-            neo4j_password="12345678" if neo4j_uri else None,
-            output_file=output_file,
-        )
-        print(f"Processing complete: {result}")
+    async def main() -> None:
+        db = GraphDatabase()
+        await db.verify_connection()
+        try:
+            await ingest_uniprot(
+                db,
+                ids,
+                chunk_size=30,
+                page_size=30,
+                batch_size=200,
+            )
+        finally:
+            await db.close()
 
     asyncio.run(main())

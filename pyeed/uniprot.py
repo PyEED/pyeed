@@ -91,9 +91,8 @@ class UniProtAdapter:
                             nxt = part[i:j]
                             break
             # After first page, use the full next URL as-is
-            url, params = (nxt, None) if nxt else (None, None)
+            url, params = (nxt, {}) if nxt else (None, {})
 
-    # --- Convenience: chunk IDs to avoid giant URLs; yields records across chunks ---
     async def fetch_accessions(
         self,
         client: httpx.AsyncClient,
@@ -130,7 +129,6 @@ class UniProtAdapter:
             ):
                 yield rec
 
-    # --- Mapping stays strict & defensive ---
     def map(self, p: Dict[str, Any]) -> Protein:
         seq_meta = p.get("sequence") or {}
         sequence = seq_meta.get("value")
@@ -218,58 +216,11 @@ class UniProtAdapter:
             seq_length=len(sequence),
             mol_weight=seq_meta.get("molWeight"),
             ec_numbers=ec_numbers,
-            organisms=[Organism(tax_id=(p.get("organism") or {}).get("taxonId"))],  # type: ignore
+            organisms=[Organism(tax_id=(p.get("organism") or {}).get("taxonId"))],
             go_terms=gos,
             annotations=anns,
             reactions=rx,
             structure_ids=[],
-            embeddings={},
+            embeddings=[],
             custom={},
         )
-
-
-from tqdm import tqdm
-
-
-async def main() -> None:
-    # Read in ids.tsv and write Accession in list of str
-    ids = []
-    with open("ids.tsv", "r") as f:
-        next(f)  # skip first line
-        for line in f:
-            if line.strip() and not line.startswith("#"):
-                parts = line.strip().split("\t")
-                if len(parts) > 2:
-                    ids.append(parts[2])
-
-    adapter = UniProtAdapter()
-
-    found = 0
-    mapped = 0
-
-    async with httpx.AsyncClient() as client:
-        # we know the target count
-        proteins = []
-        with tqdm(total=len(ids), desc="Mapped", unit="prot") as pbar:
-            async for rec in adapter.fetch_accessions(
-                client,
-                ids,
-                chunk_size=30,
-            ):
-                found += 1
-                try:
-                    proteins.append(adapter.map(rec))
-                    mapped += 1
-                finally:
-                    # advance for each intended ID that produced a mapped record
-                    pbar.update(1)
-
-    print(proteins[30:40])
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    from rich import print
-
-    asyncio.run(main())
