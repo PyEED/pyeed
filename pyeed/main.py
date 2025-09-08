@@ -16,15 +16,15 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from .database import GraphDatabase
-from .fetch.uniprotadapter import UniProtAdapter
+from .database import Database
 from .model import MODEL_CLASSES, Protein
+from .uniprot import UniProtAdapter
 
 logger = logging.getLogger(__name__)
 
 
 async def ingest_uniprot(
-    db: GraphDatabase,
+    db: Database,
     accessions: Iterable[str],
     chunk_size: int = 30,
     page_size: int = 30,
@@ -52,7 +52,7 @@ async def ingest_uniprot(
     WHERE p.accession_id IN $accessions
     RETURN p.accession_id AS accession_id
     """
-    async with db.driver.session() as session:
+    async with db.async_driver.session() as session:
         result = await session.run(query, accessions=accessions)
         existing = set(await result.value("accession_id"))
 
@@ -90,12 +90,12 @@ async def ingest_uniprot(
             item = await queue.get()
             if item is None:
                 if batch:
-                    await db.upsert_nodes(batch)
+                    await db.save_many(batch)
                     progress.update(upsert_task_id, advance=len(batch))
                 break
             batch.append(item)
             if len(batch) >= batch_size:
-                await db.upsert_nodes(batch)
+                await db.save_many(batch)
                 progress.update(upsert_task_id, advance=len(batch))
                 batch.clear()
 
@@ -124,11 +124,10 @@ if __name__ == "__main__":
             parts = s.split("\t")
             ids.append(parts[2] if len(parts) > 2 else parts[0])
 
-    print(f"Ingesting {len(ids)} proteins")
+    db = Database()
+    db.verify_connection()
 
     async def main() -> None:
-        db = GraphDatabase()
-        await db.verify_connection()
         try:
             await ingest_uniprot(
                 db,
@@ -139,5 +138,8 @@ if __name__ == "__main__":
             )
         finally:
             await db.close()
+
+    q_res = db.query("MATCH (p:Protein) RETURN p.accession_id AS AC_ID")
+    print(q_res)
 
     asyncio.run(main())

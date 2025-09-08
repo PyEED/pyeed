@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from pydantic import Field, ValidationInfo, field_validator
 
-from .pyeedbase import LabelProperty, ParentReference, PyeedBase, _is_neo4j_prop_value
+from .pyeedbase import EdgeMap, LabelProperty, PyeedBase, _is_neo4j_prop_value
 
 
 class Embedding(PyeedBase):
@@ -37,9 +37,8 @@ class Embedding(PyeedBase):
         default_factory=lambda: str(uuid4()),
         description="Embedding identifier",
     )
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Protein",
-        rel_name="HAS_EMBEDDING",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Protein": "HAS_EMBEDDING", "Molecule": "HAS_EMBEDDING"},
     )
 
     @field_validator("model_name")

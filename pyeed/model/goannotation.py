@@ -2,7 +2,7 @@ from typing import Annotated, ClassVar, Optional
 
 from pydantic import Field
 
-from .pyeedbase import LabelProperty, ParentReference, PyeedBase
+from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
 
 
 class GOAnnotation(PyeedBase):
@@ -20,7 +20,6 @@ class GOAnnotation(PyeedBase):
         None,
         description="GO term definition",
     )
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Protein",
-        rel_name="HAS_GO_ANNOTATION",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Protein": "HAS_GO_ANNOTATION"},
     )

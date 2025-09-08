@@ -2,7 +2,7 @@ from typing import Annotated, ClassVar, Optional
 
 from pydantic import Field, field_validator
 
-from .pyeedbase import LabelProperty, ParentReference, PyeedBase
+from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
 
 
 class Organism(PyeedBase):
@@ -17,9 +17,8 @@ class Organism(PyeedBase):
         description="Organism name",
     )
 
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Protein",
-        rel_name="ORIGINATES_FROM",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Protein": "ORIGINATES_FROM"},
     )
 
     @field_validator("tax_id")

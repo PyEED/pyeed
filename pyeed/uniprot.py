@@ -12,7 +12,7 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from ..model import (
+from .model import (
     Annotation,
     AnnotationType,
     GOAnnotation,
@@ -216,7 +216,7 @@ class UniProtAdapter:
             seq_length=len(sequence),
             mol_weight=seq_meta.get("molWeight"),
             ec_numbers=ec_numbers,
-            organisms=[Organism(tax_id=(p.get("organism") or {}).get("taxonId"))],
+            organisms=[Organism(tax_id=(p.get("organism") or {}).get("taxonId"))],  # type: ignore
             go_terms=gos,
             annotations=anns,
             reactions=rx,

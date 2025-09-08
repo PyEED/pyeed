@@ -3,7 +3,7 @@ from typing import Annotated, ClassVar, List, Optional
 from pydantic import Field
 
 from .molecule import Molecule
-from .pyeedbase import LabelProperty, ParentReference, PyeedBase
+from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
 
 
 class Reaction(PyeedBase):
@@ -29,7 +29,6 @@ class Reaction(PyeedBase):
         default=False,
         description="Whether the reaction is reversible",
     )
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Protein",
-        rel_name="CATALYZES",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Protein": "CATALYZES"},
     )

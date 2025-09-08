@@ -4,7 +4,7 @@ from uuid import uuid4
 from pydantic import Field, field_validator
 
 from pyeed.model.annotationtype import AnnotationType
-from pyeed.model.pyeedbase import LabelProperty, ParentReference, PyeedBase
+from pyeed.model.pyeedbase import EdgeMap, LabelProperty, PyeedBase
 
 
 class Annotation(PyeedBase):
@@ -26,9 +26,8 @@ class Annotation(PyeedBase):
         default=None,
         description="Description of the annotation",
     )
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Protein",
-        rel_name="HAS_ANNOTATION",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Protein": "HAS_ANNOTATION"},
     )
 
     @field_validator("positions")

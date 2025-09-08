@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import re
 from typing import Any, Dict, Iterable, List, Tuple
 
 import dotenv
-from neo4j import AsyncGraphDatabase, AsyncSession
+from neo4j import AsyncGraphDatabase, AsyncSession, GraphDatabase
 
 from .model.pyeedbase import LabelProperty, PyeedBase
 from .model.utility import collect_schema
@@ -15,7 +14,7 @@ from .model.utility import collect_schema
 logger = logging.getLogger(__name__)
 
 
-class GraphDatabase:
+class Database:
     def __init__(
         self,
         uri: str | None = None,
@@ -31,22 +30,29 @@ class GraphDatabase:
                 "URI, user, and password must be provided or set in env "
                 "(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)"
             )
-        self.driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
+        self.async_driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self._vec_index_cache: set[str] = set()
 
     async def close(self) -> None:
-        await self.driver.close()
+        await self.async_driver.close()
 
-    async def verify_connection(self) -> None:
-        async with self.driver.session() as session:
-            result = await session.run("RETURN 1 AS ok")
-            record = await result.single()
+    def verify_connection(self) -> None:
+        with self.driver.session() as session:
+            result = session.run("RETURN 1 AS ok")
+            record = result.single()
             if not record or record["ok"] != 1:
                 raise ConnectionError("Failed to verify Neo4j connection")
             print("ok")
 
-    def verify_connection_sync(self) -> None:
-        asyncio.run(self.verify_connection())
+    def query(
+        self,
+        query: str,
+        **params: Any,
+    ) -> List[Dict[str, Any]]:
+        with self.driver.session() as session:
+            result = session.run(query, **params)
+            return [record.data() for record in result]
 
     async def sync_schema(self, models: List[type[PyeedBase]]) -> None:
         """
@@ -60,7 +66,7 @@ class GraphDatabase:
         """
         logger.info("Creating unique constraints ...")
         uniques, btrees, _ = collect_schema(models)
-        async with self.driver.session() as session:
+        async with self.async_driver.session() as session:
             # Unique constraints
             for uniq in uniques:
                 q = (
@@ -137,7 +143,7 @@ class GraphDatabase:
             - Vector indexes for embeddings are created automatically if needed.
         """
         logger.info(f"Bulk upserting {len(nodes)} nodes and {len(edges)} edges...")
-        async with self.driver.session() as session:
+        async with self.async_driver.session() as session:
             # 0) Prepare vector indexes (Embedding vec__* props)
             vec_props: dict[str, int] = {}
             for n in nodes:
@@ -190,7 +196,7 @@ class GraphDatabase:
                     """
                     await session.run(q, rows=chunk)
 
-    async def upsert_node(self, node: PyeedBase) -> None:
+    async def save(self, node: PyeedBase) -> None:
         """
         Insert or update a single root node and its entire subtree.
 
@@ -201,7 +207,7 @@ class GraphDatabase:
         nodes, edges = node.graphify()
         await self.bulk_upsert(nodes, edges)
 
-    async def upsert_nodes(
+    async def save_many(
         self,
         roots: Iterable[PyeedBase],
         tx_size: int = 5000,
@@ -222,7 +228,7 @@ class GraphDatabase:
             all_edges.extend(e)
         await self.bulk_upsert(all_nodes, all_edges, tx_size=tx_size)
 
-    async def upsert_children(
+    async def attach(
         self,
         parent_cls: type[PyeedBase],
         parents_to_children: dict[str | int, list[PyeedBase]],
@@ -238,11 +244,11 @@ class GraphDatabase:
             tx_size: Maximum number of rows per transaction batch.
 
         Raises:
-            ValueError: If a child node has no `PARENT_REF` or mismatched parent label.
+            ValueError: If a child node has no `edge_map` or mismatched parent label.
 
         Notes:
             - Each child is inserted along with its own subtree.
-            - The edge type is read from `child.PARENT_REF.rel_type`.
+            - The edge type is read from `child.edge_map.rules`.
             - The parent unique field is resolved automatically from `NodeHint(unique=True)`.
         """
         logger.info(
@@ -257,14 +263,14 @@ class GraphDatabase:
         for pval, children in parents_to_children.items():
             for child in children:
                 clabel = type(child).__name__
-                pref = getattr(type(child), "PARENT_REF", None)
+                pref = getattr(type(child), "edge_map", None)
                 if not pref:
                     raise ValueError(
                         f"{clabel} is missing PARENT_REF; required for upsert_children()."
                     )
                 if pref.parent_label != plabel:
                     raise ValueError(
-                        f"{clabel}.PARENT_REF expects parent '{pref.parent_label}', got '{plabel}'."
+                        f"{clabel}.edge_map expects parent '{pref.parent_label}', got '{plabel}'."
                     )
 
                 # child's own subtree
@@ -277,7 +283,7 @@ class GraphDatabase:
                 cval = getattr(child, ckey)
                 all_edges.append(
                     {
-                        "type": pref.rel_type,
+                        "type": pref.rel_name,
                         "src": (plabel, pkey, pval),
                         "dst": (clabel, ckey, cval),
                     }

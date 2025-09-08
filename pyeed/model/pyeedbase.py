@@ -1,6 +1,7 @@
 import re
+from collections.abc import Iterable as _Iter
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -18,19 +19,54 @@ class LabelProperty:
 
 
 @dataclass(frozen=True)
-class ParentReference:
-    """
-    Contains information about the parent node of the current node.
-    """
+class EdgeMap:
+    """Map of parent labels to relationship names."""
 
-    parent_node_name: str
-    rel_name: str
+    rules: Dict[str, Union[str, Dict[str, str]]]
+
+    def resolve(self, parent_label: str, field_name: Optional[str]) -> str:
+        """Resolve the relationship name for a given parent + field.
+
+        Args:
+            parent_label: Name of the parent class/label.
+            field_name: Field name of the parent, if applicable.
+
+        Returns:
+            The resolved relationship name.
+
+        Raises:
+            ValueError: If no mapping exists for the given parent/field.
+        """
+        spec = self.rules.get(parent_label)
+        if spec is None:
+            raise ValueError(
+                f"No EdgeMap rule defined for parent '{parent_label}'. "
+                f"Available parents: {list(self.rules.keys())}"
+            )
+
+        if isinstance(spec, str):
+            return spec
+
+        if field_name is None:
+            raise ValueError(
+                f"EdgeMap for parent '{parent_label}' requires a field name "
+                f"(available: {list(spec.keys())})."
+            )
+
+        rel = spec.get(field_name)
+        if rel is None:
+            raise ValueError(
+                f"No EdgeMap rule for field '{field_name}' under parent '{parent_label}'. "
+                f"Available: {list(spec.keys())}"
+            )
+
+        return rel
 
 
 class PyeedBase(BaseModel):
     """Base class for all nodes in the Database."""
 
-    PARENT_REF: ClassVar[Optional[ParentReference]] = None
+    edge_map: ClassVar[Optional[EdgeMap]] = None
 
     model_config = ConfigDict(
         frozen=False, validate_assignment=True, use_enum_values=True
@@ -133,26 +169,31 @@ class PyeedBase(BaseModel):
             return {"label": lbl, "key": (k, v), "props": obj.to_dict()}
 
         def connect(parent: "PyeedBase", field_name: str, child: "PyeedBase") -> None:
-            pref = getattr(type(child), "PARENT_REF", None) or getattr(
-                type(child), "_parent_ref", None
-            )
-            # prefer PARENT_REF if it names this parent class
-            if (
-                pref
-                and getattr(pref, "parent_node_name", None) == type(parent).__name__
-            ):
-                rel_type = getattr(pref, "rel_name", None) or getattr(
-                    pref, "rel_type", None
+            parent_label = type(parent).__name__
+            child_cls = type(child)
+            emap = getattr(child_cls, "edge_map", None)
+
+            if emap is None:
+                # No mapping present: raise with a helpful message
+                raise ValueError(
+                    f"[Graphify] {child_cls.__name__} must define edge_map to connect "
+                    f"from parent '{parent_label}' (field '{field_name}')."
                 )
-            else:
-                rel_type = field_name.upper()
 
-            sl, sk = type(parent).__name__, parent.get_unique_model_field()
-            dl, dk = type(child).__name__, child.get_unique_model_field()
+            # EdgeMap will raise a clear error if parent/field is not mapped
+            rel_type = emap.resolve(parent_label=parent_label, field_name=field_name)
+
+            sl, sk = parent_label, parent.get_unique_model_field()
+            dl, dk = child_cls.__name__, child.get_unique_model_field()
             sv, dv = getattr(parent, sk), getattr(child, dk)
-            edges.append({"type": rel_type, "src": (sl, sk, sv), "dst": (dl, dk, dv)})
 
-        from collections.abc import Iterable as _Iter
+            edges.append(
+                {
+                    "type": rel_type,
+                    "src": (sl, sk, sv),
+                    "dst": (dl, dk, dv),
+                }
+            )
 
         seen: set[tuple[str, Any]] = set()
 

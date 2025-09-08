@@ -3,7 +3,7 @@ from typing import Annotated, ClassVar, List, Optional
 from pydantic import Field
 
 from .embedding import Embedding
-from .pyeedbase import LabelProperty, ParentReference, PyeedBase
+from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
 
 
 class Molecule(PyeedBase):
@@ -28,7 +28,6 @@ class Molecule(PyeedBase):
         default_factory=list,
         description="Embedding vector",
     )
-    PARENT_REF: ClassVar[ParentReference] = ParentReference(
-        parent_node_name="Reaction",
-        rel_name="PART_OF",
+    edge_map: ClassVar[EdgeMap] = EdgeMap(
+        rules={"Reaction": {"substrates": "HAS_SUBSTRATE", "products": "HAS_PRODUCT"}},
     )
