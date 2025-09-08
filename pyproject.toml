@@ -1,6 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "pyeed"
-version = "0.1.0"
+version = "1.0.0"
 description = "Toolkit to create, annotate, and analyze sequence data"
 authors = [
   { name = "Max Häußler", email = "max.haeussler@gmail.com" }
