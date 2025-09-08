@@ -43,22 +43,8 @@ async def ingest_uniprot(
     """
     accessions = list(accessions)
 
-    if not sync_schema:
+    if sync_schema:
         await db.sync_schema(MODEL_CLASSES)
-
-    # filter out already-present proteins
-    query = """
-    MATCH (p:Protein)
-    WHERE p.accession_id IN $accessions
-    RETURN p.accession_id AS accession_id
-    """
-    async with db.async_driver.session() as session:
-        result = await session.run(query, accessions=accessions)
-        existing = set(await result.value("accession_id"))
-
-    to_fetch = [a for a in accessions if a not in existing]
-    if not to_fetch:
-        return
 
     queue: asyncio.Queue[Protein | None] = asyncio.Queue(maxsize=batch_size * 2)
     adapter = UniProtAdapter()
@@ -76,7 +62,7 @@ async def ingest_uniprot(
     async def producer(fetch_task_id: TaskID) -> None:
         async with httpx.AsyncClient() as client:
             async for rec in adapter.fetch_accessions(
-                client, to_fetch, chunk_size=chunk_size, size_per_page=page_size
+                client, accessions, chunk_size=chunk_size, size_per_page=page_size
             ):
                 prot = adapter.map(rec)
                 await queue.put(prot)
@@ -100,44 +86,10 @@ async def ingest_uniprot(
                 batch.clear()
 
     with progress:
-        fetch_task = progress.add_task("Fetch/Map", total=len(to_fetch))
-        upsert_task = progress.add_task("Upsert", total=len(to_fetch))
+        fetch_task = progress.add_task("Fetch/Map", total=len(accessions))
+        upsert_task = progress.add_task("Upsert", total=len(accessions))
 
         await asyncio.gather(
             producer(fetch_task),
             consumer(upsert_task),
         )
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    # load accessions from ids.tsv (3rd column or whole line fallback)
-    ids: list[str] = []
-    path = "ids.tsv"
-    with open(path) as f:
-        next(f, None)
-        for line in f:
-            s = line.strip()
-            if not s or s.startswith("#"):
-                continue
-            parts = s.split("\t")
-            col = 2
-            ids.append(parts[2] if len(parts) > col else parts[0])
-
-    db = Database()
-    db.verify_connection()
-
-    async def main() -> None:
-        try:
-            await ingest_uniprot(
-                db,
-                ids,
-                chunk_size=30,
-                page_size=30,
-                batch_size=200,
-            )
-        finally:
-            await db.close()
-
-    asyncio.run(main())
