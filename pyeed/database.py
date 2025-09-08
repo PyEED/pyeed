@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
 import dotenv
@@ -54,6 +54,24 @@ class Database:
         with self.driver.session() as session:
             result = session.run(query, **params)
             return [record.data() for record in result]
+
+    async def async_query_iter(self, query: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
+        """
+        Iterate over the results of a query.
+        """
+        async with self.async_driver.session() as session:
+            result = await session.run(query, **params)
+            async for record in result:
+                yield record.data()
+
+    async def async_value_iter(self, query: str, key: str, **params: Any) -> AsyncIterator[Any]:
+        """
+        Iterate over the values of a key from the results of a query.
+        """
+        async with self.async_driver.session() as session:
+            result = await session.run(query, **params)
+            async for record in result:
+                yield record.value(key)
 
     async def sync_schema(self, models: list[type[PyeedBase]]) -> None:
         """
