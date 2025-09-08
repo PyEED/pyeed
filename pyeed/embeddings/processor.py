@@ -8,7 +8,7 @@ and database operations with automatic device management and model loading.
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -34,8 +34,8 @@ class EmbeddingProcessor:
     """
 
     def __init__(self) -> None:
-        self._models: Dict[str, BaseEmbeddingModel] = {}
-        self._devices: List[torch.device] = []
+        self._models: dict[str, BaseEmbeddingModel] = {}
+        self._devices: list[torch.device] = []
         self._initialize_devices()
 
     def _initialize_devices(self) -> None:
@@ -48,12 +48,12 @@ class EmbeddingProcessor:
             self._devices = [torch.device("cpu")]
             logger.warning("No GPU available, using CPU.")
 
-    def get_available_devices(self) -> List[torch.device]:
+    def get_available_devices(self) -> list[torch.device]:
         """Get list of available devices."""
         return self._devices.copy()
 
     def get_or_create_model(
-        self, model_name: str, device: Optional[torch.device] = None
+        self, model_name: str, device: torch.device | None = None
     ) -> BaseEmbeddingModel:
         """Get existing model or create new one on specified or best available device."""
         if device is None:
@@ -67,16 +67,16 @@ class EmbeddingProcessor:
 
     def calculate_batch_embeddings(
         self,
-        data: List[tuple[str, str]],
+        data: list[tuple[str, str]],
         model_name: str = "facebook/esm2_t33_650M_UR50D",
         batch_size: int = 16,
-        num_gpus: Optional[int] = None,
-        db: Optional[DatabaseConnector] = None,
+        num_gpus: int | None = None,
+        db: DatabaseConnector | None = None,
         embedding_type: Literal[
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
         normalize: bool = True,
-    ) -> Optional[List[NDArray[np.float64]]]:
+    ) -> list[NDArray[np.float64]] | None:
         """
         Calculate embeddings for a batch of sequences with automatic device management.
 
@@ -174,21 +174,19 @@ class EmbeddingProcessor:
                     all_embeddings.extend(embeddings)
 
         end_time = time.time()
-        logger.info(
-            f"Batch processing completed in {end_time - start_time:.2f} seconds"
-        )
+        logger.info(f"Batch processing completed in {end_time - start_time:.2f} seconds")
 
         return all_embeddings if db is None else None
 
     def _process_batch_single_device(
         self,
-        data: List[tuple[str, str]],
+        data: list[tuple[str, str]],
         model: BaseEmbeddingModel,
         batch_size: int,
-        db: Optional[DatabaseConnector] = None,
+        db: DatabaseConnector | None = None,
         embedding_type: str = "last_hidden_state",
         normalize: bool = True,
-    ) -> List[NDArray[np.float64]]:
+    ) -> list[NDArray[np.float64]]:
         """Process batch on a single device."""
         all_embeddings = []
 
@@ -196,7 +194,7 @@ class EmbeddingProcessor:
             batch_end = min(batch_start + batch_size, len(data))
             batch = data[batch_start:batch_end]
 
-            accessions, sequences = zip(*batch)
+            accessions, sequences = zip(*batch, strict=False)
             current_batch_size = len(sequences)
             logger.info(f"Processing {len(sequences)} sequences")
 
@@ -206,23 +204,17 @@ class EmbeddingProcessor:
                     if embedding_type == "last_hidden_state":
                         # no batching for last hidden state
                         embeddings_batch = [
-                            model.get_single_embedding_last_hidden_state(
-                                seq, normalize=normalize
-                            )
+                            model.get_single_embedding_last_hidden_state(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "all_layers":
                         embeddings_batch = [
-                            model.get_single_embedding_all_layers(
-                                seq, normalize=normalize
-                            )
+                            model.get_single_embedding_all_layers(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "first_layer":
                         embeddings_batch = [
-                            model.get_single_embedding_first_layer(
-                                seq, normalize=normalize
-                            )
+                            model.get_single_embedding_first_layer(seq, normalize=normalize)
                             for seq in sequences[:current_batch_size]
                         ]
                     elif embedding_type == "final_embeddings":
@@ -245,9 +237,7 @@ class EmbeddingProcessor:
                 except torch.cuda.OutOfMemoryError:
                     torch.cuda.empty_cache()
                     current_batch_size = max(1, current_batch_size // 2)
-                    logger.warning(
-                        f"Reduced batch size to {current_batch_size} due to OOM error."
-                    )
+                    logger.warning(f"Reduced batch size to {current_batch_size} due to OOM error.")
 
         return all_embeddings
 
@@ -258,7 +248,7 @@ class EmbeddingProcessor:
         embedding_type: Literal[
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
-        device: Optional[torch.device] = None,
+        device: torch.device | None = None,
         normalize: bool = True,
     ) -> NDArray[np.float64]:
         """
@@ -277,9 +267,7 @@ class EmbeddingProcessor:
         model = self.get_or_create_model(model_name, device)
 
         if embedding_type == "last_hidden_state":
-            return model.get_single_embedding_last_hidden_state(
-                sequence, normalize=normalize
-            )
+            return model.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
         elif embedding_type == "all_layers":
             return model.get_single_embedding_all_layers(sequence, normalize=normalize)
         elif embedding_type == "first_layer":
@@ -294,7 +282,7 @@ class EmbeddingProcessor:
         db: DatabaseConnector,
         batch_size: int = 16,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        num_gpus: Optional[int] = None,
+        num_gpus: int | None = None,
         embedding_type: Literal[
             "last_hidden_state", "all_layers", "first_layer", "final_embeddings"
         ] = "last_hidden_state",
@@ -340,10 +328,10 @@ class EmbeddingProcessor:
     # Legacy compatibility methods (for backward compatibility with existing processor.py)
     def process_batches_on_gpu(
         self,
-        data: List[tuple[str, str]],
+        data: list[tuple[str, str]],
         batch_size: int,
-        model: Union[Any, DataParallel[Module]],
-        tokenizer: Union[Any, None],
+        model: Any | DataParallel[Module],
+        tokenizer: Any | None,
         db: DatabaseConnector,
         device: torch.device,
         normalize: bool = True,
@@ -354,8 +342,8 @@ class EmbeddingProcessor:
         )
 
         # Convert to new interface
-        accessions, sequences = zip(*data)
-        embedding_data = list(zip(accessions, sequences))
+        accessions, sequences = zip(*data, strict=False)
+        embedding_data = list(zip(accessions, sequences, strict=False))
 
         # Use new method
         self.calculate_batch_embeddings(
@@ -364,13 +352,13 @@ class EmbeddingProcessor:
 
     def get_batch_embeddings_unified(
         self,
-        batch_sequences: List[str],
-        model: Union[Any, DataParallel[Module]],
-        tokenizer: Union[Any, None],
+        batch_sequences: list[str],
+        model: Any | DataParallel[Module],
+        tokenizer: Any | None,
         device: torch.device = torch.device("cuda:0"),
         pool_embeddings: bool = True,
         normalize: bool = True,
-    ) -> List[NDArray[np.float64]]:
+    ) -> list[NDArray[np.float64]]:
         """Legacy method for backward compatibility."""
         logger.warning("Using legacy get_batch_embeddings_unified method.")
 
@@ -484,19 +472,13 @@ class EmbeddingProcessor:
                 sequence, normalize=normalize
             )
         elif embedding_type == "all_layers":
-            return embedding_model.get_single_embedding_all_layers(
-                sequence, normalize=normalize
-            )
+            return embedding_model.get_single_embedding_all_layers(sequence, normalize=normalize)
         elif embedding_type == "first_layer":
-            return embedding_model.get_single_embedding_first_layer(
-                sequence, normalize=normalize
-            )
+            return embedding_model.get_single_embedding_first_layer(sequence, normalize=normalize)
         else:
             raise ValueError(f"Unknown embedding_type: {embedding_type}")
 
-    def remove_model(
-        self, model_name: str, device: Optional[torch.device] = None
-    ) -> None:
+    def remove_model(self, model_name: str, device: torch.device | None = None) -> None:
         """
         Remove a specific model from the processor's cache and clean up its resources.
 

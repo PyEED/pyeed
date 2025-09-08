@@ -2,7 +2,7 @@
 ESMC model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -20,7 +20,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, model_name: str, device: torch.device):
         super().__init__(model_name, device)
 
-    def load_model(self) -> Tuple[ESMC, None]:
+    def load_model(self) -> tuple[ESMC, None]:
         """Load ESMC model with improved error handling."""
         try:
             # Try to disable tqdm to avoid threading issues
@@ -45,9 +45,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 import time
 
                 # Add a small delay and retry
-                time.sleep(
-                    0.1 + torch.cuda.current_device() * 0.05
-                )  # Staggered delay per GPU
+                time.sleep(0.1 + torch.cuda.current_device() * 0.05)  # Staggered delay per GPU
 
                 try:
                     # Try importing tqdm and resetting its state
@@ -67,9 +65,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                     return model, None
 
                 except Exception as retry_error:
-                    logger.error(
-                        f"ESMC model loading failed even after retry: {retry_error}"
-                    )
+                    logger.error(f"ESMC model loading failed even after retry: {retry_error}")
                     raise retry_error
             else:
                 logger.error(f"ESMC model loading failed: {e}")
@@ -80,8 +76,8 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
         return ESMProtein(sequence=sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
-    ) -> List[NDArray[np.float64]]:
+        self, sequences: list[str], pool_embeddings: bool = True, normalize: bool = True
+    ) -> list[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESMC."""
         if self.model is None:
             self.load_model()
@@ -135,14 +131,10 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
             )
             # Ensure hidden_states is not None before accessing it
             if logits_output.hidden_states is None:
-                raise ValueError(
-                    "Model did not return hidden states. Check LogitsConfig settings."
-                )
+                raise ValueError("Model did not return hidden states. Check LogitsConfig settings.")
 
             # remove special tokens
-            embedding = (
-                logits_output.hidden_states[-1][0][1:-1].to(torch.float32).cpu().numpy()
-            )
+            embedding = logits_output.hidden_states[-1][0][1:-1].to(torch.float32).cpu().numpy()
 
         if normalize:
             embedding = normalize_embedding(embedding)
@@ -209,20 +201,14 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 ),
             )
             if logits_output.hidden_states is None:
-                raise ValueError(
-                    "Model did not return hidden states. Check LogitsConfig settings."
-                )
-            embedding = (
-                logits_output.hidden_states[0][0].to(torch.float32).cpu().numpy()
-            )
+                raise ValueError("Model did not return hidden states. Check LogitsConfig settings.")
+            embedding = logits_output.hidden_states[0][0].to(torch.float32).cpu().numpy()
 
         if normalize:
             embedding = normalize_embedding(embedding)
         return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(
-        self, sequence: str, normalize: bool = True
-    ) -> NDArray[np.float64]:
+    def get_final_embeddings(self, sequence: str, normalize: bool = True) -> NDArray[np.float64]:
         """
         Get final embeddings for ESMC with robust fallback.
 
@@ -235,9 +221,7 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                 [sequence], pool_embeddings=True, normalize=normalize
             )
             if embeddings and len(embeddings) > 0:
-                return cast(
-                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
-                )
+                return cast(NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64))
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -267,17 +251,13 @@ class ESMCEmbeddingModel(BaseEmbeddingModel):
                         # Drop special tokens and pool
                         embeddings = embeddings[:, 1:-1, :].mean(axis=1)[0]
                         if normalize:
-                            embeddings = normalize_embedding(embeddings.reshape(1, -1))[
-                                0
-                            ]
+                            embeddings = normalize_embedding(embeddings.reshape(1, -1))[0]
                         return cast(
                             NDArray[np.float64],
                             np.asarray(embeddings, dtype=np.float64),
                         )
                 except Exception as minimal_error:
-                    raise ValueError(
-                        f"ESMC embedding extraction failed with OOM: {minimal_error}"
-                    )
+                    raise ValueError(f"ESMC embedding extraction failed with OOM: {minimal_error}")
             else:
                 raise e
         except Exception as e:

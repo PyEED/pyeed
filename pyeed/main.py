@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 import httpx
 from rich.progress import (
@@ -60,7 +60,7 @@ async def ingest_uniprot(
     if not to_fetch:
         return
 
-    queue: asyncio.Queue[Optional[Protein]] = asyncio.Queue(maxsize=batch_size * 2)
+    queue: asyncio.Queue[Protein | None] = asyncio.Queue(maxsize=batch_size * 2)
     adapter = UniProtAdapter()
 
     progress = Progress(
@@ -85,7 +85,7 @@ async def ingest_uniprot(
         await queue.put(None)
 
     async def consumer(upsert_task_id: TaskID) -> None:
-        batch: List[Protein] = []
+        batch: list[Protein] = []
         while True:
             item = await queue.get()
             if item is None:
@@ -113,16 +113,17 @@ if __name__ == "__main__":
     import asyncio
 
     # load accessions from ids.tsv (3rd column or whole line fallback)
-    ids: List[str] = []
+    ids: list[str] = []
     path = "ids.tsv"
-    with open(path, "r") as f:
+    with open(path) as f:
         next(f, None)
         for line in f:
             s = line.strip()
             if not s or s.startswith("#"):
                 continue
             parts = s.split("\t")
-            ids.append(parts[2] if len(parts) > 2 else parts[0])
+            col = 2
+            ids.append(parts[2] if len(parts) > col else parts[0])
 
     db = Database()
     db.verify_connection()

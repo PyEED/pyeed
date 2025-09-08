@@ -1,4 +1,4 @@
-from typing import Annotated, ClassVar, List, Optional, Tuple
+from typing import Annotated, ClassVar
 
 from pydantic import Field
 
@@ -12,23 +12,23 @@ class Molecule(PyeedBase):
     chebi_id: Annotated[str, LabelProperty(unique=True)] = Field(
         description="ChEBI identifier",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         description="Molecule name",
     )
-    smiles: Optional[str] = Field(
+    smiles: str | None = Field(
         None,
         description="SMILES representation",
     )
-    inchi: Optional[str] = Field(
+    inchi: str | None = Field(
         None,
         description="InChI representation",
     )
-    embedding: List[Embedding] = Field(
+    embedding: list[Embedding] = Field(
         default_factory=list,
         description="Embedding vector",
     )
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
+    EDGES: ClassVar[tuple[Edge, ...]] = (
         Edge(
             parent_label="Reaction",
             rel_name="HAS_SUBSTRATE",

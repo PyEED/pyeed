@@ -1,5 +1,5 @@
 import re
-from typing import Annotated, Any, ClassVar, List, Tuple
+from typing import Annotated, Any, ClassVar
 from uuid import uuid4
 
 from pydantic import Field, ValidationInfo, field_validator
@@ -23,7 +23,7 @@ class Embedding(PyeedBase):
         description="Pooling method",
     )
     vector: Annotated[
-        List[float],
+        list[float],
         LabelProperty(vector_index=True),
     ] = Field(
         ...,
@@ -37,7 +37,7 @@ class Embedding(PyeedBase):
         default_factory=lambda: str(uuid4()),
         description="Embedding identifier",
     )
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
+    EDGES: ClassVar[tuple[Edge, ...]] = (
         Edge(parent_label="Protein", rel_name="HAS_EMBEDDING"),
         Edge(parent_label="Molecule", rel_name="HAS_EMBEDDING"),
     )
@@ -58,7 +58,7 @@ class Embedding(PyeedBase):
 
     @field_validator("vector")
     @classmethod
-    def _check_vector_len(cls, v: List[float], info: ValidationInfo) -> List[float]:
+    def _check_vector_len(cls, v: list[float], info: ValidationInfo) -> list[float]:
         # Access n_dims via info.data (other fields that have already been validated)
         n_dims = info.data.get("n_dims")
         if n_dims is not None and n_dims != len(v):

@@ -1,5 +1,5 @@
 import logging
-from typing import Literal, Optional
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -103,8 +103,8 @@ class EmbeddingTool:
         db: DatabaseConnector,
         perplexity: int = 50,
         n_iter: int = 1000,
-        ids_list: Optional[list[str]] = None,
-        ids_list_labels: Optional[dict[str, str]] = None,
+        ids_list: list[str] | None = None,
+        ids_list_labels: dict[str, str] | None = None,
         random_state: int = 42,
     ) -> tuple[list[str], NDArray[np.float64], list[str], list[str]]:
         """Perform a 2D projection of the embeddings using t-SNE and prepare visualization data.
@@ -170,10 +170,8 @@ class EmbeddingTool:
         ]
 
         for label in labels:
-            if label not in color_label_dict.keys():
-                color_label_dict[label] = cycle_colors[
-                    len(color_label_dict) % len(cycle_colors)
-                ]
+            if label not in color_label_dict:
+                color_label_dict[label] = cycle_colors[len(color_label_dict) % len(cycle_colors)]
 
         # assign the colors
         for label in labels:
@@ -245,12 +243,8 @@ class EmbeddingTool:
                         )
                     else:
                         # Convert the lists to np.array for valid elementwise comparison.
-                        index_matrix_1_id = np.where(
-                            np.array(protein_ids_1) == matrix_2_id
-                        )[0][0]
-                        index_matrix_2_id = np.where(
-                            np.array(protein_ids_2) == matrix_1_id
-                        )[0][0]
+                        index_matrix_1_id = np.where(np.array(protein_ids_1) == matrix_2_id)[0][0]
+                        index_matrix_2_id = np.where(np.array(protein_ids_2) == matrix_1_id)[0][0]
 
                         plt.scatter(
                             distance_matrix_1[i, index_matrix_1_id],
@@ -295,17 +289,11 @@ class EmbeddingTool:
         """
 
         if mode == "cosine":
-            return np.array(
-                1 - sp.distance.cdist(query_embed, target_embed, metric="cosine")
-            )
+            return np.array(1 - sp.distance.cdist(query_embed, target_embed, metric="cosine"))
         elif mode == "euclidean":
-            return np.array(
-                1 / sp.distance.cdist(query_embed, target_embed, metric="euclidean")
-            )
+            return np.array(1 / sp.distance.cdist(query_embed, target_embed, metric="euclidean"))
         else:
-            raise ValueError(
-                f"Invalid mode: {mode}, valid modes are 'cosine' or 'euclidean'"
-            )
+            raise ValueError(f"Invalid mode: {mode}, valid modes are 'cosine' or 'euclidean'")
 
     def create_embedding_vector_index_neo4j(
         self,
@@ -388,9 +376,7 @@ class EmbeddingTool:
         if percent < 100:
             # If not fully populated, show progress bar
             with Progress() as progress:
-                task = progress.add_task(
-                    "[cyan]Waiting for index population...", total=100
-                )
+                task = progress.add_task("[cyan]Waiting for index population...", total=100)
                 progress.update(task, completed=percent)
 
                 while True:
@@ -418,7 +404,6 @@ class EmbeddingTool:
         """
         results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [
-            (str(record["fprotein.accession_id"]), float(record["score"]))
-            for record in results
+            (str(record["fprotein.accession_id"]), float(record["score"])) for record in results
         ]
         return neighbors

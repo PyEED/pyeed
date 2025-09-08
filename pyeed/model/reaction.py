@@ -1,4 +1,4 @@
-from typing import Annotated, ClassVar, List, Optional, Tuple
+from typing import Annotated, ClassVar
 
 from pydantic import Field
 
@@ -13,15 +13,15 @@ class Reaction(PyeedBase):
         ...,
         description="RHEA reaction identifier",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None,
         description="Reaction description",
     )
-    substrates: List[Molecule] = Field(
+    substrates: list[Molecule] = Field(
         default_factory=list,
         description="List of ChEBI identifiers",
     )
-    products: List[Molecule] = Field(
+    products: list[Molecule] = Field(
         default_factory=list,
         description="List of ChEBI identifiers",
     )
@@ -29,6 +29,4 @@ class Reaction(PyeedBase):
         default=False,
         description="Whether the reaction is reversible",
     )
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
-        Edge(parent_label="Protein", rel_name="CATALYZES"),
-    )
+    EDGES: ClassVar[tuple[Edge, ...]] = (Edge(parent_label="Protein", rel_name="CATALYZES"),)

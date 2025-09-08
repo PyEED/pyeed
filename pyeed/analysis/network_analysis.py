@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Any
 
 import networkx as nx
 from loguru import logger
+
 from pyeed.dbconnect import DatabaseConnector
 
 
@@ -43,9 +44,9 @@ class NetworkAnalysis:
 
     def create_graph(
         self,
-        nodes: Optional[list[str]] = None,
-        relationships: Optional[list[str]] = None,
-        ids: Optional[list[str]] = None,
+        nodes: list[str] | None = None,
+        relationships: list[str] | None = None,
+        ids: list[str] | None = None,
     ) -> nx.Graph:
         """
         Creates a graph using data from the Neo4j database with specified filters.
@@ -106,9 +107,7 @@ class NetworkAnalysis:
         # Process nodes
         nodes_data = results[0]["nodes"]
         for node in nodes_data:
-            self.graph.add_node(
-                node["id"], labels=node["labels"], properties=node["properties"]
-            )
+            self.graph.add_node(node["id"], labels=node["labels"], properties=node["properties"])
         logger.info(f"Added {len(nodes_data)} nodes to the graph")
 
         # Process relationships
@@ -230,17 +229,15 @@ class NetworkAnalysis:
                         if edge[2]["type"] == type_relationship:
                             if edge[2]["properties"][attribute] >= threshold:
                                 edges_filtered.append(edge)
-                    else:
-                        if edge[2]["properties"][attribute] >= threshold:
-                            edges_filtered.append(edge)
+                    elif edge[2]["properties"][attribute] >= threshold:
+                        edges_filtered.append(edge)
                 elif mode == "HIDE_OVER_THRESHOLD":
                     if type_relationship is not None:
                         if edge[2]["type"] == type_relationship:
                             if edge[2]["properties"][attribute] <= threshold:
                                 edges_filtered.append(edge)
-                    else:
-                        if edge[2]["properties"][attribute] <= threshold:
-                            edges_filtered.append(edge)
+                    elif edge[2]["properties"][attribute] <= threshold:
+                        edges_filtered.append(edge)
 
         logger.debug(f"Number of edges filtered: {len(edges) - len(edges_filtered)}")
 
@@ -250,9 +247,7 @@ class NetworkAnalysis:
         filtered_graph.add_edges_from(edges_filtered)
 
         # Find self-referential nodes
-        self_referential_edges = self.find_self_referential_nodes(
-            type_relationship, filtered_graph
-        )
+        self_referential_edges = self.find_self_referential_nodes(type_relationship, filtered_graph)
         logger.info(f"Number of self-referential edges: {len(self_referential_edges)}")
         filtered_graph.remove_edges_from(self_referential_edges)
 

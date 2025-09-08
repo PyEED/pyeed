@@ -2,7 +2,7 @@
 ESM-2 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
     def __init__(self, model_name: str, device: torch.device):
         super().__init__(model_name, device)
 
-    def load_model(self) -> Tuple[EsmModel, EsmTokenizer]:
+    def load_model(self) -> tuple[EsmModel, EsmTokenizer]:
         """Load ESM-2 model and tokenizer."""
         token = get_hf_token()
 
@@ -45,8 +45,8 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         return sequence
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
-    ) -> List[NDArray[np.float64]]:
+        self, sequences: list[str], pool_embeddings: bool = True, normalize: bool = True
+    ) -> list[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESM-2."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -58,9 +58,9 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
         embeddings = []
 
         for sequence in sequences:
-            inputs = tokenizer(
-                sequence, padding=True, truncation=True, return_tensors="pt"
-            ).to(self.device)
+            inputs = tokenizer(sequence, padding=True, truncation=True, return_tensors="pt").to(
+                self.device
+            )
 
             with torch.no_grad():
                 outputs = model(**inputs, output_hidden_states=True)
@@ -154,9 +154,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
             embedding = normalize_embedding(embedding)
         return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(
-        self, sequence: str, normalize: bool = True
-    ) -> NDArray[np.float64]:
+    def get_final_embeddings(self, sequence: str, normalize: bool = True) -> NDArray[np.float64]:
         """
         Get final embeddings for ESM2 with robust fallback.
         """
@@ -165,9 +163,7 @@ class ESM2EmbeddingModel(BaseEmbeddingModel):
                 [sequence], pool_embeddings=True, normalize=normalize
             )
             if embeddings and len(embeddings) > 0:
-                return cast(
-                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
-                )
+                return cast(NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64))
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:

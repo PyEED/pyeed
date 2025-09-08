@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterable as _Iter
 from dataclasses import dataclass
-from typing import Any, ClassVar, Optional, Tuple
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -22,17 +22,15 @@ class LabelProperty:
 class Edge:
     parent_label: str
     rel_name: str
-    field_name: Optional[str] = None
+    field_name: str | None = None
 
 
 class PyeedBase(BaseModel):
     """Base class for all nodes in the Database."""
 
-    EDGES: ClassVar[Tuple[Edge, ...]] = ()
+    EDGES: ClassVar[tuple[Edge, ...]] = ()
 
-    model_config = ConfigDict(
-        frozen=False, validate_assignment=True, use_enum_values=True
-    )
+    model_config = ConfigDict(frozen=False, validate_assignment=True, use_enum_values=True)
 
     custom: dict[str, Any] = Field(
         default_factory=dict, description="Arbitrary custom data as key-value pairs"
@@ -52,9 +50,7 @@ class PyeedBase(BaseModel):
         # Collect field names from current class and all parent classes
         while current_class and current_class != BaseModel:
             field_names.update(current_class.model_fields.keys())
-            current_class = (
-                current_class.__bases__[0] if current_class.__bases__ else None
-            )
+            current_class = current_class.__bases__[0] if current_class.__bases__ else None
 
         # Check for conflicts
         conflicting_keys = []
@@ -65,9 +61,7 @@ class PyeedBase(BaseModel):
 
         for key, value in v.items():
             # Check for conflicts with existing attributes
-            if key in field_names:
-                conflicting_keys.append(key)
-            elif key == "custom":
+            if key in field_names or key == "custom":
                 conflicting_keys.append(key)
 
             # Check if key is a valid Python variable name
@@ -83,35 +77,32 @@ class PyeedBase(BaseModel):
 
         if conflicting_keys:
             raise ValueError(
-                f"Custom field keys cannot conflict with existing attributes or be 'custom': {conflicting_keys}"
+                f"Custom field keys cannot conflict with existing attributes or be 'custom': "
+                f"{conflicting_keys}"
             )
 
         if invalid_keys:
             raise ValueError(
                 f"Invalid custom field keys: {invalid_keys}. "
-                f"Keys must start with a letter or underscore and contain only letters, digits, or underscores."
+                f"Keys must start with a letter or underscore and contain only letters, digits, "
+                f"or underscores."
             )
 
         return v
 
     @classmethod
-    def resolve_edge(cls, parent_label: str, field_name: Optional[str]) -> str:
+    def resolve_edge(cls, parent_label: str, field_name: str | None) -> str:
         exact = [
-            e
-            for e in cls.EDGES
-            if e.parent_label == parent_label and e.field_name == field_name
+            e for e in cls.EDGES if e.parent_label == parent_label and e.field_name == field_name
         ]
         if len(exact) == 1:
             return exact[0].rel_name
         if len(exact) > 1:
             raise ValueError(
-                f"{cls.__name__}: multiple edges match parent='{parent_label}', field='{field_name}'."
+                f"{cls.__name__}: multiple edges match parent='{parent_label}', "
+                f"field='{field_name}'."
             )
-        generic = [
-            e
-            for e in cls.EDGES
-            if e.parent_label == parent_label and e.field_name is None
-        ]
+        generic = [e for e in cls.EDGES if e.parent_label == parent_label and e.field_name is None]
         if len(generic) == 1:
             return generic[0].rel_name
         if not generic:
@@ -140,10 +131,7 @@ class PyeedBase(BaseModel):
         for field_name, field_info in type(self).model_fields.items():
             if not field_info.metadata:
                 continue
-            if (
-                isinstance(field_info.metadata[0], LabelProperty)
-                and field_info.metadata[0].unique
-            ):
+            if isinstance(field_info.metadata[0], LabelProperty) and field_info.metadata[0].unique:
                 return field_name
 
         raise ValueError(
@@ -178,9 +166,7 @@ class PyeedBase(BaseModel):
                     f"to connect from parent '{parent_label}' via field '{field_name}'."
                 )
 
-            rel_type = child_cls.resolve_edge(
-                parent_label=parent_label, field_name=field_name
-            )
+            rel_type = child_cls.resolve_edge(parent_label=parent_label, field_name=field_name)
 
             sl, sk = parent_label, parent.get_unique_model_field()
             dl, dk = child_cls.__name__, child.get_unique_model_field()
@@ -189,13 +175,13 @@ class PyeedBase(BaseModel):
             rels.append({"type": rel_type, "src": (sl, sk, sv), "dst": (dl, dk, dv)})
 
         def walk(parent: "PyeedBase") -> None:
-            for fname in parent.model_dump().keys():
+            for fname in parent.model_dump():
                 val = getattr(parent, fname, None)
                 if isinstance(val, PyeedBase):
                     ensure_node(val)
                     connect(parent, fname, val)
                     walk(val)
-                elif isinstance(val, _Iter) and not isinstance(val, (str, bytes, dict)):
+                elif isinstance(val, _Iter) and not isinstance(val, str | bytes | dict):
                     for item in val:
                         if isinstance(item, PyeedBase):
                             ensure_node(item)
@@ -209,13 +195,13 @@ class PyeedBase(BaseModel):
 
 def _is_neo4j_primitive(x: object) -> bool:
     """Check if a value is a Neo4j primitive."""
-    return isinstance(x, (str, int, float, bool)) or x is None
+    return isinstance(x, str | int | float | bool) or x is None
 
 
 def _is_neo4j_prop_value(v: object) -> bool:
     """Check if a value is a Neo4j property value."""
     if _is_neo4j_primitive(v):
         return True
-    if isinstance(v, (list, tuple)):
+    if isinstance(v, list | tuple):
         return all(_is_neo4j_primitive(e) for e in v)
     return False

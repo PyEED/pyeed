@@ -11,7 +11,7 @@ from .prott5 import ProtT5EmbeddingModel
 
 __all__ = [
     "ESM2EmbeddingModel",
-    "ESMCEmbeddingModel",
     "ESM3EmbeddingModel",
+    "ESMCEmbeddingModel",
     "ProtT5EmbeddingModel",
 ]

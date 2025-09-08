@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any, Dict, Iterable, List, Tuple
+from collections.abc import Iterable
+from typing import Any
 
 import dotenv
 from neo4j import AsyncGraphDatabase, AsyncSession, GraphDatabase
@@ -49,12 +50,12 @@ class Database:
         self,
         query: str,
         **params: Any,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         with self.driver.session() as session:
             result = session.run(query, **params)
             return [record.data() for record in result]
 
-    async def sync_schema(self, models: List[type[PyeedBase]]) -> None:
+    async def sync_schema(self, models: list[type[PyeedBase]]) -> None:
         """
         Synchronize database schema from model definitions.
 
@@ -112,15 +113,16 @@ class Database:
         q = (
             f"CREATE VECTOR INDEX {idx_name} IF NOT EXISTS "
             f"FOR (n:Embedding) ON (n.`{safe_prop}`) "
-            "OPTIONS {indexConfig: { `vector.dimensions`: $dim, `vector.similarity_function`: $sim }}"
+            "OPTIONS {indexConfig: { `vector.dimensions`: $dim, "
+            "`vector.similarity_function`: $sim }}"
         )
         await session.run(q, dim=dims, sim=sim)
         self._vec_index_cache.add(prop)
 
     async def bulk_upsert(
         self,
-        nodes: List[Dict[str, Any]],
-        edges: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
         tx_size: int = 5000,
     ) -> None:
         """
@@ -159,7 +161,7 @@ class Database:
                 await self._ensure_vector_index(session, prop, dim)
 
             # Nodes by label
-            buckets: Dict[str, Tuple[str, List[Dict[str, Any]]]] = {}
+            buckets: dict[str, tuple[str, list[dict[str, Any]]]] = {}
             for n in nodes:
                 lbl = n["label"]
                 key_name, key_val = n["key"]
@@ -178,7 +180,7 @@ class Database:
                     await session.run(q, rows=chunk)
 
             # 2) Relationships grouped by (etype, sl, sk, dl, dk)
-            groups: Dict[Tuple[str, str, str, str, str], List[Dict[str, Any]]] = {}
+            groups: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = {}
             for e in edges:
                 sl, sk, sv = e["src"]
                 dl, dk, dv = e["dst"]

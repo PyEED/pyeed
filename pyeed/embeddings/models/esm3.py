@@ -2,7 +2,7 @@
 ESM-3 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
     def __init__(self, model_name: str, device: torch.device):
         super().__init__(model_name, device)
 
-    def load_model(self) -> Tuple[ESM3, None]:
+    def load_model(self) -> tuple[ESM3, None]:
         """Load ESM3 model."""
         model = ESM3.from_pretrained("esm3_sm_open_v1")
         model = model.to(self.device)
@@ -33,8 +33,8 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
         return ESMProtein(sequence=sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
-    ) -> List[NDArray[np.float64]]:
+        self, sequences: list[str], pool_embeddings: bool = True, normalize: bool = True
+    ) -> list[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ESM3."""
         if self.model is None:
             self.load_model()
@@ -53,9 +53,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 )
                 if result is None or result.per_residue_embedding is None:
                     raise ValueError("Model did not return embeddings")
-                embeddings = (
-                    result.per_residue_embedding.to(torch.float32).cpu().numpy()
-                )
+                embeddings = result.per_residue_embedding.to(torch.float32).cpu().numpy()
                 if pool_embeddings:
                     embeddings = embeddings.mean(axis=0)
                 if normalize:
@@ -145,9 +143,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
             embedding = normalize_embedding(embedding)
         return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(
-        self, sequence: str, normalize: bool = True
-    ) -> NDArray[np.float64]:
+    def get_final_embeddings(self, sequence: str, normalize: bool = True) -> NDArray[np.float64]:
         """
         Get final embeddings for ESM3 with robust fallback.
         """
@@ -156,9 +152,7 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                 [sequence], pool_embeddings=True, normalize=normalize
             )
             if embeddings and len(embeddings) > 0:
-                return cast(
-                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
-                )
+                return cast(NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64))
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -180,17 +174,15 @@ class ESM3EmbeddingModel(BaseEmbeddingModel):
                         embeddings = logits_output.embeddings.cpu().numpy()
                         pooled_embedding = embeddings.mean(axis=1)[0]
                         if normalize:
-                            pooled_embedding = normalize_embedding(
-                                pooled_embedding.reshape(1, -1)
-                            )[0]
+                            pooled_embedding = normalize_embedding(pooled_embedding.reshape(1, -1))[
+                                0
+                            ]
                         return cast(
                             NDArray[np.float64],
                             np.asarray(pooled_embedding, dtype=np.float64),
                         )
                 except Exception as minimal_error:
-                    raise ValueError(
-                        f"ESM3 embedding extraction failed with OOM: {minimal_error}"
-                    )
+                    raise ValueError(f"ESM3 embedding extraction failed with OOM: {minimal_error}")
             else:
                 raise e
         except Exception as e:

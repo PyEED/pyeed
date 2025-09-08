@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from typing import List
-
-from typing_extensions import get_args, get_origin
+from typing import get_args, get_origin
 
 from .pyeedbase import LabelProperty, PyeedBase
 
@@ -25,7 +23,7 @@ class VectorSpec:
 
 
 def collect_schema(
-    models: List[type[PyeedBase]],
+    models: list[type[PyeedBase]],
 ) -> tuple[list[UniqueSpec], list[BtreeSpec], list[VectorSpec]]:
     """Collect schema information from a list of models inheriting from BaseNode."""
     uniques: list[UniqueSpec] = []

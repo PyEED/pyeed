@@ -7,7 +7,7 @@
 ## About 📖
 `pyeed` is a library for creating custom Sequence Databases from primary databases such as UniProt. pyeed provides an extensible data model, structuring information on sequences, annotations and their embeddings.
 
-![PyEED Graph Model](./docs/graph.png)
+![PyEED Graph Model](./figs/graph.png)
 
 ## Installation ⚙️
 

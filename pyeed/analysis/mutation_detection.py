@@ -1,6 +1,7 @@
-from typing import Any, Optional
+from typing import Any
 
 from loguru import logger
+
 from pyeed.dbconnect import DatabaseConnector
 
 
@@ -15,7 +16,7 @@ class MutationDetection:
         db: DatabaseConnector,
         standard_numbering_tool_name: str,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> tuple[dict[str, str], dict[str, list[str]]]:
         """
         Fetch sequence and standard numbering position data for two sequences from the database.
@@ -45,9 +46,7 @@ class MutationDetection:
             AND s.name = '{standard_numbering_tool_name}'
             RETURN p.accession_id as id, p.sequence as sequence, rel2.positions as positions, rel.start as start, rel.end as end
             """
-            results = db.execute_read(
-                query, parameters={"region_ids_neo4j": region_ids_neo4j}
-            )
+            results = db.execute_read(query, parameters={"region_ids_neo4j": region_ids_neo4j})
         else:
             query = f"""
             MATCH (p:{node_type})-[r:HAS_STANDARD_NUMBERING]->(s:StandardNumbering)
@@ -63,14 +62,10 @@ class MutationDetection:
             )
         if region_ids_neo4j is not None:
             sequences = {
-                results[i]["id"]: results[i]["sequence"][
-                    results[i]["start"] : results[i]["end"]
-                ]
+                results[i]["id"]: results[i]["sequence"][results[i]["start"] : results[i]["end"]]
                 for i in range(len(results))
             }
-            positions = {
-                results[i]["id"]: results[i]["positions"] for i in range(len(results))
-            }
+            positions = {results[i]["id"]: results[i]["positions"] for i in range(len(results))}
 
             return sequences, positions
         else:
@@ -134,7 +129,7 @@ class MutationDetection:
         sequence_id1: str,
         sequence_id2: str,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> None:
         """
         Save detected mutations to the database as relationships between nodes.
@@ -241,7 +236,7 @@ class MutationDetection:
         standard_numbering_tool_name: str,
         save_to_db: bool = True,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> dict[str, list[int | str]]:
         """
         Get mutations between two sequences using standard numbering and optionally save them to the database.

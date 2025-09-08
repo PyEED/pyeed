@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "pyeed"
+version = "1.0.0"
+description = "Toolkit to create, annotate, and analyze sequence data"
+authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+neo4j = "5.19.*"
+httpx = "^0.27.0"
+tenacity = "^8.3.0"
+rich = "^13.0.0"
+torch = "^2.4.1"
+transformers = "^4.45.2"
+esm = "^3.1.3"
+python-dotenv = "^1.1.1"
+ipywidgets = "^8.1.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.1"
+ruff = "^0.4.1"
+devtools = "^0.12.2"
+mypy = "^1.14.1"
+matplotlib = "^3.9.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+check_untyped_defs = true
+strict = true
+
+[tool.ruff.lint]
+extend-select = ["I"]

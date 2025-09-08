@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, AsyncIterator, Dict, Iterable, List, Optional
+from collections.abc import AsyncIterator, Iterable
+from typing import Any
 
 import httpx
 from tenacity import (
@@ -39,7 +40,7 @@ RETURN_FIELDS = ",".join(
 )
 
 
-def _build_query_for_accessions(accessions: List[str]) -> str:
+def _build_query_for_accessions(accessions: list[str]) -> str:
     """Concatenates the accessions into a query string"""
     return "(" + " OR ".join(f"accession:{acc}" for acc in accessions) + ")"
 
@@ -60,7 +61,7 @@ class UniProtAdapter:
         query: str,
         fields: str = RETURN_FIELDS,
         size: int = 500,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         params = {
             "query": query,
             "format": "json",
@@ -68,11 +69,9 @@ class UniProtAdapter:
             "size": str(min(size, 500)),  # UniProt caps at 500/page
         }
 
-        url: Optional[str] = UNIPROT_SEARCH
+        url: str | None = UNIPROT_SEARCH
         while url:
-            r = await client.get(
-                url, params=params, headers=self.headers, timeout=self.timeout
-            )
+            r = await client.get(url, params=params, headers=self.headers, timeout=self.timeout)
             r.raise_for_status()
             data = r.json()
 
@@ -80,7 +79,7 @@ class UniProtAdapter:
                 yield rec
 
             # Follow RFC5988 Link header: rel="next"
-            nxt: Optional[str] = None
+            nxt: str | None = None
             link = r.headers.get("Link")
             if link:
                 for part in link.split(","):
@@ -99,7 +98,7 @@ class UniProtAdapter:
         accessions: Iterable[str],
         chunk_size: int = 50,  # keep URL safe; tune as needed
         size_per_page: int = 50,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Fetches the proteins by accessions from UniProt
         Args:
             client: httpx.AsyncClient
@@ -110,7 +109,7 @@ class UniProtAdapter:
         Returns:
             AsyncIterator[Dict[str, Any]]
         """
-        batch: List[str] = []
+        batch: list[str] = []
         for acc in accessions:
             batch.append(acc)
             if len(batch) >= chunk_size:
@@ -129,11 +128,11 @@ class UniProtAdapter:
             ):
                 yield rec
 
-    def map(self, p: Dict[str, Any]) -> Protein:
+    def map(self, p: dict[str, Any]) -> Protein:
         seq_meta = p.get("sequence") or {}
         sequence = seq_meta.get("value")
         if not isinstance(sequence, str):
-            raise ValueError(f"Entry {p.get('primaryAccession','?')} has no sequence")
+            raise ValueError(f"Entry {p.get('primaryAccession', '?')} has no sequence")
 
         desc = p.get("proteinDescription") or {}
         rec = desc.get("recommendedName") or {}
@@ -142,7 +141,7 @@ class UniProtAdapter:
         ecs = rec.get("ecNumbers") or []
         ec_numbers = [ec.get("value") for ec in ecs if isinstance(ec.get("value"), str)]
 
-        gos: List[GOAnnotation] = []
+        gos: list[GOAnnotation] = []
         for x in p.get("uniProtKBCrossReferences", []):
             if x.get("database") != "GO":
                 continue
@@ -150,11 +149,7 @@ class UniProtAdapter:
             if not gid.startswith("GO:"):
                 continue
             term = next(
-                (
-                    d.get("value")
-                    for d in x.get("properties", [])
-                    if d.get("key") == "GoTerm"
-                ),
+                (d.get("value") for d in x.get("properties", []) if d.get("key") == "GoTerm"),
                 None,
             )
             if term:
@@ -168,7 +163,7 @@ class UniProtAdapter:
             "metal ion-binding site": AnnotationType.BINDING_SITE,
             "nucleotide phosphate-binding region": AnnotationType.BINDING_SITE,
         }
-        anns: List[Annotation] = []
+        anns: list[Annotation] = []
         for feature in p.get("features", []):
             f_type = (feature.get("type") or "").lower().strip()
             annot_type = fmap.get(f_type)
@@ -177,12 +172,7 @@ class UniProtAdapter:
             loc = feature.get("location") or {}
             start = (loc.get("start") or {}).get("value")
             end = (loc.get("end") or {}).get("value")
-            if (
-                not isinstance(start, int)
-                or not isinstance(end, int)
-                or start <= 0
-                or end < start
-            ):
+            if not isinstance(start, int) or not isinstance(end, int) or start <= 0 or end < start:
                 continue
 
             description = feature.get("description") or None
@@ -199,7 +189,7 @@ class UniProtAdapter:
             )
 
         rhea_rx = re.compile(r"^RHEA:\d+$")
-        rx: List[Reaction] = []
+        rx: list[Reaction] = []
         for c in p.get("comments", []):
             if (c.get("commentType") or "").lower() != "catalytic activity":
                 continue

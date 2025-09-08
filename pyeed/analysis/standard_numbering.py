@@ -10,7 +10,7 @@ Dependencies:
 - ClustalOmega: For multiple sequence alignment.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -46,7 +46,7 @@ class StandardNumberingTool:
         base_sequence_id: str,
         db: DatabaseConnector,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> dict[str, str]:
         """
         Retrieve the base node sequence from the database for a given accession id.
@@ -95,7 +95,7 @@ class StandardNumberingTool:
         db: DatabaseConnector,
         positions: dict[str, list[str]],
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> None:
         """
         Save the calculated numbering positions for each protein into the database.
@@ -117,23 +117,21 @@ class StandardNumberingTool:
                     WHERE elementId(r) IN $region_ids_neo4j
                     MATCH (s:StandardNumbering {{name: '{self.name}'}})
                     MERGE (r)-[rel:HAS_STANDARD_NUMBERING]->(s)
-                    SET rel.positions = {str(positions[protein_id])}
+                    SET rel.positions = {positions[protein_id]!s}
                 """
-                db.execute_write(
-                    query, parameters={"region_ids_neo4j": region_ids_neo4j}
-                )
+                db.execute_write(query, parameters={"region_ids_neo4j": region_ids_neo4j})
             else:
                 query = f"""
                     MATCH (p:{node_type} {{accession_id: '{protein_id}'}})
                     MATCH (s:StandardNumbering {{name: '{self.name}'}})
                     MERGE (p)-[rel:HAS_STANDARD_NUMBERING]->(s)
-                    SET rel.positions = {str(positions[protein_id])}
+                    SET rel.positions = {positions[protein_id]!s}
                 """
                 db.execute_write(query)
 
     def run_numbering_algorithm_clustalo(
         self, base_sequence_id: str, alignment: Any
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """
         Compute standard numbering positions for each sequence based on a multiple alignment.
 
@@ -153,7 +151,7 @@ class StandardNumberingTool:
         """
         logger.info(f"Running numbering algorithm for base sequence {base_sequence_id}")
 
-        positions: Dict[str, List[str]] = {}
+        positions: dict[str, list[str]] = {}
 
         # Convert alignment to a list so that it is subscriptable.
         alignment_list = list(alignment)[0][1]
@@ -186,20 +184,13 @@ class StandardNumberingTool:
                     if sequence_id not in positions:
                         positions[sequence_id] = []
                         positions[sequence_id].append("0.1")
+                    # If the last number is already an insert, increase the insert counter
+                    elif "." in positions[sequence_id][-1]:
+                        insert_number = int(positions[sequence_id][-1].split(".")[1])
+                        base_number = int(positions[sequence_id][-1].split(".")[0])
+                        positions[sequence_id].append(f"{base_number}.{insert_number + 1}")
                     else:
-                        # If the last number is already an insert, increase the insert counter
-                        if "." in positions[sequence_id][-1]:
-                            insert_number = int(
-                                positions[sequence_id][-1].split(".")[1]
-                            )
-                            base_number = int(positions[sequence_id][-1].split(".")[0])
-                            positions[sequence_id].append(
-                                f"{base_number}.{insert_number + 1}"
-                            )
-                        else:
-                            positions[sequence_id].append(
-                                f"{positions[sequence_id][-1]}.1"
-                            )
+                        positions[sequence_id].append(f"{positions[sequence_id][-1]}.1")
 
                 # Handle deletion in the target sequence (i.e., gap in target):
                 if base_aa != "-" and sequence[pos] == "-":
@@ -208,43 +199,36 @@ class StandardNumberingTool:
                         positions[sequence_id] = [
                             positions[base_sequence_id][base_seq_counter] + ".GAP"
                         ]
-                    positions[sequence_id].append(
-                        f"{positions[sequence_id][-1].split('.')[0]}.GAP"
-                    )
+                    positions[sequence_id].append(f"{positions[sequence_id][-1].split('.')[0]}.GAP")
 
                 # Both positions are amino acids; advance numbering normally.
                 if base_aa != "-" and sequence[pos] != "-":
                     if sequence_id not in positions:
                         positions[sequence_id] = []
-                        positions[sequence_id].append(
-                            positions[base_sequence_id][base_seq_counter]
-                        )
+                        positions[sequence_id].append(positions[base_sequence_id][base_seq_counter])
+                    # If previous number was an insert, increment the numerical part
+                    elif (
+                        "." in positions[sequence_id][-1]
+                        and "GAP" not in positions[sequence_id][-1]
+                    ):
+                        base_number = int(positions[sequence_id][-1].split(".")[0])
+                        positions[sequence_id].append(f"{base_number + 1}")
                     else:
-                        # If previous number was an insert, increment the numerical part
-                        if (
-                            "." in positions[sequence_id][-1]
-                            and "GAP" not in positions[sequence_id][-1]
-                        ):
-                            base_number = int(positions[sequence_id][-1].split(".")[0])
-                            positions[sequence_id].append(f"{base_number + 1}")
-                        else:
-                            positions[sequence_id].append(
-                                f"{int(positions[base_sequence_id][base_seq_counter])}"
-                            )
+                        positions[sequence_id].append(
+                            f"{int(positions[base_sequence_id][base_seq_counter])}"
+                        )
 
         # Remove any gap placeholders before returning the positions.
         for protein_id in positions:
             positions[protein_id] = [
-                pos
-                for pos in positions[protein_id]
-                if pos is not None and "GAP" not in pos
+                pos for pos in positions[protein_id] if pos is not None and "GAP" not in pos
             ]
 
         return positions
 
     def run_numbering_algorithm_pairwise(
-        self, base_sequence_id: str, alignment: List[Tuple[str, str, str]]
-    ) -> Dict[str, List[str]]:
+        self, base_sequence_id: str, alignment: list[tuple[str, str, str]]
+    ) -> dict[str, list[str]]:
         """
         Compute numbering positions using pairwise alignments relative to a base sequence.
 
@@ -260,7 +244,7 @@ class StandardNumberingTool:
         Returns:
             A dictionary mapping protein accession ids to their list of numbering positions.
         """
-        positions: Dict[str, List[str]] = {}
+        positions: dict[str, list[str]] = {}
         # Initialize base positions by counting non-gap characters in the base aligned sequence.
         positions[base_sequence_id] = [
             str(i + 1) for i in range(len(alignment[0][0].replace("-", "")))
@@ -288,21 +272,14 @@ class StandardNumberingTool:
                     if target_sequence_id not in positions:
                         positions[target_sequence_id] = []
                         positions[target_sequence_id].append("0.1")
+                    elif "." in positions[target_sequence_id][-1]:
+                        insert_number = int(positions[target_sequence_id][-1].split(".")[1])
+                        base_number = int(positions[target_sequence_id][-1].split(".")[0])
+                        positions[target_sequence_id].append(f"{base_number}.{insert_number + 1}")
                     else:
-                        if "." in positions[target_sequence_id][-1]:
-                            insert_number = int(
-                                positions[target_sequence_id][-1].split(".")[1]
-                            )
-                            base_number = int(
-                                positions[target_sequence_id][-1].split(".")[0]
-                            )
-                            positions[target_sequence_id].append(
-                                f"{base_number}.{insert_number + 1}"
-                            )
-                        else:
-                            positions[target_sequence_id].append(
-                                f"{positions[target_sequence_id][-1]}.1"
-                            )
+                        positions[target_sequence_id].append(
+                            f"{positions[target_sequence_id][-1]}.1"
+                        )
 
                 # Handle deletion in the target sequence.
                 if base_sequence[pos] != "-" and target_sequence[pos] == "-":
@@ -322,26 +299,21 @@ class StandardNumberingTool:
                         positions[target_sequence_id].append(
                             positions[base_sequence_id][base_seq_counter]
                         )
+                    elif (
+                        "." in positions[target_sequence_id][-1]
+                        and "GAP" not in positions[target_sequence_id][-1]
+                    ):
+                        base_number = int(positions[target_sequence_id][-1].split(".")[0])
+                        positions[target_sequence_id].append(f"{base_number + 1}")
                     else:
-                        if (
-                            "." in positions[target_sequence_id][-1]
-                            and "GAP" not in positions[target_sequence_id][-1]
-                        ):
-                            base_number = int(
-                                positions[target_sequence_id][-1].split(".")[0]
-                            )
-                            positions[target_sequence_id].append(f"{base_number + 1}")
-                        else:
-                            positions[target_sequence_id].append(
-                                f"{int(positions[base_sequence_id][base_seq_counter])}"
-                            )
+                        positions[target_sequence_id].append(
+                            f"{int(positions[base_sequence_id][base_seq_counter])}"
+                        )
 
         # Remove gap placeholders before returning
         for protein_id in positions:
             positions[protein_id] = [
-                pos
-                for pos in positions[protein_id]
-                if pos is not None and "GAP" not in pos
+                pos for pos in positions[protein_id] if pos is not None and "GAP" not in pos
             ]
 
         return positions
@@ -350,11 +322,11 @@ class StandardNumberingTool:
         self,
         base_sequence_id: str,
         db: DatabaseConnector,
-        list_of_seq_ids: Optional[List[str]] = None,
+        list_of_seq_ids: list[str] | None = None,
         return_positions: bool = False,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
-    ) -> Optional[Dict[str, List[str]]]:
+        region_ids_neo4j: list[str] | None = None,
+    ) -> dict[str, list[str]] | None:
         """
         Apply standard numbering via pairwise alignment using a base sequence.
 
@@ -449,9 +421,7 @@ class StandardNumberingTool:
             raise ValueError("No input sequences provided")
 
         logger.info(f"Input: {input} with length of {len(input)}")
-        logger.info(
-            f"Length of region ids: {len(region_ids_neo4j) if region_ids_neo4j else 0}"
-        )
+        logger.info(f"Length of region ids: {len(region_ids_neo4j) if region_ids_neo4j else 0}")
 
         results_pairwise = pairwise_aligner.align_multipairwise(
             ids=input,  # Combine ids for alignment
@@ -468,7 +438,7 @@ class StandardNumberingTool:
             raise ValueError("Pairwise alignment failed - no results returned")
 
         # Convert results from dicts to a list of tuples with desired order.
-        converted_alignment: List[Tuple[str, str, str]] = [
+        converted_alignment: list[tuple[str, str, str]] = [
             (
                 str(result["query_aligned"]),
                 str(result["target_aligned"]),
@@ -484,9 +454,7 @@ class StandardNumberingTool:
         logger.info(f"Converted alignment: {len(converted_alignment)}")
 
         # Compute positions using the pairwise numbering algorithm.
-        positions = self.run_numbering_algorithm_pairwise(
-            base_sequence_id, converted_alignment
-        )
+        positions = self.run_numbering_algorithm_pairwise(base_sequence_id, converted_alignment)
 
         # Ensure the standard numbering node exists in the database.
         StandardNumbering.get_or_save(
@@ -505,9 +473,9 @@ class StandardNumberingTool:
         self,
         base_sequence_id: str,
         db: DatabaseConnector,
-        list_of_seq_ids: Optional[List[str]] = None,
+        list_of_seq_ids: list[str] | None = None,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> None:
         """
         Apply a standard numbering scheme to a collection of nodes using multiple sequence alignment.
@@ -543,10 +511,8 @@ class StandardNumberingTool:
         RETURN p.accession_id AS accession_id, p.sequence AS sequence
         """
         # Execute the query and build the nodes dictionary
-        nodes_read: List[Dict[str, Any]]
-        query_result = db.execute_read(
-            query, parameters={"list_of_seq_ids": list_of_seq_ids}
-        )
+        nodes_read: list[dict[str, Any]]
+        query_result = db.execute_read(query, parameters={"list_of_seq_ids": list_of_seq_ids})
         if query_result is None:
             nodes_read = []
         else:
@@ -594,9 +560,7 @@ class StandardNumberingTool:
 
         # Run the multiple sequence alignment using ClustalOmega.
         clustalO = ClustalOmega()
-        alignment = clustalO.align(
-            sequences_dict
-        )  # Passing a dict of sequences to ClustalOmega.
+        alignment = clustalO.align(sequences_dict)  # Passing a dict of sequences to ClustalOmega.
 
         logger.info(f"Alignment received from ClustalOmega:\n{alignment}")
         logger.info(f"Alignment length: {len(list(alignment)[0][1][0].sequence)}")

@@ -2,7 +2,7 @@
 ProtT5 model implementation for protein embeddings.
 """
 
-from typing import List, Tuple, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
     def __init__(self, model_name: str, device: torch.device):
         super().__init__(model_name, device)
 
-    def load_model(self) -> Tuple[T5Model, T5Tokenizer]:
+    def load_model(self) -> tuple[T5Model, T5Tokenizer]:
         """Load ProtT5 model and tokenizer."""
         token = get_hf_token()
 
@@ -47,8 +47,8 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
         return preprocess_sequence_for_prott5(sequence)
 
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
-    ) -> List[NDArray[np.float64]]:
+        self, sequences: list[str], pool_embeddings: bool = True, normalize: bool = True
+    ) -> list[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences using ProtT5."""
         if self.model is None or self.tokenizer is None:
             self.load_model()
@@ -101,9 +101,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
                 if pool_embeddings:
                     actual_embedding = actual_embedding.mean(axis=0)
                 if normalize:
-                    actual_embedding = normalize_embedding(
-                        actual_embedding.reshape(1, -1)
-                    )
+                    actual_embedding = normalize_embedding(actual_embedding.reshape(1, -1))
                 embedding_list.append(actual_embedding)
             return embedding_list
 
@@ -239,9 +237,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
             embedding = normalize_embedding(embedding)
         return cast(NDArray[np.float64], embedding)
 
-    def get_final_embeddings(
-        self, sequence: str, normalize: bool = True
-    ) -> NDArray[np.float64]:
+    def get_final_embeddings(self, sequence: str, normalize: bool = True) -> NDArray[np.float64]:
         """
         Get final embeddings for ProtT5 with robust fallback.
         """
@@ -250,9 +246,7 @@ class ProtT5EmbeddingModel(BaseEmbeddingModel):
                 [sequence], pool_embeddings=True, normalize=normalize
             )
             if embeddings and len(embeddings) > 0:
-                return cast(
-                    NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64)
-                )
+                return cast(NDArray[np.float64], np.asarray(embeddings[0], dtype=np.float64))
             else:
                 raise ValueError("Batch embeddings method returned empty results")
         except Exception as e:

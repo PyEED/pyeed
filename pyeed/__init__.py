@@ -4,4 +4,4 @@ from .main import ingest_uniprot
 
 setup_logging()
 
-__all__ = ["ingest_uniprot", "Database"]
+__all__ = ["Database", "ingest_uniprot"]

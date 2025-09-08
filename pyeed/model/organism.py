@@ -1,4 +1,4 @@
-from typing import Annotated, ClassVar, Optional, Tuple
+from typing import Annotated, ClassVar
 
 from pydantic import Field, field_validator
 
@@ -12,14 +12,12 @@ class Organism(PyeedBase):
         ...,
         description="NCBI taxonomy ID",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         default=None,
         description="Organism name",
     )
 
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
-        Edge(parent_label="Protein", rel_name="ORIGINATES_FROM"),
-    )
+    EDGES: ClassVar[tuple[Edge, ...]] = (Edge(parent_label="Protein", rel_name="ORIGINATES_FROM"),)
 
     @field_validator("tax_id")
     @classmethod

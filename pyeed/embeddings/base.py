@@ -5,7 +5,7 @@ Defines the common interface that all embedding model implementations should fol
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import torch
@@ -18,11 +18,11 @@ class BaseEmbeddingModel(ABC):
     def __init__(self, model_name: str, device: torch.device):
         self.model_name = model_name
         self.device = device
-        self._model: Optional[Any] = None
-        self._tokenizer: Optional[Any] = None
+        self._model: Any | None = None
+        self._tokenizer: Any | None = None
 
     @property
-    def model(self) -> Optional[Any]:
+    def model(self) -> Any | None:
         """Get the model instance."""
         return self._model
 
@@ -32,7 +32,7 @@ class BaseEmbeddingModel(ABC):
         self._model = value
 
     @property
-    def tokenizer(self) -> Optional[Any]:
+    def tokenizer(self) -> Any | None:
         """Get the tokenizer instance."""
         return self._tokenizer
 
@@ -42,19 +42,19 @@ class BaseEmbeddingModel(ABC):
         self._tokenizer = value
 
     @abstractmethod
-    def load_model(self) -> Tuple[Any, Optional[Any]]:
+    def load_model(self) -> tuple[Any, Any | None]:
         """Load and return the model and tokenizer."""
         pass
 
     @abstractmethod
-    def preprocess_sequence(self, sequence: str) -> Union[str, Any]:
+    def preprocess_sequence(self, sequence: str) -> str | Any:
         """Preprocess a sequence for the specific model type."""
         pass
 
     @abstractmethod
     def get_batch_embeddings(
-        self, sequences: List[str], pool_embeddings: bool = True, normalize: bool = True
-    ) -> List[NDArray[np.float64]]:
+        self, sequences: list[str], pool_embeddings: bool = True, normalize: bool = True
+    ) -> list[NDArray[np.float64]]:
         """Get embeddings for a batch of sequences."""
         pass
 
@@ -79,9 +79,7 @@ class BaseEmbeddingModel(ABC):
         """Get embedding from the first layer for a single sequence."""
         pass
 
-    def get_final_embeddings(
-        self, sequence: str, normalize: bool = True
-    ) -> NDArray[np.float64]:
+    def get_final_embeddings(self, sequence: str, normalize: bool = True) -> NDArray[np.float64]:
         """
         Get final embeddings for a single sequence.
 
@@ -89,9 +87,7 @@ class BaseEmbeddingModel(ABC):
         It falls back gracefully if certain layer-specific methods are not available.
         Default implementation uses last hidden state, but can be overridden.
         """
-        result = self.get_single_embedding_last_hidden_state(
-            sequence, normalize=normalize
-        )
+        result = self.get_single_embedding_last_hidden_state(sequence, normalize=normalize)
         return np.asarray(result, dtype=np.float64)
 
     def move_to_device(self) -> None:
@@ -106,7 +102,6 @@ class BaseEmbeddingModel(ABC):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         # Explicit return None
-        return None
 
 
 class ModelType:

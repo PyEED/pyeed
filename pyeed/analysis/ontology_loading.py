@@ -1,7 +1,8 @@
-from typing import Any, Dict
+from typing import Any
+
+from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
 
 from pyeed.dbconnect import DatabaseConnector
-from rdflib import OWL, RDF, RDFS, Graph, Namespace, URIRef
 
 
 class OntologyAdapter:
@@ -36,7 +37,7 @@ class OntologyAdapter:
         OBOINOWL_NS = Namespace("http://www.geneontology.org/formats/oboInOwl#")
 
         # Create a dictionary of the labels
-        dicts_labels: Dict[str, str] = {}
+        dicts_labels: dict[str, str] = {}
         for s, _, o in g.triples((None, RDFS.label, None)):
             dicts_labels[str(s)] = str(o)
 
@@ -50,7 +51,7 @@ class OntologyAdapter:
         self,
         g: Graph,
         db: DatabaseConnector,
-        dicts_labels: Dict[str, str],
+        dicts_labels: dict[str, str],
         IAO_NS: Namespace,
         OBOINOWL_NS: Namespace,
     ) -> None:
@@ -99,7 +100,7 @@ class OntologyAdapter:
         self,
         g: Graph,
         db: DatabaseConnector,
-        dicts_labels: Dict[str, str],
+        dicts_labels: dict[str, str],
     ) -> None:
         """Process OWL relationships and create corresponding database relationships."""
         for s, p, o in g.triples((None, RDFS.subClassOf, None)):
@@ -110,18 +111,17 @@ class OntologyAdapter:
                 # Handle OWL restrictions (e.g., RO_ in CARD)
                 self._process_restriction(g, o, subclass, db, dicts_labels)
             # Only if it's not a restriction, check if it's a direct superclass.
-            elif (o, RDF.type, OWL.Class) in g:
+            elif (o, RDF.type, OWL.Class) in g and isinstance(o, URIRef):
                 # Ensure we are linking to a named class, not a blank node
-                if isinstance(o, URIRef):
-                    superclass = str(o)
-                    db.execute_write(
-                        """
-                        MATCH (sub:OntologyObject {name: $subclass}),
-                              (super:OntologyObject {name: $superclass})
-                        CREATE (sub)-[:SUBCLASS_OF]->(super)
-                        """,
-                        parameters={"subclass": subclass, "superclass": superclass},
-                    )
+                superclass = str(o)
+                db.execute_write(
+                    """
+                    MATCH (sub:OntologyObject {name: $subclass}),
+                          (super:OntologyObject {name: $superclass})
+                    CREATE (sub)-[:SUBCLASS_OF]->(super)
+                    """,
+                    parameters={"subclass": subclass, "superclass": superclass},
+                )
 
     def _process_restriction(
         self,
@@ -129,7 +129,7 @@ class OntologyAdapter:
         restriction_node: Any,
         subclass: str,
         db: DatabaseConnector,
-        dicts_labels: Dict[str, str],
+        dicts_labels: dict[str, str],
     ) -> None:
         """Process OWL restrictions and create custom relationships."""
         on_property = None

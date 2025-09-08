@@ -1,4 +1,4 @@
-from typing import Annotated, ClassVar, List, Optional, Tuple
+from typing import Annotated, ClassVar
 from uuid import uuid4
 
 from pydantic import Field, field_validator
@@ -18,21 +18,19 @@ class Annotation(PyeedBase):
         ...,
         description="Type of annotation",
     )
-    positions: List[int] = Field(
+    positions: list[int] = Field(
         ...,
         description="Sorted list of positions",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Description of the annotation",
     )
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
-        Edge(parent_label="Protein", rel_name="HAS_ANNOTATION"),
-    )
+    EDGES: ClassVar[tuple[Edge, ...]] = (Edge(parent_label="Protein", rel_name="HAS_ANNOTATION"),)
 
     @field_validator("positions")
     @classmethod
-    def validate_positions(cls, v: List[int]) -> List[int]:
+    def validate_positions(cls, v: list[int]) -> list[int]:
         if not v:
             raise ValueError("Positions cannot be empty")
         return sorted(set(v))

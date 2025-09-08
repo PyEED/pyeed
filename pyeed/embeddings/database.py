@@ -4,8 +4,6 @@ Database operations for protein embeddings.
 Handles storing and updating protein embeddings in the database.
 """
 
-from typing import List
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -14,8 +12,8 @@ from pyeed.dbconnect import DatabaseConnector
 
 def update_protein_embeddings_in_db(
     db: DatabaseConnector,
-    accessions: List[str],
-    embeddings_batch: List[NDArray[np.float64]],
+    accessions: list[str],
+    embeddings_batch: list[NDArray[np.float64]],
 ) -> None:
     """
     Updates the embeddings for a batch of proteins in the database.
@@ -27,7 +25,7 @@ def update_protein_embeddings_in_db(
     """
     # Prepare the data for batch update
     updates = []
-    for acc, emb in zip(accessions, embeddings_batch):
+    for acc, emb in zip(accessions, embeddings_batch, strict=False):
         # Flatten the embedding array and convert to list
         flat_embedding = emb.flatten().tolist()
         updates.append({"accession": acc, "embedding": flat_embedding})

@@ -1,11 +1,4 @@
-"""
-Refactored embedding module that maintains original function signatures.
-
-This module provides the same interface as the original embedding.py while
-using the new organized structure with model classes, factory, and processor.
-"""
-
-from typing import Any, Tuple, Union
+from typing import Any
 
 import numpy as np
 import torch
@@ -15,7 +8,6 @@ from numpy.typing import NDArray
 from torch.nn import DataParallel, Module
 from transformers import EsmModel, EsmTokenizer, T5Model, T5Tokenizer
 
-from pyeed.dbconnect import DatabaseConnector
 from pyeed.embeddings.database import (
     update_protein_embeddings_in_db as _update_protein_embeddings_in_db,
 )
@@ -40,9 +32,9 @@ def get_hf_token() -> str:
 def process_batches_on_gpu(
     data: list[tuple[str, str]],
     batch_size: int,
-    model: Union[EsmModel, ESMC, ESM3, T5Model, DataParallel[Module]],
-    tokenizer: Union[EsmTokenizer, T5Tokenizer, None],
-    db: DatabaseConnector,
+    model: EsmModel | ESMC | ESM3 | T5Model | DataParallel[Module],
+    tokenizer: EsmTokenizer | T5Tokenizer | None,
+    db: Any,
     device: torch.device,
 ) -> None:
     """
@@ -62,10 +54,10 @@ def process_batches_on_gpu(
 
 def load_model_and_tokenizer(
     model_name: str,
-    device: torch.device = torch.device("cuda:0"),
-) -> Tuple[
-    Union[EsmModel, ESMC, ESM3, T5Model],
-    Union[EsmTokenizer, T5Tokenizer, None],
+    device: torch.device | None = None,
+) -> tuple[
+    EsmModel | ESMC | ESM3 | T5Model,
+    EsmTokenizer | T5Tokenizer | None,
     torch.device,
 ]:
     """
@@ -78,6 +70,8 @@ def load_model_and_tokenizer(
     Returns:
         Tuple: (model, tokenizer, device)
     """
+    if device is None:
+        device = torch.device("cuda:0")
     return ModelFactory.load_model_and_tokenizer(model_name, device)
 
 
@@ -96,14 +90,8 @@ def preprocess_sequence_for_prott5(sequence: str) -> str:
 
 def get_batch_embeddings(
     batch_sequences: list[str],
-    model: Union[
-        EsmModel,
-        ESMC,
-        DataParallel[Module],
-        ESM3,
-        T5Model,
-    ],
-    tokenizer_or_alphabet: Union[EsmTokenizer, T5Tokenizer, None],
+    model: EsmModel | ESMC | DataParallel[Module] | ESM3 | T5Model,
+    tokenizer_or_alphabet: EsmTokenizer | T5Tokenizer | None,
     device: torch.device,
     pool_embeddings: bool = True,
 ) -> list[NDArray[np.float64]]:
@@ -129,7 +117,7 @@ def get_batch_embeddings(
 
 def calculate_single_sequence_embedding_last_hidden_state(
     sequence: str,
-    device: torch.device = torch.device("cuda:0"),
+    device: torch.device | None = None,
     model_name: str = "facebook/esm2_t33_650M_UR50D",
 ) -> NDArray[np.float64]:
     """
@@ -142,6 +130,8 @@ def calculate_single_sequence_embedding_last_hidden_state(
     Returns:
         NDArray[np.float64]: Normalized embedding vector for the sequence
     """
+    if device is None:
+        device = torch.device("cuda:0")
     processor = get_processor()
     return processor.calculate_single_sequence_embedding_last_hidden_state(
         sequence, device, model_name
@@ -164,9 +154,7 @@ def calculate_single_sequence_embedding_all_layers(
         NDArray[np.float64]: A numpy array containing layer embeddings for the sequence.
     """
     processor = get_processor()
-    return processor.calculate_single_sequence_embedding_all_layers(
-        sequence, device, model_name
-    )
+    return processor.calculate_single_sequence_embedding_all_layers(sequence, device, model_name)
 
 
 def get_single_embedding_last_hidden_state(
@@ -184,9 +172,7 @@ def get_single_embedding_last_hidden_state(
         np.ndarray: Normalized embeddings for each token in the sequence
     """
     processor = get_processor()
-    return processor.get_single_embedding_last_hidden_state(
-        sequence, model, tokenizer, device
-    )
+    return processor.get_single_embedding_last_hidden_state(sequence, model, tokenizer, device)
 
 
 def get_single_embedding_all_layers(
@@ -217,15 +203,15 @@ def get_single_embedding_all_layers(
 def calculate_single_sequence_embedding_first_layer(
     sequence: str,
     model_name: str = "facebook/esm2_t33_650M_UR50D",
-    device: torch.device = torch.device("cuda:0"),
+    device: torch.device | None = None,
 ) -> NDArray[np.float64]:
     """
     Calculates an embedding for a single sequence using the first layer.
     """
+    if device is None:
+        device = torch.device("cuda:0")
     processor = get_processor()
-    return processor.calculate_single_sequence_embedding_first_layer(
-        sequence, model_name, device
-    )
+    return processor.calculate_single_sequence_embedding_first_layer(sequence, model_name, device)
 
 
 def get_single_embedding_first_layer(
@@ -235,9 +221,7 @@ def get_single_embedding_first_layer(
     Generates normalized embeddings for each token in the sequence using the first layer.
     """
     processor = get_processor()
-    return processor.get_single_embedding_first_layer(
-        sequence, model, tokenizer, device
-    )
+    return processor.get_single_embedding_first_layer(sequence, model, tokenizer, device)
 
 
 def free_memory() -> None:
@@ -248,7 +232,7 @@ def free_memory() -> None:
 
 
 def update_protein_embeddings_in_db(
-    db: DatabaseConnector,
+    db: Any,
     accessions: list[str],
     embeddings_batch: list[NDArray[np.float64]],
 ) -> None:

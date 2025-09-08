@@ -1,4 +1,4 @@
-from typing import Annotated, ClassVar, Optional, Tuple
+from typing import Annotated, ClassVar
 
 from pydantic import Field
 
@@ -12,14 +12,14 @@ class GOAnnotation(PyeedBase):
         ...,
         description="Gene Ontology identifier",
     )
-    term: Optional[str] = Field(
+    term: str | None = Field(
         None,
         description="GO term name",
     )
-    definition: Optional[str] = Field(
+    definition: str | None = Field(
         None,
         description="GO term definition",
     )
-    EDGES: ClassVar[Tuple[Edge, ...]] = (
+    EDGES: ClassVar[tuple[Edge, ...]] = (
         Edge(parent_label="Protein", rel_name="HAS_GO_ANNOTATION"),
     )

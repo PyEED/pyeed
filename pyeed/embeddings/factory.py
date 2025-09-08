@@ -5,7 +5,7 @@ Provides a centralized way to create different types of embedding models
 based on model names and automatically handles device assignment.
 """
 
-from typing import Any, Tuple, Union
+from typing import Any
 
 import torch
 from torch.nn import DataParallel, Module
@@ -52,7 +52,7 @@ class ModelFactory:
     def load_model_and_tokenizer(
         model_name: str,
         device: torch.device = torch.device("cuda:0"),
-    ) -> Tuple[Union[Any, DataParallel[Module]], Union[Any, None], torch.device]:
+    ) -> tuple[Any | DataParallel[Module], Any | None, torch.device]:
         """
         Load model and tokenizer using the factory pattern.
 

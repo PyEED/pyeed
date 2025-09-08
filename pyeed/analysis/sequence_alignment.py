@@ -1,14 +1,15 @@
 from itertools import combinations
-from typing import Any, Dict, Optional
+from typing import Any
 
 from Bio.Align import Alignment as Alignment
 from Bio.Align import PairwiseAligner as BioPairwiseAligner
 from Bio.Align.substitution_matrices import Array as BioSubstitutionMatrix
 from joblib import Parallel, cpu_count, delayed
 from loguru import logger
+from rich.progress import Progress
+
 from pyeed.dbconnect import DatabaseConnector
 from pyeed.tools.utility import chunks
-from rich.progress import Progress
 
 
 class PairwiseAligner:
@@ -37,8 +38,8 @@ class PairwiseAligner:
 
     def _align(
         self,
-        seq1: Dict[str, str],
-        seq2: Dict[str, str],
+        seq1: dict[str, str],
+        seq2: dict[str, str],
     ) -> Alignment:
         """Aligns two sequences and returns the alignment results.
 
@@ -60,9 +61,9 @@ class PairwiseAligner:
 
     def align_pairwise(
         self,
-        seq1: Dict[str, str],
-        seq2: Dict[str, str],
-        db: Optional[DatabaseConnector] = None,
+        seq1: dict[str, str],
+        seq2: dict[str, str],
+        db: DatabaseConnector | None = None,
     ) -> dict[str, Any]:
         """Aligns two sequences and returns the alignment results.
         If a `DatabaseConnector` object is provided, the results are added to the database.
@@ -87,16 +88,16 @@ class PairwiseAligner:
 
     def align_multipairwise(
         self,
-        ids: Optional[list[str]] = None,
-        sequences: Optional[dict[str, str]] = None,
-        db: Optional[DatabaseConnector] = None,
+        ids: list[str] | None = None,
+        sequences: dict[str, str] | None = None,
+        db: DatabaseConnector | None = None,
         batch_size: int = 500,
         return_results: bool = True,
-        pairs: Optional[list[tuple[str, str]]] = None,
+        pairs: list[tuple[str, str]] | None = None,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
         num_cores: int = cpu_count() - 1,
-    ) -> Optional[list[dict[str, Any]]]:
+    ) -> list[dict[str, Any]] | None:
         """
         Creates all possible pairwise alignments from a dictionary of sequences or from sequence IDs.
         If a `DatabaseConnector` object is provided, the results can be added to the database.
@@ -154,9 +155,7 @@ class PairwiseAligner:
             )
 
         # Filter new pairs that are not in existing_pairs
-        new_pairs = [
-            pair for pair in pairs if tuple(sorted(pair)) not in existing_pairs
-        ]
+        new_pairs = [pair for pair in pairs if tuple(sorted(pair)) not in existing_pairs]
 
         logger.info(f"Number of existing pairs: {len(existing_pairs)}")
         logger.info(f"Number of total pairs: {len(pairs)}")
@@ -199,7 +198,7 @@ class PairwiseAligner:
         alignments: list[dict[str, Any]],
         db: DatabaseConnector,
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> None:
         """Inserts the alignment results to pyeed graph database.
 
@@ -262,7 +261,7 @@ class PairwiseAligner:
         return aligner
 
     def _map_alignment_results(
-        self, alignment: Alignment, seq1: Dict[str, str], seq2: Dict[str, str]
+        self, alignment: Alignment, seq1: dict[str, str], seq2: dict[str, str]
     ) -> dict[str, Any]:
         """Maps the alignment results to a dictionary.
         The dictionaly has the same signature as a `PairwiseAlignmentResult` object.
@@ -299,7 +298,7 @@ class PairwiseAligner:
         db: DatabaseConnector,
         ids: list[str] = [],
         node_type: str = "Protein",
-        region_ids_neo4j: Optional[list[str]] = None,
+        region_ids_neo4j: list[str] | None = None,
     ) -> dict[str, str]:
         """Gets all sequences from the database and returns them in a dictionary.
         Key is the accession id and value is the sequence.
@@ -340,29 +339,28 @@ class PairwiseAligner:
 
                 logger.info(f"Length of nodes (run query of type ids): {len(nodes)}")
 
-        else:
-            if region_ids_neo4j is not None:
-                query = f"""
+        elif region_ids_neo4j is not None:
+            query = f"""
                 MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
                 WHERE elementId(r) IN $region_ids_neo4j
                 RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
                 """
-                nodes = db.execute_read(
-                    query,
-                    parameters={
-                        "region_ids_neo4j": region_ids_neo4j,
-                    },
-                )  #
+            nodes = db.execute_read(
+                query,
+                parameters={
+                    "region_ids_neo4j": region_ids_neo4j,
+                },
+            )
 
-                logger.info(f"Length of nodes (run query of type region): {len(nodes)}")
-            else:
-                query = f"""
+            logger.info(f"Length of nodes (run query of type region): {len(nodes)}")
+        else:
+            query = f"""
                 MATCH (p:{node_type})
                 RETURN p.accession_id AS accession_id, p.sequence AS sequence
                 """
-                nodes = db.execute_read(query)
+            nodes = db.execute_read(query)
 
-                logger.info(f"Length of nodes (run query of type): {len(nodes)}")
+            logger.info(f"Length of nodes (run query of type): {len(nodes)}")
 
         if region_ids_neo4j is not None:
             return {
