@@ -24,7 +24,7 @@ It automatically loads the database credentials from the environment variables `
 ```
 NEO4J_URI="bolt://localhost:7687"
 NEO4J_USER="neo4j"
-NEO4J_PASSWORD="12345678"
+NEO4J_PASSWORD="my_password"
 ```
 
 ### Ingest UniProt Data

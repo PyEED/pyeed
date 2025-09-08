@@ -139,7 +139,4 @@ if __name__ == "__main__":
         finally:
             await db.close()
 
-    q_res = db.query("MATCH (p:Protein) RETURN p.accession_id AS AC_ID")
-    print(q_res)
-
     asyncio.run(main())
