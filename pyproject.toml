@@ -2,7 +2,9 @@
 name = "pyeed"
 version = "0.1.0"
 description = "Toolkit to create, annotate, and analyze sequence data"
-authors = ["haeussma <83341109+haeussma@users.noreply.github.com>"]
+authors = [
+  { name = "Max Häußler", email = "max.haeussler@gmail.com" }
+]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
