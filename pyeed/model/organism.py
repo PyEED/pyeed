@@ -1,8 +1,8 @@
-from typing import Annotated, ClassVar, Optional
+from typing import Annotated, ClassVar, Optional, Tuple
 
 from pydantic import Field, field_validator
 
-from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
+from .pyeedbase import Edge, LabelProperty, PyeedBase
 
 
 class Organism(PyeedBase):
@@ -17,8 +17,8 @@ class Organism(PyeedBase):
         description="Organism name",
     )
 
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Protein": "ORIGINATES_FROM"},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(parent_label="Protein", rel_name="ORIGINATES_FROM"),
     )
 
     @field_validator("tax_id")

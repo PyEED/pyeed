@@ -1,9 +1,9 @@
-from typing import Annotated, ClassVar, List, Optional
+from typing import Annotated, ClassVar, List, Optional, Tuple
 
 from pydantic import Field
 
 from .embedding import Embedding
-from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
+from .pyeedbase import Edge, LabelProperty, PyeedBase
 
 
 class Molecule(PyeedBase):
@@ -28,6 +28,15 @@ class Molecule(PyeedBase):
         default_factory=list,
         description="Embedding vector",
     )
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Reaction": {"substrates": "HAS_SUBSTRATE", "products": "HAS_PRODUCT"}},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(
+            parent_label="Reaction",
+            rel_name="HAS_SUBSTRATE",
+            field_name="substrates",
+        ),
+        Edge(
+            parent_label="Reaction",
+            rel_name="HAS_PRODUCT",
+            field_name="products",
+        ),
     )

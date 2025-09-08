@@ -1,10 +1,10 @@
 import re
-from typing import Annotated, Any, ClassVar, List
+from typing import Annotated, Any, ClassVar, List, Tuple
 from uuid import uuid4
 
 from pydantic import Field, ValidationInfo, field_validator
 
-from .pyeedbase import EdgeMap, LabelProperty, PyeedBase, _is_neo4j_prop_value
+from .pyeedbase import Edge, LabelProperty, PyeedBase, _is_neo4j_prop_value
 
 
 class Embedding(PyeedBase):
@@ -37,8 +37,9 @@ class Embedding(PyeedBase):
         default_factory=lambda: str(uuid4()),
         description="Embedding identifier",
     )
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Protein": "HAS_EMBEDDING", "Molecule": "HAS_EMBEDDING"},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(parent_label="Protein", rel_name="HAS_EMBEDDING"),
+        Edge(parent_label="Molecule", rel_name="HAS_EMBEDDING"),
     )
 
     @field_validator("model_name")

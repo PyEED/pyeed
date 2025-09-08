@@ -1,10 +1,10 @@
-from typing import Annotated, ClassVar, List, Optional
+from typing import Annotated, ClassVar, List, Optional, Tuple
 from uuid import uuid4
 
 from pydantic import Field, field_validator
 
 from pyeed.model.annotationtype import AnnotationType
-from pyeed.model.pyeedbase import EdgeMap, LabelProperty, PyeedBase
+from pyeed.model.pyeedbase import Edge, LabelProperty, PyeedBase
 
 
 class Annotation(PyeedBase):
@@ -26,8 +26,8 @@ class Annotation(PyeedBase):
         default=None,
         description="Description of the annotation",
     )
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Protein": "HAS_ANNOTATION"},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(parent_label="Protein", rel_name="HAS_ANNOTATION"),
     )
 
     @field_validator("positions")

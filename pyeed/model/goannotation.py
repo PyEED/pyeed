@@ -1,8 +1,8 @@
-from typing import Annotated, ClassVar, Optional
+from typing import Annotated, ClassVar, Optional, Tuple
 
 from pydantic import Field
 
-from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
+from .pyeedbase import Edge, LabelProperty, PyeedBase
 
 
 class GOAnnotation(PyeedBase):
@@ -20,6 +20,6 @@ class GOAnnotation(PyeedBase):
         None,
         description="GO term definition",
     )
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Protein": "HAS_GO_ANNOTATION"},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(parent_label="Protein", rel_name="HAS_GO_ANNOTATION"),
     )

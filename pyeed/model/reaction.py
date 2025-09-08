@@ -1,9 +1,9 @@
-from typing import Annotated, ClassVar, List, Optional
+from typing import Annotated, ClassVar, List, Optional, Tuple
 
 from pydantic import Field
 
 from .molecule import Molecule
-from .pyeedbase import EdgeMap, LabelProperty, PyeedBase
+from .pyeedbase import Edge, LabelProperty, PyeedBase
 
 
 class Reaction(PyeedBase):
@@ -29,6 +29,6 @@ class Reaction(PyeedBase):
         default=False,
         description="Whether the reaction is reversible",
     )
-    edge_map: ClassVar[EdgeMap] = EdgeMap(
-        rules={"Protein": "CATALYZES"},
+    EDGES: ClassVar[Tuple[Edge, ...]] = (
+        Edge(parent_label="Protein", rel_name="CATALYZES"),
     )

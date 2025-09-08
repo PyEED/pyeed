@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterable as _Iter
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Any, ClassVar, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,54 +19,16 @@ class LabelProperty:
 
 
 @dataclass(frozen=True)
-class EdgeMap:
-    """Map of parent labels to relationship names."""
-
-    rules: Dict[str, Union[str, Dict[str, str]]]
-
-    def resolve(self, parent_label: str, field_name: Optional[str]) -> str:
-        """Resolve the relationship name for a given parent + field.
-
-        Args:
-            parent_label: Name of the parent class/label.
-            field_name: Field name of the parent, if applicable.
-
-        Returns:
-            The resolved relationship name.
-
-        Raises:
-            ValueError: If no mapping exists for the given parent/field.
-        """
-        spec = self.rules.get(parent_label)
-        if spec is None:
-            raise ValueError(
-                f"No EdgeMap rule defined for parent '{parent_label}'. "
-                f"Available parents: {list(self.rules.keys())}"
-            )
-
-        if isinstance(spec, str):
-            return spec
-
-        if field_name is None:
-            raise ValueError(
-                f"EdgeMap for parent '{parent_label}' requires a field name "
-                f"(available: {list(spec.keys())})."
-            )
-
-        rel = spec.get(field_name)
-        if rel is None:
-            raise ValueError(
-                f"No EdgeMap rule for field '{field_name}' under parent '{parent_label}'. "
-                f"Available: {list(spec.keys())}"
-            )
-
-        return rel
+class Edge:
+    parent_label: str
+    rel_name: str
+    field_name: Optional[str] = None
 
 
 class PyeedBase(BaseModel):
     """Base class for all nodes in the Database."""
 
-    edge_map: ClassVar[Optional[EdgeMap]] = None
+    EDGES: ClassVar[Tuple[Edge, ...]] = ()
 
     model_config = ConfigDict(
         frozen=False, validate_assignment=True, use_enum_values=True
@@ -132,6 +94,36 @@ class PyeedBase(BaseModel):
 
         return v
 
+    @classmethod
+    def resolve_edge(cls, parent_label: str, field_name: Optional[str]) -> str:
+        exact = [
+            e
+            for e in cls.EDGES
+            if e.parent_label == parent_label and e.field_name == field_name
+        ]
+        if len(exact) == 1:
+            return exact[0].rel_name
+        if len(exact) > 1:
+            raise ValueError(
+                f"{cls.__name__}: multiple edges match parent='{parent_label}', field='{field_name}'."
+            )
+        generic = [
+            e
+            for e in cls.EDGES
+            if e.parent_label == parent_label and e.field_name is None
+        ]
+        if len(generic) == 1:
+            return generic[0].rel_name
+        if not generic:
+            raise ValueError(
+                f"{cls.__name__}: no edge for parent='{parent_label}' "
+                f"(field='{field_name}'). Add to {cls.__name__}.EDGES."
+            )
+        raise ValueError(
+            f"{cls.__name__}: ambiguous edges for parent='{parent_label}'. "
+            f"Disambiguate by setting field_name."
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Convert the model to a Neo4j-safe dictionary.
 
@@ -158,71 +150,61 @@ class PyeedBase(BaseModel):
             f"No unique field found. No field of {type(self)} is marked with NodeHint(unique=True)"
         )
 
-    def graphify(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        nodes: List[Dict[str, Any]] = []
-        edges: List[Dict[str, Any]] = []
+    def graphify(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        nodes: list[dict[str, Any]] = []
+        rels: list[dict[str, Any]] = []
+        seen: set[tuple[str, Any]] = set()
 
-        def emit_node(obj: "PyeedBase") -> Dict[str, Any]:
+        def emit_node(obj: "PyeedBase") -> dict[str, Any]:
             lbl = obj.__class__.__name__
             k = obj.get_unique_model_field()
             v = getattr(obj, k)
             return {"label": lbl, "key": (k, v), "props": obj.to_dict()}
 
-        def connect(parent: "PyeedBase", field_name: str, child: "PyeedBase") -> None:
-            parent_label = type(parent).__name__
-            child_cls = type(child)
-            emap = getattr(child_cls, "edge_map", None)
-
-            if emap is None:
-                # No mapping present: raise with a helpful message
-                raise ValueError(
-                    f"[Graphify] {child_cls.__name__} must define edge_map to connect "
-                    f"from parent '{parent_label}' (field '{field_name}')."
-                )
-
-            # EdgeMap will raise a clear error if parent/field is not mapped
-            rel_type = emap.resolve(parent_label=parent_label, field_name=field_name)
-
-            sl, sk = parent_label, parent.get_unique_model_field()
-            dl, dk = child_cls.__name__, child.get_unique_model_field()
-            sv, dv = getattr(parent, sk), getattr(child, dk)
-
-            edges.append(
-                {
-                    "type": rel_type,
-                    "src": (sl, sk, sv),
-                    "dst": (dl, dk, dv),
-                }
-            )
-
-        seen: set[tuple[str, Any]] = set()
-
         def ensure_node(obj: "PyeedBase") -> None:
-            """Ensure a node is added to the graph."""
             key = obj.get_unique_model_field()
             ident = (f"{type(obj).__name__}:{key}", getattr(obj, key))
             if ident not in seen:
                 nodes.append(emit_node(obj))
                 seen.add(ident)
 
+        def connect(parent: "PyeedBase", field_name: str, child: "PyeedBase") -> None:
+            parent_label = type(parent).__name__
+            child_cls = type(child)
+
+            if not hasattr(child_cls, "EDGES"):
+                raise ValueError(
+                    f"{child_cls.__name__} must define EDGES "
+                    f"to connect from parent '{parent_label}' via field '{field_name}'."
+                )
+
+            rel_type = child_cls.resolve_edge(
+                parent_label=parent_label, field_name=field_name
+            )
+
+            sl, sk = parent_label, parent.get_unique_model_field()
+            dl, dk = child_cls.__name__, child.get_unique_model_field()
+            sv, dv = getattr(parent, sk), getattr(child, dk)
+
+            rels.append({"type": rel_type, "src": (sl, sk, sv), "dst": (dl, dk, dv)})
+
         def walk(parent: "PyeedBase") -> None:
-            """Walk the tree of nodes and edges."""
             for fname in parent.model_dump().keys():
                 val = getattr(parent, fname, None)
                 if isinstance(val, PyeedBase):
                     ensure_node(val)
                     connect(parent, fname, val)
-                    walk(val)  # ← descend!
+                    walk(val)
                 elif isinstance(val, _Iter) and not isinstance(val, (str, bytes, dict)):
                     for item in val:
                         if isinstance(item, PyeedBase):
                             ensure_node(item)
                             connect(parent, fname, item)
-                            walk(item)  # ← descend!
+                            walk(item)
 
         ensure_node(self)
         walk(self)
-        return nodes, edges
+        return nodes, rels
 
 
 def _is_neo4j_primitive(x: object) -> bool:

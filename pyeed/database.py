@@ -230,48 +230,46 @@ class Database:
 
     async def attach(
         self,
-        parent_cls: type[PyeedBase],
+        parent: type[PyeedBase],
         parents_to_children: dict[str | int, list[PyeedBase]],
         tx_size: int = 5000,
     ) -> None:
         """
-        Attach child nodes to existing parents using PARENT_REF metadata.
+        Attach child nodes to existing parents using the child's EDGES mapping.
 
         Args:
-            parent_cls: The class of the parent node (e.g. Protein).
+            parent: Parent node class (e.g., Protein).
             parents_to_children: Mapping of parent unique values to lists of children.
                 Example: { "P01234": [Embedding(...), Annotation(...)] }
             tx_size: Maximum number of rows per transaction batch.
 
         Raises:
-            ValueError: If a child node has no `edge_map` or mismatched parent label.
+            ValueError: If a child node has no applicable EDGES rule for this parent,
+                        or multiple ambiguous rules exist.
 
         Notes:
             - Each child is inserted along with its own subtree.
-            - The edge type is read from `child.edge_map.rules`.
-            - The parent unique field is resolved automatically from `NodeHint(unique=True)`.
+            - The relationship type is resolved from child_cls.EDGES via
+              child_cls.resolve_edge(parent_label=<parent>, field_name=None).
+              This requires a single unambiguous rule for this parent.
+            - The parent unique field is resolved automatically from LabelProperty(unique=True).
         """
         logger.info(
-            f"Upserting {len(parents_to_children)} children for parent {parent_cls.__name__}..."
+            "Attaching children to %s: %d parents",
+            parent.__name__,
+            len(parents_to_children),
         )
-        plabel = parent_cls.__name__
-        pkey = self._unique_key_of(parent_cls)
+        plabel = parent.__name__
+        pkey = self._unique_key_of(parent)
 
         all_nodes: list[dict[str, Any]] = []
         all_edges: list[dict[str, Any]] = []
 
         for pval, children in parents_to_children.items():
             for child in children:
-                clabel = type(child).__name__
-                pref = getattr(type(child), "edge_map", None)
-                if not pref:
-                    raise ValueError(
-                        f"{clabel} is missing PARENT_REF; required for upsert_children()."
-                    )
-                if pref.parent_label != plabel:
-                    raise ValueError(
-                        f"{clabel}.edge_map expects parent '{pref.parent_label}', got '{plabel}'."
-                    )
+                child_cls = type(child)
+                # resolve rel type from child's EDGES; field_name=None for attach()
+                rel_type = child_cls.resolve_edge(parent_label=plabel, field_name=None)
 
                 # child's own subtree
                 cnodes, cedges = child.graphify()
@@ -283,9 +281,9 @@ class Database:
                 cval = getattr(child, ckey)
                 all_edges.append(
                     {
-                        "type": pref.rel_name,
+                        "type": rel_type,
                         "src": (plabel, pkey, pval),
-                        "dst": (clabel, ckey, cval),
+                        "dst": (child_cls.__name__, ckey, cval),
                     }
                 )
 
