@@ -28,8 +28,7 @@ class Database:
         password = password or os.getenv("NEO4J_PASSWORD")
         if not (uri and user and password):
             raise ValueError(
-                "URI, user, and password must be provided or set in env "
-                "(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)"
+                "URI, user, and password must be provided or set in env (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)"
             )
         self.async_driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
@@ -52,8 +51,7 @@ class Database:
         **params: Any,
     ) -> list[dict[str, Any]]:
         with self.driver.session() as session:
-            result = session.run(query, **params)
-            return [record.data() for record in result]
+            return session.run(query, **params).data()
 
     async def async_query_iter(self, query: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
         """
@@ -225,6 +223,7 @@ class Database:
         """
         logger.info(f"Upserting node {node.__class__.__name__}...")
         nodes, edges = node.graphify()
+        print(nodes, edges)
         await self.bulk_upsert(nodes, edges)
 
     async def save_many(

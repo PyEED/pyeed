@@ -88,8 +88,7 @@ class Protein(PyeedBase):
         elif v != actual_length:
             # Validate that provided length matches actual sequence length
             raise ValueError(
-                f"Provided sequence length {v} does not match actual sequence length "
-                f"{actual_length}"
+                f"Provided sequence length {v} does not match actual sequence length {actual_length}"
             )
         elif v <= 0:
             raise ValueError("Sequence length must be positive")

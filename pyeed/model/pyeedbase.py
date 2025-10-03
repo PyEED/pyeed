@@ -71,14 +71,12 @@ class PyeedBase(BaseModel):
             # Check for nested dictionaries (not allowed)
             if isinstance(value, dict):
                 raise ValueError(
-                    f"Nested dictionaries are not allowed in custom fields. "
-                    f"Key '{key}' contains a dictionary value."
+                    f"Nested dictionaries are not allowed in custom fields. Key '{key}' contains a dictionary value."
                 )
 
         if conflicting_keys:
             raise ValueError(
-                f"Custom field keys cannot conflict with existing attributes or be 'custom': "
-                f"{conflicting_keys}"
+                f"Custom field keys cannot conflict with existing attributes or be 'custom': {conflicting_keys}"
             )
 
         if invalid_keys:
@@ -99,8 +97,7 @@ class PyeedBase(BaseModel):
             return exact[0].rel_name
         if len(exact) > 1:
             raise ValueError(
-                f"{cls.__name__}: multiple edges match parent='{parent_label}', "
-                f"field='{field_name}'."
+                f"{cls.__name__}: multiple edges match parent='{parent_label}', field='{field_name}'."
             )
         generic = [e for e in cls.EDGES if e.parent_label == parent_label and e.field_name is None]
         if len(generic) == 1:
@@ -111,8 +108,7 @@ class PyeedBase(BaseModel):
                 f"(field='{field_name}'). Add to {cls.__name__}.EDGES."
             )
         raise ValueError(
-            f"{cls.__name__}: ambiguous edges for parent='{parent_label}'. "
-            f"Disambiguate by setting field_name."
+            f"{cls.__name__}: ambiguous edges for parent='{parent_label}'. Disambiguate by setting field_name."
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -124,7 +120,8 @@ class PyeedBase(BaseModel):
         d = self.model_dump(exclude_none=True, exclude_unset=True)
         custom = d.pop("custom", {}) or {}
         flat = {**d, **custom}
-        return {k: v for k, v in flat.items() if _is_neo4j_prop_value(v)}
+        result = {k: v for k, v in flat.items() if _is_neo4j_prop_value(v)}
+        return result
 
     def get_unique_model_field(self) -> str:
         """Returns the name of the field marked with NodeHint(unique=True)"""

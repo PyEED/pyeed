@@ -52,7 +52,6 @@ max-args = 8
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.3.0",
     "ruff>=0.12.12",
     "ruff-lsp>=0.0.62",
 ]

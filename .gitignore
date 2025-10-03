@@ -171,3 +171,5 @@ poetry.lock
 test.py
 
 docker-compose.yml
+.DS_Store
+uv.lock

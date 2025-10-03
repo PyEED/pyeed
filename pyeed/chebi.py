@@ -1,156 +1,248 @@
-# adapter_chebi.py
+# pyeed/chebi.py
 from __future__ import annotations
 
-import asyncio
-from collections.abc import AsyncIterator, Iterable
-from typing import Any
-
 import httpx
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential_jitter,
-)
+from pydantic import BaseModel, ConfigDict, Field
 
 from .model import Molecule
 
-OLS4_CHEBI_TERMS = "https://www.ebi.ac.uk/ols4/api/ontologies/chebi/terms"
+__all__ = ["ChebiClient", "ChebiError"]
 
 
-class ChebiAdapter:
-    """
-    Async ChEBI fetcher using the OLS4 REST API.
+class ChebiError(Exception):
+    """ChEBI-specific errors during API communication."""
 
-    Notes:
-    - OLS4 doesn't support multi-ID queries here; we achieve "batching" via
-      bounded concurrency (multiple GETs in flight).
-    - Fields like SMILES/InChI are exposed under term['annotation'] and are often lists.
-    - All parsing is defensive; values are optional.
-    """
+    def __init__(self, message: str, cause: Exception | None = None) -> None:
+        super().__init__(message)
+        self.cause = cause
 
-    def __init__(self, *, timeout_s: float = 15.0) -> None:
-        self.headers = {"Accept": "application/json"}
-        self.timeout = httpx.Timeout(timeout_s)
 
-    @retry(
-        wait=wait_exponential_jitter(0.5, 3.0),
-        stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(httpx.HTTPError),
-        reraise=True,
-    )
-    async def _fetch_one(
+# --- API Response Models ---
+
+
+class ChebiStructure(BaseModel):
+    """Chemical structure data from ChEBI."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int
+    smiles: str | None = None
+    standard_inchi: str | None = None
+    standard_inchi_key: str | None = None
+    wurcs: str | None = None
+    is_r_group: bool
+
+
+class ChebiName(BaseModel):
+    """Individual name/synonym entry."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    status: str
+    type: str
+    source: str
+    ascii_name: str
+    adapted: bool
+    language_code: str
+
+
+class ChebiNames(BaseModel):
+    """Names and synonyms. All name types are optional."""
+
+    model_config = ConfigDict(frozen=True)
+
+    SYNONYM: list[ChebiName] | None = None
+    IUPAC_NAME: list[ChebiName] | None = Field(None, alias="IUPAC NAME")
+    INN: list[ChebiName] | None = None
+
+
+class ChebiChemicalData(BaseModel):
+    """Chemical formula and mass data."""
+
+    model_config = ConfigDict(frozen=True)
+
+    formula: str
+    charge: int
+    mass: str
+    monoisotopic_mass: str
+
+
+class ChebiEntryData(BaseModel):
+    """Core data for a ChEBI entry."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int
+    chebi_accession: str
+    name: str
+    ascii_name: str
+    stars: int
+    definition: str
+    names: ChebiNames
+    chemical_data: ChebiChemicalData
+    default_structure: ChebiStructure | None = None
+    modified_on: str
+    secondary_ids: list[str]
+    is_released: bool
+
+
+class ChebiEntryResult(BaseModel):
+    """Individual ChEBI entry result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    standardized_chebi_id: str
+    primary_chebi_id: str
+    exists: bool
+    id_type: str
+    data: ChebiEntryData
+
+
+# --- Client ---
+
+
+class ChebiClient:
+    """Async client for the ChEBI API."""
+
+    def __init__(
         self,
-        client: httpx.AsyncClient,
-        chebi_id: str,
-    ) -> dict[str, Any] | None:
+        user_agent: str = "pyeed/1.0",
+        timeout_s: float = 20.0,
+    ) -> None:
         """
-        Fetch a single ChEBI term by obo_id (e.g., 'CHEBI:16072').
-        Returns the first matching term dict or None if not found.
+        Initialize ChEBI client.
+
+        Args:
+            user_agent: User-Agent header for requests.
+            timeout_s: Timeout in seconds for HTTP requests.
         """
-        params = {"obo_id": chebi_id}
-        r = await client.get(
-            OLS4_CHEBI_TERMS, params=params, headers=self.headers, timeout=self.timeout
-        )
-        r.raise_for_status()
-        data = r.json() or {}
-
-        # OLS4 embeds terms under _embedded.terms
-        embedded = data.get("_embedded") or {}
-        terms = embedded.get("terms") or []
-        if not terms:
-            return None
-
-        # Typically there is exactly one matching term for an obo_id
-        return terms[0]
-
-    async def fetch_ids(
-        self,
-        client: httpx.AsyncClient,
-        chebi_ids: Iterable[str],
-        *,
-        concurrency: int = 16,
-    ) -> AsyncIterator[dict[str, Any]]:
-        """
-        Fetch many ChEBI terms concurrently with bounded concurrency.
-
-        Yields raw term dicts (as returned by OLS4) for each ID that resolves.
-        """
-
-        sem = asyncio.Semaphore(concurrency)
-
-        async def worker(cid: str) -> dict[str, Any] | None:
-            async with sem:
-                try:
-                    return await self._fetch_one(client, cid)
-                except httpx.HTTPStatusError as e:
-                    err_code = 404
-                    if e.response is not None and e.response.status_code == err_code:
-                        return None
-                    raise
-
-        tasks: list[asyncio.Task[dict[str, Any] | None]] = []
-        for cid in chebi_ids:
-            tasks.append(asyncio.create_task(worker(cid)))
-
-        for fut in asyncio.as_completed(tasks):
-            term = await fut
-            if term:
-                yield term
+        self._base_url = "https://www.ebi.ac.uk/chebi/backend/api/public/compounds/"
+        self._headers = {"User-Agent": user_agent}
+        self._timeout = httpx.Timeout(timeout_s)
 
     @staticmethod
-    def _first_str(value: Any) -> str | None:
-        """OLS 'annotation' values are often lists; return the first string if present."""
-        if isinstance(value, str):
-            return value
-        if isinstance(value, list) and value and isinstance(value[0], str):
-            return value[0]
-        return None
+    def _normalize_chebi_id(chebi_id: str) -> str:
+        """Ensure ChEBI ID has 'CHEBI:' prefix."""
+        return chebi_id if chebi_id.startswith("CHEBI:") else f"CHEBI:{chebi_id}"
 
-    def map(self, term: dict[str, Any]) -> Molecule:
+    async def _fetch_raw(self, chebi_ids: list[str]) -> dict[str, ChebiEntryResult]:
         """
-        Map an OLS ChEBI term into our Molecule model.
+        Fetch raw API response for one or more ChEBI IDs.
 
-        Fields:
-        - chebi_id: term['obo_id'] (e.g., 'CHEBI:16072')
-        - name:     term['label']
-        - smiles/inchi: from term['annotation'] dict if present
+        Args:
+            chebi_ids: List of ChEBI IDs (with or without 'CHEBI:' prefix).
+
+        Returns:
+            Dict mapping ChEBI IDs to entry results.
+
+        Raises:
+            ChebiError: On API errors or connection failures.
         """
-        chebi_id = term.get("obo_id") or term.get("oboId")  # be defensive
-        if not isinstance(chebi_id, str):
-            raise ValueError("ChEBI term missing 'obo_id'")
+        normalized = [self._normalize_chebi_id(cid) for cid in chebi_ids]
+        params = {"chebi_ids": ",".join(normalized)}
 
-        name = term.get("label")
-        if name is not None and not isinstance(name, str):
-            name = None
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    self._base_url,
+                    params=params,
+                    headers=self._headers,
+                    timeout=self._timeout,
+                )
+                resp.raise_for_status()
+                raw_data = resp.json()
+        except httpx.HTTPStatusError as e:
+            raise ChebiError(
+                f"HTTP {e.response.status_code} fetching ChEBI IDs {normalized}",
+                cause=e,
+            ) from e
+        except httpx.RequestError as e:
+            raise ChebiError(f"Request failed for ChEBI IDs {normalized}", cause=e) from e
 
-        ann = term.get("annotation") or {}
-        smiles = self._first_str(ann.get("smiles") or ann.get("SMILES"))
-        inchi = self._first_str(ann.get("inchi") or ann.get("InChI") or ann.get("INCHI"))
+        if not raw_data:
+            raise ChebiError(f"Empty response for ChEBI IDs {normalized}")
 
+        try:
+            return {key: ChebiEntryResult.model_validate(val) for key, val in raw_data.items()}
+        except Exception as e:
+            raise ChebiError(f"Failed to parse ChEBI response: {e}", cause=e) from e
+
+    @staticmethod
+    def _entry_to_molecule(entry: ChebiEntryResult) -> Molecule:
+        """Convert a ChebiEntryResult to a Molecule."""
+        struct = entry.data.default_structure
         return Molecule(
-            chebi_id=chebi_id,
-            name=name,
-            smiles=smiles,
-            inchi=inchi,
-            embedding=[],
+            chebi_id=entry.standardized_chebi_id,
+            name=entry.data.ascii_name or None,
+            smiles=struct.smiles if struct else None,
+            inchi=struct.standard_inchi if struct else None,
         )
 
+    async def get_molecule(self, chebi_id: str) -> Molecule:
+        """
+        Fetch a single ChEBI entry and return as Molecule.
 
-async def main() -> None:
-    """Minimal async usage example for ChebiAdapter.
+        Args:
+            chebi_id: ChEBI ID (with or without 'CHEBI:' prefix).
 
-    Example:
-        >>> import asyncio
-        >>> asyncio.run(main())
-    """
-    adapter = ChebiAdapter()
-    async with httpx.AsyncClient() as client:
-        async for term in adapter.fetch_ids(client, ["CHEBI:15377", "CHEBI:15379"]):
-            molecule = adapter.map(term)
-            print("Fetched molecule", f"chebi_id: {molecule.chebi_id}, name: {molecule.name}")
-            print(molecule)
+        Returns:
+            Molecule instance.
+
+        Raises:
+            ChebiError: If the ID is not found or the request fails.
+        """
+        results = await self._fetch_raw([chebi_id])
+        if not results:
+            raise ChebiError(f"No data found for ChEBI ID {chebi_id}")
+        entry = next(iter(results.values()))
+        return self._entry_to_molecule(entry)
+
+    async def get_molecules(self, chebi_ids: list[str]) -> list[Molecule]:
+        """
+        Fetch multiple ChEBI entries in batch and return as Molecules.
+
+        Args:
+            chebi_ids: List of ChEBI IDs (with or without 'CHEBI:' prefix).
+
+        Returns:
+            List of Molecule instances in the same order as input IDs.
+
+        Raises:
+            ChebiError: If any request fails.
+        """
+        if not chebi_ids:
+            return []
+
+        results = await self._fetch_raw(chebi_ids)
+        # Maintain input order
+        normalized = [self._normalize_chebi_id(cid) for cid in chebi_ids]
+        molecules: list[Molecule] = []
+        for cid in normalized:
+            if cid in results:
+                molecules.append(self._entry_to_molecule(results[cid]))
+            else:
+                # If a specific ID is missing, raise error or skip depending on use case
+                raise ChebiError(f"ChEBI ID {cid} not found in batch response")
+        return molecules
 
 
+# --- Usage Example ---
 if __name__ == "__main__":
-    asyncio.run(main())
+    import asyncio
+
+    from rich import print
+
+    async def demo() -> None:
+        client = ChebiClient()
+
+        # Single fetch
+        mol = await client.get_molecule("CHEBI:57844")  # l-Methionine
+        print(f"Single: {mol}")
+
+        # Batch fetch
+        mols = await client.get_molecules(["CHEBI:57844", "CHEBI:16526"])  # water, CO2
+        for m in mols:
+            print(f"Batch: {m}")
+
+    asyncio.run(demo())
