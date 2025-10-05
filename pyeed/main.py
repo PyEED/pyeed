@@ -16,7 +16,6 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from .chebi import ChebiClient
 from .database import Database
 from .model import MODEL_CLASSES, Protein, Reaction
 from .rhea import RheaClient
@@ -97,20 +96,12 @@ async def ingest_uniprot(
         )
 
 
-async def enrich_rhea(
-    db: Database,
-    concurrency: int = 8,
-    save_batch: int = 200,
-) -> None:
+async def enrich_rhea(db: Database, concurrency: int = 8, save_batch: int = 200) -> None:
     """
     Enrich Reaction nodes (missing Molecule edges) via RheaClient.
     Uses bounded concurrency for HTTP and batched MERGE writes.
     """
-    rhea_client = RheaClient(user_agent="pyeed/1.0")
-    chebi_client = ChebiClient(user_agent="pyeed/1.0")
-
-    # Cache for ChEBI molecule data to avoid duplicate fetches
-    chebi_cache: dict[str, dict[str, str | None] | None] = {}
+    rhea_client = RheaClient(user_agent="")  # add contact
 
     pquery = """
     MATCH (r:Reaction)
@@ -118,44 +109,18 @@ async def enrich_rhea(
       AND NOT (r)--(:Molecule)
     RETURN r.rhea_id AS rhea_id
     """
+    # preflight
+    n = db.query("""
+        MATCH (n) RETURN count(n) AS n;
+    """)
+    print(f"enrich_rhea: database={2} candidates={n}", flush=True)
 
     queue: asyncio.Queue[Reaction | None] = asyncio.Queue(maxsize=concurrency * 2)
     sem = asyncio.Semaphore(concurrency)
 
-    def chebi_enricher(chebi_id: str) -> dict[str, str | None] | None:
-        """Synchronous enricher that pulls from cache populated by async fetch."""
-        return chebi_cache.get(chebi_id)
-
     async def fetch_one(rid: str) -> Reaction | None:
         async with sem:
-            # First fetch reaction structure without enrichment
-            reaction = await rhea_client.get_reaction(rid, chebi_enricher=None)
-            if not reaction:
-                return None
-
-            # Collect all ChEBI IDs from this reaction
-            chebi_ids = [mol.chebi_id for mol in reaction.substrates + reaction.products]
-
-            # Fetch missing ChEBI data
-            missing_ids = [cid for cid in chebi_ids if cid not in chebi_cache]
-            if missing_ids:
-                try:
-                    molecules = await chebi_client.get_molecules(missing_ids)
-                    for mol in molecules:
-                        chebi_cache[mol.chebi_id] = {
-                            "name": mol.name,
-                            "smiles": mol.smiles,
-                            "inchi": mol.inchi,
-                        }
-                except Exception as e:
-                    logger.warning(f"Failed to enrich ChEBI IDs {missing_ids}: {e}")
-                    # Cache None for failed IDs to avoid retrying
-                    for cid in missing_ids:
-                        if cid not in chebi_cache:
-                            chebi_cache[cid] = None
-
-            # Now re-fetch reaction with enriched cache
-            return await rhea_client.get_reaction(rid, chebi_enricher=chebi_enricher)
+            return await rhea_client.get_reaction(rid)
 
     async def producer(fetch_task_id: TaskID) -> None:
         tasks = []

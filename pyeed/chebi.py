@@ -141,6 +141,7 @@ class ChebiClient:
         """
         normalized = [self._normalize_chebi_id(cid) for cid in chebi_ids]
         params = {"chebi_ids": ",".join(normalized)}
+        print(f"[DEBUG] Fetching ChEBI IDs: {normalized}")
 
         try:
             async with httpx.AsyncClient() as client:
@@ -152,6 +153,10 @@ class ChebiClient:
                 )
                 resp.raise_for_status()
                 raw_data = resp.json()
+                print(f"[DEBUG] Raw response keys: {list(raw_data.keys())}")
+                if raw_data:
+                    first_key = list(raw_data.keys())[0]
+                    print(f"[DEBUG] Sample entry structure: {raw_data[first_key].keys()}")
         except httpx.HTTPStatusError as e:
             raise ChebiError(
                 f"HTTP {e.response.status_code} fetching ChEBI IDs {normalized}",
@@ -172,12 +177,21 @@ class ChebiClient:
     def _entry_to_molecule(entry: ChebiEntryResult) -> Molecule:
         """Convert a ChebiEntryResult to a Molecule."""
         struct = entry.data.default_structure
-        return Molecule(
+        print(f"[DEBUG] Converting entry for {entry.standardized_chebi_id}")
+        print(f"[DEBUG]   - name: {entry.data.ascii_name}")
+        print(f"[DEBUG]   - has structure: {struct is not None}")
+        if struct:
+            print(f"[DEBUG]   - smiles: {struct.smiles}")
+            print(f"[DEBUG]   - inchi: {struct.standard_inchi}")
+
+        mol = Molecule(
             chebi_id=entry.standardized_chebi_id,
             name=entry.data.ascii_name or None,
             smiles=struct.smiles if struct else None,
             inchi=struct.standard_inchi if struct else None,
         )
+        print(f"[DEBUG] Created Molecule: {mol.model_dump()}")
+        return mol
 
     async def get_molecule(self, chebi_id: str) -> Molecule:
         """
