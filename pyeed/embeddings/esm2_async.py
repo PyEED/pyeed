@@ -264,32 +264,34 @@ class ESM2Embedder:
         embeddings: list[Embedding] = []
 
         with torch.no_grad():
-            for seq, acc in zip(sequences, accessions, strict=True):
-                # Tokenize
-                inputs = tokenizer(
-                    seq,
-                    return_tensors="pt",
-                    padding=False,
-                    truncation=True,
-                    max_length=1024,
-                ).to(device)
+            # Batch tokenize all sequences at once with padding
+            inputs = tokenizer(
+                list(sequences),
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=1024,
+            ).to(device)
 
-                # Forward pass
-                outputs = model(**inputs, output_hidden_states=True)
+            # Single forward pass for entire batch
+            outputs = model(**inputs, output_hidden_states=True)
 
-                # Extract layer
-                hidden_states = (
-                    outputs.last_hidden_state
-                    if self.layer_index == -1
-                    else outputs.hidden_states[self.layer_index]
-                )
+            # Extract layer
+            hidden_states = (
+                outputs.last_hidden_state
+                if self.layer_index == -1
+                else outputs.hidden_states[self.layer_index]
+            )
 
-                # Pool
-                attention_mask = inputs.get("attention_mask")
-                pooled = self.pooling(hidden_states, attention_mask)
+            # Pool each sequence in the batch
+            attention_mask = inputs.get("attention_mask")
+            pooled = self.pooling(hidden_states, attention_mask)
 
-                # To numpy and normalize
-                vector = pooled.cpu().numpy()[0]
+            # Convert to numpy and process each embedding
+            pooled_np = pooled.cpu().numpy()
+            
+            for i, acc in enumerate(accessions):
+                vector = pooled_np[i]
                 if self.normalize:
                     vector = normalize_embeddings(vector)
 
