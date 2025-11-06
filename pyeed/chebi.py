@@ -62,10 +62,10 @@ class ChebiChemicalData(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    formula: str
-    charge: int
-    mass: str
-    monoisotopic_mass: str
+    formula: str | None = None
+    charge: int | None = None
+    mass: str | None = None
+    monoisotopic_mass: str | None = None
 
 
 class ChebiEntryData(BaseModel):
@@ -78,11 +78,11 @@ class ChebiEntryData(BaseModel):
     name: str
     ascii_name: str
     stars: int
-    definition: str
+    definition: str | None = None
     names: ChebiNames
     chemical_data: ChebiChemicalData
     default_structure: ChebiStructure | None = None
-    modified_on: str
+    modified_on: str | None = None
     secondary_ids: list[str]
     is_released: bool
 

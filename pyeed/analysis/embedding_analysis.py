@@ -36,7 +36,7 @@ class EmbeddingTool:
         """
 
         query = f"""
-        MATCH (p:Protein {{accession_id: '{sequence_id}'}})
+        MATCH (p:Protein {{sequence_id: '{sequence_id}'}})
         RETURN p.embedding AS embedding
         """
         embedding_read = db.execute_read(query)
@@ -75,7 +75,7 @@ class EmbeddingTool:
         query = """
         MATCH (p:Protein)
         WHERE p.embedding IS NOT NULL
-        RETURN p.accession_id AS accession_id, p.embedding AS embedding
+        RETURN p.sequence_id AS sequence_id, p.embedding AS embedding
         """
         embeddings_read = db.execute_read(query)
         logger.info(f"Found {len(embeddings_read)} embeddings")
@@ -91,7 +91,7 @@ class EmbeddingTool:
             elif metric == "manhattan":
                 distance = np.sum(np.abs(start_embedding - embedding))
 
-            distances.append((embedding_read["accession_id"], distance))
+            distances.append((embedding_read["sequence_id"], distance))
 
         # sort the distances
         distances.sort(key=lambda x: x[1])
@@ -125,19 +125,19 @@ class EmbeddingTool:
                 - list[str]: Colors for each point
         """
         if ids_list is None:
-            # get all the accession_ids
+            # get all the sequence_ids
             query = """
             MATCH (p:Protein)
-            WHERE p.accession_id IS NOT NULL
-            RETURN p.accession_id AS protein_id
+            WHERE p.sequence_id IS NOT NULL
+            RETURN p.sequence_id AS protein_id
             """
             ids_list = [record["protein_id"] for record in db.execute_read(query)]
 
         # get the embeddings for the proteins based in the ids list
         query = """
         MATCH (p:Protein)
-        WHERE p.accession_id IN $ids
-        RETURN p.accession_id AS protein_id, p.embedding AS embedding
+        WHERE p.sequence_id IN $ids
+        RETURN p.sequence_id AS protein_id, p.embedding AS embedding
         """
         result = db.execute_read(query, {"ids": ids_list})
 
@@ -394,16 +394,16 @@ class EmbeddingTool:
             logger.info(f"Index {index_name} is populated, finding nearest neighbors")
 
         query_find_nearest_neighbors = f"""
-        MATCH (source:Protein {{accession_id: '{query_id}'}})
+        MATCH (source:Protein {{sequence_id: '{query_id}'}})
         WITH source.embedding AS embedding
         CALL db.index.vector.queryNodes('{index_name}', {number_of_neighbors}, embedding)
         YIELD node AS fprotein, score
         WHERE score > 0.95
-        RETURN fprotein.accession_id, score
+        RETURN fprotein.sequence_id, score
         SKIP {skip}
         """
         results = db.execute_read(query_find_nearest_neighbors)
         neighbors: list[tuple[str, float]] = [
-            (str(record["fprotein.accession_id"]), float(record["score"])) for record in results
+            (str(record["fprotein.sequence_id"]), float(record["score"])) for record in results
         ]
         return neighbors

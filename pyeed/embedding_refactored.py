@@ -19,10 +19,6 @@ from pyeed.embeddings.utils import (
     preprocess_sequence_for_prott5 as _preprocess_sequence_for_prott5,
 )
 
-# ============================================================================
-# Original function signatures maintained for backward compatibility
-# ============================================================================
-
 
 def get_hf_token() -> str:
     """Get or request Hugging Face token."""
@@ -41,7 +37,7 @@ def process_batches_on_gpu(
     Splits data into batches and processes them on a single GPU.
 
     Args:
-        data (list): List of (accession_id, sequence) tuples.
+        data (list): List of (protein_id, sequence) tuples.
         batch_size (int): Size of each batch.
         model: The model instance for this GPU.
         tokenizer: The tokenizer for the model.

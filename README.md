@@ -64,7 +64,7 @@ async def main():
 
     # Create a Protein object
     p1 = Protein(
-        accession_id="P00001",
+        sequence_id="P00001",
         name="Protein 1",
         sequence="ACDEFGHIKLMNPQRSTVWY",
     )
@@ -110,8 +110,8 @@ async def main():
     db = Database()
     db.verify_connection()
 
-    p2 = Protein(accession_id="TEST_P00002", sequence="ACDEFGHIKLMNPQR", name="P2")
-    p3 = Protein(accession_id="TEST_P00003", sequence="ACDEFGHIKLMNPQR", name="P3")
+    p2 = Protein(sequence_id="TEST_P00002", sequence="ACDEFGHIKLMNPQR", name="P2")
+    p3 = Protein(sequence_id="TEST_P00003", sequence="ACDEFGHIKLMNPQR", name="P3")
 
     await db.save_many([p2, p3])
 
@@ -156,7 +156,7 @@ Cypher queries can be executed against the connected Neo4j database using the `q
 from pyeed import Database
 
 db = Database()
-q_res = db.query("MATCH (p:Protein) RETURN p.accession_id AS AC_ID")
+q_res = db.query("MATCH (p:Protein) RETURN p.sequence_id AS AC_ID")
 print(q_res)
 ```
 

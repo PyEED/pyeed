@@ -25,7 +25,7 @@ async def main() -> None:
 
     # ----- 1) save(): one root + subtree -----
     p1 = Protein(
-        accession_id="TEST_P00001",
+        sequence_id="TEST_P00001",
         name="Demo Protein 1",
         sequence="ACDEFGHIKLMNPQRSTVWY",
     )
@@ -52,22 +52,22 @@ async def main() -> None:
 
     # sanity check
     res = db.query(
-        "MATCH (p:Protein {accession_id:$id}) "
+        "MATCH (p:Protein {sequence_id:$id}) "
         "OPTIONAL MATCH (p)-[r:CATALYZES]->(:Reaction) "
-        "RETURN p.accession_id AS id, count(r) AS rxn_count",
+        "RETURN p.sequence_id AS id, count(r) AS rxn_count",
         id="TEST_P00001",
     )
     print("Query result:", res)
 
     # ----- 2) save_many(): batch roots -----
-    p2 = Protein(accession_id="TEST_P00002", sequence="ACDEFGHIKLMNPQR", name="P2")
-    p3 = Protein(accession_id="TEST_P00003", sequence="ACDEFGHIKLMNPQR", name="P3")
+    p2 = Protein(sequence_id="TEST_P00002", sequence="ACDEFGHIKLMNPQR", name="P2")
+    p3 = Protein(sequence_id="TEST_P00003", sequence="ACDEFGHIKLMNPQR", name="P3")
     await db.save_many([p2, p3])
     print("Saved two more Proteins.")
 
     # verify they exist
     res_many = db.query(
-        "MATCH (p:Protein) WHERE p.accession_id IN $ids RETURN collect(p.accession_id) AS ids",
+        "MATCH (p:Protein) WHERE p.sequence_id IN $ids RETURN collect(p.sequence_id) AS ids",
         ids=["TEST_P00002", "TEST_P00003"],
     )
     print("Batch save check:", res_many)
@@ -87,10 +87,10 @@ async def main() -> None:
 
     # confirm attachment
     res2 = db.query(
-        "MATCH (p:Protein {accession_id:$id}) "
+        "MATCH (p:Protein {sequence_id:$id}) "
         "OPTIONAL MATCH (p)-[:HAS_EMBEDDING]->(e:Embedding) "
         "OPTIONAL MATCH (p)-[:HAS_ANNOTATION]->(a:Annotation) "
-        "RETURN p.accession_id AS id, "
+        "RETURN p.sequence_id AS id, "
         "       count(DISTINCT e) AS emb_count, "
         "       count(DISTINCT a) AS ann_count",
         id="TEST_P00001",

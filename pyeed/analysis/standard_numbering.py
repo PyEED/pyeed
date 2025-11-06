@@ -65,27 +65,27 @@ class StandardNumberingTool:
             query = f"""
             MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
             WHERE elementId(r) IN $region_ids_neo4j
-            WHERE p.accession_id = '{base_sequence_id}'
-            RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+            WHERE p.sequence_id = '{base_sequence_id}'
+            RETURN p.sequence_id AS sequence_id, e.start AS start, e.end AS end, p.sequence AS sequence
             """
         else:
             query = f"""
             MATCH (p:{node_type})
-            WHERE p.accession_id = '{base_sequence_id}'
-            RETURN p.accession_id AS accession_id, p.sequence AS sequence
+            WHERE p.sequence_id = '{base_sequence_id}'
+            RETURN p.sequence_id AS sequence_id, p.sequence AS sequence
             """
         base_sequence_read = db.execute_read(query)
         # Assume the first returned record is the desired base sequence
         if region_ids_neo4j:
             base_sequence = {
-                "id": base_sequence_read[0]["accession_id"],
+                "id": base_sequence_read[0]["sequence_id"],
                 "sequence": base_sequence_read[0]["sequence"][
                     base_sequence_read[0]["start"] : base_sequence_read[0]["end"]
                 ],
             }
         else:
             base_sequence = {
-                "id": base_sequence_read[0]["accession_id"],
+                "id": base_sequence_read[0]["sequence_id"],
                 "sequence": base_sequence_read[0]["sequence"],
             }
         return base_sequence
@@ -113,7 +113,7 @@ class StandardNumberingTool:
         for protein_id in positions:
             if region_ids_neo4j:
                 query = f"""
-                    MATCH (p:{node_type} {{accession_id: '{protein_id}'}})-[e:HAS_REGION]->(r:Region)
+                    MATCH (p:{node_type} {{sequence_id: '{protein_id}'}})-[e:HAS_REGION]->(r:Region)
                     WHERE elementId(r) IN $region_ids_neo4j
                     MATCH (s:StandardNumbering {{name: '{self.name}'}})
                     MERGE (r)-[rel:HAS_STANDARD_NUMBERING]->(s)
@@ -122,7 +122,7 @@ class StandardNumberingTool:
                 db.execute_write(query, parameters={"region_ids_neo4j": region_ids_neo4j})
             else:
                 query = f"""
-                    MATCH (p:{node_type} {{accession_id: '{protein_id}'}})
+                    MATCH (p:{node_type} {{sequence_id: '{protein_id}'}})
                     MATCH (s:StandardNumbering {{name: '{self.name}'}})
                     MERGE (p)-[rel:HAS_STANDARD_NUMBERING]->(s)
                     SET rel.positions = {positions[protein_id]!s}
@@ -348,8 +348,8 @@ class StandardNumberingTool:
         if list_of_seq_ids is None:
             query = f"""
             MATCH (p:{node_type})
-            WHERE p.accession_id IS NOT NULL
-            RETURN p.accession_id AS accession_id
+            WHERE p.sequence_id IS NOT NULL
+            RETURN p.sequence_id AS sequence_id
             """
             results = db.execute_read(query)
             if results is None:
@@ -357,9 +357,9 @@ class StandardNumberingTool:
             for row in results:
                 if row is None:
                     raise ValueError("No results returned from the query")
-                if not row.get("accession_id"):
-                    raise ValueError("Row missing required accession_id field")
-            list_of_seq_ids = [row["accession_id"] for row in results]
+                if not row.get("sequence_id"):
+                    raise ValueError("Row missing required sequence_id field")
+            list_of_seq_ids = [row["sequence_id"] for row in results]
 
         # Remove the base sequence id from the list if present.
         while base_sequence_id in list_of_seq_ids:
@@ -376,8 +376,8 @@ class StandardNumberingTool:
             MATCH (s:StandardNumbering {name: $name})
             MATCH (d:DNA)-[e:HAS_REGION]-(r:Region)-[:HAS_STANDARD_NUMBERING]-(s)
             WHERE elementId(r) IN $region_ids_neo4j
-            AND d.accession_id IN $list_of_seq_ids
-            RETURN d.accession_id AS accession_id
+            AND d.sequence_id IN $list_of_seq_ids
+            RETURN d.sequence_id AS sequence_id
             """
 
             results = db.execute_read(
@@ -392,8 +392,8 @@ class StandardNumberingTool:
             query = f"""
             MATCH (s:StandardNumbering {{name: $name}})
             MATCH (p:{node_type})-[rel:HAS_STANDARD_NUMBERING]->(s)
-            WHERE p.accession_id IN $list_of_seq_ids
-            RETURN p.accession_id AS accession_id
+            WHERE p.sequence_id IN $list_of_seq_ids
+            RETURN p.sequence_id AS sequence_id
             """
             results = db.execute_read(
                 query,
@@ -403,11 +403,11 @@ class StandardNumberingTool:
         if results is not None:
             for row in results:
                 if row is not None:
-                    if row.get("accession_id"):
+                    if row.get("sequence_id"):
                         logger.info(
-                            f"Pair {base_sequence_id} and {row['accession_id']} already exists under the same standard numbering node \n Removing x from the list: {(base_sequence_id, row['accession_id'])}"
+                            f"Pair {base_sequence_id} and {row['sequence_id']} already exists under the same standard numbering node \n Removing x from the list: {(base_sequence_id, row['sequence_id'])}"
                         )
-                        pairs.remove((base_sequence_id, row["accession_id"]))
+                        pairs.remove((base_sequence_id, row["sequence_id"]))
                         break
 
         # remove double pairs in the list of pairs
@@ -496,19 +496,19 @@ class StandardNumberingTool:
             query = f"""
             MATCH (p:{node_type}) 
             WHERE p.sequence IS NOT NULL
-            RETURN p.accession_id AS accession_id
+            RETURN p.sequence_id AS sequence_id
             """
             results = db.execute_read(query)
             if results is None:
                 raise ValueError("No results returned from the query")
-            list_of_seq_ids = [row["accession_id"] for row in results]
+            list_of_seq_ids = [row["sequence_id"] for row in results]
 
         # Retrieve all nodes from the database. With both id and sequence.
         query = f"""
         MATCH (p:{node_type})
         WHERE p.sequence IS NOT NULL
-        AND p.accession_id IN $list_of_seq_ids
-        RETURN p.accession_id AS accession_id, p.sequence AS sequence
+        AND p.sequence_id IN $list_of_seq_ids
+        RETURN p.sequence_id AS sequence_id, p.sequence AS sequence
         """
         # Execute the query and build the nodes dictionary
         nodes_read: list[dict[str, Any]]
@@ -524,8 +524,8 @@ class StandardNumberingTool:
             query = f"""
             MATCH (p:{node_type})-[e:HAS_REGION]->(r:Region)
             WHERE elementId(r) IN $region_ids_neo4j
-            WHERE p.accession_id IN $list_of_seq_ids
-            RETURN p.accession_id AS accession_id, e.start AS start, e.end AS end, p.sequence AS sequence
+            WHERE p.sequence_id IN $list_of_seq_ids
+            RETURN p.sequence_id AS sequence_id, e.start AS start, e.end AS end, p.sequence AS sequence
             """
             region_read = db.execute_read(
                 query,
@@ -535,12 +535,12 @@ class StandardNumberingTool:
                 },
             )
             nodes_dict = {
-                node["accession_id"]: node["sequence"][node["start"] : node["end"]]
+                node["sequence_id"]: node["sequence"][node["start"] : node["end"]]
                 for node in region_read
             }
 
         else:
-            nodes_dict = {node["accession_id"]: node["sequence"] for node in nodes_read}
+            nodes_dict = {node["sequence_id"]: node["sequence"] for node in nodes_read}
 
         logger.info(f"Using {len(nodes_dict)} sequences for standard numbering")
 

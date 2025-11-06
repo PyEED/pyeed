@@ -22,6 +22,10 @@ from .model import (
     Reaction,
 )
 
+INTERPRO_PATTERN = re.compile(r"^IPR\d{6}$")
+UNIPROT_PATTERN = re.compile(
+    r"^(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})$"
+)
 UNIPROT_SEARCH = "https://rest.uniprot.org/uniprotkb/search"
 RETURN_FIELDS = ",".join(
     [
@@ -200,7 +204,7 @@ class UniProtAdapter:
                     rx.append(Reaction(rhea_id=rid, description=rct.get("name")))
 
         return Protein(
-            accession_id=p["primaryAccession"],
+            sequence_id=p["primaryAccession"],
             name=name,
             sequence=sequence,
             seq_length=len(sequence),
@@ -214,3 +218,76 @@ class UniProtAdapter:
             embeddings=[],
             custom={},
         )
+
+    @retry(
+        wait=wait_exponential_jitter(0.5, 3),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception_type(httpx.HTTPError),
+    )
+    async def fetch_accessions_by_interpro(
+        self,
+        client: httpx.AsyncClient,
+        ipr: str,
+        distinct: bool = True,
+        limit: int = 1_000_000_000,
+    ) -> list[str]:
+        """
+        One-shot SPARQL: return all UniProt accessions linked to an InterPro ID.
+        No pagination; relies on a very large LIMIT and whatever cap the endpoint applies.
+
+        Args:
+            client: shared httpx.AsyncClient
+            ipr: e.g. "IPR002133"
+            distinct: use SELECT DISTINCT
+            limit: upper bound for rows (kept huge to approximate 'all at once')
+
+        Returns:
+            List of accessions (strings).
+        """
+        assert ipr.startswith("IPR"), f"Expected InterPro ID like 'IPRxxxxx', got {ipr!r}"
+
+        base_url = "https://sparql.uniprot.org/sparql"
+        accept_headers = {"Accept": "application/sparql-results+json", **self.headers}
+
+        q = (
+            "PREFIX up:<http://purl.uniprot.org/core/> "
+            "PREFIX uniprotkb:<http://purl.uniprot.org/uniprot/> "
+            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> "
+            f"SELECT {'DISTINCT ' if distinct else ''}"
+            "(SUBSTR(STR(?p), STRLEN(STR(uniprotkb:)) + 1) AS ?acc) "
+            "WHERE { "
+            f"?p a up:Protein ; rdfs:seeAlso <http://purl.uniprot.org/interpro/{ipr}> . "
+            "} "
+            f"LIMIT {int(limit)}"
+        )
+
+        r = await client.get(
+            base_url, params={"query": q}, headers=accept_headers, timeout=self.timeout
+        )
+        r.raise_for_status()
+
+        data = r.json()
+        bindings = data.get("results", {}).get("bindings", []) or []
+        # Extract 'acc' safely
+        accs = []
+        for b in bindings:
+            v = (b.get("acc") or {}).get("value")
+            if isinstance(v, str):
+                accs.append(v)
+
+        return accs
+
+
+async def _amain() -> None:
+    adapter = UniProtAdapter()
+    ipr = "IPR002133"
+    async with httpx.AsyncClient() as client:
+        accs = await adapter.fetch_all_accessions_sparql(client, ipr)
+        return accs
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    length = len(asyncio.run(_amain()))
+    print(f"Length: {length}")

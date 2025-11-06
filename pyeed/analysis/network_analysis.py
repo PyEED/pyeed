@@ -73,7 +73,7 @@ class NetworkAnalysis:
         if nodes:
             node_filters.append("labels(n)[0] IN $node_types")
         if ids:
-            node_filters.append("n.accession_id IN $accession_ids")
+            node_filters.append("n.sequence_id IN $sequence_ids")
 
         if node_filters:
             base_query += "WHERE " + " AND ".join(node_filters)
@@ -97,7 +97,7 @@ class NetworkAnalysis:
         logger.info("Executing combined query for nodes and relationships")
         results = self.db.execute_read(
             base_query,
-            {"node_types": nodes, "accession_ids": ids, "relationships": relationships},
+            {"node_types": nodes, "sequence_ids": ids, "relationships": relationships},
         )
 
         if not results or not results[0]:

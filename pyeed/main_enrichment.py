@@ -9,19 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TaskID,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
+from rich.progress import TaskID
 
 from .chebi import ChebiClient
 from .database import Database
+from .ingest.progress import create_progress
 from .model import MODEL_CLASSES, Molecule
 from .rhea import RheaClient
 
@@ -108,7 +100,8 @@ async def enrich_reactions_with_molecules(
                     return None
 
                 logger.debug(
-                    f"Fetched {len(substrate_chebi_ids)} substrates and {len(product_chebi_ids)} products for {rhea_id}"
+                    f"Fetched {len(substrate_chebi_ids)} substrates and "
+                    f"{len(product_chebi_ids)} products for {rhea_id}"
                 )
 
                 return rhea_id, substrate_chebi_ids, product_chebi_ids
@@ -147,7 +140,7 @@ async def enrich_reactions_with_molecules(
         reaction_molecule_map: dict[str, tuple[list[str], list[str]]] = {}
         all_chebi_ids: set[str] = set()
 
-        # Phase 1: Collect all data from queue
+        # Collect all data from queue
         while True:
             item = await queue.get()
             if item is None:
@@ -159,15 +152,16 @@ async def enrich_reactions_with_molecules(
             all_chebi_ids.update(product_chebi_ids)
 
         logger.info(
-            f"Collected {len(all_chebi_ids)} unique ChEBI IDs from {len(reaction_molecule_map)} reactions"
+            f"Collected {len(all_chebi_ids)} unique ChEBI IDs from "
+            f"{len(reaction_molecule_map)} reactions"
         )
 
-        # Phase 2: Batch fetch molecules and save
+        # Batch fetch molecules and save
         chebi_to_molecule = await _fetch_and_save_molecules(
             chebi_client, db, list(all_chebi_ids), save_batch
         )
 
-        # Phase 3: Create edges between reactions and molecules
+        # Create edges between reactions and molecules
         await _create_reaction_molecule_edges(
             db, reaction_molecule_map, chebi_to_molecule, save_batch
         )
@@ -175,15 +169,7 @@ async def enrich_reactions_with_molecules(
         # Update progress
         progress.update(save_task_id, advance=len(reaction_molecule_map))
 
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[bold]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        transient=False,
-    )
+    progress = create_progress()
 
     with progress:
         fetch_task = progress.add_task("Fetch Rhea Data", total=total_candidates)
@@ -286,14 +272,68 @@ async def _create_reaction_molecule_edges(
         logger.info(f"Created {len(product_edge_data)} HAS_PRODUCT edges")
 
 
-# Example usage
+# ============================================================================
+# Example Usage
+# ============================================================================
+
 if __name__ == "__main__":
     import asyncio
 
-    from pyeed.database import Database
+    from pyeed.db.neo4j import Database
+    from pyeed.embedding.pooling import max_pooling, mean_pooling
+    from pyeed.ingest import Ingester, embed_proteins
 
     async def main() -> None:
         db = Database()
+
+        # Example 1: Enrich reactions with molecules
         await enrich_reactions_with_molecules(db, sync_schema=True)
+
+        # Example 2: Embed proteins using fluent API with default Neo4j sink
+        await (
+            Ingester(db)
+            .from_interpro("IPR002133")
+            .with_embeddings()  # Default: Neo4j sink, mean_pooling
+            .run()
+        )
+
+        # Example 3: Embed proteins with multiple pooling methods
+        await (
+            Ingester(db)
+            .from_ids(["P12345", "Q9Y6K9"])
+            .with_embeddings(
+                pooling_methods=[mean_pooling, max_pooling],
+                model_name="facebook/esm2_t33_650M_UR50D",
+            )
+            .run()
+        )
+
+        # Example 4: Embed proteins with custom sink configuration
+        # sink = Neo4jEmbeddingSink(db, batch_size=500)
+        # await (
+        #     Ingester(db)
+        #     .from_interpro("IPR002133")
+        #     .with_embeddings(sinks=[sink], pooling_methods=[mean_pooling])
+        #     .run()
+        # )
+
+        # Example 5: Functional API for embedding proteins
+        await embed_proteins(
+            db,
+            pooling_methods=[mean_pooling],
+            batch_size=16,
+            chunk_size=1000,
+        )
+
+        # Example 6: Full pipeline with embeddings
+        stats = await (
+            Ingester(db)
+            .from_interpro("IPR002133")
+            .with_reactions()
+            .with_molecules()
+            .with_embeddings(pooling_methods=[mean_pooling, max_pooling])
+            .run()
+        )
+        print(f"Pipeline complete: {stats}")
 
     asyncio.run(main())

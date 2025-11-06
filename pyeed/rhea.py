@@ -12,7 +12,6 @@ import httpx
 from .model import Molecule, Reaction
 
 _RHEA_TABLE_URL = "https://www.rhea-db.org/rhea/"
-# We request only what we need; header labels are human-readable.
 _RHEA_COLS = "rhea-id,equation,chebi-id"
 _HEADER_MAP = {
     "Reaction identifier": "rhea-id",
@@ -27,9 +26,7 @@ _PLUS_OUTSIDE_PARENS = re.compile(r"\+(?![^()]*\))")
 
 
 class RheaClient:
-    def __init__(
-        self, user_agent: str = "pyeed/1.0 (contact: you@example.org)", timeout_s: float = 20.0
-    ) -> None:
+    def __init__(self, user_agent: str = "pyeed/1.0", timeout_s: float = 20.0) -> None:
         self._hdr = {"User-Agent": user_agent}
         self._timeout = httpx.Timeout(timeout_s)
 
@@ -141,6 +138,8 @@ class RheaClient:
 
 ## test rhea client
 if __name__ == "__main__":
+    from rich import print
+
     rhea_client = RheaClient()
     rx = asyncio.run(rhea_client.get_reaction("RHEA:32459"))
     print(rx)

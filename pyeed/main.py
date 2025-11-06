@@ -5,6 +5,7 @@ import logging
 from collections.abc import Iterable
 
 import httpx
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -16,12 +17,52 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from .database import Database
+from .db.neo4j import Database
+from .environment import IN_NOTEBOOK
 from .model import MODEL_CLASSES, Protein, Reaction
 from .rhea import RheaClient
 from .uniprot import UniProtAdapter
 
 logger = logging.getLogger(__name__)
+
+CONSOLE = Console(force_jupyter=IN_NOTEBOOK)
+
+
+async def ingest_interpro(
+    db: Database,
+    interpro: str,
+    chunk_size: int = 30,
+    page_size: int = 30,
+    batch_size: int = 200,
+    sync_schema: bool = True,
+) -> None:
+    """Ingests proteins from UniProt by InterPro ID.
+
+    Args:
+        db: GraphDatabase
+        interpro: InterPro ID (e.g., "IPR002133")
+        chunk_size: Number of accessions per batch for fetching
+        page_size: Results per page for UniProt API
+        batch_size: Number of proteins to batch before upserting to database
+        sync_schema: Whether to sync the database schema before ingestion
+    """
+    adapter = UniProtAdapter()
+
+    logger.info(f"Fetching accessions for InterPro ID: {interpro}")
+    async with httpx.AsyncClient() as client:
+        accessions = await adapter.fetch_accessions_by_interpro(client, interpro)
+
+    logger.info(f"Found {len(accessions)} accessions for {interpro}")
+
+    # Forward to ingest_uniprot
+    await ingest_uniprot(
+        db=db,
+        accessions=accessions,
+        chunk_size=chunk_size,
+        page_size=page_size,
+        batch_size=batch_size,
+        sync_schema=sync_schema,
+    )
 
 
 async def ingest_uniprot(
@@ -30,7 +71,7 @@ async def ingest_uniprot(
     chunk_size: int = 30,
     page_size: int = 30,
     batch_size: int = 200,
-    sync_schema: bool = False,
+    sync_schema: bool = True,
 ) -> None:
     """Ingests proteins from UniProt by accession IDs.
 
@@ -40,7 +81,7 @@ async def ingest_uniprot(
         chunk_size: int = 30
         page_size: int = 30
         batch_size: int = 200
-        schema_synced: bool = False
+        sync_schema: bool = False
     """
     accessions = list(accessions)
 
@@ -58,6 +99,7 @@ async def ingest_uniprot(
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         transient=False,
+        console=CONSOLE,
     )
 
     async def producer(fetch_task_id: TaskID) -> None:
@@ -172,14 +214,3 @@ async def enrich_rhea(db: Database, concurrency: int = 8, save_batch: int = 200)
         t_fetch = progress.add_task("Fetch+Map (Rhea)", total=None)
         t_save = progress.add_task("Upsert (Neo4j)", total=None)
         await asyncio.gather(producer(t_fetch), consumer(t_save))
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    from pyeed.database import Database
-
-    print("Starting")
-
-    db = Database()
-    asyncio.run(enrich_rhea(db))
