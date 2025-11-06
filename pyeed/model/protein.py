@@ -3,7 +3,6 @@ from typing import Annotated, Any
 from pydantic import Field, field_validator
 
 from .annotation import Annotation
-from .embedding import Embedding
 from .goannotation import GOAnnotation
 from .organism import Organism
 from .pyeedbase import LabelProperty, PyeedBase
@@ -13,12 +12,12 @@ from .reaction import Reaction
 class Protein(PyeedBase):
     """Protein sequence and metadata."""
 
-    accession_id: Annotated[
+    sequence_id: Annotated[
         str,
         LabelProperty(unique=True),
     ] = Field(
         ...,
-        description="Protein accession identifier",
+        description="Protein sequence identifier",
     )
     sequence: str = Field(
         ...,
@@ -55,10 +54,6 @@ class Protein(PyeedBase):
     reactions: list[Reaction] = Field(
         default_factory=list,
         description="RHEA reaction identifiers",
-    )
-    embeddings: list[Embedding] = Field(
-        default_factory=list,
-        description="Embeddings from different models",
     )
     annotations: list[Annotation] = Field(
         default_factory=list,
