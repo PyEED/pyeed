@@ -11,10 +11,11 @@ Optimizations:
 
 from __future__ import annotations
 
+import asyncio
 import mmap
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 from rich.progress import Progress, TaskID
 
@@ -62,7 +63,7 @@ def _read_sequence_from_offset_mmap(
     start_offset: int,
     end_offset: int,
     header_pattern: re.Pattern[str] | None = None,
-) -> dict[str, str]:
+) -> tuple[str, str]:
     """Read a single FASTA entry (protein_id + sequence) from a memory-mapped file.
 
     Optimized version using mmap and replace() for removing newlines.
@@ -77,7 +78,7 @@ def _read_sequence_from_offset_mmap(
             If None, the entire header (without '>') is used as protein_id.
 
     Returns:
-        Dict with 'protein_id' and 'sequence' keys. Both are strings.
+        Tuple of (protein_id, sequence). Both are strings.
 
     Raises:
         ValueError: If start_offset doesn't point to a valid header line.
@@ -121,10 +122,7 @@ def _read_sequence_from_offset_mmap(
     else:
         protein_id = header_str
 
-    return {
-        "protein_id": protein_id,
-        "sequence": sequence_bytes.decode("ascii", errors="ignore"),
-    }
+    return (protein_id, sequence_bytes.decode("ascii", errors="ignore"))
 
 
 def read_fasta_chunks(
@@ -133,7 +131,7 @@ def read_fasta_chunks(
     header_pattern: str | re.Pattern[str] | None = None,
     show_progress: bool = True,
     progress: Progress | None = None,
-) -> Iterator[list[dict[str, str]]]:
+) -> Iterator[dict[str, str]]:
     """Read FASTA file in chunks of entries.
 
     This is a high-level convenience function that automatically builds
@@ -157,8 +155,8 @@ def read_fasta_chunks(
         progress: Existing Progress instance to share progress context.
 
     Yields:
-        Lists of dicts, each with 'protein_id' and 'sequence' keys. Each chunk contains
-        up to chunk_size entries. The final chunk may have fewer entries.
+        Dicts mapping protein_id to sequence. Each chunk contains up to chunk_size
+        entries. The final chunk may have fewer entries.
 
     Raises:
         FileNotFoundError: If the file doesn't exist.
@@ -166,18 +164,17 @@ def read_fasta_chunks(
         ValueError: If chunk_size is not positive.
 
     Example:
-        >>> # Read as strings (default)
+        >>> # Read as dict (protein_id -> sequence)
         >>> for chunk in read_fasta_chunks("proteins.fasta", chunk_size=1000):
-        ...     for entry in chunk:
-        ...         pid = entry['protein_id']
-        ...         seq_len = len(entry['sequence'])
-        ...         print(f"Protein ID: {pid}, Sequence length: {seq_len}")
+        ...     for protein_id, sequence in chunk.items():
+        ...         seq_len = len(sequence)
+        ...         print(f"Protein ID: {protein_id}, Sequence length: {seq_len}")
         ...
         >>> # Extract UniProt accession from header
         >>> pattern = re.compile(r"^sp\\|([A-Z0-9]+)\\|")
         >>> for chunk in read_fasta_chunks("proteins.fasta", header_pattern=pattern):
-        ...     for entry in chunk:
-        ...         print(f"Accession: {entry['protein_id']}")
+        ...     for accession in chunk:
+        ...         print(f"Accession: {accession}")
     """
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
@@ -214,7 +211,7 @@ def iter_fasta_batches(
     show_progress: bool = True,
     progress: Progress | None = None,
     total: int | None = None,
-) -> Iterator[list[dict[str, str]]]:
+) -> Iterator[dict[str, str]]:
     """Iterate over FASTA entries in batches using memory-mapped access.
 
     Optimized version using mmap and replace() for removing newlines.
@@ -230,8 +227,8 @@ def iter_fasta_batches(
         total: Total number of entries for progress tracking (default: len(offsets)).
 
     Yields:
-        Lists of dicts, each with 'protein_id' and 'sequence' keys. Each batch contains
-        up to batch_size entries. The final batch may have fewer entries.
+        Dicts mapping protein_id to sequence. Each batch contains up to batch_size
+        entries. The final batch may have fewer entries.
 
     Raises:
         FileNotFoundError: If the file doesn't exist.
@@ -284,20 +281,22 @@ def _iter_fasta_batches_impl(
     header_pattern: re.Pattern[str] | None,
     progress: Progress | None,
     task_id: TaskID | None,
-) -> Iterator[list[dict[str, str]]]:
+) -> Iterator[dict[str, str]]:
     """Internal implementation of iter_fasta_batches with progress tracking."""
     with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-        batch: list[dict[str, str]] = []
+        batch: dict[str, str] = {}
 
         for start, end in zip(offsets, end_offsets, strict=False):
-            entry = _read_sequence_from_offset_mmap(mm, start, end, header_pattern=header_pattern)
-            batch.append(entry)
+            protein_id, sequence = _read_sequence_from_offset_mmap(
+                mm, start, end, header_pattern=header_pattern
+            )
+            batch[protein_id] = sequence
 
             if len(batch) >= batch_size:
                 yield batch
                 if task_id is not None and progress is not None:
                     progress.update(task_id, advance=len(batch))
-                batch = []
+                batch = {}
 
         if batch:
             yield batch
@@ -313,7 +312,7 @@ def read_fasta_range(
     header_pattern: re.Pattern[str] | None = None,
     show_progress: bool = True,
     progress: Progress | None = None,
-) -> list[dict[str, str]]:
+) -> dict[str, str]:
     """Read a range of FASTA entries by their ordinal positions.
 
     Optimized version using mmap and replace() for removing newlines.
@@ -329,7 +328,7 @@ def read_fasta_range(
         progress: Existing Progress instance to share progress context.
 
     Returns:
-        List of dicts, each with 'protein_id' and 'sequence' keys, for indices [start, end).
+        Dict mapping protein_id to sequence for indices [start, end).
 
     Raises:
         ValueError: If the range [start, end) is invalid.
@@ -345,7 +344,7 @@ def read_fasta_range(
     end_offsets = [*offsets, file_size]
     total_entries = end - start
 
-    entries: list[dict[str, str]] = []
+    entries: dict[str, str] = {}
 
     # Set up progress tracking
     if show_progress:
@@ -356,31 +355,176 @@ def read_fasta_range(
                 task_id = progress_instance.add_task("Read FASTA Range", total=total_entries)
                 with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                     for i in range(start, end):
-                        entry = _read_sequence_from_offset_mmap(
+                        protein_id, sequence = _read_sequence_from_offset_mmap(
                             mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
                         )
-                        entries.append(entry)
+                        entries[protein_id] = sequence
                         progress_instance.update(task_id, advance=1)
         else:
             # Shared progress - don't use context manager
             task_id = progress_instance.add_task("Read FASTA Range", total=total_entries)
             with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 for i in range(start, end):
-                    entry = _read_sequence_from_offset_mmap(
+                    protein_id, sequence = _read_sequence_from_offset_mmap(
                         mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
                     )
-                    entries.append(entry)
+                    entries[protein_id] = sequence
                     progress_instance.update(task_id, advance=1)
     else:
         # No progress tracking
         with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             for i in range(start, end):
-                entry = _read_sequence_from_offset_mmap(
+                protein_id, sequence = _read_sequence_from_offset_mmap(
                     mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
                 )
-                entries.append(entry)
+                entries[protein_id] = sequence
 
     return entries
+
+
+async def async_read_fasta_chunks(
+    path: str,
+    chunk_size: int = 1000,
+    header_pattern: str | re.Pattern[str] | None = None,
+    show_progress: bool = True,
+    progress: Progress | None = None,
+) -> AsyncIterator[dict[str, str]]:
+    """Read FASTA file in chunks of entries asynchronously.
+
+    This is an async version of read_fasta_chunks that uses asyncio.to_thread()
+    for file I/O operations. Memory-efficient for large FASTA files.
+
+    Optimizations:
+    - Uses memory-mapped file access (mmap) for faster reads
+    - Uses replace() for removing newlines (C-level, fast)
+    - Optional regex pattern to extract protein_id from header
+    - Optional progress tracking with Rich progress bars
+
+    Args:
+        path: Path to the FASTA file.
+        chunk_size: Number of entries per chunk (default: 1000).
+        header_pattern: Optional regex pattern (string or compiled Pattern) to extract
+            protein_id from header. If provided, the first capture group is used.
+            Example: r"^sp\\|([A-Z0-9]+)\\|" to extract UniProt accession from
+            "sp|P12345|PROTEIN_NAME".
+        show_progress: Display progress bar (default: True).
+        progress: Existing Progress instance to share progress context.
+
+    Yields:
+        Dicts mapping protein_id to sequence. Each chunk contains up to chunk_size
+        entries. The final chunk may have fewer entries.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        IOError: If the file cannot be read.
+        ValueError: If chunk_size is not positive.
+
+    Example:
+        >>> async for chunk in async_read_fasta_chunks("proteins.fasta", chunk_size=1000):
+        ...     for protein_id, sequence in chunk.items():
+        ...         seq_len = len(sequence)
+        ...         print(f"Protein ID: {protein_id}, Sequence length: {seq_len}")
+    """
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+
+    # Compile pattern if string provided
+    compiled_pattern: re.Pattern[str] | None = None
+    if header_pattern:
+        if isinstance(header_pattern, str):
+            compiled_pattern = re.compile(header_pattern)
+        else:
+            compiled_pattern = header_pattern
+
+    # Build index to get total count for progress tracking
+    offsets = await asyncio.to_thread(build_header_index, path)
+    total_entries = len(offsets)
+
+    file_size = await asyncio.to_thread(os.path.getsize, path)
+    end_offsets = [*offsets[1:], file_size]
+
+    # Set up progress tracking
+    if show_progress:
+        progress_instance = create_progress(progress=progress)
+        # Only use 'with' context if we created a new progress instance
+        if progress is None:
+            with progress_instance:
+                task_id = progress_instance.add_task("Read FASTA", total=total_entries)
+                async for chunk in _async_iter_fasta_batches_impl(
+                    path,
+                    offsets,
+                    end_offsets,
+                    chunk_size,
+                    compiled_pattern,
+                    progress_instance,
+                    task_id,
+                ):
+                    yield chunk
+        else:
+            # Shared progress - don't use context manager
+            task_id = progress_instance.add_task("Read FASTA", total=total_entries)
+            async for chunk in _async_iter_fasta_batches_impl(
+                path,
+                offsets,
+                end_offsets,
+                chunk_size,
+                compiled_pattern,
+                progress_instance,
+                task_id,
+            ):
+                yield chunk
+    else:
+        # No progress tracking
+        async for chunk in _async_iter_fasta_batches_impl(
+            path, offsets, end_offsets, chunk_size, compiled_pattern, None, None
+        ):
+            yield chunk
+
+
+async def _async_iter_fasta_batches_impl(
+    path: str,
+    offsets: list[int],
+    end_offsets: list[int],
+    batch_size: int,
+    header_pattern: re.Pattern[str] | None,
+    progress: Progress | None,
+    task_id: TaskID | None,
+) -> AsyncIterator[dict[str, str]]:
+    # Shared state
+    idx = 0
+    n = len(offsets)
+
+    # One file + mmap, not per-batch reopen
+    with open(path, "rb") as f:
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+
+            def read_next_batch(start_idx: int) -> tuple[dict[str, str], int]:
+                """Read a single batch starting at start_idx.
+                Returns (batch_dict, next_idx)."""
+                if start_idx >= n:
+                    return {}, start_idx
+                batch: dict[str, str] = {}
+                i = start_idx
+                while i < n and len(batch) < batch_size:
+                    pid, seq = _read_sequence_from_offset_mmap(
+                        mm, offsets[i], end_offsets[i], header_pattern=header_pattern
+                    )
+                    batch[pid] = seq
+                    i += 1
+                return batch, i
+
+            while idx < n:
+                # do the heavy IO work in thread pool but with shared idx
+                batch, next_idx = await asyncio.to_thread(read_next_batch, idx)
+                if not batch:
+                    break
+                if progress is not None and task_id is not None:
+                    progress.update(task_id, advance=len(batch))
+                yield batch
+                idx = next_idx
+        finally:
+            mm.close()
 
 
 if __name__ == "__main__":
@@ -392,8 +536,13 @@ if __name__ == "__main__":
     print(f"Found {len(offsets)} sequences")
 
     # Test with strings (default)
-    sequences = list(read_fasta_chunks(path, chunk_size=100, header_pattern=r"(?<=\|)[^|]+(?=\|)"))
+    sequences = list(read_fasta_chunks(path, chunk_size=1000, header_pattern=r"(?<=\|)[^|]+(?=\|)"))
     print(len(sequences))
 
-    # print first sequence
-    print(sequences[0][0])
+    # print first chunk (dict of protein_id -> sequence)
+    if sequences:
+        first_chunk = sequences[0]
+        if first_chunk:
+            first_id = next(iter(first_chunk))
+            print(f"First protein ID: {first_id}, Sequence: {first_chunk[first_id]}")
+            print("n sequences in first chunk: ", len(first_chunk))
