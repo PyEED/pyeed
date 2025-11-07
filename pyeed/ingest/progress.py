@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Protocol
+
 from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     Progress,
     SpinnerColumn,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
@@ -42,3 +46,16 @@ def create_progress(transient: bool = False, progress: Progress | None = None) -
         transient=transient,
         console=CONSOLE,
     )
+
+
+class Reporter(Protocol):
+    def __call__(self, **kw: object) -> None: ...
+
+
+@dataclass(frozen=True)
+class ProgressReporter:
+    progress: Progress
+    task_id: TaskID
+
+    def __call__(self, **kw: object) -> None:
+        self.progress.update(self.task_id, **kw)

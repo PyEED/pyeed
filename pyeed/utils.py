@@ -1,12 +1,6 @@
-"""Efficient FASTA file parser with seek-based random access.
+"""Refactored FASTA parser with clean async methods.
 
-This module provides tools for parsing large FASTA files without loading
-the entire file into memory. It uses byte offset indexing for fast random
-access to individual sequences.
-
-Optimizations:
-- Memory-mapped file access (mmap) for faster reads
-- C-level translate() for removing newlines (faster than replace())
+All methods are async except the high-level wrapper `read_fasta_chunks()`.
 """
 
 from __future__ import annotations
@@ -17,39 +11,29 @@ import os
 import re
 from collections.abc import AsyncIterator, Iterator
 
-from rich.progress import Progress, TaskID
-
-from .ingest.progress import create_progress
+from .ingest.progress import ProgressReporter
 
 
 def build_header_index(path: str) -> list[int]:
-    """Build an index of byte offsets for all FASTA headers in a file.
+    """Build an index of byte offsets for all FASTA headers.
 
-    Performs a single-pass scan using memory-mapped file access for speed.
-    Locates all lines starting with '>' (FASTA header lines) and records
-    their byte positions.
+    Single-pass scan using memory-mapped file access.
 
     Args:
-        path: Path to the FASTA file.
+        path: Path to FASTA file
 
     Returns:
-        List of byte offsets where each header begins, in file order.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        IOError: If the file cannot be read.
+        List of byte offsets where each header begins
     """
     offsets: list[int] = []
 
     with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
         pos = 0
         while pos < len(mm):
-            # Find next newline
             newline_pos = mm.find(b"\n", pos)
             if newline_pos == -1:
                 break
 
-            # Check if line starts with '>'
             if mm[pos] == ord(b">"):
                 offsets.append(pos)
 
@@ -58,30 +42,22 @@ def build_header_index(path: str) -> list[int]:
     return offsets
 
 
-def _read_sequence_from_offset_mmap(
+async def _read_sequence_async(
     mm: mmap.mmap,
     start_offset: int,
     end_offset: int,
     header_pattern: re.Pattern[str] | None = None,
 ) -> tuple[str, str]:
-    """Read a single FASTA entry (protein_id + sequence) from a memory-mapped file.
-
-    Optimized version using mmap and replace() for removing newlines.
+    """Read a single FASTA entry from memory-mapped file.
 
     Args:
-        mm: Memory-mapped file object.
-        start_offset: Byte position of the sequence header.
-        end_offset: Byte position where this sequence ends (start of next
-            sequence or EOF).
-        header_pattern: Optional regex pattern to extract protein_id from header.
-            If provided, the first capture group is used as protein_id.
-            If None, the entire header (without '>') is used as protein_id.
+        mm: Memory-mapped file object
+        start_offset: Byte position of sequence header
+        end_offset: Byte position where sequence ends
+        header_pattern: Optional regex to extract protein_id from header
 
     Returns:
-        Tuple of (protein_id, sequence). Both are strings.
-
-    Raises:
-        ValueError: If start_offset doesn't point to a valid header line.
+        Tuple of (protein_id, sequence)
     """
     # Validate header
     if mm[start_offset] != ord(b">"):
@@ -95,18 +71,16 @@ def _read_sequence_from_offset_mmap(
     if header_end == -1 or header_end >= end_offset:
         header_end = end_offset
 
-    # Extract header (without '>' prefix, without trailing newline)
-    header_bytes = mm[start_offset + 1 : header_end]  # Skip '>' prefix
+    # Extract header (without '>' prefix)
+    header_bytes = mm[start_offset + 1 : header_end]
 
     # Extract sequence (skip header line)
     seq_start = header_end + 1
     if seq_start >= end_offset:
-        # Empty sequence
         sequence_bytes = b""
     else:
-        # Read sequence bytes
         sequence_bytes = mm[seq_start:end_offset]
-        # Remove newlines using replace (fast, C-level implementation)
+        # Fast C-level newline removal
         sequence_bytes = sequence_bytes.replace(b"\n", b"").replace(b"\r", b"")
 
     # Decode header
@@ -125,424 +99,315 @@ def _read_sequence_from_offset_mmap(
     return (protein_id, sequence_bytes.decode("ascii", errors="ignore"))
 
 
-def read_fasta_chunks(
-    path: str,
-    chunk_size: int = 1000,
-    header_pattern: str | re.Pattern[str] | None = None,
-    show_progress: bool = True,
-    progress: Progress | None = None,
-) -> Iterator[dict[str, str]]:
-    """Read FASTA file in chunks of entries.
-
-    This is a high-level convenience function that automatically builds
-    the header index and yields FASTA entries in chunks. Memory-efficient
-    for large FASTA files.
-
-    Optimizations:
-    - Uses memory-mapped file access (mmap) for faster reads
-    - Uses replace() for removing newlines (C-level, fast)
-    - Optional regex pattern to extract protein_id from header
-    - Optional progress tracking with Rich progress bars
-
-    Args:
-        path: Path to the FASTA file.
-        chunk_size: Number of entries per chunk (default: 1000).
-        header_pattern: Optional regex pattern (string or compiled Pattern) to extract
-            protein_id from header. If provided, the first capture group is used.
-            Example: r"^sp\\|([A-Z0-9]+)\\|" to extract UniProt accession from
-            "sp|P12345|PROTEIN_NAME".
-        show_progress: Display progress bar (default: True).
-        progress: Existing Progress instance to share progress context.
-
-    Yields:
-        Dicts mapping protein_id to sequence. Each chunk contains up to chunk_size
-        entries. The final chunk may have fewer entries.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        IOError: If the file cannot be read.
-        ValueError: If chunk_size is not positive.
-
-    Example:
-        >>> # Read as dict (protein_id -> sequence)
-        >>> for chunk in read_fasta_chunks("proteins.fasta", chunk_size=1000):
-        ...     for protein_id, sequence in chunk.items():
-        ...         seq_len = len(sequence)
-        ...         print(f"Protein ID: {protein_id}, Sequence length: {seq_len}")
-        ...
-        >>> # Extract UniProt accession from header
-        >>> pattern = re.compile(r"^sp\\|([A-Z0-9]+)\\|")
-        >>> for chunk in read_fasta_chunks("proteins.fasta", header_pattern=pattern):
-        ...     for accession in chunk:
-        ...         print(f"Accession: {accession}")
-    """
-    if chunk_size <= 0:
-        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-
-    # Compile pattern if string provided
-    compiled_pattern: re.Pattern[str] | None = None
-    if header_pattern:
-        if isinstance(header_pattern, str):
-            compiled_pattern = re.compile(header_pattern)
-        else:
-            compiled_pattern = header_pattern
-
-    # Build index to get total count for progress tracking
-    offsets = build_header_index(path)
-    total_entries = len(offsets)
-
-    # Pass progress parameters to iter_fasta_batches
-    yield from iter_fasta_batches(
-        path,
-        offsets,
-        chunk_size,
-        header_pattern=compiled_pattern,
-        show_progress=show_progress,
-        progress=progress,
-        total=total_entries,
-    )
-
-
-def iter_fasta_batches(
-    path: str,
-    offsets: list[int],
-    batch_size: int,
-    header_pattern: re.Pattern[str] | None = None,
-    show_progress: bool = True,
-    progress: Progress | None = None,
-    total: int | None = None,
-) -> Iterator[dict[str, str]]:
-    """Iterate over FASTA entries in batches using memory-mapped access.
-
-    Optimized version using mmap and replace() for removing newlines.
-
-    Args:
-        path: Path to the FASTA file.
-        offsets: List of byte offsets for each sequence header, typically
-            obtained from build_header_index().
-        batch_size: Number of entries to yield in each batch.
-        header_pattern: Optional regex pattern to extract protein_id from header.
-        show_progress: Display progress bar (default: True).
-        progress: Existing Progress instance to share progress context.
-        total: Total number of entries for progress tracking (default: len(offsets)).
-
-    Yields:
-        Dicts mapping protein_id to sequence. Each batch contains up to batch_size
-        entries. The final batch may have fewer entries.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        IOError: If the file cannot be read.
-    """
-    file_size = os.path.getsize(path)
-    end_offsets = [*offsets[1:], file_size]
-    total_entries = total if total is not None else len(offsets)
-
-    # Set up progress tracking
-    if show_progress:
-        progress_instance = create_progress(progress=progress)
-        # Only use 'with' context if we created a new progress instance
-        if progress is None:
-            with progress_instance:
-                task_id = progress_instance.add_task("Read FASTA", total=total_entries)
-                yield from _iter_fasta_batches_impl(
-                    path,
-                    offsets,
-                    end_offsets,
-                    batch_size,
-                    header_pattern,
-                    progress_instance,
-                    task_id,
-                )
-        else:
-            # Shared progress - don't use context manager
-            task_id = progress_instance.add_task("Read FASTA", total=total_entries)
-            yield from _iter_fasta_batches_impl(
-                path,
-                offsets,
-                end_offsets,
-                batch_size,
-                header_pattern,
-                progress_instance,
-                task_id,
-            )
-    else:
-        # No progress tracking
-        yield from _iter_fasta_batches_impl(
-            path, offsets, end_offsets, batch_size, header_pattern, None, None
-        )
-
-
-def _iter_fasta_batches_impl(
-    path: str,
+async def _read_batch_async(
+    mm: mmap.mmap,
     offsets: list[int],
     end_offsets: list[int],
+    start_idx: int,
     batch_size: int,
     header_pattern: re.Pattern[str] | None,
-    progress: Progress | None,
-    task_id: TaskID | None,
-) -> Iterator[dict[str, str]]:
-    """Internal implementation of iter_fasta_batches with progress tracking."""
-    with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-        batch: dict[str, str] = {}
-
-        for start, end in zip(offsets, end_offsets, strict=False):
-            protein_id, sequence = _read_sequence_from_offset_mmap(
-                mm, start, end, header_pattern=header_pattern
-            )
-            batch[protein_id] = sequence
-
-            if len(batch) >= batch_size:
-                yield batch
-                if task_id is not None and progress is not None:
-                    progress.update(task_id, advance=len(batch))
-                batch = {}
-
-        if batch:
-            yield batch
-            if task_id is not None and progress is not None:
-                progress.update(task_id, advance=len(batch))
-
-
-def read_fasta_range(
-    path: str,
-    offsets: list[int],
-    start: int,
-    end: int,
-    header_pattern: re.Pattern[str] | None = None,
-    show_progress: bool = True,
-    progress: Progress | None = None,
-) -> dict[str, str]:
-    """Read a range of FASTA entries by their ordinal positions.
-
-    Optimized version using mmap and replace() for removing newlines.
+) -> tuple[dict[str, str], int]:
+    """Read a single batch of sequences starting at start_idx.
 
     Args:
-        path: Path to the FASTA file.
-        offsets: List of byte offsets for each sequence header, typically
-            obtained from build_header_index().
-        start: Starting entry index (inclusive, 0-based).
-        end: Ending entry index (exclusive).
-        header_pattern: Optional regex pattern to extract protein_id from header.
-        show_progress: Display progress bar (default: True).
-        progress: Existing Progress instance to share progress context.
+        mm: Memory-mapped file object
+        offsets: List of header byte offsets
+        end_offsets: List of end byte offsets
+        start_idx: Starting sequence index
+        batch_size: Number of sequences per batch
+        header_pattern: Optional regex to extract protein_id
 
     Returns:
-        Dict mapping protein_id to sequence for indices [start, end).
-
-    Raises:
-        ValueError: If the range [start, end) is invalid.
-        FileNotFoundError: If the file doesn't exist.
-        IOError: If the file cannot be read.
+        Tuple of (batch_dict, next_idx)
     """
-    if not (0 <= start < end <= len(offsets)):
-        raise ValueError(
-            f"Invalid range [{start}, {end}): must satisfy 0 <= start < end <= {len(offsets)}"
+    n = len(offsets)
+    if start_idx >= n:
+        return {}, start_idx
+
+    batch: dict[str, str] = {}
+    i = start_idx
+
+    while i < n and len(batch) < batch_size:
+        protein_id, sequence = await _read_sequence_async(
+            mm, offsets[i], end_offsets[i], header_pattern=header_pattern
         )
+        batch[protein_id] = sequence
+        i += 1
 
-    file_size = os.path.getsize(path)
-    end_offsets = [*offsets, file_size]
-    total_entries = end - start
-
-    entries: dict[str, str] = {}
-
-    # Set up progress tracking
-    if show_progress:
-        progress_instance = create_progress(progress=progress)
-        # Only use 'with' context if we created a new progress instance
-        if progress is None:
-            with progress_instance:
-                task_id = progress_instance.add_task("Read FASTA Range", total=total_entries)
-                with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                    for i in range(start, end):
-                        protein_id, sequence = _read_sequence_from_offset_mmap(
-                            mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
-                        )
-                        entries[protein_id] = sequence
-                        progress_instance.update(task_id, advance=1)
-        else:
-            # Shared progress - don't use context manager
-            task_id = progress_instance.add_task("Read FASTA Range", total=total_entries)
-            with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                for i in range(start, end):
-                    protein_id, sequence = _read_sequence_from_offset_mmap(
-                        mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
-                    )
-                    entries[protein_id] = sequence
-                    progress_instance.update(task_id, advance=1)
-    else:
-        # No progress tracking
-        with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-            for i in range(start, end):
-                protein_id, sequence = _read_sequence_from_offset_mmap(
-                    mm, offsets[i], end_offsets[i + 1], header_pattern=header_pattern
-                )
-                entries[protein_id] = sequence
-
-    return entries
+    return batch, i
 
 
-async def async_read_fasta_chunks(
-    path: str,
-    chunk_size: int = 1000,
-    header_pattern: str | re.Pattern[str] | None = None,
-    show_progress: bool = True,
-    progress: Progress | None = None,
-) -> AsyncIterator[dict[str, str]]:
-    """Read FASTA file in chunks of entries asynchronously.
-
-    This is an async version of read_fasta_chunks that uses asyncio.to_thread()
-    for file I/O operations. Memory-efficient for large FASTA files.
-
-    Optimizations:
-    - Uses memory-mapped file access (mmap) for faster reads
-    - Uses replace() for removing newlines (C-level, fast)
-    - Optional regex pattern to extract protein_id from header
-    - Optional progress tracking with Rich progress bars
-
-    Args:
-        path: Path to the FASTA file.
-        chunk_size: Number of entries per chunk (default: 1000).
-        header_pattern: Optional regex pattern (string or compiled Pattern) to extract
-            protein_id from header. If provided, the first capture group is used.
-            Example: r"^sp\\|([A-Z0-9]+)\\|" to extract UniProt accession from
-            "sp|P12345|PROTEIN_NAME".
-        show_progress: Display progress bar (default: True).
-        progress: Existing Progress instance to share progress context.
-
-    Yields:
-        Dicts mapping protein_id to sequence. Each chunk contains up to chunk_size
-        entries. The final chunk may have fewer entries.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        IOError: If the file cannot be read.
-        ValueError: If chunk_size is not positive.
-
-    Example:
-        >>> async for chunk in async_read_fasta_chunks("proteins.fasta", chunk_size=1000):
-        ...     for protein_id, sequence in chunk.items():
-        ...         seq_len = len(sequence)
-        ...         print(f"Protein ID: {protein_id}, Sequence length: {seq_len}")
-    """
-    if chunk_size <= 0:
-        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-
-    # Compile pattern if string provided
-    compiled_pattern: re.Pattern[str] | None = None
-    if header_pattern:
-        if isinstance(header_pattern, str):
-            compiled_pattern = re.compile(header_pattern)
-        else:
-            compiled_pattern = header_pattern
-
-    # Build index to get total count for progress tracking
-    offsets = await asyncio.to_thread(build_header_index, path)
-    total_entries = len(offsets)
-
-    file_size = await asyncio.to_thread(os.path.getsize, path)
-    end_offsets = [*offsets[1:], file_size]
-
-    # Set up progress tracking
-    if show_progress:
-        progress_instance = create_progress(progress=progress)
-        # Only use 'with' context if we created a new progress instance
-        if progress is None:
-            with progress_instance:
-                task_id = progress_instance.add_task("Read FASTA", total=total_entries)
-                async for chunk in _async_iter_fasta_batches_impl(
-                    path,
-                    offsets,
-                    end_offsets,
-                    chunk_size,
-                    compiled_pattern,
-                    progress_instance,
-                    task_id,
-                ):
-                    yield chunk
-        else:
-            # Shared progress - don't use context manager
-            task_id = progress_instance.add_task("Read FASTA", total=total_entries)
-            async for chunk in _async_iter_fasta_batches_impl(
-                path,
-                offsets,
-                end_offsets,
-                chunk_size,
-                compiled_pattern,
-                progress_instance,
-                task_id,
-            ):
-                yield chunk
-    else:
-        # No progress tracking
-        async for chunk in _async_iter_fasta_batches_impl(
-            path, offsets, end_offsets, chunk_size, compiled_pattern, None, None
-        ):
-            yield chunk
-
-
-async def _async_iter_fasta_batches_impl(
+async def _iterate_batches_async(
     path: str,
     offsets: list[int],
     end_offsets: list[int],
     batch_size: int,
     header_pattern: re.Pattern[str] | None,
-    progress: Progress | None,
-    task_id: TaskID | None,
+    progress_report: ProgressReporter | None,
 ) -> AsyncIterator[dict[str, str]]:
-    # Shared state
+    """Internal implementation: iterate over FASTA in batches.
+
+    This keeps the file open for the entire iteration, avoiding
+    repeated open/close overhead.
+    """
     idx = 0
     n = len(offsets)
 
-    # One file + mmap, not per-batch reopen
     with open(path, "rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         try:
-
-            def read_next_batch(start_idx: int) -> tuple[dict[str, str], int]:
-                """Read a single batch starting at start_idx.
-                Returns (batch_dict, next_idx)."""
-                if start_idx >= n:
-                    return {}, start_idx
-                batch: dict[str, str] = {}
-                i = start_idx
-                while i < n and len(batch) < batch_size:
-                    pid, seq = _read_sequence_from_offset_mmap(
-                        mm, offsets[i], end_offsets[i], header_pattern=header_pattern
-                    )
-                    batch[pid] = seq
-                    i += 1
-                return batch, i
-
             while idx < n:
-                # do the heavy IO work in thread pool but with shared idx
-                batch, next_idx = await asyncio.to_thread(read_next_batch, idx)
+                # read a batch synchronously inside a thread to avoid blocking loop
+                def read_batch_sync(start: int) -> tuple[dict[str, str], int]:
+                    batch: dict[str, str] = {}
+                    i = start
+                    while i < n and len(batch) < batch_size:
+                        pid, seq = _read_sequence_from_offset_mmap(
+                            mm, offsets[i], end_offsets[i], header_pattern
+                        )
+                        batch[pid] = seq
+                        i += 1
+                    return batch, i
+
+                batch, next_idx = await asyncio.to_thread(read_batch_sync, idx)
                 if not batch:
                     break
-                if progress is not None and task_id is not None:
-                    progress.update(task_id, advance=len(batch))
+
+                if progress_report:
+                    progress_report(advance=1)
                 yield batch
                 idx = next_idx
         finally:
             mm.close()
 
 
+def _read_sequence_from_offset_mmap(
+    mm: mmap.mmap,
+    start_offset: int,
+    end_offset: int,
+    header_pattern: re.Pattern[str] | None = None,
+) -> tuple[str, str]:
+    """Synchronous version for use in thread pool."""
+    if mm[start_offset] != ord(b">"):
+        header_preview = mm[start_offset : start_offset + 50]
+        raise ValueError(
+            f"Expected FASTA header at byte offset {start_offset}, found: {header_preview}"
+        )
+
+    header_end = mm.find(b"\n", start_offset)
+    if header_end == -1 or header_end >= end_offset:
+        header_end = end_offset
+
+    header_bytes = mm[start_offset + 1 : header_end]
+
+    seq_start = header_end + 1
+    if seq_start >= end_offset:
+        sequence_bytes = b""
+    else:
+        sequence_bytes = mm[seq_start:end_offset]
+        sequence_bytes = sequence_bytes.replace(b"\n", b"").replace(b"\r", b"")
+
+    header_str = header_bytes.decode("ascii", errors="ignore")
+
+    if header_pattern:
+        match = header_pattern.search(header_str)
+        if match:
+            protein_id = match.group(1) if match.lastindex else match.group(0)
+        else:
+            protein_id = header_str
+    else:
+        protein_id = header_str
+
+    return (protein_id, sequence_bytes.decode("ascii", errors="ignore"))
+
+
+async def read_fasta_chunks_async(
+    path: str,
+    chunk_size: int,
+    header_pattern: str | re.Pattern[str] | None = None,
+    offsets: list[int] | None = None,
+    progress_report: ProgressReporter | None = None,
+) -> AsyncIterator[dict[str, str]]:
+    """Read FASTA file in chunks asynchronously.
+
+    This is the main async entry point.
+
+    Args:
+        path: Path to FASTA file
+        chunk_size: Number of entries per chunk
+        header_pattern: Optional regex to extract protein_id from header
+        progress_report: Progress reporter to use
+
+    Yields:
+        Dicts mapping protein_id to sequence
+
+    Example:
+        >>> async for chunk in read_fasta_chunks_async("proteins.fasta"):
+        ...     for protein_id, sequence in chunk.items():
+        ...         print(f"{protein_id}: {len(sequence)} aa")
+    """
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+
+    compiled_pattern: re.Pattern[str] | None = (
+        re.compile(header_pattern) if isinstance(header_pattern, str) else header_pattern
+    )
+
+    if offsets is None:
+        offsets = await asyncio.to_thread(build_header_index, path)
+
+    file_size = await asyncio.to_thread(os.path.getsize, path)
+    end_offsets = [*offsets[1:], file_size]
+
+    async for chunk in _iterate_batches_async(
+        path, offsets, end_offsets, chunk_size, compiled_pattern, progress_report
+    ):
+        yield chunk
+
+
+def read_fasta_chunks(
+    path: str,
+    chunk_size: int = 1000,
+    header_pattern: str | re.Pattern[str] | None = None,
+    progress_report: ProgressReporter | None = None,
+) -> Iterator[dict[str, str]]:
+    """Synchronous wrapper for async FASTA reading.
+
+    This is the high-level entry point for non-async code.
+
+    Args:
+        path: Path to FASTA file
+        chunk_size: Number of entries per chunk (default: 1000)
+        header_pattern: Optional regex to extract protein_id from header
+        show_progress: Display progress bar (default: True)
+        progress: Existing Progress instance to share
+
+    Yields:
+        Dicts mapping protein_id to sequence
+
+    Example:
+        >>> for chunk in read_fasta_chunks("proteins.fasta", chunk_size=1000):
+        ...     for protein_id, sequence in chunk.items():
+        ...         print(f"{protein_id}: {len(sequence)} aa")
+    """
+
+    # Run the async generator in a new event loop
+    async def _run():
+        chunks = []
+        async for chunk in read_fasta_chunks_async(
+            path, chunk_size, header_pattern, progress_report
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+    yield from chunks
+
+
 if __name__ == "__main__":
-    from rich import print
+    import asyncio
+    import re
+    from collections.abc import Callable
+
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
     path = "/home/mha/projects/proteingraph/downloads/uniprot_sprot.fasta"
 
-    offsets = build_header_index(path)
-    print(f"Found {len(offsets)} sequences")
+    # -------- reporter type (simple callable) --------
+    Reporter = Callable[..., None]
 
-    # Test with strings (default)
-    sequences = list(read_fasta_chunks(path, chunk_size=1000, header_pattern=r"(?<=\|)[^|]+(?=\|)"))
-    print(len(sequences))
+    def null_reporter(**_: object) -> None:  # no-op
+        pass
 
-    # print first chunk (dict of protein_id -> sequence)
-    if sequences:
-        first_chunk = sequences[0]
-        if first_chunk:
-            first_id = next(iter(first_chunk))
-            print(f"First protein ID: {first_id}, Sequence: {first_chunk[first_id]}")
-            print("n sequences in first chunk: ", len(first_chunk))
+    # -------- pipeline (clean, no monkey-patch) --------
+    class AsyncPipelineDemo:
+        SENTINEL = object()
+
+        def __init__(
+            self,
+            path: str,
+            chunk_size: int = 1000,
+            header_pattern: str | re.Pattern[str] | None = None,
+        ):
+            self.path = path
+            self.chunk_size = chunk_size
+            self.header_pattern = header_pattern
+
+            self.read_queue: asyncio.Queue[dict[str, str] | object] = asyncio.Queue(maxsize=2)
+            self.write_queue: asyncio.Queue[list[str] | object] = asyncio.Queue(maxsize=2)
+
+        async def _reader_worker(self, report_read: ProgressReporter) -> None:
+            async for chunk in read_fasta_chunks_async(  # uses your parser
+                self.path, self.chunk_size, self.header_pattern, report_read
+            ):
+                await self.read_queue.put(chunk)
+            # signal end of stream to processor
+            await self.read_queue.put(self.SENTINEL)
+
+        async def _processor_worker(self, report_proc: ProgressReporter) -> None:
+            while True:
+                batch = await self.read_queue.get()
+                if batch is self.SENTINEL:
+                    # propagate termination to writer and stop
+                    await self.write_queue.put(self.SENTINEL)
+                    break
+                report_proc(advance=1)
+                await asyncio.sleep(1.0)  # simulate heavy processing
+                await self.write_queue.put(list(batch.keys()))
+
+        async def _writer_worker(
+            self, report_write: ProgressReporter, flush_batches: int = 10
+        ) -> None:
+            buf: list[list[str]] = []
+            while True:
+                item = await self.write_queue.get()
+                if item is self.SENTINEL:
+                    if buf:
+                        print(f"flushing {len(buf)} batches")
+                        await asyncio.sleep(0.3)  # simulate fast upload
+                        # Update progress incrementally for remaining items
+                        report_write(advance=len(buf))
+                        buf.clear()
+                    break
+
+                buf.append(item)
+                if len(buf) >= flush_batches:
+                    await asyncio.sleep(0.3)  # simulate fast upload
+                    report_write(advance=len(buf))
+                    buf.clear()
+
+        async def run(self) -> None:
+            from rich.progress import MofNCompleteColumn
+
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn("[bold]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                refresh_per_second=3,
+            )
+
+            read_task_id = progress.add_task("read", total=None)
+            read_reporter = ProgressReporter(progress, read_task_id)
+
+            proc_task_id = progress.add_task("proc", total=None)
+            proc_reporter = ProgressReporter(progress, proc_task_id)
+
+            write_task_id = progress.add_task("write", total=None)
+            write_reporter = ProgressReporter(progress, write_task_id)
+
+            with progress:
+                await asyncio.gather(
+                    self._reader_worker(read_reporter),
+                    self._processor_worker(proc_reporter),
+                    self._writer_worker(write_reporter),
+                )
+
+    # -------- Rich Progress wiring via reporters --------
+
+    demo = AsyncPipelineDemo(
+        path=path,
+        chunk_size=1000,
+    )
+    asyncio.run(demo.run())

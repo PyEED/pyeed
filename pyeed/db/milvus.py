@@ -1,5 +1,9 @@
+from __future__ import annotations
+
+import asyncio
 from dataclasses import dataclass
 
+import numpy as np
 from loguru import logger
 from pymilvus import (
     AsyncMilvusClient,
@@ -7,6 +11,8 @@ from pymilvus import (
     DataType,
     MilvusClient,
 )
+
+from ..embedding.types import EmbeddingBatch
 
 
 @dataclass
@@ -34,6 +40,7 @@ class VectorDB:
 
         self.collections = self.client.list_collections()
         self.databases = self.client.list_databases()
+        self._initialized_collections: set[str] = set()
 
     def _connect(self, uri: str | None, token: str | None):
         if not uri or not token:
@@ -61,7 +68,7 @@ class VectorDB:
         schema.add_field(
             field_name="protein_id",
             datatype=DataType.VARCHAR,
-            max_length=64,
+            max_length=65535,
             is_primary=True,
         )
 
@@ -100,6 +107,164 @@ class VectorDB:
             num_shards=8,
         )
 
+    def _initialize_collection_from_batch(
+        self,
+        collection_name: str,
+        batch: EmbeddingBatch,
+        include_sequence: bool = True,
+    ) -> None:
+        """Initialize collection schema from first EmbeddingBatch.
+
+        This is a blocking operation that creates the collection if it doesn't exist.
+        Uses the first batch to determine vector field names, dtypes, and dimensions.
+
+        Args:
+            collection_name: Name of the collection to create.
+            batch: First EmbeddingBatch to use for schema inference.
+            include_sequence: Whether to include sequence field in schema.
+        """
+        if collection_name in self._initialized_collections:
+            return
+
+        # Check if collection already exists
+        if collection_name in self.client.list_collections():
+            self._initialized_collections.add(collection_name)
+            logger.info(f"Collection '{collection_name}' already exists, skipping initialization")
+            return
+
+        if not batch.embeddings:
+            raise ValueError("Cannot initialize collection: batch has no embeddings")
+
+        # Extract vector field information from batch
+        vec_field_names: list[str] = []
+        vec_field_dtypes: list[DataType] = []
+        vec_dims: list[int] = []
+
+        for pool_name, embeddings in batch.embeddings.items():
+            if not embeddings:
+                continue
+
+            # Get first embedding to determine dtype and dimension
+            first_emb = embeddings[0]
+            if not isinstance(first_emb, np.ndarray):
+                raise ValueError(f"Expected numpy array for embedding, got {type(first_emb)}")
+
+            # Determine dtype
+            if first_emb.dtype == np.float16:
+                dtype = DataType.FLOAT16_VECTOR
+            elif first_emb.dtype == np.float32:
+                dtype = DataType.FLOAT_VECTOR
+            else:
+                raise ValueError(f"Unsupported embedding dtype: {first_emb.dtype}")
+
+            # Get dimension
+            dim = int(first_emb.shape[0])
+
+            # Field name format: vec_{pool_name}
+            field_name = f"vec_{pool_name}"
+            vec_field_names.append(field_name)
+            vec_field_dtypes.append(dtype)
+            vec_dims.append(dim)
+
+        if not vec_field_names:
+            raise ValueError("Cannot initialize collection: no valid embeddings found in batch")
+
+        logger.info(
+            f"Initializing collection '{collection_name}' with {len(vec_field_names)} vector fields"
+        )
+
+        # Create collection (blocking operation)
+        self.create_collection(
+            collection_name=collection_name,
+            vec_field_names=vec_field_names,
+            vec_field_dtypes=vec_field_dtypes,
+            vec_dims=vec_dims,
+            include_sequence=include_sequence,
+        )
+
+        self._initialized_collections.add(collection_name)
+        logger.info(f"Collection '{collection_name}' initialized successfully")
+
+    async def insert_async(
+        self,
+        collection_name: str,
+        batch: EmbeddingBatch,
+        include_sequence: bool = True,
+    ) -> int:
+        """Insert EmbeddingBatch into Milvus collection asynchronously.
+
+        Automatically initializes collection if it doesn't exist (blocking operation).
+        Converts EmbeddingBatch to Milvus format and inserts using async client.
+
+        Args:
+            collection_name: Name of the collection to insert into.
+            batch: EmbeddingBatch containing protein_ids, sequences, and embeddings.
+            include_sequence: Whether to include sequence in inserted records.
+
+        Returns:
+            Number of records inserted.
+
+        Raises:
+            ValueError: If batch is empty or has mismatched lengths.
+        """
+        if not batch.protein_ids:
+            logger.warning("Empty batch, skipping insert")
+            return 0
+
+        if len(batch.protein_ids) != len(batch.sequences):
+            raise ValueError(
+                f"Mismatched lengths: {len(batch.protein_ids)} protein_ids vs "
+                f"{len(batch.sequences)} sequences"
+            )
+
+        # Initialize collection if needed (blocking, but only once)
+        if collection_name not in self._initialized_collections:
+            self._initialize_collection_from_batch(collection_name, batch, include_sequence)
+
+        # Convert EmbeddingBatch to Milvus format
+        milvus_data: list[dict[str, object]] = []
+
+        for i, protein_id in enumerate(batch.protein_ids):
+            record: dict[str, object] = {
+                "protein_id": protein_id,
+            }
+
+            if include_sequence:
+                sequence = batch.sequences[i]
+                record["sequence"] = sequence
+                record["seq_length"] = len(sequence)
+
+            # Add embeddings for each pooling method
+            for pool_name, embeddings in batch.embeddings.items():
+                if i >= len(embeddings):
+                    logger.warning(f"Missing embedding for {pool_name} at index {i}, skipping")
+                    continue
+
+                embedding = embeddings[i]
+                if not isinstance(embedding, np.ndarray):
+                    logger.warning(f"Invalid embedding type for {pool_name} at index {i}, skipping")
+                    continue
+
+                field_name = f"vec_{pool_name}"
+                record[field_name] = embedding
+                record[f"has_{field_name}"] = True
+
+            milvus_data.append(record)
+
+        if not milvus_data:
+            logger.warning("No valid data to insert after conversion")
+            return 0
+
+        # Insert using sync client wrapped in thread pool
+        # This avoids event loop issues with AsyncMilvusClient
+        def _insert() -> None:
+            self.client.insert(collection_name, milvus_data)
+
+        await asyncio.to_thread(_insert)
+
+        logger.debug(f"Inserted {len(milvus_data)} records into '{collection_name}'")
+        return len(milvus_data)
+
 
 # Example usage
 if __name__ == "__main__":
@@ -118,86 +283,4 @@ if __name__ == "__main__":
 
     # drop collection
     print("Dropping collection 'protein_emb' if it exists...")
-    vector_db.client.drop_collection("protein_emb")
-
-    # create collection
-    print("Creating collection 'protein_emb' with vector fields...")
-    vector_db.create_collection(
-        collection_name="protein_emb",
-        vec_field_names=["vec_mean_pooling"],
-        vec_field_dtypes=[DataType.FLOAT16_VECTOR],
-        vec_dims=[1024],
-        include_sequence=True,
-    )
-
-    # check collection
-    print("Listing collections after creation of 'protein_emb':")
-    print(f"Collections: {vector_db.client.list_collections()}")
-    print("Describing 'protein_emb' collection schema:")
-    print(f"Collection schema: {vector_db.client.describe_collection('protein_emb')}")
-
-    import numpy as np
-    from rich import print
-
-    # insert data
-    print("Populating data with 100 protein entries and adding one zeroed entry...")
-    data = []
-    for i in range(100):
-        data.append(
-            {
-                "protein_id": f"P0000{i}",
-                "vec_mean_pooling": np.random.RandomState(42).rand(1024).astype(np.float16),
-                "sequence": "ACDEFGHIKLMNPQRSTVWY",
-                "seq_length": len("ACDEFGHIKLMNPQRSTVWY"),
-                "has_vec_mean_pooling": True,
-            }
-        )
-
-    # add entry where embedding and sequece is none
-    print("Adding one entry with zeroed embedding and short sequence.")
-    data.append(
-        {
-            "protein_id": "P69",
-            "vec_mean_pooling": np.zeros(1024, dtype=np.float16),
-            "sequence": "ASD",
-            "seq_length": 3,
-            "has_vec_mean_pooling": False,
-        }
-    )
-    print(f"Upserting {len(data)} data entries into 'protein_emb' collection...")
-    vector_db.client.insert("protein_emb", data)
-    print("Upsert finished.")
-    vector_db.client.flush("protein_emb")  # force persistence
-
-    # first vec
-    first_vec = data[0]["vec_mean_pooling"]
-    print("The dtype of the first vector inserted:")
-    print(first_vec.dtype)
-
-    # get embeddig and protein id of P00000
-    print('Querying for protein with id "P00000"...')
-    res = vector_db.client.query(
-        collection_name="protein_emb",
-        filter='protein_id == "P69"',
-        output_fields=[
-            "protein_id",
-            "seq_length",
-            "sequence",
-            "vec_mean_pooling",
-            "has_vec_mean_pooling",
-        ],  # include vector if you want
-    )
-    print(f"Number of results for protein_id == 'P00000': {len(res)}")
-    row = res[0]  # one entity from client.query(...) or client.search(...)
-    print("Fields in the first result row:", row.keys())
-    print("First result row:")
-    print(row)
-    buf = row["vec_mean_pooling"][0]  # this is a bytes-like object
-    print("Converting 'vec_mean_pooling' from buffer to numpy float16 array...")
-    vec_f16 = np.frombuffer(buf, dtype=np.float16)
-    print("Retrieved vector (float16):")
-    print(vec_f16)
-    print("Original (first) vector inserted:")
-    print(first_vec)
-    print("Are the retrieved vector and first vector equal?")
-    print(vec_f16 == first_vec)
+    vector_db.client.drop_collection("test")

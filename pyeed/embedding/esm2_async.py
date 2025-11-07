@@ -1,28 +1,19 @@
 import asyncio
+import time
+from collections import defaultdict
 from collections.abc import AsyncIterator, Sequence
 
-import numpy as np
 import torch
 from loguru import logger
-from numpy.typing import NDArray
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    ProgressColumn,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
-from rich.text import Text
+from rich.progress import Progress, TaskID
 from transformers import EsmModel, EsmTokenizer
 
 from ..logging_setup import setup_logging
-from .pooling import PoolingFn, PoolingLike, l2_normalize, mean_pooling, normalize_cast_renorm
+from .pooling import PoolingFn, PoolingLike, l2_normalize, normalize_cast_renorm
 from .types import (
     NP_DTYPE_MAP,
     TF_DTYPE_MAP,
+    EmbeddingBatch,
     ModelDType,
     ReturnDType,
 )
@@ -32,23 +23,21 @@ setup_logging()
 
 __all__ = [
     "ESM2Embedder",
-    "EmbeddingResult",
 ]
 
-type Vec16 = NDArray[np.float16]
-type Vec32 = NDArray[np.float32]
-type Vec = Vec16 | Vec32
-type EmbeddingResult = dict[str, str | Vec]
+# Timing statistics
+_timing_stats: dict[str, list[float]] = defaultdict(list)
 
 
-class SpeedColumn(ProgressColumn):
-    """Custom column that displays sequences per second, handling None values."""
+def _timeit() -> float:
+    """Get current time for timing operations."""
+    return time.perf_counter()
 
-    def render(self, task) -> Text:
-        """Render speed with None handling."""
-        if task.speed is not None and task.speed > 0:
-            return Text(f"{task.speed:.1f} seq/s", style="cyan")
-        return Text("0.0 seq/s", style="dim")
+
+def _log_timing(operation: str, duration: float, details: str = "") -> None:
+    """Log timing with operation name and details."""
+    _timing_stats[operation].append(duration)
+    print(f"[TIMING] {operation}: {duration * 1000:.2f}ms {details}")
 
 
 class ESM2Embedder:
@@ -69,8 +58,8 @@ class ESM2Embedder:
             model_name: ESM-2 model identifier
             pooling_methods: Single or multiple pooling functions
             normalize: L2-normalize embeddings
-            model_dtype: Model precision for computation (float32/bfloat16/float16)
-            return_dtype: Output array dtype (float32/bfloat16/float16)
+            model_dtype: Model precision for computation (float32/float16)
+            return_dtype: Output array dtype (float32/float16)
             max_length: Maximum sequence length
             verbose: Show progress bar with rich (sequences/sec rate)
         """
@@ -93,6 +82,11 @@ class ESM2Embedder:
         self.devices: list[torch.device] = []
         self.token: str | None = None
         self.device_ids: list[int] = []
+
+        # Persistent workers for continuous processing
+        self._batch_queue: asyncio.Queue[tuple[list[str], list[str]] | None] | None = None
+        self._result_queue: asyncio.Queue[EmbeddingBatch | None] | None = None
+        self._worker_tasks: list[asyncio.Task] | None = None
 
         logger.info(
             "ESM2 embedder initialized",
@@ -147,7 +141,7 @@ class ESM2Embedder:
 
         self.token = _login_hf()
 
-        self.devices = self._detect_devices()[0:2]
+        self.devices = self._detect_devices()
 
         # Pre-allocate lists to avoid race conditions with asyncio.gather
         self.models = [None] * len(self.devices)
@@ -158,8 +152,18 @@ class ESM2Embedder:
         # Load models on all devices in parallel
         await asyncio.gather(*[self._load_on_device(i, d) for i, d in enumerate(self.devices)])
 
+        # Create persistent queues
+        self._batch_queue = asyncio.Queue()
+        self._result_queue = asyncio.Queue()
+
+        # Launch persistent workers (one per GPU)
+        self._worker_tasks = [
+            asyncio.create_task(self._persistent_worker(device_idx))
+            for device_idx in range(len(self.devices))
+        ]
+
         self._initialized = True
-        logger.info("ESM2 embedder ready")
+        logger.info("ESM2 embedder ready with persistent workers")
 
     def _detect_devices(self) -> list[torch.device]:
         """Detect available CUDA devices or fallback to CPU."""
@@ -233,6 +237,19 @@ class ESM2Embedder:
         """Clean up models and free GPU memory on all used devices."""
         logger.info("Cleaning up ESM2 embedder")
 
+        # Shutdown persistent workers
+        if self._worker_tasks:
+            # Send shutdown sentinels (one per worker)
+            for _ in range(len(self.devices)):
+                await self._batch_queue.put(None)
+
+            # Wait for workers to finish
+            await asyncio.gather(*self._worker_tasks, return_exceptions=True)
+
+            self._worker_tasks = None
+            self._batch_queue = None
+            self._result_queue = None
+
         # Store device IDs before clearing
         device_ids = self.device_ids if self.device_ids else None
 
@@ -249,17 +266,20 @@ class ESM2Embedder:
     # Public API
     # ========================================================================
 
-    def _create_length_sorted_batches(
+    def create_length_sorted_batches(
         self,
         sequences: list[str],
         accessions: list[str],
         batch_size: int,
     ) -> list[tuple[list[str], list[str]]]:
-        """
-        Sort sequences by length and create batches for efficient GPU processing.
+        """Sort sequences by length and create batches for efficient GPU processing.
 
         Sorting by length (descending) minimizes padding within each batch,
         improving GPU efficiency. Batches are pre-formed before distribution.
+
+        This is a pure function with no side effects - can be called from
+        pipeline to enable overlapping batch creation while embeddings are
+        being computed.
 
         Args:
             sequences: Protein sequences
@@ -268,6 +288,13 @@ class ESM2Embedder:
 
         Returns:
             List of (batch_sequences, batch_accessions) tuples
+
+        Example:
+            # Create batches externally in pipeline
+            batches = embedder.create_length_sorted_batches(sequences, accessions, 32)
+            # Then process them
+            async for batch in embedder.embed_prepared_batches(batches):
+                await db.insert(batch)
         """
         # Create pairs and sort by sequence length (descending - longest first)
         seq_acc_pairs = list(zip(sequences, accessions, strict=True))
@@ -286,20 +313,31 @@ class ESM2Embedder:
     async def embed_batch(
         self,
         sequences: list[str],
-        accessions: list[str] | None = None,
-        batch_size: int = 16,
-    ) -> EmbeddingResult:
-        """
-        Generate embeddings for multiple sequences using work queue for load balancing.
+        accessions: list[str],
+        batch_size: int,
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+        prepare_task_id: TaskID | None = None,
+    ) -> AsyncIterator[EmbeddingBatch]:
+        """Create batches and embed sequences (convenience method).
+
+        This is a convenience method that combines batch creation and embedding.
+        For pipeline use, prefer calling create_length_sorted_batches() and
+        embed_prepared_batches() separately to enable overlapping batch creation
+        for chunk N+1 while chunk N is being embedded.
 
         Args:
             sequences: Protein sequences
             accessions: Optional IDs (auto-generated if None)
             batch_size: Sequences per batch per GPU
+            progress: Optional Progress instance
+            task_id: Optional TaskID to update existing progress task for embedding
+            prepare_task_id: Optional TaskID to update progress for batch preparation
 
-        Returns:
-            Dict with "ids" key (list[str]) and pooling method keys (list[EmbeddingArray])
-            Example: {"ids": ["P001", "P002", ...], "mean_pooling": [arr1, arr2, ...]}
+        Yields:
+            EmbeddingBatch for each completed batch. id↔embedding↔sequence
+            relation is preserved within each batch, but batch order is
+            non-deterministic (depends on GPU completion timing).
         """
         if not self._initialized:
             await self.initialize()
@@ -308,417 +346,176 @@ class ESM2Embedder:
         if len(sequences) != len(accessions):
             raise ValueError("sequences and accessions must have same length")
 
-        logger.info(
-            "Embedding sequences with work queue",
-            extra={
-                "num_sequences": len(sequences),
-                "num_devices": len(self.devices),
-                "batch_size": batch_size,
-            },
+        # Create sorted batches in thread pool
+        batches = await asyncio.to_thread(
+            self.create_length_sorted_batches,
+            sequences,
+            accessions,
+            batch_size,
         )
 
-        # Sort sequences by length and create pre-formed batches
-        batches = self._create_length_sorted_batches(sequences, accessions, batch_size)
+        # Update prepare progress - batch creation is complete
+        if progress is not None and prepare_task_id is not None:
+            progress.update(prepare_task_id, advance=len(sequences))
 
-        logger.debug(
-            "Created batches",
-            extra={
-                "num_batches": len(batches),
-                "sequences_per_batch": batch_size,
-            },
-        )
-
-        # Create work queue and populate with batches
-        batch_queue: asyncio.Queue[tuple[list[str], list[str]] | None] = asyncio.Queue()
-        for batch in batches:
-            await batch_queue.put(batch)
-
-        # Add sentinel None values to signal workers to stop (one per device)
-        for _ in range(len(self.devices)):
-            await batch_queue.put(None)
-
-        # Launch workers with optional progress bar
-        if self.verbose:
-            # Create rich progress bar with custom columns
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                MofNCompleteColumn(),
-                TextColumn("•"),
-                SpeedColumn(),
-                TimeRemainingColumn(),
-            ) as progress:
-                task_id = progress.add_task(
-                    "[green]Embedding sequences...",
-                    total=len(sequences),
-                )
-
-                # Launch workers with progress tracking
-                workers = [
-                    self._process_queue_worker(device_idx, batch_queue, progress, task_id)
-                    for device_idx in range(len(self.devices))
-                ]
-
-                # Wait for all workers to complete
-                results = await asyncio.gather(*workers)
-        else:
-            # Launch workers without progress bar
-            workers = [
-                self._process_queue_worker(device_idx, batch_queue)
-                for device_idx in range(len(self.devices))
-            ]
-
-            # Wait for all workers to complete
-            results = await asyncio.gather(*workers)
-
-        # Concatenate results from all workers
-        final_result: EmbeddingResult = {name: [] for name, _ in self.pooling_configs}
-        final_result["ids"] = []
-
-        for worker_result in results:
-            for key, values in worker_result.items():
-                final_result[key].extend(values)
-
-        logger.info(
-            "Generated embeddings",
-            extra={
-                "num_embeddings": len(final_result["ids"]),
-                "num_batches": len(batches),
-            },
-        )
-
-        return final_result
-
-    async def embed_single(self, sequence: str, accession: str) -> EmbeddingResult:
-        """Embed a single sequence. Returns dict with same structure as embed_batch."""
-        return await self.embed_batch([sequence], [accession], batch_size=1)
+        # Delegate to embed_prepared_batches for processing
+        async for batch in self.embed_prepared_batches(batches, progress, task_id):
+            yield batch
 
     async def embed_stream(
         self,
-        sequences: list[str],
-        accessions: list[str],
-        batch_size: int = 8,
-        chunk_size: int = 1000,
-    ) -> AsyncIterator[EmbeddingResult]:
-        """
-        Stream embeddings in chunks for large datasets.
+        batches: AsyncIterator[tuple[list[str], list[str]]],
+    ) -> AsyncIterator[EmbeddingBatch]:
+        """Stream embeddings from batch iterator.
 
-        Yields batches of embeddings as they complete, enabling
-        immediate database writes without waiting for all sequences.
+        Pipeline controls pace - embedder processes batches as they arrive.
+        Internal GPU workers and queues are completely hidden.
 
         Args:
-            sequences: Protein sequences
-            accessions: Accession IDs
-            batch_size: Sequences per batch per GPU
-            chunk_size: Sequences per yielded chunk
+            batches: Async iterator of (sequences, accessions) tuples
 
         Yields:
-            Dict mapping pooling method to list of embeddings for the chunk
+            EmbeddingBatch for each processed batch
         """
         if not self._initialized:
             await self.initialize()
 
-        if len(sequences) != len(accessions):
-            raise ValueError("sequences and accessions must have same length")
+        # Count batches enqueued for draining later
+        enqueued_count = 0
 
-        logger.info(
-            "Streaming sequences",
-            extra={
-                "num_sequences": len(sequences),
-                "chunk_size": chunk_size,
-                "batch_size": batch_size,
-            },
-        )
+        # Consume all batches from iterator and enqueue to GPU workers
+        async for batch_seqs, batch_accs in batches:
+            await self._batch_queue.put((batch_seqs, batch_accs))
+            enqueued_count += 1
 
-        for chunk_start in range(0, len(sequences), chunk_size):
-            chunk_end = min(chunk_start + chunk_size, len(sequences))
-            chunk_seqs = sequences[chunk_start:chunk_end]
-            chunk_accs = accessions[chunk_start:chunk_end]
+        # Send shutdown sentinels to all GPU workers
+        num_workers = len(self._worker_tasks or [])
+        for _ in range(num_workers):
+            await self._batch_queue.put(None)
 
-            # Await the batch computation
-            embeddings = await self.embed_batch(chunk_seqs, chunk_accs, batch_size)
+        # Drain results - yield embedded batches as they complete
+        # Expect enqueued_count results + num_workers sentinels
+        results_collected = 0
+        sentinels_received = 0
 
-            logger.info(
-                "Completed chunk",
-                extra={
-                    "chunk_start": chunk_start,
-                    "chunk_end": chunk_end,
-                    "total": len(sequences),
-                },
-            )
+        while results_collected < enqueued_count or sentinels_received < num_workers:
+            batch_result = await self._result_queue.get()
 
-            # Yield results immediately
-            yield embeddings
+            if batch_result is None:
+                # Sentinel from GPU worker
+                sentinels_received += 1
+                self._result_queue.task_done()
+                continue
 
-    def _distribute_work(
+            # Real result
+            results_collected += 1
+            yield batch_result
+            self._result_queue.task_done()
+
+    async def embed_prepared_batches(
         self,
-        sequences: list[str],
-        accessions: list[str],
-    ) -> list[tuple[list[str], list[str]]]:
-        """
-        Distribute sequences round-robin across devices.
+        batches: list[tuple[list[str], list[str]]],
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+    ) -> AsyncIterator[EmbeddingBatch]:
+        """Process pre-created batches (no batch creation step).
 
-        Example with 3 devices and 10 sequences:
-        - Device 0: sequences [0, 3, 6, 9]
-        - Device 1: sequences [1, 4, 7]
-        - Device 2: sequences [2, 5, 8]
-
-        Note: Order is reconstructed in _reorder_results using the same pattern.
-        """
-        num_devices = len(self.devices)
-        return [(sequences[i::num_devices], accessions[i::num_devices]) for i in range(num_devices)]
-
-    def _reorder_results(
-        self, device_results: list[EmbeddingResult], total: int
-    ) -> EmbeddingResult:
-        """
-        Reorder round-robin results back to original sequence order.
+        This method processes batches that have already been created and sorted
+        externally. Use this in the pipeline to enable overlapping batch creation
+        for chunk N+1 while chunk N is being embedded.
 
         Args:
-            device_results: List of dicts from each device, each containing embeddings
-                           in the order they were processed by that device
-            total: Total number of sequences
+            batches: Pre-created batches as (sequences, accessions) tuples
+            progress: Optional Progress instance
+            task_id: Optional TaskID for embedding progress
 
-        Returns:
-            Dict with reordered embeddings matching input order
+        Yields:
+            EmbeddingBatch for each completed batch. id↔embedding↔sequence
+            relation is preserved within each batch.
 
         Example:
-            3 devices, 10 sequences distributed [0,3,6,9], [1,4,7], [2,5,8]
-            device_results = [
-                {"mean": [emb0, emb3, emb6, emb9]},  # Device 0
-                {"mean": [emb1, emb4, emb7]},         # Device 1
-                {"mean": [emb2, emb5, emb8]},         # Device 2
-            ]
-            Result: {"mean": [emb0, emb1, emb2, emb3, emb4, emb5, emb6, emb7, emb8, emb9]}
+            # In pipeline: create batches externally
+            batches = embedder.create_length_sorted_batches(sequences, accessions, batch_size)
+            async for batch in embedder.embed_prepared_batches(batches):
+                await db.insert(batch)
         """
-        if not device_results:
-            return {}
+        if not self._initialized:
+            await self.initialize()
 
-        pooling_names = list(device_results[0].keys())
-        result: EmbeddingResult = {name: [] for name in pooling_names}
+        # Enqueue all batches immediately
+        for batch_seqs, batch_accs in batches:
+            await self._batch_queue.put((batch_seqs, batch_accs))
 
-        for pool_name in pooling_names:
-            # Collect from each device (already in correct order per device)
-            device_values = [device_result[pool_name] for device_result in device_results]
+        # Wait for results - they can arrive in any order
+        collected = 0
+        while collected < len(batches):
+            batch_result = await self._result_queue.get()
 
-            # Reconstruct original order using round-robin pattern
-            ordered: list = []
-            for seq_idx in range(total):
-                device_idx = seq_idx % len(self.devices)
-                device_seq_idx = seq_idx // len(self.devices)
+            collected += 1
 
-                # Check if this device has this sequence
-                if device_seq_idx < len(device_values[device_idx]):
-                    ordered.append(device_values[device_idx][device_seq_idx])
+            if progress is not None and task_id is not None:
+                progress.update(task_id, advance=len(batch_result.protein_ids))
 
-            result[pool_name] = ordered
+            yield batch_result
 
-        return result
+            self._result_queue.task_done()
 
-    async def _process_queue_worker(
+    async def _persistent_worker(
         self,
         device_idx: int,
-        batch_queue: asyncio.Queue[tuple[list[str], list[str]] | None],
-        progress: Progress | None = None,
-        task_id: int | None = None,
-    ) -> EmbeddingResult:
-        """
-        Worker that pulls pre-formed batches from a queue and processes them.
+    ) -> None:
+        """Persistent worker that processes batches until shutdown.
 
-        This implements dynamic load balancing: faster GPUs automatically
-        process more batches. Continues until None sentinel is received.
+        Runs continuously from initialize() until cleanup(). Pulls jobs from
+        batch_queue, processes them, and puts results in result_queue.
 
         Args:
             device_idx: Index of GPU device to use
-            batch_queue: Queue containing (sequences, accessions) tuples
-            progress: Optional Rich Progress instance for visual feedback
-            task_id: Optional Progress task ID to update
-
-        Returns:
-            Accumulated results with all pooling methods and IDs
         """
-        # Initialize accumulator for each pooling method
-        accumulated: EmbeddingResult = {name: [] for name, _ in self.pooling_configs}
-        accumulated["ids"] = []
-
-        logger.debug(
-            "Worker starting",
-            extra={
-                "device_idx": device_idx,
-                "device": str(self.devices[device_idx]),
-            },
-        )
+        logger.debug(f"Persistent worker {device_idx} starting")
 
         batch_count = 0
         while True:
-            # Get next batch from queue
-            batch_item = await batch_queue.get()
-
-            # None sentinel signals end of work
-            if batch_item is None:
-                batch_queue.task_done()
+            # Get next job from queue
+            job = await self._batch_queue.get()
+            # None sentinel signals shutdown
+            if job is None:
+                self._batch_queue.task_done()
+                # Signal consumer that this worker is shutting down
+                await self._result_queue.put(None)
+                logger.debug(f"Persistent worker {device_idx} shutting down")
                 break
 
-            batch_seqs, batch_accs = batch_item
+            batch_seqs, batch_accs = job
 
-            try:
-                batch_result = await asyncio.to_thread(
-                    self._compute_embeddings,
-                    device_idx,
-                    batch_seqs,
-                    batch_accs,
-                )
-            except torch.cuda.OutOfMemoryError as e:
-                logger.error(
-                    "GPU OOM error on device",
-                    extra={
-                        "device_idx": device_idx,
-                        "device": str(self.devices[device_idx]),
-                        "batch_size": len(batch_seqs),
-                        "error": str(e),
-                    },
-                )
-                batch_queue.task_done()
-                raise RuntimeError(
-                    f"GPU out of memory on device {device_idx}. "
-                    f"Try reducing batch_size or using dtype=torch.bfloat16"
-                ) from e
-            except Exception as e:
-                logger.error(
-                    "Unexpected error during embedding computation",
-                    extra={
-                        "device_idx": device_idx,
-                        "device": str(self.devices[device_idx]),
-                        "batch_count": batch_count,
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                )
-                batch_queue.task_done()
-                raise
+            # Process batch on GPU
+            t0 = _timeit()
+            batch_result = await asyncio.to_thread(
+                self._compute_embeddings,
+                device_idx,
+                batch_seqs,
+                batch_accs,
+            )
+            t1 = _timeit()
+            _log_timing(
+                "esm2_worker_compute",
+                t1 - t0,
+                f"worker {device_idx} batch {batch_count} ({len(batch_seqs)} seqs)",
+            )
 
-            # Accumulate results
-            for key, values in batch_result.items():
-                accumulated[key].extend(values)
-
+            # Put result in result queue
+            await self._result_queue.put(batch_result)
             batch_count += 1
-            batch_queue.task_done()
+            self._batch_queue.task_done()
 
-            # Update progress bar with number of sequences processed in this batch
-            if progress is not None and task_id is not None:
-                progress.update(task_id, advance=len(batch_seqs))
-
-            logger.debug(
-                "Worker progress",
-                extra={
-                    "device_idx": device_idx,
-                    "batches_completed": batch_count,
-                    "total_sequences": len(accumulated["ids"]),
-                },
-            )
-
-        logger.debug(
-            "Worker finished",
-            extra={
-                "device_idx": device_idx,
-                "total_batches": batch_count,
-                "total_sequences": len(accumulated["ids"]),
-            },
-        )
-
-        return accumulated
-
-    async def _process_device_work(
-        self,
-        device_idx: int,
-        sequences: list[str],
-        accessions: list[str],
-        batch_size: int,
-    ) -> EmbeddingResult:
-        """Process all sequences assigned to a device."""
-        if not sequences:
-            # Return empty dict with all pooling methods and IDs
-            result = {name: [] for name, _ in self.pooling_configs}
-            result["ids"] = []
-            return result
-
-        logger.debug(
-            "Processing device work",
-            extra={
-                "device_idx": device_idx,
-                "device": str(self.devices[device_idx]),
-                "num_sequences": len(sequences),
-                "batch_size": batch_size,
-            },
-        )
-
-        # Initialize accumulator for each pooling method
-        accumulated: EmbeddingResult = {name: [] for name, _ in self.pooling_configs}
-        accumulated["ids"] = []
-
-        for batch_start in range(0, len(sequences), batch_size):
-            batch_end = min(batch_start + batch_size, len(sequences))
-            batch_seqs = sequences[batch_start:batch_end]
-            batch_accs = accessions[batch_start:batch_end]
-
-            try:
-                batch_embs = await asyncio.to_thread(
-                    self._compute_embeddings,
-                    device_idx,
-                    batch_seqs,
-                    batch_accs,
-                )
-            except torch.cuda.OutOfMemoryError as e:
-                logger.error(
-                    "GPU OOM error on device",
-                    extra={
-                        "device_idx": device_idx,
-                        "device": str(self.devices[device_idx]),
-                        "batch_size": len(batch_seqs),
-                        "error": str(e),
-                    },
-                )
-                raise RuntimeError(
-                    f"GPU out of memory on device {device_idx}. "
-                    f"Try reducing batch_size or using dtype=torch.bfloat16"
-                ) from e
-            except Exception as e:
-                logger.error(
-                    "Unexpected error during embedding computation",
-                    extra={
-                        "device_idx": device_idx,
-                        "device": str(self.devices[device_idx]),
-                        "batch_start": batch_start,
-                        "batch_end": batch_end,
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                )
-                raise
-
-            # Accumulate embeddings for each pooling method
-            for pool_name, embeddings_list in batch_embs.items():
-                accumulated[pool_name].extend(embeddings_list)
-
-            logger.debug(
-                "Device progress",
-                extra={
-                    "device_idx": device_idx,
-                    "completed": len(next(iter(accumulated.values()))),
-                    "total": len(sequences),
-                },
-            )
-
-        return accumulated
+        logger.debug(f"Persistent worker {device_idx} finished ({batch_count} batches)")
 
     def _compute_embeddings(
         self,
         device_idx: int,
         sequences: Sequence[str],
-        accessions: Sequence[str],
-    ) -> EmbeddingResult:
+        protein_ids: Sequence[str],
+    ) -> EmbeddingBatch:
         """
         Compute embeddings for a batch (GPU-bound, runs in thread pool).
 
@@ -728,11 +525,12 @@ class ESM2Embedder:
         Args:
             device_idx: Index of GPU device to use
             sequences: Batch of protein sequences
-            accessions: Accession IDs (currently unused but kept for API compatibility)
+            protein_ids: Protein IDs
 
         Returns:
-            Dict mapping pooling method name to list of embeddings (one per sequence)
-            Each embedding is a numpy array of shape [hidden_dim] or [seq_len * hidden_dim]
+            EmbeddingBatch with protein_ids, sequences, and embeddings dict
+            Each embedding in embeddings dict is a list of numpy arrays (one per sequence)
+            Each array has shape [hidden_dim] or [seq_len * hidden_dim]
 
         Raises:
             RuntimeError: If model/tokenizer not loaded or device mismatch
@@ -772,48 +570,61 @@ class ESM2Embedder:
             self._tf_model_dtype in (torch.float16, torch.bfloat16)
         )
 
-        # inference_mode() is more efficient than no_grad() for inference
+        t0 = _timeit()
+        inputs = tokenizer(
+            list(sequences),
+            return_tensors="pt",
+            padding=True,  # Pads to longest in batch, not max_length
+            truncation=True,
+            max_length=eff_max_len,
+        )
+
+        # Pin CPU tensors to enable true async H→D transfers
+        for k in inputs:
+            if inputs[k].device.type == "cpu":
+                inputs[k] = inputs[k].pin_memory()
+
+        t1 = _timeit()
+        _log_timing("esm2_tokenize", t1 - t0, f"device {device_idx} ({len(sequences)} seqs)")
+
         with torch.inference_mode():
             # Batch tokenize - padding to longest sequence in this batch
-            inputs = tokenizer(
-                list(sequences),
-                return_tensors="pt",
-                padding=True,  # Pads to longest in batch, not max_length
-                truncation=True,
-                max_length=eff_max_len,
-            )
-
-            # Pin CPU tensors to enable true async H→D transfers
-            # Without pinning, non_blocking=True falls back to sync copy
-            for k in inputs:
-                if inputs[k].device.type == "cpu":
-                    inputs[k] = inputs[k].pin_memory()
 
             # Move tensors to target device (now truly async thanks to pinning)
             inputs = {k: v.to(device, non_blocking=True) for k, v in inputs.items()}
 
             # Forward pass - model.config.output_hidden_states=False set at load time
+            t0 = _timeit()
             if use_autocast:
                 with torch.autocast(device_type=device.type, dtype=self._tf_model_dtype):
                     outputs = model(**inputs)
             else:
                 outputs = model(**inputs)
+            t1 = _timeit()
+            _log_timing(
+                "esm2_forward_pass",
+                t1 - t0,
+                f"device {device_idx} ({len(sequences)} seqs)",
+            )
 
             # Extract last hidden state only (no intermediate layers)
             hidden_states = outputs.last_hidden_state  # [B, L, D]
             attention_mask = inputs.get("attention_mask")  # [B, L] or None
 
-            # Apply all pooling methods
-            result: EmbeddingResult = {}
+            # Apply all pooling methods on GPU first (no CPU transfers yet)
+            # This batches all GPU operations before any CPU transfer
+            t0 = _timeit()
+            pooled_tensors: dict[str, torch.Tensor] = {}
+            pool_funcs: dict[str, PoolingFn | None] = {}
 
             for pool_name, pool_func in self.pooling_configs:
-                if pool_func is None:
-                    # No pooling: return raw hidden states [batch, seq_len, hidden_dim]
-                    raw_np = hidden_states.cpu().numpy().astype(np.float32)
-                    result[pool_name] = raw_np.astype(self.return_dtype)
+                pool_funcs[pool_name] = pool_func
 
+                if pool_func is None:
+                    # No pooling: keep raw hidden states on GPU [B, L, D]
+                    pooled_tensors[pool_name] = hidden_states
                 else:
-                    # Apply pooling function
+                    # Apply pooling function (GPU operation)
                     pooled = pool_func(hidden_states, attention_mask)  # [B, D]
 
                     if self.normalize:
@@ -822,107 +633,47 @@ class ESM2Embedder:
                         else:
                             pooled = normalize_cast_renorm(pooled, self._tf_return_dtype)
 
-            result[pool_name] = pooled.cpu().numpy().astype(self._np_return_dtype)
+                    pooled_tensors[pool_name] = pooled  # Keep on GPU
+            t1 = _timeit()
+            _log_timing(
+                "esm2_pooling",
+                t1 - t0,
+                f"device {device_idx} ({len(self.pooling_configs)} methods)",
+            )
 
-            # Add IDs to maintain sequence-embedding correspondence
-            result["ids"] = list(accessions)
+            if device.type == "cuda":
+                torch.cuda.synchronize(device=device)  # Sync only this device
 
-            # Explicitly delete GPU tensors to free memory immediately
-            del inputs, outputs, hidden_states
-            if "pooled" in locals():
-                del pooled
+            # Now transfer all results to CPU (separate phase after all GPU work)
+            t0 = _timeit()
+            result = EmbeddingBatch()
+            result.protein_ids = list(protein_ids)
+            result.sequences = list(sequences)
 
-        # Clear GPU cache after batch processing
-        if device.type == "cuda":
-            torch.cuda.empty_cache()
+            for pool_name, pooled_tensor in pooled_tensors.items():
+                pool_func = pool_funcs[pool_name]
+
+                # Single GPU→CPU transfer per pooling method
+                # (Can't batch different shapes, but all GPU work is done first)
+                if pool_func is None:
+                    # 3D tensor: [B, L, D] - no pooling
+                    raw_np = pooled_tensor.cpu().numpy().astype(self._np_return_dtype)
+                    result.embeddings[pool_name] = [raw_np[i] for i in range(raw_np.shape[0])]
+                else:
+                    # 2D tensor: [B, D] - pooled
+                    pooled_np = pooled_tensor.cpu().numpy().astype(self._np_return_dtype)
+                    result.embeddings[pool_name] = [pooled_np[i] for i in range(pooled_np.shape[0])]
+            t1 = _timeit()
+            _log_timing(
+                "esm2_transfer_to_cpu",
+                t1 - t0,
+                f"device {device_idx} ({len(pooled_tensors)} tensors)",
+            )
+
+            # delete tensors
+            del inputs, outputs, hidden_states, pooled_tensors
 
         return result
-
-    async def embed_from_generator(
-        self,
-        seq_generator: AsyncIterator[tuple[list[str], list[str]]],
-        batch_size: int = 8,
-    ) -> AsyncIterator[EmbeddingResult]:
-        """
-        Process sequences from an async generator and stream embeddings.
-
-        This method accepts an async generator that yields (sequences, accessions) tuples
-        and processes them incrementally. Results are yielded as they complete, enabling
-        immediate downstream processing (e.g., database insertion) without waiting for
-        all sequences to be embedded.
-
-        Args:
-            seq_generator: Async generator yielding (sequences, accessions) tuples
-            batch_size: Sequences per batch per GPU
-
-        Yields:
-            Dict mapping pooling method to list of embeddings for each chunk
-
-        Example:
-            async def load_sequences():
-                # Load from file, database, etc.
-                for chunk in load_chunks():
-                    yield chunk_seqs, chunk_accs
-
-            async with ESM2Embedder(pooling_methods=[mean_pooling]) as embedder:
-                async for batch_embeddings in embedder.embed_from_generator(load_sequences()):
-                    # batch_embeddings is {"mean_pooling": [array1, array2, ...]}
-                    await db.insert_embeddings(batch_embeddings)
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        logger.info(
-            "Starting generator-based embedding stream",
-            extra={
-                "batch_size": batch_size,
-                "num_devices": len(self.devices),
-            },
-        )
-
-        chunk_count = 0
-        async for sequences, accessions in seq_generator:
-            if len(sequences) != len(accessions):
-                raise ValueError(
-                    f"Chunk {chunk_count}: sequences and accessions must have same length "
-                    f"(got {len(sequences)} vs {len(accessions)})"
-                )
-
-            logger.debug(
-                "Processing generator chunk",
-                extra={
-                    "chunk_idx": chunk_count,
-                    "num_sequences": len(sequences),
-                },
-            )
-
-            # Process this chunk through the standard embed_batch pipeline
-            embeddings = await self.embed_batch(
-                list(sequences),
-                list(accessions),
-                batch_size=batch_size,
-            )
-
-            chunk_count += 1
-            # Count embeddings from first pooling method
-            num_embeddings = len(next(iter(embeddings.values()))) if embeddings else 0
-            logger.debug(
-                "Completed generator chunk",
-                extra={
-                    "chunk_idx": chunk_count - 1,
-                    "num_embeddings": num_embeddings,
-                },
-            )
-
-            # Yield results immediately for downstream processing
-            yield embeddings
-
-        logger.info(
-            "Completed generator-based embedding",
-            extra={
-                "total_chunks": chunk_count,
-            },
-        )
 
     async def __aenter__(self) -> "ESM2Embedder":
         await self.initialize()
@@ -930,55 +681,3 @@ class ESM2Embedder:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
         await self.cleanup()
-
-
-if __name__ == "__main__":
-    path = "/home/mha/projects/proteingraph/downloads/1000seq.fasta"
-
-    # read fasta and get sequences and accessions (sequences are multiline)
-    sequences = []
-    accessions = []
-    sequence = ""
-    accession = ""
-    with open(path) as f:
-        for idx, line in enumerate(f):
-            if line.startswith(">"):
-                if idx != 0:
-                    sequences.append(sequence)
-                    accessions.append(accession)
-                accession = line.strip().split()[0][1:]
-                sequence = ""
-            else:
-                sequence += line.strip()
-        # Don't forget last sequence
-        if sequence:
-            sequences.append(sequence)
-            accessions.append(accession)
-
-    # Example: Float16 (recommended for Milvus)
-    print("\n=== Float16 Embeddings (Milvus-ready) ===")
-    embedder = ESM2Embedder(
-        model_dtype="float16",
-        return_dtype="float16",
-        pooling_methods=[mean_pooling],
-        verbose=True,  # Show progress bar with sequences/sec
-    )
-    init = asyncio.run(embedder.initialize())
-
-    result = asyncio.run(
-        embedder.embed_batch(
-            sequences,
-            accessions,
-            batch_size=48,
-        )
-    )
-
-    for pool_name, values in result.items():
-        if pool_name == "ids":
-            print(f"ids: {len(values)} IDs")
-            print(f"  Sample: {values[:3]}")
-        else:
-            print(f"{pool_name}: {len(values)} embeddings")
-            print(f"  Shape: {values[0].shape}")
-            print(f"  Dtype: {values[0].dtype}")
-            print(f"  Sample: {values[0][:5]}")

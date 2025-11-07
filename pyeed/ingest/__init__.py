@@ -31,8 +31,10 @@ from .functions import (
     ingest_full_pipeline,
 )
 from .orchestrator import Ingester
+from .pipeline import EmbeddingPipeline
 
 __all__ = [
+    "EmbeddingPipeline",
     "EmbeddingSink",
     "Ingester",
     "embed_proteins",
