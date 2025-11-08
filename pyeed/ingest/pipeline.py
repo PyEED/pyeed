@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
+import numpy as np
 from loguru import logger
+from pymilvus.exceptions import DescribeCollectionException
 
 from ..db.milvus import VectorDB
-from ..embedding.esm2_async import ESM2Embedder
-from ..embedding.types import EmbeddingBatch
+from ..embed.esm2 import ESM2Embedder
+from ..embed.types import NP_DTYPE_MAP, EmbeddingBatch
 from ..utils import build_header_index, read_fasta_chunks_async
 from .progress import ProgressReporter, create_progress
 
@@ -42,10 +43,10 @@ class EmbeddingPipeline:
         chunk_size: int = 32 * 100,
         batch_size: int = 32,
         write_batch_size: int = 10,
-        max_reader_queue: int = 2,
-        max_writer_queue: int = 2,
+        max_reader_queue: int = 256,
+        max_writer_queue: int = 256,
         include_sequence: bool = True,
-        header_pattern: str | re.Pattern[str] | None = None,
+        header_extractor: Callable[[str], str] | None = None,
     ):
         """Initialize embedding pipeline.
 
@@ -56,10 +57,12 @@ class EmbeddingPipeline:
             chunk_size: FASTA entries per chunk (default: 3200)
             batch_size: Sequences per GPU batch (default: 32)
             write_batch_size: Batches to accumulate before Milvus write (default: 10)
-            max_reader_queue: Max batches buffered after reading (default: 2)
-            max_writer_queue: Max batches buffered after embedding (default: 2)
+            max_reader_queue: Max batches buffered after reading (default: 256)
+            max_writer_queue: Max batches buffered after embedding (default: 256)
             include_sequence: Whether to include sequence in Milvus records
-            header_pattern: Optional regex pattern to extract protein_id from FASTA header
+            header_extractor: Optional function to extract protein_id from FASTA header
+                             Signature: (header: str) -> str
+                             If None, uses entire header as protein_id
         """
         self.embedder = embedder
         self.vector_db = vector_db
@@ -68,7 +71,7 @@ class EmbeddingPipeline:
         self.batch_size = batch_size
         self.write_batch_size = write_batch_size
         self.include_sequence = include_sequence
-        self.header_pattern = header_pattern
+        self.header_extractor = header_extractor
 
         # Two queues only: reader → embedder → writer
         self.reader_queue: asyncio.Queue[tuple[list[str], list[str]] | object] = asyncio.Queue(
@@ -78,40 +81,120 @@ class EmbeddingPipeline:
             maxsize=max_writer_queue
         )
 
-        # Statistics
-        self._total_written = 0
-
     async def _reader_worker(
         self,
         fasta_path: str,
-        progress_reporter: ProgressReporter,
+        read_progress_reporter: ProgressReporter,
+        embed_progress_reporter: ProgressReporter,
+        write_progress_reporter: ProgressReporter,
     ) -> None:
-        """Read FASTA, sort by length, create batches, emit to queue.
+        """Read FASTA, check existing IDs, sort by length, create batches, emit to queue.
+
+        Splits sequences by embedder's max_length and filters existing IDs:
+        - Existing IDs → skipped (not processed)
+        - OK sequences (≤ max_length) → reader_queue → embedder
+        - Long sequences (> max_length) → writer_queue with zero embeddings
 
         Args:
             fasta_path: Path to FASTA file
-            progress_reporter: Progress reporter for reading
+            read_progress_reporter: Progress reporter for reading
+            embed_progress_reporter: Progress reporter for embedding
+            write_progress_reporter: Progress reporter for writing
         """
+        max_length = self.embedder.max_length
+
         async for chunk_dict in read_fasta_chunks_async(
             fasta_path,
             chunk_size=self.chunk_size,
-            header_pattern=self.header_pattern,
+            header_extractor=self.header_extractor,
         ):
-            # Sort by length in thread pool (descending - longest first)
-            sorted_pairs = await asyncio.to_thread(
-                sorted,
-                list(chunk_dict.items()),
-                key=lambda x: len(x[1]),
-                reverse=True,
-            )
+            read_progress_reporter(advance=len(chunk_dict))
 
-            # Create batches
-            for i in range(0, len(sorted_pairs), self.batch_size):
-                batch = sorted_pairs[i : i + self.batch_size]
-                accessions = [acc for acc, _ in batch]
-                sequences = [seq for _, seq in batch]
-                await self.reader_queue.put((sequences, accessions))
-                progress_reporter(advance=len(sequences))
+            # Collect all protein IDs from chunk
+            all_protein_ids = list(chunk_dict.keys())
+
+            # Check for existing IDs in Milvus (run in thread pool)
+            try:
+                existing_ids = await asyncio.to_thread(
+                    self.vector_db._check_existing_ids,
+                    all_protein_ids,
+                )
+            except DescribeCollectionException as e:
+                logger.error(f"Error checking existing IDs: {e}")
+                existing_ids = set()
+
+            # Filter out existing IDs
+            new_pairs: list[tuple[str, str]] = [
+                (pid, seq) for pid, seq in chunk_dict.items() if pid not in existing_ids
+            ]
+
+            # Count skipped sequences for progress adjustment
+            skipped_count = len(existing_ids)
+            if skipped_count > 0:
+                logger.debug(f"Skipping {skipped_count} existing sequences in chunk")
+                # Adjust embed progress total
+                total_sequences = embed_progress_reporter.progress._tasks[
+                    embed_progress_reporter.task_id
+                ].total
+                new_total = total_sequences - skipped_count
+                embed_progress_reporter.progress.update(
+                    embed_progress_reporter.task_id, total=new_total
+                )
+                # Adjust write progress total
+                write_total = write_progress_reporter.progress._tasks[
+                    write_progress_reporter.task_id
+                ].total
+                write_new_total = write_total - skipped_count
+                write_progress_reporter.progress.update(
+                    write_progress_reporter.task_id, total=write_new_total
+                )
+
+            # Split new sequences by length
+            ok_pairs: list[tuple[str, str]] = []
+            long_pairs: list[tuple[str, str]] = []
+
+            for protein_id, sequence in new_pairs:
+                if len(sequence) <= max_length:
+                    ok_pairs.append((protein_id, sequence))
+                else:
+                    long_pairs.append((protein_id, sequence))
+
+            # Process OK sequences (normal flow)
+            if ok_pairs:
+                # Sort by length in thread pool (descending - longest first)
+                sorted_pairs = await asyncio.to_thread(
+                    sorted,
+                    ok_pairs,
+                    key=lambda x: len(x[1]),
+                    reverse=True,
+                )
+
+                # Create batches
+                for i in range(0, len(sorted_pairs), self.batch_size):
+                    batch = sorted_pairs[i : i + self.batch_size]
+                    accessions = [acc for acc, _ in batch]
+                    sequences = [seq for _, seq in batch]
+                    await self.reader_queue.put((sequences, accessions))
+
+            # Process long sequences (skip embedder, use zero embeddings)
+            if long_pairs:
+                # Create batches of long sequences
+                for i in range(0, len(long_pairs), self.batch_size):
+                    batch = long_pairs[i : i + self.batch_size]
+                    protein_ids = [pid for pid, _ in batch]
+                    sequences = [seq for _, seq in batch]
+
+                    # Create EmbeddingBatch with zero embeddings
+                    zero_batch = self._create_zero_embedding_batch(protein_ids, sequences)
+                    await self.writer_queue.put(zero_batch)
+                    # Adjust embed progress for long sequences (skip embedding)
+                    total_sequences = embed_progress_reporter.progress._tasks[
+                        embed_progress_reporter.task_id
+                    ].total
+                    new_total = total_sequences - len(long_pairs)
+                    embed_progress_reporter.progress.update(
+                        embed_progress_reporter.task_id, total=new_total
+                    )
 
         await self.reader_queue.put(self.SENTINEL)
         logger.debug("Reader worker finished")
@@ -164,7 +247,6 @@ class EmbeddingPipeline:
                         combined,
                         include_sequence=self.include_sequence,
                     )
-                    self._total_written += inserted
                     progress_reporter(advance=inserted)
                 break
 
@@ -178,7 +260,6 @@ class EmbeddingPipeline:
                     combined,
                     include_sequence=self.include_sequence,
                 )
-                self._total_written += inserted
                 progress_reporter(advance=inserted)
                 buffer.clear()
 
@@ -202,6 +283,40 @@ class EmbeddingPipeline:
                     combined.embeddings[pool_name] = []
                 combined.embeddings[pool_name].extend(embeddings)
         return combined
+
+    def _create_zero_embedding_batch(
+        self,
+        protein_ids: list[str],
+        sequences: list[str],
+    ) -> EmbeddingBatch:
+        """Create EmbeddingBatch with zero embeddings for long sequences.
+
+        Args:
+            protein_ids: List of protein IDs
+            sequences: List of sequences
+
+        Returns:
+            EmbeddingBatch with zero embeddings (single vector per sequence)
+        """
+        batch = EmbeddingBatch()
+        batch.protein_ids = protein_ids
+        batch.sequences = sequences
+
+        # Get embedding dimension from embedder (model hidden_size)
+        embedding_dim = self.embedder.embedding_dim
+
+        # Get return dtype
+        dtype = NP_DTYPE_MAP[self.embedder.return_dtype]
+
+        # Create zero vector for each sequence (just model output dimension)
+        # Use first pooling method name or "zero" as key
+        pool_name = self.embedder.pooling_configs[0][0] if self.embedder.pooling_configs else "zero"
+
+        # Create zero embeddings: list of zero vectors, one per sequence
+        batch.embeddings[pool_name] = [np.zeros(embedding_dim, dtype=dtype) for _ in protein_ids]
+
+        print("Created zero embedding batch")
+        return batch
 
     async def run(self, fasta_path: str) -> int:
         """Run the three-stage pipeline.
@@ -242,7 +357,12 @@ class EmbeddingPipeline:
             write_task = progress.add_task("Write", total=total_sequences)
 
             await asyncio.gather(
-                self._reader_worker(fasta_path, ProgressReporter(progress, read_task)),
+                self._reader_worker(
+                    fasta_path,
+                    ProgressReporter(progress, read_task),
+                    ProgressReporter(progress, embed_task),
+                    ProgressReporter(progress, write_task),
+                ),
                 self._embedder_worker(ProgressReporter(progress, embed_task)),
                 self._writer_worker(ProgressReporter(progress, write_task)),
             )
@@ -259,11 +379,16 @@ if __name__ == "__main__":
     from ..db.milvus import VectorDB
     from ..embedding.pooling import mean_pooling
 
+    def extract_uniprot_id(s: str) -> str:
+        """Extract UniProt ID from header using regex."""
+        return s.split("|")[1]
+
     async def main() -> None:
         embedder = ESM2Embedder(
             model_name="facebook/esm2_t33_650M_UR50D",
             model_dtype="float32",
             return_dtype="float32",
+            n_gpus=2,
             pooling_methods=[mean_pooling],
         )
         await embedder.initialize()
@@ -273,9 +398,10 @@ if __name__ == "__main__":
             embedder,
             vector_db,
             "test",
-            batch_size=24,
-            chunk_size=24 * 100,
-            write_batch_size=10,
+            batch_size=16,
+            chunk_size=16 * 400,
+            write_batch_size=16,
+            header_extractor=extract_uniprot_id,
         )
 
         await pipeline.run(

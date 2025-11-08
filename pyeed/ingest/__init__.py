@@ -21,8 +21,6 @@ Embedding Sinks:
     - EmbeddingSink (Protocol)
 """
 
-from ..embedding.sinks import EmbeddingSink
-from .embed import embed_proteins
 from .functions import (
     enrich_molecules,
     enrich_reactions,
@@ -30,14 +28,10 @@ from .functions import (
     fetch_proteins_by_interpro,
     ingest_full_pipeline,
 )
-from .orchestrator import Ingester
 from .pipeline import EmbeddingPipeline
 
 __all__ = [
     "EmbeddingPipeline",
-    "EmbeddingSink",
-    "Ingester",
-    "embed_proteins",
     "enrich_molecules",
     "enrich_reactions",
     "fetch_proteins_by_ids",

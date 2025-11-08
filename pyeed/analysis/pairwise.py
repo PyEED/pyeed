@@ -4,23 +4,14 @@ from itertools import combinations
 from multiprocessing import cpu_count
 from typing import Literal
 
-from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    ProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
-from rich.text import Text
 from skbio.alignment import pair_align as skbio_pair_align
 from skbio.alignment._pair import PairAlignResult
 from skbio.sequence import Sequence, SubstitutionMatrix
 
+from ..ingest.progress import create_progress
 
-@dataclass
+
+@dataclass(slots=True)
 class AlignmentResult:
     """Alignment statistics and metrics for a pairwise sequence alignment.
 
@@ -205,17 +196,7 @@ def align_pairs(
     sub_matrix = SubstitutionMatrix.by_name(substitution_matrix)
     results: list[PairAlignResult] = []
 
-    console = Console(quiet=not verbose, force_jupyter=in_notebook)
-    with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        RateColumn(),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-        refresh_per_second=2,
-    ) as progress:
+    with create_progress() as progress:
         task = progress.add_task("⛓️ Aligning sequence pairs...", total=len(pairs))
 
         with ProcessPoolExecutor(max_workers=n_jobs) as ex:
@@ -228,12 +209,6 @@ def align_pairs(
                 progress.update(task, advance=1)
 
     return results
-
-
-class RateColumn(ProgressColumn):
-    def render(self, task) -> Text:
-        spd = task.speed  # completed/second (EMA-smoothed)
-        return Text(f"{int(spd)} it/s" if spd else "- it/s")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import asyncio
-import time
 from collections import defaultdict
 from collections.abc import AsyncIterator, Sequence
 
@@ -29,17 +28,6 @@ __all__ = [
 _timing_stats: dict[str, list[float]] = defaultdict(list)
 
 
-def _timeit() -> float:
-    """Get current time for timing operations."""
-    return time.perf_counter()
-
-
-def _log_timing(operation: str, duration: float, details: str = "") -> None:
-    """Log timing with operation name and details."""
-    _timing_stats[operation].append(duration)
-    print(f"[TIMING] {operation}: {duration * 1000:.2f}ms {details}")
-
-
 class ESM2Embedder:
     def __init__(
         self,
@@ -48,8 +36,10 @@ class ESM2Embedder:
         normalize: bool = True,
         model_dtype: ModelDType = "float32",
         return_dtype: ReturnDType = "float32",
+        n_gpus: int = -1,
         max_length: int = 1024,
         verbose: bool = False,
+        max_batch_queue_size: int | None = 32,
     ):
         """
         Initialize ESM2 embedder.
@@ -60,8 +50,10 @@ class ESM2Embedder:
             normalize: L2-normalize embeddings
             model_dtype: Model precision for computation (float32/float16)
             return_dtype: Output array dtype (float32/float16)
+            n_gpus: Number of GPUs to use (-1 for all available)
             max_length: Maximum sequence length
             verbose: Show progress bar with rich (sequences/sec rate)
+            max_batch_queue_size: Max batches in internal queues (default: n_gpus * 2)
         """
         self.model_name = model_name
         self.normalize = normalize
@@ -69,10 +61,14 @@ class ESM2Embedder:
         self.return_dtype = return_dtype
         self.max_length = max_length
         self.verbose = verbose
+        self.n_gpus = n_gpus
         self._initialized = False
         self._tf_model_dtype = TF_DTYPE_MAP[model_dtype]
         self._tf_return_dtype = TF_DTYPE_MAP[return_dtype]
         self._np_return_dtype = NP_DTYPE_MAP[return_dtype]
+
+        # Calculate queue size based on GPUs (will be finalized in initialize)
+        self._max_queue_size = max_batch_queue_size
 
         # Normalize pooling_methods into a list of (name, function) tuples
         self.pooling_configs = self._normalize_pooling_methods(pooling_methods)
@@ -141,9 +137,11 @@ class ESM2Embedder:
 
         self.token = _login_hf()
 
-        self.devices = self._detect_devices()
+        if self.n_gpus == -1:
+            self.devices = self._detect_devices()
+        else:
+            self.devices = [torch.device(f"cuda:{i}") for i in range(self.n_gpus)]
 
-        # Pre-allocate lists to avoid race conditions with asyncio.gather
         self.models = [None] * len(self.devices)
 
         # Load single tokenizer on CPU (thread-safe, no device affinity)
@@ -152,9 +150,13 @@ class ESM2Embedder:
         # Load models on all devices in parallel
         await asyncio.gather(*[self._load_on_device(i, d) for i, d in enumerate(self.devices)])
 
-        # Create persistent queues
-        self._batch_queue = asyncio.Queue()
-        self._result_queue = asyncio.Queue()
+        # Finalize queue size based on actual number of devices
+        if self._max_queue_size is None:
+            self._max_queue_size = len(self.devices) * 2
+
+        # Create BOUNDED persistent queues to enable backpressure
+        self._batch_queue = asyncio.Queue(maxsize=self._max_queue_size)
+        self._result_queue = asyncio.Queue(maxsize=self._max_queue_size)
 
         # Launch persistent workers (one per GPU)
         self._worker_tasks = [
@@ -163,7 +165,10 @@ class ESM2Embedder:
         ]
 
         self._initialized = True
-        logger.info("ESM2 embedder ready with persistent workers")
+        logger.info(
+            "ESM2 embedder ready with persistent workers",
+            extra={"max_queue_size": self._max_queue_size, "num_workers": len(self.devices)},
+        )
 
     def _detect_devices(self) -> list[torch.device]:
         """Detect available CUDA devices or fallback to CPU."""
@@ -261,6 +266,20 @@ class ESM2Embedder:
         # Free memory on all devices that were used
         await asyncio.to_thread(_free_device_memory, device_ids)
         logger.info("ESM2 embedder cleanup complete")
+
+    @property
+    def embedding_dim(self) -> int:
+        """Get embedding dimension from model config.
+
+        Returns:
+            Hidden size of the model (embedding dimension)
+
+        Raises:
+            RuntimeError: If model not initialized
+        """
+        if not self._initialized or not self.models or self.models[0] is None:
+            raise RuntimeError("Model not initialized. Call initialize() first.")
+        return self.models[0].config.hidden_size
 
     # ========================================================================
     # Public API
@@ -371,6 +390,9 @@ class ESM2Embedder:
         Pipeline controls pace - embedder processes batches as they arrive.
         Internal GPU workers and queues are completely hidden.
 
+        Uses bounded queues to apply backpressure when GPU workers are saturated,
+        preventing upstream reader from racing ahead and consuming excessive memory.
+
         Args:
             batches: Async iterator of (sequences, accessions) tuples
 
@@ -380,37 +402,39 @@ class ESM2Embedder:
         if not self._initialized:
             await self.initialize()
 
-        # Count batches enqueued for draining later
-        enqueued_count = 0
+        async def producer():
+            """Enqueue batches as they arrive (blocks when queue full)."""
+            async for batch_seqs, batch_accs in batches:
+                # This will block when _batch_queue is full, applying backpressure
+                await self._batch_queue.put((batch_seqs, batch_accs))
+            # Send shutdown sentinels when iterator exhausted
+            num_workers = len(self._worker_tasks or [])
+            for _ in range(num_workers):
+                await self._batch_queue.put(None)
 
-        # Consume all batches from iterator and enqueue to GPU workers
-        async for batch_seqs, batch_accs in batches:
-            await self._batch_queue.put((batch_seqs, batch_accs))
-            enqueued_count += 1
+        # Start producer task (runs concurrently with consumer)
+        producer_task = asyncio.create_task(producer())
 
-        # Send shutdown sentinels to all GPU workers
-        num_workers = len(self._worker_tasks or [])
-        for _ in range(num_workers):
-            await self._batch_queue.put(None)
-
-        # Drain results - yield embedded batches as they complete
-        # Expect enqueued_count results + num_workers sentinels
-        results_collected = 0
+        # Yield results as they complete
         sentinels_received = 0
+        num_workers = len(self._worker_tasks or [])
 
-        while results_collected < enqueued_count or sentinels_received < num_workers:
-            batch_result = await self._result_queue.get()
+        try:
+            while sentinels_received < num_workers:
+                batch_result = await self._result_queue.get()
 
-            if batch_result is None:
-                # Sentinel from GPU worker
-                sentinels_received += 1
+                if batch_result is None:
+                    # Sentinel from GPU worker
+                    sentinels_received += 1
+                    self._result_queue.task_done()
+                    continue
+
+                # Real result - yield immediately
+                yield batch_result
                 self._result_queue.task_done()
-                continue
-
-            # Real result
-            results_collected += 1
-            yield batch_result
-            self._result_queue.task_done()
+        finally:
+            # Ensure producer finishes
+            await producer_task
 
     async def embed_prepared_batches(
         self,
@@ -489,18 +513,11 @@ class ESM2Embedder:
             batch_seqs, batch_accs = job
 
             # Process batch on GPU
-            t0 = _timeit()
             batch_result = await asyncio.to_thread(
                 self._compute_embeddings,
                 device_idx,
                 batch_seqs,
                 batch_accs,
-            )
-            t1 = _timeit()
-            _log_timing(
-                "esm2_worker_compute",
-                t1 - t0,
-                f"worker {device_idx} batch {batch_count} ({len(batch_seqs)} seqs)",
             )
 
             # Put result in result queue
@@ -569,8 +586,6 @@ class ESM2Embedder:
         use_autocast = (device.type == "cuda") and (
             self._tf_model_dtype in (torch.float16, torch.bfloat16)
         )
-
-        t0 = _timeit()
         inputs = tokenizer(
             list(sequences),
             return_tensors="pt",
@@ -584,9 +599,6 @@ class ESM2Embedder:
             if inputs[k].device.type == "cpu":
                 inputs[k] = inputs[k].pin_memory()
 
-        t1 = _timeit()
-        _log_timing("esm2_tokenize", t1 - t0, f"device {device_idx} ({len(sequences)} seqs)")
-
         with torch.inference_mode():
             # Batch tokenize - padding to longest sequence in this batch
 
@@ -594,18 +606,11 @@ class ESM2Embedder:
             inputs = {k: v.to(device, non_blocking=True) for k, v in inputs.items()}
 
             # Forward pass - model.config.output_hidden_states=False set at load time
-            t0 = _timeit()
             if use_autocast:
                 with torch.autocast(device_type=device.type, dtype=self._tf_model_dtype):
                     outputs = model(**inputs)
             else:
                 outputs = model(**inputs)
-            t1 = _timeit()
-            _log_timing(
-                "esm2_forward_pass",
-                t1 - t0,
-                f"device {device_idx} ({len(sequences)} seqs)",
-            )
 
             # Extract last hidden state only (no intermediate layers)
             hidden_states = outputs.last_hidden_state  # [B, L, D]
@@ -613,7 +618,6 @@ class ESM2Embedder:
 
             # Apply all pooling methods on GPU first (no CPU transfers yet)
             # This batches all GPU operations before any CPU transfer
-            t0 = _timeit()
             pooled_tensors: dict[str, torch.Tensor] = {}
             pool_funcs: dict[str, PoolingFn | None] = {}
 
@@ -634,18 +638,11 @@ class ESM2Embedder:
                             pooled = normalize_cast_renorm(pooled, self._tf_return_dtype)
 
                     pooled_tensors[pool_name] = pooled  # Keep on GPU
-            t1 = _timeit()
-            _log_timing(
-                "esm2_pooling",
-                t1 - t0,
-                f"device {device_idx} ({len(self.pooling_configs)} methods)",
-            )
 
             if device.type == "cuda":
                 torch.cuda.synchronize(device=device)  # Sync only this device
 
             # Now transfer all results to CPU (separate phase after all GPU work)
-            t0 = _timeit()
             result = EmbeddingBatch()
             result.protein_ids = list(protein_ids)
             result.sequences = list(sequences)
@@ -663,12 +660,6 @@ class ESM2Embedder:
                     # 2D tensor: [B, D] - pooled
                     pooled_np = pooled_tensor.cpu().numpy().astype(self._np_return_dtype)
                     result.embeddings[pool_name] = [pooled_np[i] for i in range(pooled_np.shape[0])]
-            t1 = _timeit()
-            _log_timing(
-                "esm2_transfer_to_cpu",
-                t1 - t0,
-                f"device {device_idx} ({len(pooled_tensors)} tensors)",
-            )
 
             # delete tensors
             del inputs, outputs, hidden_states, pooled_tensors

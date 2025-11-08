@@ -1,6 +1,5 @@
 from .annotation import Annotation
 from .annotationtype import AnnotationType
-from .embedding import Embedding
 from .goannotation import GOAnnotation
 from .molecule import Molecule
 from .organism import Organism
@@ -22,7 +21,6 @@ __all__ = [
 
 MODEL_CLASSES: list[type[PyeedBase]] = [
     Annotation,
-    Embedding,
     GOAnnotation,
     Molecule,
     Organism,

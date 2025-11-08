@@ -16,6 +16,35 @@ class Organism(PyeedBase):
         default=None,
         description="Organism name",
     )
+    kingdom: str | None = Field(
+        default=None,
+        description="Organism kingdom",
+    )
+    phylum: str | None = Field(
+        default=None,
+        description="Organism phylum",
+    )
+    class_name: str | None = Field(
+        default=None,
+        description="Organism class name",
+        alias="class",
+    )
+    order: str | None = Field(
+        default=None,
+        description="Organism order",
+    )
+    family: str | None = Field(
+        default=None,
+        description="Organism family",
+    )
+    genus: str | None = Field(
+        default=None,
+        description="Organism genus",
+    )
+    species: str | None = Field(
+        default=None,
+        description="Organism species",
+    )
 
     EDGES: ClassVar[tuple[Edge, ...]] = (Edge(parent_label="Protein", rel_name="ORIGINATES_FROM"),)
 

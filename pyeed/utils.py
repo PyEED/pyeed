@@ -8,8 +8,7 @@ from __future__ import annotations
 import asyncio
 import mmap
 import os
-import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 
 from .ingest.progress import ProgressReporter
 
@@ -46,7 +45,7 @@ async def _read_sequence_async(
     mm: mmap.mmap,
     start_offset: int,
     end_offset: int,
-    header_pattern: re.Pattern[str] | None = None,
+    header_extractor: Callable[[str], str] | None = None,
 ) -> tuple[str, str]:
     """Read a single FASTA entry from memory-mapped file.
 
@@ -54,7 +53,8 @@ async def _read_sequence_async(
         mm: Memory-mapped file object
         start_offset: Byte position of sequence header
         end_offset: Byte position where sequence ends
-        header_pattern: Optional regex to extract protein_id from header
+        header_extractor: Optional function to extract protein_id from header
+                         Signature: (header: str) -> str
 
     Returns:
         Tuple of (protein_id, sequence)
@@ -86,13 +86,9 @@ async def _read_sequence_async(
     # Decode header
     header_str = header_bytes.decode("ascii", errors="ignore")
 
-    # Extract protein_id from header using pattern if provided
-    if header_pattern:
-        match = header_pattern.search(header_str)
-        if match:
-            protein_id = match.group(1) if match.lastindex else match.group(0)
-        else:
-            protein_id = header_str
+    # Extract protein_id using extractor function if provided
+    if header_extractor:
+        protein_id = header_extractor(header_str)
     else:
         protein_id = header_str
 
@@ -105,7 +101,7 @@ async def _read_batch_async(
     end_offsets: list[int],
     start_idx: int,
     batch_size: int,
-    header_pattern: re.Pattern[str] | None,
+    header_extractor: Callable[[str], str] | None,
 ) -> tuple[dict[str, str], int]:
     """Read a single batch of sequences starting at start_idx.
 
@@ -115,7 +111,8 @@ async def _read_batch_async(
         end_offsets: List of end byte offsets
         start_idx: Starting sequence index
         batch_size: Number of sequences per batch
-        header_pattern: Optional regex to extract protein_id
+        header_extractor: Optional function to extract protein_id from header
+                         Signature: (header: str) -> str
 
     Returns:
         Tuple of (batch_dict, next_idx)
@@ -129,7 +126,7 @@ async def _read_batch_async(
 
     while i < n and len(batch) < batch_size:
         protein_id, sequence = await _read_sequence_async(
-            mm, offsets[i], end_offsets[i], header_pattern=header_pattern
+            mm, offsets[i], end_offsets[i], header_extractor=header_extractor
         )
         batch[protein_id] = sequence
         i += 1
@@ -142,7 +139,7 @@ async def _iterate_batches_async(
     offsets: list[int],
     end_offsets: list[int],
     batch_size: int,
-    header_pattern: re.Pattern[str] | None,
+    header_extractor: Callable[[str], str] | None,
     progress_report: ProgressReporter | None,
 ) -> AsyncIterator[dict[str, str]]:
     """Internal implementation: iterate over FASTA in batches.
@@ -163,7 +160,7 @@ async def _iterate_batches_async(
                     i = start
                     while i < n and len(batch) < batch_size:
                         pid, seq = _read_sequence_from_offset_mmap(
-                            mm, offsets[i], end_offsets[i], header_pattern
+                            mm, offsets[i], end_offsets[i], header_extractor
                         )
                         batch[pid] = seq
                         i += 1
@@ -185,7 +182,7 @@ def _read_sequence_from_offset_mmap(
     mm: mmap.mmap,
     start_offset: int,
     end_offset: int,
-    header_pattern: re.Pattern[str] | None = None,
+    header_extractor: Callable[[str], str] | None = None,
 ) -> tuple[str, str]:
     """Synchronous version for use in thread pool."""
     if mm[start_offset] != ord(b">"):
@@ -209,12 +206,9 @@ def _read_sequence_from_offset_mmap(
 
     header_str = header_bytes.decode("ascii", errors="ignore")
 
-    if header_pattern:
-        match = header_pattern.search(header_str)
-        if match:
-            protein_id = match.group(1) if match.lastindex else match.group(0)
-        else:
-            protein_id = header_str
+    # Extract protein_id using extractor function if provided
+    if header_extractor:
+        protein_id = header_extractor(header_str)
     else:
         protein_id = header_str
 
@@ -224,7 +218,7 @@ def _read_sequence_from_offset_mmap(
 async def read_fasta_chunks_async(
     path: str,
     chunk_size: int,
-    header_pattern: str | re.Pattern[str] | None = None,
+    header_extractor: Callable[[str], str] | None = None,
     offsets: list[int] | None = None,
     progress_report: ProgressReporter | None = None,
 ) -> AsyncIterator[dict[str, str]]:
@@ -235,23 +229,28 @@ async def read_fasta_chunks_async(
     Args:
         path: Path to FASTA file
         chunk_size: Number of entries per chunk
-        header_pattern: Optional regex to extract protein_id from header
+        header_extractor: Optional function to extract protein_id from header
+                         Signature: (header: str) -> str
+                         If None, uses entire header as protein_id
+        offsets: Pre-computed header offsets (optional)
         progress_report: Progress reporter to use
 
     Yields:
         Dicts mapping protein_id to sequence
 
     Example:
-        >>> async for chunk in read_fasta_chunks_async("proteins.fasta"):
+        >>> def extract_uniprot_id(header: str) -> str:
+        ...     return header.split()[0]
+        >>> async for chunk in read_fasta_chunks_async(
+        ...     "proteins.fasta",
+        ...     chunk_size=1000,
+        ...     header_extractor=extract_uniprot_id
+        ... ):
         ...     for protein_id, sequence in chunk.items():
         ...         print(f"{protein_id}: {len(sequence)} aa")
     """
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-
-    compiled_pattern: re.Pattern[str] | None = (
-        re.compile(header_pattern) if isinstance(header_pattern, str) else header_pattern
-    )
 
     if offsets is None:
         offsets = await asyncio.to_thread(build_header_index, path)
@@ -260,7 +259,7 @@ async def read_fasta_chunks_async(
     end_offsets = [*offsets[1:], file_size]
 
     async for chunk in _iterate_batches_async(
-        path, offsets, end_offsets, chunk_size, compiled_pattern, progress_report
+        path, offsets, end_offsets, chunk_size, header_extractor, progress_report
     ):
         yield chunk
 
@@ -268,7 +267,7 @@ async def read_fasta_chunks_async(
 def read_fasta_chunks(
     path: str,
     chunk_size: int = 1000,
-    header_pattern: str | re.Pattern[str] | None = None,
+    header_extractor: Callable[[str], str] | None = None,
     progress_report: ProgressReporter | None = None,
 ) -> Iterator[dict[str, str]]:
     """Synchronous wrapper for async FASTA reading.
@@ -278,15 +277,21 @@ def read_fasta_chunks(
     Args:
         path: Path to FASTA file
         chunk_size: Number of entries per chunk (default: 1000)
-        header_pattern: Optional regex to extract protein_id from header
-        show_progress: Display progress bar (default: True)
-        progress: Existing Progress instance to share
+        header_extractor: Optional function to extract protein_id from header
+                         Signature: (header: str) -> str
+        progress_report: Progress reporter to use
 
     Yields:
         Dicts mapping protein_id to sequence
 
     Example:
-        >>> for chunk in read_fasta_chunks("proteins.fasta", chunk_size=1000):
+        >>> def extract_uniprot_id(header: str) -> str:
+        ...     return header.split()[0]
+        >>> for chunk in read_fasta_chunks(
+        ...     "proteins.fasta",
+        ...     chunk_size=1000,
+        ...     header_extractor=extract_uniprot_id
+        ... ):
         ...     for protein_id, sequence in chunk.items():
         ...         print(f"{protein_id}: {len(sequence)} aa")
     """
@@ -295,119 +300,10 @@ def read_fasta_chunks(
     async def _run():
         chunks = []
         async for chunk in read_fasta_chunks_async(
-            path, chunk_size, header_pattern, progress_report
+            path, chunk_size, header_extractor, None, progress_report
         ):
             chunks.append(chunk)
         return chunks
 
     chunks = asyncio.run(_run())
     yield from chunks
-
-
-if __name__ == "__main__":
-    import asyncio
-    import re
-    from collections.abc import Callable
-
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-
-    path = "/home/mha/projects/proteingraph/downloads/uniprot_sprot.fasta"
-
-    # -------- reporter type (simple callable) --------
-    Reporter = Callable[..., None]
-
-    def null_reporter(**_: object) -> None:  # no-op
-        pass
-
-    # -------- pipeline (clean, no monkey-patch) --------
-    class AsyncPipelineDemo:
-        SENTINEL = object()
-
-        def __init__(
-            self,
-            path: str,
-            chunk_size: int = 1000,
-            header_pattern: str | re.Pattern[str] | None = None,
-        ):
-            self.path = path
-            self.chunk_size = chunk_size
-            self.header_pattern = header_pattern
-
-            self.read_queue: asyncio.Queue[dict[str, str] | object] = asyncio.Queue(maxsize=2)
-            self.write_queue: asyncio.Queue[list[str] | object] = asyncio.Queue(maxsize=2)
-
-        async def _reader_worker(self, report_read: ProgressReporter) -> None:
-            async for chunk in read_fasta_chunks_async(  # uses your parser
-                self.path, self.chunk_size, self.header_pattern, report_read
-            ):
-                await self.read_queue.put(chunk)
-            # signal end of stream to processor
-            await self.read_queue.put(self.SENTINEL)
-
-        async def _processor_worker(self, report_proc: ProgressReporter) -> None:
-            while True:
-                batch = await self.read_queue.get()
-                if batch is self.SENTINEL:
-                    # propagate termination to writer and stop
-                    await self.write_queue.put(self.SENTINEL)
-                    break
-                report_proc(advance=1)
-                await asyncio.sleep(1.0)  # simulate heavy processing
-                await self.write_queue.put(list(batch.keys()))
-
-        async def _writer_worker(
-            self, report_write: ProgressReporter, flush_batches: int = 10
-        ) -> None:
-            buf: list[list[str]] = []
-            while True:
-                item = await self.write_queue.get()
-                if item is self.SENTINEL:
-                    if buf:
-                        print(f"flushing {len(buf)} batches")
-                        await asyncio.sleep(0.3)  # simulate fast upload
-                        # Update progress incrementally for remaining items
-                        report_write(advance=len(buf))
-                        buf.clear()
-                    break
-
-                buf.append(item)
-                if len(buf) >= flush_batches:
-                    await asyncio.sleep(0.3)  # simulate fast upload
-                    report_write(advance=len(buf))
-                    buf.clear()
-
-        async def run(self) -> None:
-            from rich.progress import MofNCompleteColumn
-
-            progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[bold]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeElapsedColumn(),
-                refresh_per_second=3,
-            )
-
-            read_task_id = progress.add_task("read", total=None)
-            read_reporter = ProgressReporter(progress, read_task_id)
-
-            proc_task_id = progress.add_task("proc", total=None)
-            proc_reporter = ProgressReporter(progress, proc_task_id)
-
-            write_task_id = progress.add_task("write", total=None)
-            write_reporter = ProgressReporter(progress, write_task_id)
-
-            with progress:
-                await asyncio.gather(
-                    self._reader_worker(read_reporter),
-                    self._processor_worker(proc_reporter),
-                    self._writer_worker(write_reporter),
-                )
-
-    # -------- Rich Progress wiring via reporters --------
-
-    demo = AsyncPipelineDemo(
-        path=path,
-        chunk_size=1000,
-    )
-    asyncio.run(demo.run())

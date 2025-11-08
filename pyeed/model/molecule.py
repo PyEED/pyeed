@@ -2,7 +2,6 @@ from typing import Annotated, ClassVar
 
 from pydantic import Field
 
-from .embedding import Embedding
 from .pyeedbase import Edge, LabelProperty, PyeedBase
 
 
@@ -23,10 +22,6 @@ class Molecule(PyeedBase):
     inchi: str | None = Field(
         None,
         description="InChI representation",
-    )
-    embedding: list[Embedding] = Field(
-        default_factory=list,
-        description="Embedding vector",
     )
     EDGES: ClassVar[tuple[Edge, ...]] = (
         Edge(
