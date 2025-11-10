@@ -7,12 +7,12 @@ from collections.abc import Iterable
 import httpx
 from rich.progress import Progress, TaskID
 
-from ..chebi import ChebiClient
 from ..db.neo4j import Database
 from ..model import MODEL_CLASSES, Protein, Reaction
-from ..rhea import RheaClient
-from ..uniprot import UniProtAdapter
+from .chebi import ChebiClient
 from .progress import create_progress
+from .rhea import RheaClient
+from .uniprot import UniProtAdapter
 
 __all__ = [
     "enrich_molecules",

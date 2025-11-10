@@ -7,10 +7,6 @@ from dotenv import load_dotenv
 from huggingface_hub import login
 from loguru import logger
 
-from ..logging_setup import setup_logging
-
-setup_logging()
-
 
 def _login_hf() -> str:
     """Login to Hugging Face."""

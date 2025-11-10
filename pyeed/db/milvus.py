@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from time import sleep
 
 import numpy as np
+import pandas as pd
 from loguru import logger
 from pymilvus import (
     AsyncMilvusClient,
@@ -12,7 +14,14 @@ from pymilvus import (
     MilvusClient,
 )
 
-from ..embedding.types import EmbeddingBatch
+from pyeed.ingest.progress import create_progress
+
+from ..embed.types import EmbeddingBatch
+
+MILVUS_TO_NP_DTYPE_MAP = {
+    DataType.FLOAT16_VECTOR: np.float16,
+    DataType.FLOAT_VECTOR: np.float32,
+}
 
 
 @dataclass
@@ -25,15 +34,17 @@ class UploadStats:
 
 
 class VectorDB:
+    MAX_HITLIST_SIZE = 16384
+
     def __init__(
         self,
         uri: str | None = None,
         token: str | None = None,
         batch_size: int = 1000,
-        max_batch_mb: float = 30.0,
+        collection_name: str = "test",
     ):
         self.batch_size = batch_size
-        self.max_batch_mb = max_batch_mb
+        self.collection_name = collection_name
 
         self.async_client, self.client = self._connect(uri, token)
         self._connected = True
@@ -61,7 +72,7 @@ class VectorDB:
     ) -> Collection:
         schema = self.client.create_schema(
             auto_id=False,
-            enable_dynamic_field=True,
+            enable_dynamic_field=False,
         )
         index_params = self.client.prepare_index_params()
 
@@ -140,7 +151,7 @@ class VectorDB:
         vec_field_dtypes: list[DataType] = []
         vec_dims: list[int] = []
 
-        for pool_name, embeddings in batch.embeddings.items():
+        for pooling_name, embeddings in batch.embeddings.items():
             if not embeddings:
                 continue
 
@@ -160,9 +171,7 @@ class VectorDB:
             # Get dimension
             dim = int(first_emb.shape[0])
 
-            # Field name format: vec_{pool_name}
-            field_name = f"vec_{pool_name}"
-            vec_field_names.append(field_name)
+            vec_field_names.append(pooling_name)
             vec_field_dtypes.append(dtype)
             vec_dims.append(dim)
 
@@ -184,6 +193,11 @@ class VectorDB:
 
         self._initialized_collections.add(collection_name)
         logger.info(f"Collection '{collection_name}' initialized successfully")
+
+    def _check_existing_ids(self, ids: list[str]) -> set[str]:
+        """Check if the ids are already in the collection."""
+        response = self.client.get(self.collection_name, ids=ids, output_fields=["protein_id"])
+        return set(result["protein_id"] for result in response)
 
     async def insert_async(
         self,
@@ -235,19 +249,20 @@ class VectorDB:
                 record["seq_length"] = len(sequence)
 
             # Add embeddings for each pooling method
-            for pool_name, embeddings in batch.embeddings.items():
+            for pooling_name, embeddings in batch.embeddings.items():
                 if i >= len(embeddings):
-                    logger.warning(f"Missing embedding for {pool_name} at index {i}, skipping")
+                    logger.warning(f"Missing embedding for {pooling_name} at index {i}, skipping")
                     continue
 
                 embedding = embeddings[i]
                 if not isinstance(embedding, np.ndarray):
-                    logger.warning(f"Invalid embedding type for {pool_name} at index {i}, skipping")
+                    logger.warning(
+                        f"Invalid embedding type for {pooling_name} at index {i}, skipping"
+                    )
                     continue
 
-                field_name = f"vec_{pool_name}"
-                record[field_name] = embedding
-                record[f"has_{field_name}"] = True
+                record[pooling_name] = embedding
+                record[f"has_{pooling_name}"] = bool(embedding.any())
 
             milvus_data.append(record)
 
@@ -265,6 +280,181 @@ class VectorDB:
         logger.debug(f"Inserted {len(milvus_data)} records into '{collection_name}'")
         return len(milvus_data)
 
+    # Search
+    # ------------------------------------------------------------
+
+    def get_vectors(
+        self, collection_name: str, protein_ids: list[str], vector_field_name: str = "mean_pooling"
+    ) -> list[np.ndarray]:
+        response = self.client.get(
+            collection_name, ids=protein_ids, output_fields=[vector_field_name]
+        )
+
+        np_array = np.vstack([result[vector_field_name] for result in response]).astype(
+            self._get_numpy_type(collection_name, vector_field_name)
+        )
+        return np_array
+
+    def vector_search(
+        self,
+        collection_name: str,
+        query_vectors: list[np.ndarray],
+        vector_field_name: str = "mean_pooling",
+        return_vector: bool = False,
+        n_hits: int = 10,
+        return_fields: list[str] = [],
+        radius: float = 1.0,
+        range_filter: float = 0.0,
+        hitlist_size: int = 16384,
+        offset: int = 0,
+    ) -> list[list[dict[str, object]]]:
+        if return_vector:
+            return_fields.append(vector_field_name)
+
+        return_fields = list(set(return_fields))
+
+        # if vector is 1d make it 2d
+        if len(query_vectors.shape) == 1:
+            query_vectors = [query_vectors]
+
+        records: list[dict]
+
+        records = []
+        records.extend(
+            self.client.search(
+                collection_name=collection_name,
+                data=query_vectors,
+                anns_field=vector_field_name,
+                limit=n_hits,
+                output_fields=return_fields,
+                params={
+                    "offset": offset,
+                    "radius": radius,
+                    "range_filter": range_filter,
+                },
+            )
+        )
+
+        # flatten the records
+        clean_recs = []
+        for rec in records[0]:
+            value = rec["entity"][vector_field_name]
+            vector = {
+                vector_field_name: self._get_numpy_type(collection_name, vector_field_name)(value)
+            }
+            del rec["entity"]
+            rec.update(vector)
+            clean_recs.append(rec)
+
+        df = pd.DataFrame.from_records(clean_recs)
+        return df
+
+    def id_search(self, collection_name: str, protein_ids: list[str]) -> list[dict[str, object]]:
+        if isinstance(protein_ids, str):
+            protein_ids = [protein_ids]
+
+        # get
+
+    def _get_search_load_params(
+        self,
+        n_hits: int,
+        n_queries: int | None = None,
+        *,
+        max_total_hits_per_request: int = 16384,
+        request_size_limit_mb: float = 64.0,
+        safety: float = 0.6,
+        id_bytes: int = 8,
+        dist_bytes: int = 4,
+        wire_overhead: float = 1.6,
+    ) -> tuple[int, int]:
+        """Return (hitlist_size, queries_per_search) without exceeding limits.
+
+        n_hits: desired results per query (topK).
+        n_queries: optional cap on queries per network request.
+        """
+
+        # Byte-budget-derived cap on total results we can return in one request.
+        request_budget_bytes = int(request_size_limit_mb * (1024**2) * safety)
+        bytes_per_result = int((id_bytes + dist_bytes) * wire_overhead)
+        budget_cap_total_hits = request_budget_bytes // bytes_per_result
+
+        # Effective total-results cap per request respects both byte budget and server max.
+        total_hits_cap = min(budget_cap_total_hits, max_total_hits_per_request)
+
+        # Per-query result count cannot exceed requested n_hits nor the total cap.
+        hitlist_size = min(n_hits, total_hits_cap)
+
+        # Number of queries we can pack while staying within the total results cap.
+        queries_per_search = total_hits_cap // hitlist_size
+
+        if n_queries is not None:
+            queries_per_search = min(queries_per_search, n_queries)
+
+        # Ensure product stays within the cap (guard against rounding).
+        if queries_per_search * hitlist_size > total_hits_cap:
+            queries_per_search = total_hits_cap // hitlist_size
+
+        return hitlist_size, queries_per_search
+
+    def get_all_vectors(
+        self,
+        collection_name: str,
+        vector_field_name: str = "mean_pooling",
+        show_progress: bool = True,
+    ) -> list[np.ndarray]:
+        it = self.client.query_iterator(
+            collection_name=collection_name,
+            batch_size=1000,
+            output_fields=[vector_field_name],
+        )
+        protein_ids = []
+        vectors = []
+
+        # get total number of rows
+        total_rows = self.client.get_collection_stats(collection_name)["row_count"]
+
+        progress = create_progress(total_rows)
+        with progress:
+            task = progress.add_task(
+                f"Loading {vector_field_name} vectors from {collection_name}", total=total_rows
+            )
+
+            while True:
+                batch = it.next()
+                if not batch:
+                    break
+
+                # extract protein id and make in list of protein ids
+                for rec in batch:
+                    protein_ids.append(rec["protein_id"])
+                    vectors.append(rec[vector_field_name])
+
+                progress.update(task, advance=len(batch))
+
+            task_convert = progress.add_task(
+                "Converting vectors to numpy array", total=None, start=True
+            )
+            vectors = np.vstack(vectors).astype(
+                self._get_numpy_type(collection_name, vector_field_name)
+            )
+            progress.update(task_convert, completed=True)
+            sleep(1)
+
+            return protein_ids, vectors
+
+    def _get_numpy_type(
+        self,
+        collection_name: str,
+        vector_field_name: str,
+    ) -> np.dtype:
+        schema = self.client.describe_collection(collection_name)
+        for field in schema["fields"]:
+            if field["name"] == vector_field_name:
+                return MILVUS_TO_NP_DTYPE_MAP[field["type"]]
+        raise ValueError(
+            f"Vector field '{vector_field_name}' not found in collection '{collection_name}'"
+        )
+
 
 # Example usage
 if __name__ == "__main__":
@@ -281,6 +471,14 @@ if __name__ == "__main__":
     print(f"Collections: {vector_db.collections}")
     print(f"Databases: {vector_db.databases}")
 
-    # drop collection
-    print("Dropping collection 'protein_emb' if it exists...")
-    vector_db.client.drop_collection("test")
+    stats = vector_db.client.get_collection_stats(collection_name="test")
+    print(stats)
+    # Typical keys: row_count, data_size, index_file_size (bytes), partitions, segments, etc.
+
+    to_gb = lambda b: b / (1024**3)
+    print(f"rows: {stats['row_count']:,}")
+    print(f"data: {to_gb(stats.get('data_size', 0)):.2f} GB")
+    print(f"index: {to_gb(stats.get('index_file_size', 0)):.2f} GB")
+    print(
+        f"total on disk: {to_gb(stats.get('data_size', 0) + stats.get('index_file_size', 0)):.2f} GB"
+    )

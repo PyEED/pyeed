@@ -7,7 +7,6 @@ from loguru import logger
 from rich.progress import Progress, TaskID
 from transformers import EsmModel, EsmTokenizer
 
-from ..logging_setup import setup_logging
 from .pooling import PoolingFn, PoolingLike, l2_normalize, normalize_cast_renorm
 from .types import (
     NP_DTYPE_MAP,
@@ -17,8 +16,6 @@ from .types import (
     ReturnDType,
 )
 from .utils import _free_device_memory, _login_hf, silence_transformers_init_only
-
-setup_logging()
 
 __all__ = [
     "ESM2Embedder",

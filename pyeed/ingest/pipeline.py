@@ -1,5 +1,3 @@
-"""Three-stage async embedding pipeline for FASTA → Embedding → Milvus."""
-
 from __future__ import annotations
 
 import asyncio

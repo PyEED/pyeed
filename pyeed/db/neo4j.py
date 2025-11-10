@@ -9,7 +9,7 @@ import dotenv
 from neo4j import AsyncGraphDatabase, GraphDatabase
 
 from ..model.pyeedbase import LabelProperty, PyeedBase
-from ..model.utility import collect_schema
+from ..model.utils import collect_schema
 
 logger = logging.getLogger(__name__)
 
