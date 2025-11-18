@@ -30,8 +30,6 @@ class EmbeddingPipeline:
     maintaining concurrency.
     """
 
-    SENTINEL = object()
-
     def __init__(  # noqa: PLR0913
         self,
         embedder: ESM2Embedder,
@@ -252,6 +250,7 @@ class EmbeddingPipeline:
 
             # Flush when buffer is full
             if len(buffer) >= self.write_batch_size:
+                assert False, "Writer worker should not be called"
                 combined = self._combine_batches(buffer)
                 inserted = await self.vector_db.insert_async(
                     self.collection_name,

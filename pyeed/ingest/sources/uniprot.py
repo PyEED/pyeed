@@ -1,4 +1,3 @@
-# adapter_uniprot.py
 from __future__ import annotations
 
 import re
@@ -13,20 +12,22 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+from pyeed.ingest.core.pipeline import ChildRecord, PipelineRecord
+
 from ..model import (
     Annotation,
     AnnotationType,
     GOAnnotation,
-    Organism,
     Protein,
-    Reaction,
 )
 
 INTERPRO_PATTERN = re.compile(r"^IPR\d{6}$")
 UNIPROT_PATTERN = re.compile(
     r"^(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})$"
 )
-UNIPROT_SEARCH = "https://rest.uniprot.org/uniprotkb/search"
+RHEA_PATTERN = re.compile(r"^RHEA:\d+$")
+
+PROTEIN_UNIPROT_SEARCH = "https://rest.uniprot.org/uniprotkb/search"
 RETURN_FIELDS = ",".join(
     [
         "accession",
@@ -73,7 +74,7 @@ class UniProtAdapter:
             "size": str(min(size, 500)),  # UniProt caps at 500/page
         }
 
-        url: str | None = UNIPROT_SEARCH
+        url: str | None = PROTEIN_UNIPROT_SEARCH
         while url:
             r = await client.get(url, params=params, headers=self.headers, timeout=self.timeout)
             r.raise_for_status()
@@ -132,19 +133,46 @@ class UniProtAdapter:
             ):
                 yield rec
 
-    def map(self, p: dict[str, Any]) -> Protein:
-        seq_meta = p.get("sequence") or {}
-        sequence = seq_meta.get("value")
-        if not isinstance(sequence, str):
-            raise ValueError(f"Entry {p.get('primaryAccession', '?')} has no sequence")
+    def _extract_protein(self, p: dict[str, Any]) -> list[Protein]:
+        """Extract Protein object from UniProt record.
 
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List containing single Protein object
+        """
+        seq_meta = p.get("sequence") or {}
         desc = p.get("proteinDescription") or {}
         rec = desc.get("recommendedName") or {}
 
-        name = (rec.get("fullName") or {}).get("value")
-        ecs = rec.get("ecNumbers") or []
-        ec_numbers = [ec.get("value") for ec in ecs if isinstance(ec.get("value"), str)]
+        protein_id = p.get("primaryAccession")
+        sequence = seq_meta.get("value")
+        seq_length = seq_meta.get("length")
+        protein_name = (rec.get("fullName") or {}).get("value")
+        reaction_ids = self._extract_rhea_ids(p)
+        ec_numbers = self._extract_ec_numbers(p)
+        taxon_ids = self._extract_taxon_ids(p)
 
+        return Protein(
+            id=protein_id,
+            name=protein_name,
+            sequence=sequence,
+            seq_length=seq_length,
+            reaction_ids=reaction_ids,
+            ec_numbers=ec_numbers,
+            taxon_ids=taxon_ids,
+        )
+
+    def _extract_go_annotations(self, p: dict[str, Any]) -> list[GOAnnotation]:
+        """Extract GO annotations from UniProt record.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List of GOAnnotation objects
+        """
         gos: list[GOAnnotation] = []
         for x in p.get("uniProtKBCrossReferences", []):
             if x.get("database") != "GO":
@@ -157,8 +185,18 @@ class UniProtAdapter:
                 None,
             )
             if term:
-                gos.append(GOAnnotation(go_id=gid, term=term, definition=None))
+                gos.append(GOAnnotation(id=gid, term=term, definition=None))
+        return gos
 
+    def _extract_annotations(self, p: dict[str, Any]) -> list[Annotation]:
+        """Extract sequence annotations from UniProt record.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List of Annotation objects
+        """
         fmap = {
             "active site": AnnotationType.ACTIVE_SITE,
             "site": AnnotationType.SITE,
@@ -191,32 +229,103 @@ class UniProtAdapter:
                     custom=custom,
                 )
             )
+        return anns
 
-        rhea_rx = re.compile(r"^RHEA:\d+$")
-        rx: list[Reaction] = []
+    def _extract_ec_numbers(self, p: dict[str, Any]) -> list[str]:
+        """Extract EC numbers from UniProt record.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List of EC number strings (e.g., ["1.1.1.1", "2.3.4.5"])
+        """
+        desc = p.get("proteinDescription") or {}
+        rec = desc.get("recommendedName") or {}
+        ecs = rec.get("ecNumbers") or []
+        return [ec.get("value") for ec in ecs if isinstance(ec.get("value"), str)]
+
+    def _extract_taxon_ids(self, p: dict[str, Any]) -> list[str]:
+        """Extract taxon IDs from UniProt record.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List of taxon ID strings (e.g., ["9606", "10090"])
+        """
+        organism = p.get("organism") or {}
+        taxon_id = organism.get("taxonId")
+        if taxon_id is not None:
+            return [str(taxon_id)]
+        return []
+
+    def _extract_rhea_ids(self, p: dict[str, Any]) -> list[str]:
+        """Extract Rhea reaction IDs from UniProt record.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            List of Rhea ID strings (e.g., ["RHEA:12345", "RHEA:67890"])
+        """
+        rhea_ids: list[str] = []
         for c in p.get("comments", []):
             if (c.get("commentType") or "").lower() != "catalytic activity":
                 continue
             rct = c.get("reaction") or {}
             for ref in rct.get("reactionCrossReferences", []):
                 rid = ref.get("id", "")
-                if ref.get("database") == "Rhea" and rhea_rx.match(rid):
-                    rx.append(Reaction(rhea_id=rid, description=rct.get("name")))
+                if ref.get("database") == "Rhea" and RHEA_PATTERN.match(rid):
+                    rhea_ids.append(rid)
+        return rhea_ids
 
-        return Protein(
-            sequence_id=p["primaryAccession"],
-            name=name,
-            sequence=sequence,
-            seq_length=len(sequence),
-            mol_weight=seq_meta.get("molWeight"),
-            ec_numbers=ec_numbers,
-            organisms=[Organism(tax_id=(p.get("organism") or {}).get("taxonId"))],  # type: ignore
-            go_terms=gos,
-            annotations=anns,
-            reactions=rx,
-            structure_ids=[],
-            embeddings=[],
-            custom={},
+    def map(self, p: dict[str, Any]) -> PipelineRecord:
+        """Maps a UniProt protein record to a dictionary of PyeedBase objects.
+
+        Args:
+            p: UniProt protein record dictionary
+
+        Returns:
+            PipelineRecord containing the Protein object and its children
+        """
+        protein = self._extract_protein(p)
+        go_annotations = self._extract_go_annotations(p)
+        annotations = self._extract_annotations(p)
+
+        go_ids = [go.id for go in go_annotations]
+        annotation_ids = [ann.id for ann in annotations]
+
+        protein.go_ids = go_ids
+        protein.annotation_ids = annotation_ids
+
+        children = []
+        children.append(
+            ChildRecord(
+                data=go_annotations,
+                parent_label=Protein.__name__,
+                parent_field="go_ids",
+                child_field="id",
+                edge_name="GO_ANNOTATION",
+                edge_direction_to_parent=False,
+                remove_parent_value_on_join=True,
+            )
+        )
+        children.append(
+            ChildRecord(
+                data=annotations,
+                parent_label=Protein.__name__,
+                parent_field="annotation_ids",
+                child_field="id",
+                edge_name="HAS_SEQUENCE_ANNOTATION",
+                edge_direction_to_parent=False,
+                remove_parent_value_on_join=True,
+            )
+        )
+
+        return PipelineRecord(
+            data=protein,
+            children=children,
         )
 
     @retry(
@@ -278,16 +387,24 @@ class UniProtAdapter:
         return accs
 
 
-async def _amain() -> None:
-    adapter = UniProtAdapter()
-    ipr = "IPR002133"
-    async with httpx.AsyncClient() as client:
-        accs = await adapter.fetch_all_accessions_sparql(client, ipr)
-        return accs
+# async def _amain() -> None:
+#     adapter = UniProtAdapter()
+#     ipr = "IPR002133"
+#     async with httpx.AsyncClient() as client:
+#         accs = await adapter.fetch_all_accessions_sparql(client, ipr)
+#         return accs
 
 
 if __name__ == "__main__":
     import asyncio
 
-    length = len(asyncio.run(_amain()))
-    print(f"Length: {length}")
+    from rich import print
+
+    ids = ["P12345", "Q9Y6X9"]
+
+    async def run() -> None:
+        async with httpx.AsyncClient() as client:
+            async for rec in UniProtAdapter().fetch_accessions(client, ids):
+                print(UniProtAdapter().map(rec))
+
+    asyncio.run(run())

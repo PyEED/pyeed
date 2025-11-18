@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass
 from time import sleep
 
+import dotenv
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -14,7 +16,7 @@ from pymilvus import (
     MilvusClient,
 )
 
-from pyeed.ingest.progress import create_progress
+from pyeed.utils.progress import create_progress
 
 from ..embed.types import EmbeddingBatch
 
@@ -40,10 +42,13 @@ class VectorDB:
         self,
         uri: str | None = None,
         token: str | None = None,
-        batch_size: int = 1000,
-        collection_name: str = "test",
+        collection_name: str = "pyeed",
     ):
-        self.batch_size = batch_size
+        dotenv.load_dotenv()
+        uri = uri or os.getenv("MILVUS_URI")
+        token = token or os.getenv("MILVUS_TOKEN")
+
+        self.uri = uri
         self.collection_name = collection_name
 
         self.async_client, self.client = self._connect(uri, token)
@@ -413,8 +418,7 @@ class VectorDB:
         # get total number of rows
         total_rows = self.client.get_collection_stats(collection_name)["row_count"]
 
-        progress = create_progress(total_rows)
-        with progress:
+        with create_progress() as progress:
             task = progress.add_task(
                 f"Loading {vector_field_name} vectors from {collection_name}", total=total_rows
             )

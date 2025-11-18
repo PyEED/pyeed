@@ -12,7 +12,6 @@ import logging
 from rich.progress import TaskID
 
 from .chebi import ChebiClient
-from .database import Database
 from .ingest.progress import create_progress
 from .model import MODEL_CLASSES, Molecule
 from .rhea import RheaClient
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 async def enrich_reactions_with_molecules(
-    db: Database,
+    db: GraphDB,
     concurrency: int = 8,
     save_batch: int = 200,
     sync_schema: bool = False,
@@ -183,7 +182,7 @@ async def enrich_reactions_with_molecules(
 
 async def _fetch_and_save_molecules(
     chebi_client: ChebiClient,
-    db: Database,
+    db: GraphDB,
     unique_chebi_list: list[str],
     save_batch: int,
 ) -> dict[str, Molecule]:
@@ -223,7 +222,7 @@ async def _fetch_and_save_molecules(
 
 
 async def _create_reaction_molecule_edges(
-    db: Database,
+    db: GraphDB,
     reaction_molecule_map: dict[str, tuple[list[str], list[str]]],
     chebi_to_molecule: dict[str, Molecule],
     save_batch: int,
@@ -279,12 +278,12 @@ async def _create_reaction_molecule_edges(
 if __name__ == "__main__":
     import asyncio
 
-    from pyeed.db.neo4j import Database
+    from pyeed.db.neo4j import GraphDB
     from pyeed.embedding.pooling import max_pooling, mean_pooling
     from pyeed.ingest import Ingester, embed_proteins
 
     async def main() -> None:
-        db = Database()
+        db = GraphDB()
 
         # Example 1: Enrich reactions with molecules
         await enrich_reactions_with_molecules(db, sync_schema=True)

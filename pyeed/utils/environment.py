@@ -29,6 +29,7 @@ def in_ipython() -> bool:
         return False
 
 
-# Cached flags (computed once at import)
 IN_NOTEBOOK: bool = in_notebook()
 IN_IPYTHON: bool = in_ipython()
+
+__all__ = ["IN_IPYTHON", "IN_NOTEBOOK"]

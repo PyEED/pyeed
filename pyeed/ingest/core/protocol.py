@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from rich.progress import Progress
-
-from ...utils.progress import ProgressReporter
+from rich.progress import Progress, TaskID
 
 SENTINEL = object()
 
 
 @dataclass
 class PipelineContext:
-    """Shared context across all pipeline stages."""
+    """Shared state across pipeline stages."""
 
     progress: Progress
-    skip_neo4j: set[str] = field(default_factory=set)
+    added_nodes: defaultdict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
     skip_milvus: set[str] = field(default_factory=set)
     stats: dict[str, int] = field(default_factory=dict)
 
@@ -32,15 +31,17 @@ class PipelineStage(Protocol):
         self,
         input_queues: dict[str, asyncio.Queue[Any]],
         output_queues: dict[str, asyncio.Queue[Any]],
-        progress_reporters: dict[str, ProgressReporter],
         context: PipelineContext,
+        progress: Progress | None,
+        task_id: TaskID | None,
     ) -> None:
         """Run the stage until SENTINEL received on all input queues.
 
         Args:
             input_queues: Named input queues (empty dict for source stages)
             output_queues: Named output queues (empty dict for sink stages)
-            progress_reporters: Named progress reporters for this stage
             context: Shared pipeline context
+            progress: Progress object for reporting progress
+            task_id: TaskID for progress tracking
         """
         ...

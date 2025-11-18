@@ -10,7 +10,7 @@ import mmap
 import os
 from collections.abc import AsyncIterator, Callable, Iterator
 
-from ..utils.progress import ProgressReporter
+from ...utils.progress import ProgressReporter
 
 
 def build_header_index(path: str) -> list[int]:

@@ -3,8 +3,8 @@ from uuid import uuid4
 
 from pydantic import Field
 
-from pyeed.model.annotationtype import AnnotationType
-from pyeed.model.pyeedbase import LabelProperty, PyeedBase
+from .annotationtype import AnnotationType
+from .pyeedbase import LabelProperty, PyeedBase
 
 
 class Annotation(PyeedBase):

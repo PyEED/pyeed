@@ -17,7 +17,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from .db.neo4j import Database
+from .db.neo4j import GraphDB
 from .environment import IN_NOTEBOOK
 from .model import MODEL_CLASSES, Protein, Reaction
 from .rhea import RheaClient
@@ -29,7 +29,7 @@ CONSOLE = Console(force_jupyter=IN_NOTEBOOK)
 
 
 async def ingest_interpro(
-    db: Database,
+    db: GraphDB,
     interpro: str,
     chunk_size: int = 30,
     page_size: int = 30,
@@ -66,7 +66,7 @@ async def ingest_interpro(
 
 
 async def ingest_uniprot(
-    db: Database,
+    db: GraphDB,
     accessions: Iterable[str],
     chunk_size: int = 30,
     page_size: int = 30,
@@ -138,7 +138,7 @@ async def ingest_uniprot(
         )
 
 
-async def enrich_rhea(db: Database, concurrency: int = 8, save_batch: int = 200) -> None:
+async def enrich_rhea(db: GraphDB, concurrency: int = 8, save_batch: int = 200) -> None:
     """
     Enrich Reaction nodes (missing Molecule edges) via RheaClient.
     Uses bounded concurrency for HTTP and batched MERGE writes.

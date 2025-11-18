@@ -45,6 +45,4 @@ def collect_schema(
                         uniques.append(UniqueSpec(label, name))
                     if m.index:
                         btrees.append(BtreeSpec(label, name))
-                    if m.vector_index:
-                        vectors.append(VectorSpec(label, name))
     return uniques, btrees, vectors

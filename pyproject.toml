@@ -53,6 +53,8 @@ max-statements = 100
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.0",
+    "pytest-sugar>=1.1.1",
     "ruff>=0.12.12",
     "ruff-lsp>=0.0.62",
 ]

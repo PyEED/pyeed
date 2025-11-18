@@ -2,9 +2,7 @@ from typing import Annotated, Any
 
 from pydantic import Field, field_validator
 
-from .annotation import Annotation
 from .pyeedbase import LabelProperty, PyeedBase
-from .reaction import Reaction
 
 
 class Protein(PyeedBase):
@@ -29,10 +27,6 @@ class Protein(PyeedBase):
         None,
         description="Protein name",
     )
-    organism_ids: list[str] = Field(
-        default_factory=list,
-        description="NCBI taxonomy IDs of organisms the protein originates from",
-    )
     mol_weight: float | None = Field(
         None,
         description="Molecular weight in Daltons",
@@ -40,6 +34,10 @@ class Protein(PyeedBase):
     ec_numbers: list[str] | None = Field(
         None,
         description="Enzyme Commission numbers associated with the protein",
+    )
+    taxon_ids: list[str] = Field(
+        default_factory=list,
+        description="Taxonomy IDs of the organism the protein originates from",
     )
     structure_ids: list[str] = Field(
         default_factory=list,
@@ -49,13 +47,13 @@ class Protein(PyeedBase):
         default_factory=list,
         description="Gene Ontology identifiers",
     )
-    reactions: list[Reaction] = Field(
+    reaction_ids: list[str] = Field(
         default_factory=list,
         description="RHEA reaction identifiers",
     )
-    annotations: list[Annotation] = Field(
+    annotation_ids: list[str] = Field(
         default_factory=list,
-        description="Sequence annotations",
+        description="Sequence annotation identifiers",
     )
 
     @field_validator("sequence")

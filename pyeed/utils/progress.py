@@ -15,7 +15,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from ..environment import IN_NOTEBOOK
+from .environment import IN_NOTEBOOK
 
 __all__ = ["create_progress"]
 

@@ -1,5 +1,24 @@
+"""ESM2 protein embedder with GPU parallelism and per-GPU thread safety.
+
+Architecture:
+    Uses per-GPU locks to serialize model access. Multiple batches can process
+    concurrently across different GPUs, but only one batch processes per GPU
+    at a time. This prevents rotary embeddings cache corruption.
+
+Thread Safety:
+    ESM2's rotary embeddings use per-model-instance cache. Concurrent access
+    from multiple threads corrupts this cache. Per-GPU locks ensure sequential
+    access to each model instance while maintaining parallelism across GPUs.
+
+Backpressure Flow:
+    GPU processing slow → Task limit reached → embed_stream blocks →
+    Pipeline queue fills → Reader blocks → No more data ingested
+
+This prevents memory exhaustion when embedding is the bottleneck, while ensuring
+thread-safe execution and maintaining GPU utilization.
+"""
+
 import asyncio
-from collections import defaultdict
 from collections.abc import AsyncIterator, Sequence
 
 import torch
@@ -17,55 +36,40 @@ from .types import (
 )
 from .utils import _free_device_memory, _login_hf, silence_transformers_init_only
 
-__all__ = [
-    "ESM2Embedder",
-]
-
-# Timing statistics
-_timing_stats: dict[str, list[float]] = defaultdict(list)
-
 
 class ESM2Embedder:
     def __init__(
         self,
+        model_dtype: ModelDType,
+        return_dtype: ReturnDType,
+        pooling_methods: PoolingLike,
         model_name: str = "facebook/esm2_t33_650M_UR50D",
-        pooling_methods: PoolingLike = None,
         normalize: bool = True,
-        model_dtype: ModelDType = "float32",
-        return_dtype: ReturnDType = "float32",
-        n_gpus: int = -1,
         max_length: int = 1024,
-        verbose: bool = False,
-        max_batch_queue_size: int | None = 32,
+        n_gpus: int = -1,
     ):
         """
         Initialize ESM2 embedder.
 
         Args:
             model_name: ESM-2 model identifier
-            pooling_methods: Single or multiple pooling functions
-            normalize: L2-normalize embeddings
             model_dtype: Model precision for computation (float32/float16)
             return_dtype: Output array dtype (float32/float16)
-            n_gpus: Number of GPUs to use (-1 for all available)
+            pooling_methods: Single or multiple pooling functions
+            normalize: L2-normalize embeddings
             max_length: Maximum sequence length
-            verbose: Show progress bar with rich (sequences/sec rate)
-            max_batch_queue_size: Max batches in internal queues (default: n_gpus * 2)
+            n_gpus: Number of GPUs to use (-1 for all available)
         """
         self.model_name = model_name
         self.normalize = normalize
         self.model_dtype = model_dtype
         self.return_dtype = return_dtype
         self.max_length = max_length
-        self.verbose = verbose
         self.n_gpus = n_gpus
         self._initialized = False
         self._tf_model_dtype = TF_DTYPE_MAP[model_dtype]
         self._tf_return_dtype = TF_DTYPE_MAP[return_dtype]
         self._np_return_dtype = NP_DTYPE_MAP[return_dtype]
-
-        # Calculate queue size based on GPUs (will be finalized in initialize)
-        self._max_queue_size = max_batch_queue_size
 
         # Normalize pooling_methods into a list of (name, function) tuples
         self.pooling_configs = self._normalize_pooling_methods(pooling_methods)
@@ -75,24 +79,7 @@ class ESM2Embedder:
         self.devices: list[torch.device] = []
         self.token: str | None = None
         self.device_ids: list[int] = []
-
-        # Persistent workers for continuous processing
-        self._batch_queue: asyncio.Queue[tuple[list[str], list[str]] | None] | None = None
-        self._result_queue: asyncio.Queue[EmbeddingBatch | None] | None = None
-        self._worker_tasks: list[asyncio.Task] | None = None
-
-        logger.info(
-            "ESM2 embedder initialized",
-            extra={
-                "model_name": model_name,
-                "normalize": normalize,
-                "model_dtype": model_dtype,
-                "return_dtype": return_dtype,
-                "max_length": max_length,
-                "verbose": verbose,
-                "pooling_methods": [name for name, _ in self.pooling_configs],
-            },
-        )
+        self._device_locks: list[asyncio.Lock] | None = None
 
     def _normalize_pooling_methods(
         self, pooling_methods: PoolingLike
@@ -112,19 +99,16 @@ class ESM2Embedder:
             return [(name, pooling_methods)]
 
         # Sequence of pooling functions
-        if isinstance(pooling_methods, Sequence):
-            result = []
-            for idx, method in enumerate(pooling_methods):
-                if method is None:
-                    result.append(("none", None))
-                elif callable(method):
-                    name = getattr(method, "__name__", f"custom_{idx}")
-                    result.append((name, method))
-                else:
-                    raise ValueError(f"Invalid pooling method at index {idx}: {method}")
-            return result
-
-        raise ValueError(f"Invalid pooling_methods type: {type(pooling_methods)}")
+        result = []
+        for idx, method in enumerate(pooling_methods):
+            if method is None:
+                result.append(("none", None))
+            elif callable(method):
+                name = getattr(method, "__name__", f"custom_{idx}")
+                result.append((name, method))
+            else:
+                raise ValueError(f"Invalid pooling method at index {idx}: {method}")
+        return result
 
     async def initialize(self) -> None:
         """Load models on all available GPUs and tokenizer on CPU."""
@@ -147,24 +131,14 @@ class ESM2Embedder:
         # Load models on all devices in parallel
         await asyncio.gather(*[self._load_on_device(i, d) for i, d in enumerate(self.devices)])
 
-        # Finalize queue size based on actual number of devices
-        if self._max_queue_size is None:
-            self._max_queue_size = len(self.devices) * 2
-
-        # Create BOUNDED persistent queues to enable backpressure
-        self._batch_queue = asyncio.Queue(maxsize=self._max_queue_size)
-        self._result_queue = asyncio.Queue(maxsize=self._max_queue_size)
-
-        # Launch persistent workers (one per GPU)
-        self._worker_tasks = [
-            asyncio.create_task(self._persistent_worker(device_idx))
-            for device_idx in range(len(self.devices))
-        ]
+        # Create per-device locks for thread-safe model access
+        self._device_locks = [asyncio.Lock() for _ in range(len(self.devices))]
+        logger.debug(f"Created {len(self._device_locks)} device locks for thread safety")
 
         self._initialized = True
         logger.info(
-            "ESM2 embedder ready with persistent workers",
-            extra={"max_queue_size": self._max_queue_size, "num_workers": len(self.devices)},
+            "ESM2 embedder ready",
+            extra={"num_gpus": len(self.devices), "devices": [str(d) for d in self.devices]},
         )
 
     def _detect_devices(self) -> list[torch.device]:
@@ -215,8 +189,7 @@ class ESM2Embedder:
                     torch_dtype=self._tf_model_dtype,
                 )
 
-            # CRITICAL: Disable all-layer hidden states to save memory
-            # ESM2-T33 has ~33 layers; materializing all = ~33x memory per forward pass
+            # Disable all-layer hidden states to save memory
             model.config.output_hidden_states = False
 
             model = model.to(device=device, dtype=self._tf_model_dtype).eval()
@@ -227,7 +200,7 @@ class ESM2Embedder:
         # Use indexed assignment instead of append to avoid race conditions
         self.models[device_idx] = model
         logger.info(
-            "ESM2 model loaded on device",
+            f"ESM2 model loaded on {device!r}",
             extra={
                 "device": str(device),
                 "model_dtype": self.model_dtype,
@@ -238,19 +211,6 @@ class ESM2Embedder:
     async def cleanup(self) -> None:
         """Clean up models and free GPU memory on all used devices."""
         logger.info("Cleaning up ESM2 embedder")
-
-        # Shutdown persistent workers
-        if self._worker_tasks:
-            # Send shutdown sentinels (one per worker)
-            for _ in range(len(self.devices)):
-                await self._batch_queue.put(None)
-
-            # Wait for workers to finish
-            await asyncio.gather(*self._worker_tasks, return_exceptions=True)
-
-            self._worker_tasks = None
-            self._batch_queue = None
-            self._result_queue = None
 
         # Store device IDs before clearing
         device_ids = self.device_ids if self.device_ids else None
@@ -277,10 +237,6 @@ class ESM2Embedder:
         if not self._initialized or not self.models or self.models[0] is None:
             raise RuntimeError("Model not initialized. Call initialize() first.")
         return self.models[0].config.hidden_size
-
-    # ========================================================================
-    # Public API
-    # ========================================================================
 
     def create_length_sorted_batches(
         self,
@@ -355,8 +311,6 @@ class ESM2Embedder:
             relation is preserved within each batch, but batch order is
             non-deterministic (depends on GPU completion timing).
         """
-        if not self._initialized:
-            await self.initialize()
 
         accessions = accessions or [f"seq_{i}" for i in range(len(sequences))]
         if len(sequences) != len(accessions):
@@ -382,147 +336,126 @@ class ESM2Embedder:
         self,
         batches: AsyncIterator[tuple[list[str], list[str]]],
     ) -> AsyncIterator[EmbeddingBatch]:
-        """Stream embeddings from batch iterator.
+        """Stream embeddings from batch iterator with concurrent GPU processing.
 
-        Pipeline controls pace - embedder processes batches as they arrive.
-        Internal GPU workers and queues are completely hidden.
+        Processes batches concurrently across available GPUs using task-based
+        parallelism. Results are yielded as they complete (order non-deterministic).
 
-        Uses bounded queues to apply backpressure when GPU workers are saturated,
-        preventing upstream reader from racing ahead and consuming excessive memory.
+        Backpressure: Limits concurrent tasks to prevent memory exhaustion when
+        GPU processing is slower than batch generation.
 
         Args:
             batches: Async iterator of (sequences, accessions) tuples
 
         Yields:
-            EmbeddingBatch for each processed batch
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        async def producer():
-            """Enqueue batches as they arrive (blocks when queue full)."""
-            async for batch_seqs, batch_accs in batches:
-                # This will block when _batch_queue is full, applying backpressure
-                await self._batch_queue.put((batch_seqs, batch_accs))
-            # Send shutdown sentinels when iterator exhausted
-            num_workers = len(self._worker_tasks or [])
-            for _ in range(num_workers):
-                await self._batch_queue.put(None)
-
-        # Start producer task (runs concurrently with consumer)
-        producer_task = asyncio.create_task(producer())
-
-        # Yield results as they complete
-        sentinels_received = 0
-        num_workers = len(self._worker_tasks or [])
-
-        try:
-            while sentinels_received < num_workers:
-                batch_result = await self._result_queue.get()
-
-                if batch_result is None:
-                    # Sentinel from GPU worker
-                    sentinels_received += 1
-                    self._result_queue.task_done()
-                    continue
-
-                # Real result - yield immediately
-                yield batch_result
-                self._result_queue.task_done()
-        finally:
-            # Ensure producer finishes
-            await producer_task
-
-    async def embed_prepared_batches(
-        self,
-        batches: list[tuple[list[str], list[str]]],
-        progress: Progress | None = None,
-        task_id: TaskID | None = None,
-    ) -> AsyncIterator[EmbeddingBatch]:
-        """Process pre-created batches (no batch creation step).
-
-        This method processes batches that have already been created and sorted
-        externally. Use this in the pipeline to enable overlapping batch creation
-        for chunk N+1 while chunk N is being embedded.
-
-        Args:
-            batches: Pre-created batches as (sequences, accessions) tuples
-            progress: Optional Progress instance
-            task_id: Optional TaskID for embedding progress
-
-        Yields:
-            EmbeddingBatch for each completed batch. id↔embedding↔sequence
-            relation is preserved within each batch.
+            EmbeddingBatch for each processed batch (order non-deterministic)
 
         Example:
-            # In pipeline: create batches externally
-            batches = embedder.create_length_sorted_batches(sequences, accessions, batch_size)
-            async for batch in embedder.embed_prepared_batches(batches):
-                await db.insert(batch)
+            ```python
+            async def batch_gen():
+                for batch in batches:
+                    yield batch
+
+            async for result in embedder.embed_stream(batch_gen()):
+                process(result)
+            ```
         """
-        if not self._initialized:
-            await self.initialize()
+        num_gpus = len(self.devices)
+        device_idx = 0
 
-        # Enqueue all batches immediately
-        for batch_seqs, batch_accs in batches:
-            await self._batch_queue.put((batch_seqs, batch_accs))
+        # Sliding window: Limit concurrent tasks for backpressure
+        # Strategy: Allow 2 batches per GPU in flight
+        max_concurrent_batches = num_gpus * 2
 
-        # Wait for results - they can arrive in any order
-        collected = 0
-        while collected < len(batches):
-            batch_result = await self._result_queue.get()
-
-            collected += 1
-
-            if progress is not None and task_id is not None:
-                progress.update(task_id, advance=len(batch_result.protein_ids))
-
-            yield batch_result
-
-            self._result_queue.task_done()
-
-    async def _persistent_worker(
-        self,
-        device_idx: int,
-    ) -> None:
-        """Persistent worker that processes batches until shutdown.
-
-        Runs continuously from initialize() until cleanup(). Pulls jobs from
-        batch_queue, processes them, and puts results in result_queue.
-
-        Args:
-            device_idx: Index of GPU device to use
-        """
-        logger.debug(f"Persistent worker {device_idx} starting")
-
+        pending_tasks: set[asyncio.Task] = set()
         batch_count = 0
-        while True:
-            # Get next job from queue
-            job = await self._batch_queue.get()
-            # None sentinel signals shutdown
-            if job is None:
-                self._batch_queue.task_done()
-                # Signal consumer that this worker is shutting down
-                await self._result_queue.put(None)
-                logger.debug(f"Persistent worker {device_idx} shutting down")
-                break
+        results_yielded = 0
 
-            batch_seqs, batch_accs = job
+        logger.info(
+            "Starting embedding stream",
+            extra={
+                "num_gpus": num_gpus,
+                "max_concurrent": max_concurrent_batches,
+            },
+        )
 
-            # Process batch on GPU
-            batch_result = await asyncio.to_thread(
-                self._compute_embeddings,
-                device_idx,
-                batch_seqs,
-                batch_accs,
+        try:
+            async for batch_seqs, batch_accs in batches:
+                batch_count += 1
+
+                # Backpressure: Wait if too many tasks in flight
+                while len(pending_tasks) >= max_concurrent_batches:
+                    logger.debug(
+                        f"Concurrent limit reached "
+                        f"({len(pending_tasks)}/{max_concurrent_batches}), "
+                        f"waiting for completion"
+                    )
+                    # Yield one completed result
+                    done, pending_tasks = await asyncio.wait(
+                        pending_tasks, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in done:
+                        result = task.result()
+                        results_yielded += 1
+                        logger.debug(
+                            f"Yielding result {results_yielded}/{batch_count}",
+                            extra={"num_proteins": len(result.protein_ids)},
+                        )
+                        yield result
+
+                # Create task for this batch (round-robin GPU assignment)
+                logger.debug(
+                    f"Creating task for batch {batch_count}",
+                    extra={"device_idx": device_idx, "batch_size": len(batch_seqs)},
+                )
+
+                # Define async function that acquires lock before processing
+                async def process_with_lock(
+                    gpu_idx: int, seqs: list[str], accs: list[str]
+                ) -> EmbeddingBatch:
+                    """Process batch with per-GPU lock for thread safety."""
+                    async with self._device_locks[gpu_idx]:
+                        # Only one batch processes on this GPU at a time
+                        return await asyncio.to_thread(
+                            self._compute_embeddings,
+                            gpu_idx,
+                            seqs,
+                            accs,
+                        )
+
+                task = asyncio.create_task(process_with_lock(device_idx, batch_seqs, batch_accs))
+                pending_tasks.add(task)
+                device_idx = (device_idx + 1) % num_gpus
+
+            # Yield remaining results
+            logger.debug(f"All batches enqueued, waiting for {len(pending_tasks)} pending tasks")
+            while pending_tasks:
+                done, pending_tasks = await asyncio.wait(
+                    pending_tasks, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    result = task.result()
+                    results_yielded += 1
+                    logger.debug(
+                        f"Yielding result {results_yielded}/{batch_count}",
+                        extra={"num_proteins": len(result.protein_ids)},
+                    )
+                    yield result
+
+        except Exception as e:
+            logger.error(f"Error in embed_stream: {e}", exc_info=True)
+            # Cancel pending tasks on error
+            for task in pending_tasks:
+                task.cancel()
+            raise
+        finally:
+            logger.info(
+                "Embedding stream complete",
+                extra={
+                    "batches_processed": batch_count,
+                    "results_yielded": results_yielded,
+                },
             )
-
-            # Put result in result queue
-            await self._result_queue.put(batch_result)
-            batch_count += 1
-            self._batch_queue.task_done()
-
-        logger.debug(f"Persistent worker {device_idx} finished ({batch_count} batches)")
 
     def _compute_embeddings(
         self,
@@ -661,6 +594,7 @@ class ESM2Embedder:
             # delete tensors
             del inputs, outputs, hidden_states, pooled_tensors
 
+        logger.debug(f"Computed embeddings for {len(result.protein_ids)} protein IDs")
         return result
 
     async def __aenter__(self) -> "ESM2Embedder":

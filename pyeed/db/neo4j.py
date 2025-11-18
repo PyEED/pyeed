@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from typing import Any
 
 import dotenv
 from neo4j import AsyncGraphDatabase, GraphDatabase
+from pandas.core.common import defaultdict
 
-from ..model.pyeedbase import LabelProperty, PyeedBase
-from ..model.utils import collect_schema
+from ..ingest.model.pyeedbase import PyeedBase
+from ..ingest.model.utils import collect_schema
 
 logger = logging.getLogger(__name__)
 
 
-class Database:
+class GraphDB:
     def __init__(
         self,
         uri: str | None = None,
@@ -29,6 +30,7 @@ class Database:
             raise ValueError(
                 "URI, user, and password must be provided or set in env (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)"
             )
+        self.uri = uri
         self.async_driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -99,39 +101,6 @@ class Database:
                 )
                 logger.debug("Schema: %s", q)
                 await session.run(q)
-
-    # async def _ensure_vector_index(
-    #     self,
-    #     session: AsyncSession,
-    #     prop: str,
-    #     dims: int,
-    #     sim: str = "cosine",
-    # ) -> None:
-    #     """
-    #     Ensure a vector index exists on Embedding.`prop`.
-
-    #     Notes:
-    #         - Neo4j does NOT allow parameterizing index names or property identifiers.
-    #         - We inline both and only parameterize values (dims, sim).
-    #     """
-    #     logger.info(f"Setting up vector index for {prop} with dimensions {dims}...")
-    #     if prop in self._vec_index_cache:
-    #         return
-
-    #     # sanitize for safety
-    #     safe_prop = prop.replace("`", "``")  # escape backticks in property
-    #     # keep index name simple (letters, digits, underscores)
-    #     idx_name = f"vx_Embedding__{prop}"
-    #     idx_name = re.sub(r"[^A-Za-z0-9_]", "_", idx_name)
-
-    #     q = (
-    #         f"CREATE VECTOR INDEX {idx_name} IF NOT EXISTS "
-    #         f"FOR (n:Embedding) ON (n.`{safe_prop}`) "
-    #         "OPTIONS {indexConfig: { `vector.dimensions`: $dim, "
-    #         "`vector.similarity_function`: $sim }}"
-    #     )
-    #     await session.run(q, dim=dims, sim=sim)
-    #     self._vec_index_cache.add(prop)
 
     async def bulk_upsert(
         self,
@@ -212,119 +181,57 @@ class Database:
                     """
                     await session.run(q, rows=chunk)
 
-    async def save(self, node: PyeedBase) -> None:
-        """
-        Insert or update a single root node and its entire subtree.
-
-        Args:
-            node: A BaseNode instance (e.g. Protein) with nested child nodes.
-        """
-        logger.info(f"Upserting node {node.__class__.__name__}...")
-        nodes, edges = node.graphify()
-        print(nodes, edges)
-        await self.bulk_upsert(nodes, edges)
-
-    async def save_many(
+    async def upsert_nodes(
         self,
-        roots: Iterable[PyeedBase],
+        nodes: list[PyeedBase],
         tx_size: int = 5000,
-    ) -> None:
-        """
-        Insert or update multiple root nodes and their subtrees in one call.
+    ) -> defaultdict[str, set[str]]:
+        """Upsert PyeedBase nodes without edges.
+
+        Groups nodes by label, uses MERGE on unique field with SET for all properties.
 
         Args:
-            roots: Iterable of PyeedBase instances to upsert.
-            tx_size: Maximum number of rows per transaction batch.
-        """
-        logger.info("Upserting nodes...")
-        all_nodes: list[dict[str, Any]] = []
-        all_edges: list[dict[str, Any]] = []
-        for r in roots:
-            n, e = r.graphify()
-            all_nodes.extend(n)
-            all_edges.extend(e)
-        await self.bulk_upsert(all_nodes, all_edges, tx_size=tx_size)
-
-    async def attach(
-        self,
-        parent: type[PyeedBase],
-        parents_to_children: dict[str | int, list[PyeedBase]],
-        tx_size: int = 5000,
-    ) -> None:
-        """
-        Attach child nodes to existing parents using the child's EDGES mapping.
-
-        Args:
-            parent: Parent node class (e.g., Protein).
-            parents_to_children: Mapping of parent unique values to lists of children.
-                Example: { "P01234": [Embedding(...), Annotation(...)] }
-            tx_size: Maximum number of rows per transaction batch.
-
-        Raises:
-            ValueError: If a child node has no applicable EDGES rule for this parent,
-                        or multiple ambiguous rules exist.
-
-        Notes:
-            - Each child is inserted along with its own subtree.
-            - The relationship type is resolved from child_cls.EDGES via
-              child_cls.resolve_edge(parent_label=<parent>, field_name=None).
-              This requires a single unambiguous rule for this parent.
-            - The parent unique field is resolved automatically from LabelProperty(unique=True).
-        """
-        logger.info(
-            "Attaching children to %s: %d parents",
-            parent.__name__,
-            len(parents_to_children),
-        )
-        plabel = parent.__name__
-        pkey = self._unique_key_of(parent)
-
-        all_nodes: list[dict[str, Any]] = []
-        all_edges: list[dict[str, Any]] = []
-
-        for pval, children in parents_to_children.items():
-            for child in children:
-                child_cls = type(child)
-                # resolve rel type from child's EDGES; field_name=None for attach()
-                rel_type = child_cls.resolve_edge(parent_label=plabel, field_name=None)
-
-                # child's own subtree
-                cnodes, cedges = child.graphify()
-                all_nodes.extend(cnodes)
-                all_edges.extend(cedges)
-
-                # explicit parent -> child edge
-                ckey = child.get_unique_model_field()
-                cval = getattr(child, ckey)
-                all_edges.append(
-                    {
-                        "type": rel_type,
-                        "src": (plabel, pkey, pval),
-                        "dst": (child_cls.__name__, ckey, cval),
-                    }
-                )
-
-        await self.bulk_upsert(all_nodes, all_edges, tx_size=tx_size)
-
-    # Helpers
-    @staticmethod
-    def _unique_key_of(model_cls: type[PyeedBase]) -> str:
-        """
-        Get the unique key field of a model class.
-
-        Args:
-            model_cls: A PyeedBase subclass.
+            nodes: Pre-batched list of PyeedBase instances
+            tx_size: Max rows per Neo4j UNWIND transaction
 
         Returns:
-            The name of the field marked with `NodeHint(unique=True)`.
-
-        Raises:
-            ValueError: If the model class has no unique field.
+            List of (label, unique_id) for each processed node
         """
-        logger.debug(f"Finding unique key for {model_cls.__name__}...")
-        for fname, finfo in model_cls.model_fields.items():
-            meta = getattr(finfo, "metadata", []) or ()
-            for m in meta:
-                if isinstance(m, LabelProperty) and m.unique:
-                    return str(fname)
-        raise ValueError(f"No unique field declared for {model_cls.__name__}")
+
+        tracking: defaultdict[str, set[str]] = defaultdict(set)
+
+        if not nodes:
+            return tracking
+
+        # Group by label (class name)
+        by_label: dict[str, list[PyeedBase]] = {}
+        for node in nodes:
+            label = type(node).__name__
+            by_label.setdefault(label, []).append(node)
+
+        async with self.async_driver.session() as session:
+            for label, node_list in by_label.items():
+                # Get unique field from first node
+                unique_field = node_list[0].get_unique_model_field()
+
+                # Build rows for UNWIND
+                rows = []
+                for node in node_list:
+                    unique_value = str(getattr(node, unique_field))
+                    props = node.to_dict()
+                    rows.append({"key": unique_value, "props": props})
+
+                # Batch by tx_size
+                for i in range(0, len(rows), tx_size):
+                    chunk = rows[i : i + tx_size]
+                    query = f"""
+                    UNWIND $rows AS r
+                    MERGE (n:`{label}` {{ `{unique_field}`: r.key }})
+                    SET n += r.props
+                    """
+                    await session.run(query, rows=chunk)
+
+                    # simulate longer processing time to test queue backpressure
+                    tracking[label].update(set(r["key"] for r in chunk))
+
+        return tracking
