@@ -47,6 +47,7 @@ class ESM2Embedder:
         normalize: bool = True,
         max_length: int = 1024,
         n_gpus: int = -1,
+        huggingface_token: str | None = None,
     ):
         """
         Initialize ESM2 embedder.
@@ -59,6 +60,7 @@ class ESM2Embedder:
             normalize: L2-normalize embeddings
             max_length: Maximum sequence length
             n_gpus: Number of GPUs to use (-1 for all available)
+            huggingface_token: HuggingFace API token (optional, for gated models)
         """
         self.model_name = model_name
         self.normalize = normalize
@@ -70,14 +72,13 @@ class ESM2Embedder:
         self._tf_model_dtype = TF_DTYPE_MAP[model_dtype]
         self._tf_return_dtype = TF_DTYPE_MAP[return_dtype]
         self._np_return_dtype = NP_DTYPE_MAP[return_dtype]
-
+        self.huggingface_token = huggingface_token or _login_hf()
         # Normalize pooling_methods into a list of (name, function) tuples
         self.pooling_configs = self._normalize_pooling_methods(pooling_methods)
 
         self.models: list[EsmModel | None] = []
         self.tokenizer: EsmTokenizer | None = None  # Single tokenizer on CPU
         self.devices: list[torch.device] = []
-        self.token: str | None = None
         self.device_ids: list[int] = []
         self._device_locks: list[asyncio.Lock] | None = None
 
@@ -115,8 +116,6 @@ class ESM2Embedder:
         if self._initialized:
             logger.debug("ESM2 embedder already initialized")
             return
-
-        self.token = _login_hf()
 
         if self.n_gpus == -1:
             self.devices = self._detect_devices()
@@ -168,7 +167,7 @@ class ESM2Embedder:
         with silence_transformers_init_only():
             tokenizer = EsmTokenizer.from_pretrained(
                 self.model_name,
-                token=self.token,
+                token=self.huggingface_token,
             )
         logger.info("ESM2 tokenizer loaded on CPU")
         return tokenizer
@@ -185,7 +184,7 @@ class ESM2Embedder:
             with silence_transformers_init_only():
                 model = EsmModel.from_pretrained(
                     self.model_name,
-                    token=self.token,
+                    token=self.huggingface_token,
                     torch_dtype=self._tf_model_dtype,
                 )
 
