@@ -127,7 +127,7 @@ class VectorDB:
         self,
         collection_name: str,
         batch: EmbeddingBatch,
-        include_sequence: bool = True,
+        include_sequence: bool,
     ) -> None:
         """Initialize collection schema from first EmbeddingBatch.
 
@@ -139,13 +139,11 @@ class VectorDB:
             batch: First EmbeddingBatch to use for schema inference.
             include_sequence: Whether to include sequence field in schema.
         """
-        if collection_name in self._initialized_collections:
-            return
-
         # Check if collection already exists
-        if collection_name in self.client.list_collections():
-            self._initialized_collections.add(collection_name)
-            logger.info(f"Collection '{collection_name}' already exists, skipping initialization")
+        if collection_name in self._initialized_collections:
+            logger.warning(
+                f"Collection '{collection_name}' already initialized. Skipping initialization"
+            )
             return
 
         if not batch.embeddings:
@@ -183,11 +181,12 @@ class VectorDB:
         if not vec_field_names:
             raise ValueError("Cannot initialize collection: no valid embeddings found in batch")
 
-        logger.info(
-            f"Initializing collection '{collection_name}' with {len(vec_field_names)} vector fields"
+        logger.debug(
+            f"Initializing collection '{collection_name}' with fields: {vec_field_names}, "
+            f"dtypes: {vec_field_dtypes}, dimensions: {vec_dims}"
         )
 
-        # Create collection (blocking operation)
+        # Create collection
         self.create_collection(
             collection_name=collection_name,
             vec_field_names=vec_field_names,
@@ -208,11 +207,11 @@ class VectorDB:
         self,
         collection_name: str,
         batch: EmbeddingBatch,
-        include_sequence: bool = True,
+        include_sequence: bool,
     ) -> int:
         """Insert EmbeddingBatch into Milvus collection asynchronously.
 
-        Automatically initializes collection if it doesn't exist (blocking operation).
+        Automatically initializes collection if it doesn't exist.
         Converts EmbeddingBatch to Milvus format and inserts using async client.
 
         Args:
