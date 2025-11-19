@@ -34,9 +34,16 @@ class GraphDB:
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     async def close(self) -> None:
+        """
+        Close the database connection.
+        """
         await self.async_driver.close()
 
     def verify_connection(self) -> None:
+        """
+        Verify the database connection.
+        Prints "ok" if the connection is successful.
+        """
         with self.driver.session() as session:
             result = session.run("RETURN 1 AS ok")
             record = result.single()
@@ -49,12 +56,29 @@ class GraphDB:
         query: str,
         **params: Any,
     ) -> list[dict[str, Any]]:
+        """
+        Query the database.
+
+        Args:
+            query: The query to execute.
+            params: The parameters to pass to the query.
+
+        Returns:
+            The results of the query.
+        """
         with self.driver.session() as session:
             return session.run(query, **params).data()
 
     async def async_query_iter(self, query: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
         """
         Iterate over the results of a query.
+
+        Args:
+            query: The query to execute.
+            params: The parameters to pass to the query.
+
+        Returns:
+            An iterator over the results of the query.
         """
         async with self.async_driver.session() as session:
             result = await session.run(query, **params)
@@ -64,6 +88,14 @@ class GraphDB:
     async def async_value_iter(self, query: str, key: str, **params: Any) -> AsyncIterator[Any]:
         """
         Iterate over the values of a key from the results of a query.
+
+        Args:
+            query: The query to execute.
+            key: The key to iterate over.
+            params: The parameters to pass to the query.
+
+        Returns:
+            An iterator over the values of the key.
         """
         async with self.async_driver.session() as session:
             result = await session.run(query, **params)
@@ -100,85 +132,6 @@ class GraphDB:
                 )
                 logger.debug("Schema: %s", q)
                 await session.run(q)
-
-    async def bulk_upsert(
-        self,
-        nodes: list[dict[str, Any]],
-        edges: list[dict[str, Any]],
-        tx_size: int = 5000,
-    ) -> None:
-        """
-        Insert or update a batch of nodes and relationships.
-
-        Args:
-            nodes: List of node dicts, each with keys:
-                - "label": Node label (str).
-                - "key": (unique_field, unique_value).
-                - "props": Dict of node properties.
-            edges: List of edge dicts, each with keys:
-                - "type": Relationship type (str).
-                - "src": (label, key_field, key_value) of source node.
-                - "dst": (label, key_field, key_value) of target node.
-            tx_size: Maximum number of rows per transaction batch.
-
-        Notes:
-            - Nodes are grouped by label and upserted with MERGE.
-            - Relationships are grouped by type and endpoints and merged.
-            - Vector indexes for embeddings are created automatically if needed.
-        """
-        logger.info(f"Bulk upserting {len(nodes)} nodes and {len(edges)} edges...")
-        async with self.async_driver.session() as session:
-            # 0) Prepare vector indexes (Embedding vec__* props)
-            vec_props: dict[str, int] = {}
-            for n in nodes:
-                if n.get("label") != "Embedding":
-                    continue
-                props = n.get("props", {})
-                dims = props.get("n_dims")
-                if isinstance(dims, int):
-                    for k in props:
-                        if k.startswith("vec__"):
-                            vec_props[k] = dims
-            for prop, dim in vec_props.items():
-                await self._ensure_vector_index(session, prop, dim)
-
-            # Nodes by label
-            buckets: dict[str, tuple[str, list[dict[str, Any]]]] = {}
-            for n in nodes:
-                lbl = n["label"]
-                key_name, key_val = n["key"]
-                buckets.setdefault(lbl, (key_name, []))[1].append(
-                    {"key": key_val, "props": n["props"]}
-                )
-
-            for lbl, (kname, rows) in buckets.items():
-                for i in range(0, len(rows), tx_size):
-                    chunk = rows[i : i + tx_size]
-                    q = f"""
-                    UNWIND $rows AS r
-                    MERGE (n:`{lbl}` {{ `{kname}`: r.key }})
-                    SET n += r.props
-                    """
-                    await session.run(q, rows=chunk)
-
-            # 2) Relationships grouped by (etype, sl, sk, dl, dk)
-            groups: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = {}
-            for e in edges:
-                sl, sk, sv = e["src"]
-                dl, dk, dv = e["dst"]
-                key = (e["type"], sl, sk, dl, dk)
-                groups.setdefault(key, []).append({"sv": sv, "dv": dv})
-
-            for (etype, sl, sk, dl, dk), rows in groups.items():
-                for i in range(0, len(rows), tx_size):
-                    chunk = rows[i : i + tx_size]
-                    q = f"""
-                    UNWIND $rows AS r
-                    MATCH (s:`{sl}` {{ `{sk}`: r.sv }})
-                    MATCH (d:`{dl}` {{ `{dk}`: r.dv }})
-                    MERGE (s)-[:`{etype}`]->(d)
-                    """
-                    await session.run(q, rows=chunk)
 
     async def upsert_nodes(
         self,
