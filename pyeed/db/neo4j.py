@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import logging
 import os
 from collections.abc import AsyncIterator
 from typing import Any
 
 import dotenv
+from loguru import logger
 from neo4j import AsyncGraphDatabase, GraphDatabase
 from pandas.core.common import defaultdict
 
 from ..ingest.model.pyeedbase import PyeedBase
 from ..ingest.model.utils import collect_schema
-
-logger = logging.getLogger(__name__)
 
 
 class GraphDB:
@@ -28,7 +26,8 @@ class GraphDB:
         password = password or os.getenv("NEO4J_PASSWORD")
         if not (uri and user and password):
             raise ValueError(
-                "URI, user, and password must be provided or set in env (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)"
+                "URI, user, and password must be provided or set in env "
+                f"(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD): {uri}, {user}, {password}"
             )
         self.uri = uri
         self.async_driver = AsyncGraphDatabase.driver(uri, auth=(user, password))

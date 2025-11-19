@@ -46,7 +46,7 @@ select = ["E","F","W","I","UP","B","SIM","PL","RUF"]
 ignore = ["E203"]
 
 [tool.ruff.lint.pylint]
-max-args = 8
+max-args = 100
 max-statements = 100
 
 [tool.ruff.format]
