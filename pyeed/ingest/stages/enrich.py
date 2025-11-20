@@ -167,6 +167,143 @@ class TaxonomyEnrichmentStage:
             f"Taxonomy enrichment complete: {enriched_count} enriched, {failed_count} failed"
         )
 
+    async def _process_taxonomy(
+        self,
+        session: Any,
+        taxonomy_response: dict[str, Any],
+        protein_taxon_map: dict[str, list[str]],
+    ) -> None:
+        """Process a single taxonomy response: upsert, link, cleanup.
+
+        Args:
+            session: Neo4j async session
+            taxonomy_response: Taxonomy API response
+            protein_taxon_map: Mapping of taxon_id → [protein_ids]
+        """
+        # Extract hierarchy info
+        hierarchy_info = self.adapter.extract_hierarchy_info(taxonomy_response)
+        main_taxon_id = hierarchy_info["main_id"]
+
+        if main_taxon_id is None:
+            logger.warning("Taxonomy response has no main taxon ID, skipping")
+            return
+
+        # Get proteins that need this taxon
+        protein_ids = protein_taxon_map.get(str(main_taxon_id), [])
+        if not protein_ids:
+            logger.debug(f"No proteins waiting for taxon {main_taxon_id}, skipping")
+            return
+
+        # Parse into Taxon objects
+        taxon_nodes = self.adapter.map(taxonomy_response)
+        if not taxon_nodes:
+            logger.warning(f"Failed to parse taxonomy {main_taxon_id}, skipping")
+            return
+
+        logger.debug(
+            f"Processing taxon {main_taxon_id} with {len(taxon_nodes)} "
+            f"nodes for {len(protein_ids)} proteins"
+        )
+
+        # Step 1: Upsert all Taxon nodes
+        await _upsert_nodes_with_session(session, taxon_nodes)
+
+        # Step 2: Create IS_A hierarchy
+        await create_taxonomy_hierarchy(
+            session=session,
+            main_taxon_id=hierarchy_info["main_id"],
+            parent_taxon_id=hierarchy_info["parent_id"],
+            lineage_ids=hierarchy_info["lineage_ids"],
+        )
+
+        # Step 3: Create ORIGINATES_FROM relationships (Protein → main taxon)
+        await create_relationships_batch(
+            session=session,
+            source_label="Protein",
+            source_field="id",
+            source_values=protein_ids,
+            target_label="Taxon",
+            target_field="id",
+            target_values=[main_taxon_id] * len(protein_ids),
+            relationship_type="ORIGINATES_FROM",
+            direction_to_source=True,  # Protein -> Taxon
+        )
+
+        # Step 4: Remove taxon_id from protein.taxon_ids
+        values_to_remove = {pid: [str(main_taxon_id)] for pid in protein_ids}
+        await remove_list_property_values(
+            session=session,
+            label="Protein",
+            unique_field="id",
+            unique_values=protein_ids,
+            list_property="taxon_ids",
+            values_to_remove=values_to_remove,
+        )
+
+        logger.debug(f"Enriched {len(protein_ids)} proteins with taxon {main_taxon_id}")
+
+    async def _get_existing_taxon_ids(self, session: Any, taxon_ids: list[str]) -> set[str]:
+        """Check which taxon IDs already exist in database.
+
+        Args:
+            session: Neo4j async session
+            taxon_ids: List of taxon IDs (as strings) to check
+
+        Returns:
+            Set of taxon IDs (as strings) that exist in database
+        """
+        if not taxon_ids:
+            return set()
+
+        query = """
+        MATCH (t:Taxon)
+        WHERE t.id IN $taxon_ids
+        RETURN t.id AS taxon_id
+        """
+        result = await session.run(query, taxon_ids=taxon_ids)
+        existing = {str(record["taxon_id"]) async for record in result}
+        return existing
+
+    async def _link_existing_taxon(
+        self, session: Any, taxon_id: str, protein_taxon_map: dict[str, list[str]]
+    ) -> None:
+        """Link proteins to existing taxon without fetching from API.
+
+        Args:
+            session: Neo4j async session
+            taxon_id: Taxon ID (as string)
+            protein_taxon_map: Mapping of taxon_id → [protein_ids]
+        """
+        protein_ids = protein_taxon_map.get(taxon_id, [])
+        if not protein_ids:
+            return
+
+        # Create ORIGINATES_FROM relationships
+        await create_relationships_batch(
+            session=session,
+            source_label="Protein",
+            source_field="id",
+            source_values=protein_ids,
+            target_label="Taxon",
+            target_field="id",
+            target_values=[taxon_id] * len(protein_ids),
+            relationship_type="ORIGINATES_FROM",
+            direction_to_source=True,
+        )
+
+        # Remove taxon_id from protein.taxon_ids
+        values_to_remove = {pid: [taxon_id] for pid in protein_ids}
+        await remove_list_property_values(
+            session=session,
+            label="Protein",
+            unique_field="id",
+            unique_values=protein_ids,
+            list_property="taxon_ids",
+            values_to_remove=values_to_remove,
+        )
+
+        logger.debug(f"Linked {len(protein_ids)} proteins to existing taxon {taxon_id}")
+
 
 class ReactionEnrichmentStage:
     """Enriches Protein nodes with reaction and molecule information.
@@ -474,140 +611,3 @@ class ReactionEnrichmentStage:
             list_property="reaction_ids",
             values_to_remove=removal_map,
         )
-
-    async def _process_taxonomy(
-        self,
-        session: Any,
-        taxonomy_response: dict[str, Any],
-        protein_taxon_map: dict[str, list[str]],
-    ) -> None:
-        """Process a single taxonomy response: upsert, link, cleanup.
-
-        Args:
-            session: Neo4j async session
-            taxonomy_response: Taxonomy API response
-            protein_taxon_map: Mapping of taxon_id → [protein_ids]
-        """
-        # Extract hierarchy info
-        hierarchy_info = self.adapter.extract_hierarchy_info(taxonomy_response)
-        main_taxon_id = hierarchy_info["main_id"]
-
-        if main_taxon_id is None:
-            logger.warning("Taxonomy response has no main taxon ID, skipping")
-            return
-
-        # Get proteins that need this taxon
-        protein_ids = protein_taxon_map.get(str(main_taxon_id), [])
-        if not protein_ids:
-            logger.debug(f"No proteins waiting for taxon {main_taxon_id}, skipping")
-            return
-
-        # Parse into Taxon objects
-        taxon_nodes = self.adapter.map(taxonomy_response)
-        if not taxon_nodes:
-            logger.warning(f"Failed to parse taxonomy {main_taxon_id}, skipping")
-            return
-
-        logger.debug(
-            f"Processing taxon {main_taxon_id} with {len(taxon_nodes)} "
-            f"nodes for {len(protein_ids)} proteins"
-        )
-
-        # Step 1: Upsert all Taxon nodes
-        await _upsert_nodes_with_session(session, taxon_nodes)
-
-        # Step 2: Create IS_A hierarchy
-        await create_taxonomy_hierarchy(
-            session=session,
-            main_taxon_id=hierarchy_info["main_id"],
-            parent_taxon_id=hierarchy_info["parent_id"],
-            lineage_ids=hierarchy_info["lineage_ids"],
-        )
-
-        # Step 3: Create ORIGINATES_FROM relationships (Protein → main taxon)
-        await create_relationships_batch(
-            session=session,
-            source_label="Protein",
-            source_field="id",
-            source_values=protein_ids,
-            target_label="Taxon",
-            target_field="id",
-            target_values=[main_taxon_id] * len(protein_ids),
-            relationship_type="ORIGINATES_FROM",
-            direction_to_source=True,  # Protein -> Taxon
-        )
-
-        # Step 4: Remove taxon_id from protein.taxon_ids
-        values_to_remove = {pid: [str(main_taxon_id)] for pid in protein_ids}
-        await remove_list_property_values(
-            session=session,
-            label="Protein",
-            unique_field="id",
-            unique_values=protein_ids,
-            list_property="taxon_ids",
-            values_to_remove=values_to_remove,
-        )
-
-        logger.debug(f"Enriched {len(protein_ids)} proteins with taxon {main_taxon_id}")
-
-    async def _get_existing_taxon_ids(self, session: Any, taxon_ids: list[str]) -> set[str]:
-        """Check which taxon IDs already exist in database.
-
-        Args:
-            session: Neo4j async session
-            taxon_ids: List of taxon IDs (as strings) to check
-
-        Returns:
-            Set of taxon IDs (as strings) that exist in database
-        """
-        if not taxon_ids:
-            return set()
-
-        query = """
-        MATCH (t:Taxon)
-        WHERE t.id IN $taxon_ids
-        RETURN t.id AS taxon_id
-        """
-        result = await session.run(query, taxon_ids=taxon_ids)
-        existing = {str(record["taxon_id"]) async for record in result}
-        return existing
-
-    async def _link_existing_taxon(
-        self, session: Any, taxon_id: str, protein_taxon_map: dict[str, list[str]]
-    ) -> None:
-        """Link proteins to existing taxon without fetching from API.
-
-        Args:
-            session: Neo4j async session
-            taxon_id: Taxon ID (as string)
-            protein_taxon_map: Mapping of taxon_id → [protein_ids]
-        """
-        protein_ids = protein_taxon_map.get(taxon_id, [])
-        if not protein_ids:
-            return
-
-        # Create ORIGINATES_FROM relationships
-        await create_relationships_batch(
-            session=session,
-            source_label="Protein",
-            source_field="id",
-            source_values=protein_ids,
-            target_label="Taxon",
-            target_field="id",
-            target_values=[taxon_id] * len(protein_ids),
-            relationship_type="ORIGINATES_FROM",
-            direction_to_source=True,
-        )
-
-        # Remove taxon_id from protein.taxon_ids
-        values_to_remove = {pid: [taxon_id] for pid in protein_ids}
-        await remove_list_property_values(
-            session=session,
-            label="Protein",
-            unique_field="id",
-            unique_values=protein_ids,
-            list_property="taxon_ids",
-            values_to_remove=values_to_remove,
-        )
-
-        logger.debug(f"Linked {len(protein_ids)} proteins to existing taxon {taxon_id}")

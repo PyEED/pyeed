@@ -46,7 +46,8 @@ async def _read_sequence_async(
     start_offset: int,
     end_offset: int,
     header_extractor: Callable[[str], str] | None = None,
-) -> tuple[str, str]:
+    taxon_extractor: Callable[[str], str] | None = None,
+) -> tuple[str, str, str | None]:
     """Read a single FASTA entry from memory-mapped file.
 
     Args:
@@ -55,9 +56,11 @@ async def _read_sequence_async(
         end_offset: Byte position where sequence ends
         header_extractor: Optional function to extract protein_id from header
                          Signature: (header: str) -> str
+        taxon_extractor: Optional function to extract taxon_id from header
+                         Signature: (header: str) -> str
 
     Returns:
-        Tuple of (protein_id, sequence)
+        Tuple of (protein_id, sequence, taxon_id)
     """
     # Validate header
     if mm[start_offset] != ord(b">"):
@@ -86,10 +89,11 @@ async def _read_sequence_async(
     # Decode header
     header_str = header_bytes.decode("ascii", errors="ignore")
 
-    # Extract protein_id
+    # Extract protein_id and taxon_id
     protein_id = header_extractor(header_str) if header_extractor else header_str
+    taxon_id = taxon_extractor(header_str) if taxon_extractor else None
 
-    return (protein_id, sequence_bytes.decode("ascii", errors="ignore"))
+    return (protein_id, sequence_bytes.decode("ascii", errors="ignore"), taxon_id)
 
 
 async def _read_batch_async(
@@ -99,7 +103,8 @@ async def _read_batch_async(
     start_idx: int,
     batch_size: int,
     header_extractor: Callable[[str], str] | None,
-) -> tuple[dict[str, str], int]:
+    taxon_extractor: Callable[[str], str] | None,
+) -> tuple[list[tuple[str, str, str | None]], int]:
     """Read a single batch of sequences starting at start_idx.
 
     Args:
@@ -110,22 +115,29 @@ async def _read_batch_async(
         batch_size: Number of sequences per batch
         header_extractor: Optional function to extract protein_id from header
                          Signature: (header: str) -> str
+        taxon_extractor: Optional function to extract taxon_id from header
+                         Signature: (header: str) -> str
 
     Returns:
-        Tuple of (batch_dict, next_idx)
+        Tuple of (batch_list, next_idx) where batch_list contains
+        (protein_id, sequence, taxon_id) tuples
     """
     n = len(offsets)
     if start_idx >= n:
-        return {}, start_idx
+        return [], start_idx
 
-    batch: dict[str, str] = {}
+    batch: list[tuple[str, str, str | None]] = []
     i = start_idx
 
     while i < n and len(batch) < batch_size:
-        protein_id, sequence = await _read_sequence_async(
-            mm, offsets[i], end_offsets[i], header_extractor=header_extractor
+        protein_id, sequence, taxon_id = await _read_sequence_async(
+            mm,
+            offsets[i],
+            end_offsets[i],
+            header_extractor=header_extractor,
+            taxon_extractor=taxon_extractor,
         )
-        batch[protein_id] = sequence
+        batch.append((protein_id, sequence, taxon_id))
         i += 1
 
     return batch, i
@@ -137,8 +149,9 @@ async def _iterate_batches_async(
     end_offsets: list[int],
     batch_size: int,
     header_extractor: Callable[[str], str] | None,
+    taxon_extractor: Callable[[str], str] | None,
     progress_report: ProgressReporter | None,
-) -> AsyncIterator[dict[str, str]]:
+) -> AsyncIterator[list[tuple[str, str, str | None]]]:
     """Internal implementation: iterate over FASTA in batches.
 
     This keeps the file open for the entire iteration, avoiding
@@ -151,19 +164,15 @@ async def _iterate_batches_async(
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         try:
             while idx < n:
-                # read a batch synchronously inside a thread to avoid blocking loop
-                def read_batch_sync(start: int) -> tuple[dict[str, str], int]:
-                    batch: dict[str, str] = {}
-                    i = start
-                    while i < n and len(batch) < batch_size:
-                        pid, seq = _read_sequence_from_offset_mmap(
-                            mm, offsets[i], end_offsets[i], header_extractor
-                        )
-                        batch[pid] = seq
-                        i += 1
-                    return batch, i
-
-                batch, next_idx = await asyncio.to_thread(read_batch_sync, idx)
+                batch, next_idx = await _read_batch_async(
+                    mm,
+                    offsets,
+                    end_offsets,
+                    idx,
+                    batch_size,
+                    header_extractor,
+                    taxon_extractor,
+                )
                 if not batch:
                     break
 
@@ -175,45 +184,14 @@ async def _iterate_batches_async(
             mm.close()
 
 
-def _read_sequence_from_offset_mmap(
-    mm: mmap.mmap,
-    start_offset: int,
-    end_offset: int,
-    header_extractor: Callable[[str], str] | None = None,
-) -> tuple[str, str]:
-    """Synchronous version for use in thread pool."""
-    if mm[start_offset] != ord(b">"):
-        header_preview = mm[start_offset : start_offset + 50]
-        raise ValueError(
-            f"Expected FASTA header at byte offset {start_offset}, found: {header_preview}"
-        )
-
-    header_end = mm.find(b"\n", start_offset)
-    if header_end == -1 or header_end >= end_offset:
-        header_end = end_offset
-
-    header_bytes = mm[start_offset + 1 : header_end]
-
-    seq_start = header_end + 1
-    if seq_start >= end_offset:
-        sequence_bytes = b""
-    else:
-        sequence_bytes = mm[seq_start:end_offset]
-        sequence_bytes = sequence_bytes.replace(b"\n", b"").replace(b"\r", b"")
-
-    header_str = header_bytes.decode("ascii", errors="ignore")
-
-    protein_id = header_extractor(header_str) if header_extractor else header_str
-    return (protein_id, sequence_bytes.decode("ascii", errors="ignore"))
-
-
 async def read_fasta_chunks_async(
     path: str,
     chunk_size: int,
     header_extractor: Callable[[str], str] | None = None,
+    taxon_extractor: Callable[[str], str] | None = None,
     offsets: list[int] | None = None,
     progress_report: ProgressReporter | None = None,
-) -> AsyncIterator[dict[str, str]]:
+) -> AsyncIterator[list[tuple[str, str, str | None]]]:
     """Read FASTA file in chunks asynchronously.
 
     This is the main async entry point.
@@ -224,22 +202,25 @@ async def read_fasta_chunks_async(
         header_extractor: Optional function to extract protein_id from header
                          Signature: (header: str) -> str
                          If None, uses entire header as protein_id
+        taxon_extractor: Optional function to extract taxon_id from header
+                         Signature: (header: str) -> str
+                         If None, taxon_id will be None
         offsets: Pre-computed header offsets (optional)
         progress_report: Progress reporter to use
 
     Yields:
-        Dicts mapping protein_id to sequence
+        Lists of tuples (protein_id, sequence, taxon_id)
 
     Example:
         >>> def extract_uniprot_id(header: str) -> str:
-        ...     return header.split()[0]
+        ...     return header.split("|")[1]
         >>> async for chunk in read_fasta_chunks_async(
         ...     "proteins.fasta",
         ...     chunk_size=1000,
         ...     header_extractor=extract_uniprot_id
         ... ):
-        ...     for protein_id, sequence in chunk.items():
-        ...         print(f"{protein_id}: {len(sequence)} aa")
+        ...     for protein_id, sequence, taxon_id in chunk:
+        ...         print(f"{protein_id}: {len(sequence)} aa, taxon: {taxon_id}")
     """
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
@@ -250,18 +231,19 @@ async def read_fasta_chunks_async(
     file_size = await asyncio.to_thread(os.path.getsize, path)
     end_offsets = [*offsets[1:], file_size]
 
-    async for chunk in _iterate_batches_async(
-        path, offsets, end_offsets, chunk_size, header_extractor, progress_report
+    async for batch in _iterate_batches_async(
+        path, offsets, end_offsets, chunk_size, header_extractor, taxon_extractor, progress_report
     ):
-        yield chunk
+        yield batch
 
 
 def read_fasta_chunks(
     path: str,
     chunk_size: int = 1000,
     header_extractor: Callable[[str], str] | None = None,
+    taxon_extractor: Callable[[str], str] | None = None,
     progress_report: ProgressReporter | None = None,
-) -> Iterator[dict[str, str]]:
+) -> Iterator[list[tuple[str, str, str | None]]]:
     """Synchronous wrapper for async FASTA reading.
 
     This is the high-level entry point for non-async code.
@@ -271,28 +253,30 @@ def read_fasta_chunks(
         chunk_size: Number of entries per chunk (default: 1000)
         header_extractor: Optional function to extract protein_id from header
                          Signature: (header: str) -> str
+        taxon_extractor: Optional function to extract taxon_id from header
+                         Signature: (header: str) -> str
         progress_report: Progress reporter to use
 
     Yields:
-        Dicts mapping protein_id to sequence
+        Lists of tuples (protein_id, sequence, taxon_id)
 
     Example:
         >>> def extract_uniprot_id(header: str) -> str:
-        ...     return header.split()[0]
+        ...     return header.split("|")[1]
         >>> for chunk in read_fasta_chunks(
         ...     "proteins.fasta",
         ...     chunk_size=1000,
         ...     header_extractor=extract_uniprot_id
         ... ):
-        ...     for protein_id, sequence in chunk.items():
-        ...         print(f"{protein_id}: {len(sequence)} aa")
+        ...     for protein_id, sequence, taxon_id in chunk:
+        ...         print(f"{protein_id}: {len(sequence)} aa, taxon: {taxon_id}")
     """
 
     # Run the async generator in a new event loop
     async def _run():
         chunks = []
         async for chunk in read_fasta_chunks_async(
-            path, chunk_size, header_extractor, None, progress_report
+            path, chunk_size, header_extractor, taxon_extractor, None, progress_report
         ):
             chunks.append(chunk)
         return chunks

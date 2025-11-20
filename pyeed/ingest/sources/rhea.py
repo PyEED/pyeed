@@ -315,14 +315,3 @@ if __name__ == "__main__":
     rhea_client = RheaClient()
     rx = asyncio.run(rhea_client.get_reaction("RHEA:32459"))
     print(rx)
-
-
-class Join:
-    parent_uuid: str
-    field_name: str
-    objects: list[PyeedBase]
-
-
-class PipeEntry:
-    object: PyeedBase
-    joins: list[Join]

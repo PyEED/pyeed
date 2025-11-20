@@ -384,11 +384,6 @@ class ESM2Embedder:
 
                 # Backpressure: Wait if too many tasks in flight
                 while len(pending_tasks) >= max_concurrent_batches:
-                    logger.debug(
-                        f"Concurrent limit reached "
-                        f"({len(pending_tasks)}/{max_concurrent_batches}), "
-                        f"waiting for completion"
-                    )
                     # Yield one completed result
                     done, pending_tasks = await asyncio.wait(
                         pending_tasks, return_when=asyncio.FIRST_COMPLETED
@@ -397,16 +392,10 @@ class ESM2Embedder:
                         result = task.result()
                         results_yielded += 1
                         logger.debug(
-                            f"Yielding result {results_yielded}/{batch_count}",
+                            f"Yielding result {results_yielded}",
                             extra={"num_proteins": len(result.protein_ids)},
                         )
                         yield result
-
-                # Create task for this batch (round-robin GPU assignment)
-                logger.debug(
-                    f"Creating task for batch {batch_count}",
-                    extra={"device_idx": device_idx, "batch_size": len(batch_seqs)},
-                )
 
                 # Define async function that acquires lock before processing
                 async def process_with_lock(
@@ -436,7 +425,7 @@ class ESM2Embedder:
                     result = task.result()
                     results_yielded += 1
                     logger.debug(
-                        f"Yielding result {results_yielded}/{batch_count}",
+                        f"Yielding result {results_yielded}",
                         extra={"num_proteins": len(result.protein_ids)},
                     )
                     yield result

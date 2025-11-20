@@ -457,31 +457,3 @@ class VectorDB:
         raise ValueError(
             f"Vector field '{vector_field_name}' not found in collection '{collection_name}'"
         )
-
-
-# Example usage
-if __name__ == "__main__":
-    from rich import print
-
-    print("Initializing VectorDB...")
-    vector_db = VectorDB(
-        uri="http://localhost:19530",
-        token="root:Milvus",
-    )
-
-    # check connection
-    print("Checking available collections and databases after connection.")
-    print(f"Collections: {vector_db.collections}")
-    print(f"Databases: {vector_db.databases}")
-
-    stats = vector_db.client.get_collection_stats(collection_name="test")
-    print(stats)
-    # Typical keys: row_count, data_size, index_file_size (bytes), partitions, segments, etc.
-
-    to_gb = lambda b: b / (1024**3)
-    print(f"rows: {stats['row_count']:,}")
-    print(f"data: {to_gb(stats.get('data_size', 0)):.2f} GB")
-    print(f"index: {to_gb(stats.get('index_file_size', 0)):.2f} GB")
-    print(
-        f"total on disk: {to_gb(stats.get('data_size', 0) + stats.get('index_file_size', 0)):.2f} GB"
-    )

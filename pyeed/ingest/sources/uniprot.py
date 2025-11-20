@@ -223,6 +223,7 @@ class UniProtAdapter:
 
             anns.append(
                 Annotation(
+                    id=f"{p.get('primaryAccession')}-{annot_type.value}-{start}-{end}",
                     annotation_type=annot_type,
                     positions=list(range(start, end + 1)),
                     description=description,
@@ -385,14 +386,6 @@ class UniProtAdapter:
                 accs.append(v)
 
         return accs
-
-
-# async def _amain() -> None:
-#     adapter = UniProtAdapter()
-#     ipr = "IPR002133"
-#     async with httpx.AsyncClient() as client:
-#         accs = await adapter.fetch_all_accessions_sparql(client, ipr)
-#         return accs
 
 
 if __name__ == "__main__":

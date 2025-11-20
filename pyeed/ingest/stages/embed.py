@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from rich.progress import Progress, TaskID
@@ -30,6 +30,9 @@ from ...embed.types import distribute_embeddings_to_records, records_to_embeddin
 from ..core.pipeline import PipelineRecord
 from ..core.protocol import SENTINEL, PipelineContext
 from ..model.pyeedbase import PyeedBase
+
+if TYPE_CHECKING:
+    from ...db.milvus import VectorDB
 
 
 class EmbeddingStage:
@@ -44,6 +47,8 @@ class EmbeddingStage:
         embedder: ESM2Embedder,
         chunk_size: int = 1000,
         batch_size: int = 32,
+        vector_db: VectorDB | None = None,
+        collection_name: str | None = None,
     ):
         """Initialize embedding stage.
 
@@ -51,10 +56,14 @@ class EmbeddingStage:
             embedder: ESM2Embedder instance (must be initialized before pipeline run)
             chunk_size: Number of records to accumulate before embedding (default: 1000)
             batch_size: GPU batch size for embedding (default: 32)
+            vector_db: Optional VectorDB to check for existing embeddings
+            collection_name: Collection name to check
         """
         self.embedder = embedder
         self.chunk_size = chunk_size
         self.batch_size = batch_size
+        self.vector_db = vector_db
+        self.collection_name = collection_name
 
     async def run(
         self,
@@ -131,13 +140,11 @@ class EmbeddingStage:
         async for record in stream:
             chunk.append(record)
             if len(chunk) >= self.chunk_size:
-                logger.debug(f"Chunk full ({len(chunk)} records), yielding")
                 yield chunk
                 chunk = []
 
         # Yield remaining records
         if chunk:
-            logger.debug(f"Yielding final chunk with {len(chunk)} records")
             yield chunk
 
     def _records_to_batch_generator(
@@ -194,7 +201,7 @@ class EmbeddingStage:
         progress: Progress | None,
         task_id: TaskID | None,
     ) -> None:
-        """Process one chunk: batch → embed → convert → emit.
+        """Process one chunk: check Milvus → batch → embed → convert → emit.
 
         Args:
             records: List of pipeline records to embed
@@ -206,10 +213,45 @@ class EmbeddingStage:
             logger.debug("Empty chunk, skipping")
             return
 
-        logger.debug(f"Processing chunk of {len(records)} records")
+        # Check Milvus for existing embeddings (if configured)
+        existing_ids: set[str] = set()
+        if self.vector_db and self.collection_name:
+            protein_ids = [record.data.id for record in records]
+            try:
+                existing_ids = await asyncio.to_thread(
+                    self.vector_db._check_existing_ids,
+                    protein_ids,
+                )
+                if existing_ids:
+                    logger.info(
+                        f"Found {len(existing_ids)} records with existing embeddings in Milvus, "
+                        f"skipping embedding for those"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to check existing IDs in Milvus: {e}")
 
-        # Create lazy batch generator
-        batch_generator = self._records_to_batch_generator(records)
+        # Split: existing vs. new
+        to_embed = [r for r in records if r.data.id not in existing_ids]
+        already_embedded = [r for r in records if r.data.id in existing_ids]
+
+        # Emit already-embedded records immediately (without embeddings)
+        for record in already_embedded:
+            for queue in output_queues.values():
+                await queue.put(record)
+
+        # Update progress for skipped records
+        if progress is not None and task_id is not None and already_embedded:
+            progress.update(task_id, advance=len(already_embedded))
+
+        # If nothing to embed, we're done
+        if not to_embed:
+            logger.debug("No new records to embed after checking Milvus")
+            return
+
+        logger.debug(f"Embedding {len(to_embed)} new records")
+
+        # Create lazy batch generator for records that need embedding
+        batch_generator = self._records_to_batch_generator(to_embed)
 
         # Convert to async iterator with natural backpressure
         batch_stream = self._batches_to_async_iterator(batch_generator)
@@ -224,12 +266,12 @@ class EmbeddingStage:
             )
 
             # Distribute embeddings to records
-            distribute_embeddings_to_records(embedding_batch, records)
+            distribute_embeddings_to_records(embedding_batch, to_embed)
 
             # Emit records that got embeddings (as they complete)
             batch_ids = set(embedding_batch.protein_ids)
             emitted = 0
-            for record in records:
+            for record in to_embed:
                 if record.data.id in batch_ids:
                     for queue in output_queues.values():
                         await queue.put(record)
