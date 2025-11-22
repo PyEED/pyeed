@@ -19,7 +19,7 @@ natural backpressure to the pipeline.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -96,6 +96,11 @@ class EmbeddingStage:
         # Process in chunks
         chunk_count = 0
         async for chunk in self._chunk_records(record_stream):
+            # Check for total update on first item (pipeline is active by then)
+            if progress is not None and task_id is not None:
+                total = context.stats.get("total")
+                if total is not None:
+                    progress.update(task_id, total=total)
             chunk_count += 1
             logger.info(f"Processing chunk {chunk_count} with {len(chunk)} records")
             await self._process_chunk(chunk, output_queues, progress, task_id)
@@ -147,13 +152,11 @@ class EmbeddingStage:
         if chunk:
             yield chunk
 
-    def _records_to_batch_generator(
+    async def _records_to_batches(
         self,
         records: list[PipelineRecord[PyeedBase]],
-    ) -> Iterator[tuple[list[str], list[str]]]:
-        """Convert records to length-sorted batches (lazy generator).
-
-        Pure function: records → (sequences, ids) → sorted → batched (lazily)
+    ) -> AsyncIterator[tuple[list[str], list[str]]]:
+        """Convert records to length-sorted batches with natural backpressure.
 
         Args:
             records: List of pipeline records to convert
@@ -171,27 +174,9 @@ class EmbeddingStage:
 
         logger.debug(f"Created {len(batches)} batches from {len(records)} records")
 
-        yield from batches
-
-    async def _batches_to_async_iterator(
-        self,
-        batch_generator: Iterator[tuple[list[str], list[str]]],
-    ) -> AsyncIterator[tuple[list[str], list[str]]]:
-        """Convert batch generator to async iterator with natural backpressure.
-
-        Yields batches from generator, yielding control to event loop between batches
-        to allow backpressure when embedder queue is full.
-
-        Args:
-            batch_generator: Generator of (sequences, protein_ids) tuples
-
-        Yields:
-            Batches as async iterator
-        """
-        for batch in batch_generator:
-            # Yield control to event loop - allows backpressure to work
-            # This is the natural async operation that makes the iterator async
-            await asyncio.sleep(0)
+        # Yield batches with async backpressure
+        for batch in batches:
+            await asyncio.sleep(0)  # Yield control to event loop for backpressure
             yield batch
 
     async def _process_chunk(
@@ -234,27 +219,23 @@ class EmbeddingStage:
         to_embed = [r for r in records if r.data.id not in existing_ids]
         already_embedded = [r for r in records if r.data.id in existing_ids]
 
-        # Emit already-embedded records immediately (without embeddings)
-        for record in already_embedded:
-            for queue in output_queues.values():
-                await queue.put(record)
-
         # Update progress for skipped records
         if progress is not None and task_id is not None and already_embedded:
             progress.update(task_id, advance=len(already_embedded))
 
-        # If nothing to embed, we're done
+        if already_embedded:
+            for record in already_embedded:
+                for queue in output_queues.values():
+                    await queue.put(record)
+
         if not to_embed:
             logger.debug("No new records to embed after checking Milvus")
             return
 
         logger.debug(f"Embedding {len(to_embed)} new records")
 
-        # Create lazy batch generator for records that need embedding
-        batch_generator = self._records_to_batch_generator(to_embed)
-
-        # Convert to async iterator with natural backpressure
-        batch_stream = self._batches_to_async_iterator(batch_generator)
+        # Create async batch stream with natural backpressure
+        batch_stream = self._records_to_batches(to_embed)
 
         # Stream through embedder - results arrive as they complete
         batch_count = 0

@@ -6,7 +6,6 @@ import asyncio
 from collections import defaultdict
 from typing import Any
 
-from loguru import logger
 from rich.progress import Progress, TaskID
 
 from pyeed.db.milvus import VectorDB
@@ -43,9 +42,8 @@ class Neo4jUpsertStage:
         progress: Progress | None,
         task_id: TaskID | None,
     ) -> None:
-        """Consume PipelineRecords, batch, upsert to Neo4j, and forward to embedding."""
+        """Consume PipelineRecords, batch, upsert to Neo4j, and forward to all output queues."""
         input_queue: asyncio.Queue[PipelineRecord[PyeedBase]] = next(iter(input_queues.values()))
-        output_queue = next(iter(output_queues.values())) if output_queues else None
 
         item_dict: dict[str, set[str]] = defaultdict(set)
         batch: list[PipelineRecord[PyeedBase]] = []
@@ -53,23 +51,29 @@ class Neo4jUpsertStage:
         while True:
             item = await input_queue.get()
 
+            # Check for total update on first item (pipeline is active by then)
+            if progress is not None and task_id is not None:
+                total = context.stats.get("total")
+                if total is not None:
+                    progress.update(task_id, total=total)
+
             if item is SENTINEL:
                 # Flush remaining batch
                 if batch:
                     async with self.db.async_driver.session() as session:
                         await upsert_pipeline_records(session, batch)
-                    # Track and forward
+                    # Track and forward to ALL output queues
                     for record in batch:
                         unique_field = record.data.get_unique_model_field()
                         unique_value = str(getattr(record.data, unique_field))
                         context.added_nodes[type(record.data).__name__].add(unique_value)
-                        if output_queue:
+                        for output_queue in output_queues.values():
                             await output_queue.put(record)
                     if progress is not None and task_id is not None:
                         progress.advance(task_id, len(batch))
 
-                # Forward SENTINEL
-                if output_queue:
+                # Forward SENTINEL to ALL output queues
+                for output_queue in output_queues.values():
                     await output_queue.put(SENTINEL)
                 break
 
@@ -82,12 +86,12 @@ class Neo4jUpsertStage:
             if len(batch) >= self.batch_size:
                 async with self.db.async_driver.session() as session:
                     await upsert_pipeline_records(session, batch)
-                # Track and forward
+
                 for record in batch:
                     unique_field = record.data.get_unique_model_field()
                     unique_value = str(getattr(record.data, unique_field))
                     context.added_nodes[type(record.data).__name__].add(unique_value)
-                    if output_queue:
+                    for output_queue in output_queues.values():
                         await output_queue.put(record)
                 if progress is not None and task_id is not None:
                     progress.advance(task_id, len(batch))
@@ -133,6 +137,11 @@ class MilvusUpsertStage:
         while True:
             item = await input_queue.get()
 
+            if progress is not None and task_id is not None:
+                total = context.stats.get("total")
+                if total is not None:
+                    progress.update(task_id, total=total)
+
             if item is SENTINEL:
                 # Flush remaining batch
                 if batch:
@@ -148,7 +157,6 @@ class MilvusUpsertStage:
 
             # Skip records without embeddings
             if not item.embeddings:
-                logger.debug(f"Skipping record without embeddings: {item.data.id}")
                 if progress is not None and task_id is not None:
                     progress.advance(task_id, 1)
                 continue

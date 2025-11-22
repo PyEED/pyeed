@@ -10,7 +10,6 @@ from .taxon import Taxon
 __all__ = [
     "Annotation",
     "AnnotationType",
-    "Embedding",
     "GOAnnotation",
     "Molecule",
     "Protein",

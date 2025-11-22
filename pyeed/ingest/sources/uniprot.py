@@ -133,14 +133,14 @@ class UniProtAdapter:
             ):
                 yield rec
 
-    def _extract_protein(self, p: dict[str, Any]) -> list[Protein]:
+    def _extract_protein(self, p: dict[str, Any]) -> Protein:
         """Extract Protein object from UniProt record.
 
         Args:
             p: UniProt protein record dictionary
 
         Returns:
-            List containing single Protein object
+            Protein object
         """
         seq_meta = p.get("sequence") or {}
         desc = p.get("proteinDescription") or {}

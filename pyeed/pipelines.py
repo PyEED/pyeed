@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Callable
 from typing import Literal
 
@@ -26,6 +27,9 @@ from .db.neo4j import GraphDB
 from .ingest.core.pipeline import Pipeline
 from .ingest.sources.fasta import build_header_index
 from .ingest.stages.embed import EmbeddingStage
+from .ingest.stages.enrich_molecules import MoleculeEnrichmentStage
+from .ingest.stages.enrich_reactions import ReactionEnrichmentStage
+from .ingest.stages.enrich_taxonomy import TaxonomyEnrichmentStage
 from .ingest.stages.fasta import FASTAReaderStage
 from .ingest.stages.sink import MilvusUpsertStage, Neo4jUpsertStage
 from .ingest.stages.uniprot import InterProReaderStage, UniProtReaderStage
@@ -52,7 +56,8 @@ def ingest_fasta(
     pooling_methods: PoolingLike | None = None,
     embedding_chunk_size: int = 1000,
     embedding_batch_size: int = 32,
-    enable_embedding: bool = True,
+    enrichment_batch_size: int = 50,
+    enrichment_max_concurrent: int = 50,
 ) -> None:
     """Ingest a FASTA file into the pipeline.
 
@@ -80,7 +85,8 @@ def ingest_fasta(
         pooling_methods: Pooling methods for embeddings
         embedding_chunk_size: Records to accumulate before embedding (default: 1000)
         embedding_batch_size: GPU batch size for embedding (default: 32)
-        enable_embedding: Whether to enable embedding stage (default: True)
+        enrichment_batch_size: Records to accumulate before enriching (default: 1000)
+        enrichment_max_concurrent: Maximum concurrent API requests for enrichment (default: 10)
 
     Returns:
         None
@@ -107,8 +113,10 @@ def ingest_fasta(
     vector_db_connect_task = spin.add_task("Connecting to VectorDB", total=1)
     embedder_init_task = spin.add_task("Initializing ESM2Embedder", total=1)
     read_task = bar.add_task("Read FASTA", total=None)
-    embed_task = bar.add_task("Embed Sequences", total=None)
     write_task = bar.add_task("Add Sequences to GraphDB", total=None)
+    embed_task = bar.add_task("Embed Sequences", total=None)
+    milvus_task = bar.add_task("Add Embeddings to VectorDB", total=None)
+    enrich_taxonomy_task = bar.add_task("Enrich Taxonomy", total=None)
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
@@ -127,124 +135,102 @@ def ingest_fasta(
             token=vector_db_token,
             collection_name=vector_db_collection,
         )
+        logger.info(f"Connected to VectorDB: {vector_db.uri}")
         spin.update(vector_db_connect_task, completed=1)
         spin.update(vector_db_connect_task, description=f"Connected to VectorDB: {vector_db.uri}")
-        logger.info(f"Connected to VectorDB: {vector_db.uri}")
 
         # Initialize ESM2Embedder (only if embedding is enabled)
-        embedder = None
-        if enable_embedding:
-            embedder = ESM2Embedder(
-                model_name=huggingface_model_name,
-                model_dtype=model_dtype,
-                return_dtype=return_dtype,
-                n_gpus=n_gpus,
-                pooling_methods=pooling_methods,
-                max_length=huggingface_model_max_seq_length,
-                huggingface_token=huggingface_token,
-            )
-            asyncio.run(embedder.initialize())
-            spin.update(embedder_init_task, completed=1)
-            spin.update(
-                embedder_init_task,
-                description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
-            )
-            logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
-        else:
-            spin.update(embedder_init_task, completed=1)
-            spin.update(embedder_init_task, description="Embedding disabled")
-            logger.info("Embedding stage disabled")
+        embedder = ESM2Embedder(
+            model_name=huggingface_model_name,
+            model_dtype=model_dtype,
+            return_dtype=return_dtype,
+            n_gpus=n_gpus,
+            pooling_methods=pooling_methods,
+            max_length=huggingface_model_max_seq_length,
+            huggingface_token=huggingface_token,
+        )
+        asyncio.run(embedder.initialize())
+        logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
+        spin.update(embedder_init_task, completed=1)
+        spin.update(
+            embedder_init_task,
+            description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
+        )
 
         # Build header index from FASTA file
         offsets = build_header_index(fasta_path)
         total_sequences = len(offsets)
-        bar.update(read_task, description="Read FASTA", total=total_sequences)
-        bar.update(embed_task, description="Embed Sequences", total=total_sequences)
-        bar.update(write_task, description="Add Sequences to GraphDB", total=total_sequences)
+        bar.update(read_task, total=total_sequences)
+        bar.update(embed_task, total=total_sequences)
+        bar.update(write_task, total=total_sequences)
+        bar.update(milvus_task, total=total_sequences)
+        bar.update(enrich_taxonomy_task, total=total_sequences)
 
-        # Build pipeline with optional embedding stage
+        # Build pipeline
         pipeline = Pipeline(progress=bar)
+        neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
+        embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
+        taxonomy_queue = pipeline.add_queue("taxonomy", maxsize=1000)
+        milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
 
-        if enable_embedding and embedder is not None:
-            # Four-stage pipeline: Read → Neo4j → Embed → Milvus
-            neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
-            embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
-            milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
+        pipeline.add_stage(
+            stage=FASTAReaderStage(
+                fasta_path=fasta_path,
+                offsets=offsets,
+                chunk_size=chunk_size,
+                header_extractor=header_fn,
+                taxon_extractor=taxon_fn,
+            ),
+            input_queues=[],
+            output_queues=[neo4j_queue],
+            task_id=read_task,
+        )
 
-            # Stage 1: Read FASTA
-            pipeline.add_stage(
-                stage=FASTAReaderStage(
-                    fasta_path=fasta_path,
-                    offsets=offsets,
-                    chunk_size=chunk_size,
-                    header_extractor=header_fn,
-                    taxon_extractor=taxon_fn,
-                ),
-                input_queues=[],
-                output_queues=[neo4j_queue],
-                task_id=read_task,
-            )
+        pipeline.add_stage(
+            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            input_queues=[neo4j_queue],
+            output_queues=[embedding_queue, taxonomy_queue],
+            task_id=write_task,
+        )
 
-            # Stage 2: Neo4j (forwards to embedding)
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
-                input_queues=[neo4j_queue],
-                output_queues=[embedding_queue],  # Forward records
-                task_id=write_task,
-            )
+        pipeline.add_stage(
+            stage=EmbeddingStage(
+                embedder=embedder,
+                chunk_size=embedding_chunk_size,
+                batch_size=embedding_batch_size,
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+            ),
+            input_queues=[embedding_queue],
+            output_queues=[milvus_queue],
+            task_id=embed_task,
+        )
 
-            # Stage 3: Embedding (checks Milvus, embeds new)
-            pipeline.add_stage(
-                stage=EmbeddingStage(
-                    embedder=embedder,
-                    chunk_size=embedding_chunk_size,
-                    batch_size=embedding_batch_size,
-                    vector_db=vector_db,  # Pass VectorDB for existence check
-                    collection_name=vector_db_collection,
-                ),
-                input_queues=[embedding_queue],
-                output_queues=[milvus_queue],
-                task_id=embed_task,
-            )
+        pipeline.add_stage(
+            stage=MilvusUpsertStage(
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+                batch_size=100,
+            ),
+            input_queues=[milvus_queue],
+            output_queues=[],
+            task_id=milvus_task,
+        )
 
-            # Stage 4: Milvus (inserts embeddings)
-            milvus_task = bar.add_task("Add Embeddings to Milvus", total=total_sequences)
-            pipeline.add_stage(
-                stage=MilvusUpsertStage(
-                    vector_db=vector_db,
-                    collection_name=vector_db_collection,
-                    batch_size=100,
-                ),
-                input_queues=[milvus_queue],
-                output_queues=[],
-                task_id=milvus_task,
-            )
-        else:
-            # Two-stage pipeline: Read → Neo4j (no embedding)
-            node_queue = pipeline.add_queue("nodes", maxsize=10)
+        # Create shared DB semaphore for enrichment stages
+        db_semaphore = asyncio.Semaphore(20)
 
-            pipeline.add_stage(
-                stage=FASTAReaderStage(
-                    fasta_path=fasta_path,
-                    offsets=offsets,
-                    chunk_size=chunk_size,
-                    header_extractor=header_fn,
-                    taxon_extractor=taxon_fn,
-                ),
-                input_queues=[],
-                output_queues=[node_queue],
-                task_id=read_task,
-            )
-
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(
-                    db=graph_db,
-                    batch_size=100,
-                ),
-                input_queues=[node_queue],
-                output_queues=[],
-                task_id=write_task,
-            )
+        pipeline.add_stage(
+            stage=TaxonomyEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[taxonomy_queue],
+            output_queues=[],
+            task_id=enrich_taxonomy_task,
+        )
 
         asyncio.run(pipeline.run())
 
@@ -281,7 +267,8 @@ def ingest_uniprot(
     embedding_batch_size: int = 32,
     uniprot_chunk_size: int = 50,
     uniprot_page_size: int = 50,
-    enable_embedding: bool = True,
+    enrichment_batch_size: int = 1000,
+    enrichment_max_concurrent: int = 50,
 ) -> None:
     """Ingest proteins from UniProt by accession IDs.
 
@@ -304,7 +291,8 @@ def ingest_uniprot(
         embedding_batch_size: GPU batch size for embedding (default: 32)
         uniprot_chunk_size: Accessions per API batch (default: 50)
         uniprot_page_size: Results per page (default: 50)
-        enable_embedding: Whether to enable embedding stage (default: True)
+        enrichment_batch_size: Records to accumulate before enriching (default: 1000)
+        enrichment_max_concurrent: Maximum concurrent API requests for enrichment (default: 10)
 
     Returns:
         None
@@ -330,9 +318,14 @@ def ingest_uniprot(
     graph_db_connect_task = spin.add_task("Connecting to GraphDB", total=1)
     vector_db_connect_task = spin.add_task("Connecting to VectorDB", total=1)
     embedder_init_task = spin.add_task("Initializing ESM2Embedder", total=1)
+
     fetch_task = bar.add_task("Fetch from UniProt", total=len(ids))
-    embed_task = bar.add_task("Embed Sequences", total=len(ids))
     write_task = bar.add_task("Add Sequences to GraphDB", total=len(ids))
+    embed_task = bar.add_task("Embed Sequences", total=len(ids))
+    milvus_task = bar.add_task("Add Embeddings to VectorDB", total=len(ids))
+    enrich_taxonomy_task = bar.add_task("Enrich Taxonomy", total=len(ids))
+    enrich_reactions_task = bar.add_task("Enrich Reactions", total=None)
+    enrich_molecules_task = bar.add_task("Enrich Molecules", total=None)
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
@@ -355,109 +348,119 @@ def ingest_uniprot(
         spin.update(vector_db_connect_task, description=f"Connected to VectorDB: {vector_db.uri}")
         logger.info(f"Connected to VectorDB: {vector_db.uri}")
 
-        # Initialize ESM2Embedder (only if embedding is enabled)
-        embedder = None
-        if enable_embedding:
-            embedder = ESM2Embedder(
-                model_name=huggingface_model_name,
-                model_dtype=model_dtype,
-                return_dtype=return_dtype,
-                n_gpus=n_gpus,
-                pooling_methods=pooling_methods,
-                max_length=huggingface_model_max_seq_length,
-                huggingface_token=huggingface_token,
-            )
-            asyncio.run(embedder.initialize())
-            spin.update(embedder_init_task, completed=1)
-            spin.update(
-                embedder_init_task,
-                description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
-            )
-            logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
-        else:
-            spin.update(embedder_init_task, completed=1)
-            spin.update(embedder_init_task, description="Embedding disabled")
-            logger.info("Embedding stage disabled")
+        embedder = ESM2Embedder(
+            model_name=huggingface_model_name,
+            model_dtype=model_dtype,
+            return_dtype=return_dtype,
+            n_gpus=n_gpus,
+            pooling_methods=pooling_methods,
+            max_length=huggingface_model_max_seq_length,
+            huggingface_token=huggingface_token,
+        )
+        asyncio.run(embedder.initialize())
+        logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
+        spin.update(embedder_init_task, completed=1)
+        spin.update(
+            embedder_init_task,
+            description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
+        )
 
-        # Build pipeline with optional embedding stage
+        # Build pipeline
         pipeline = Pipeline(progress=bar)
 
-        if enable_embedding and embedder is not None:
-            # Four-stage pipeline: UniProt → Neo4j → Embed → Milvus
-            neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
-            embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
-            milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
+        neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
+        embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
+        taxonomy_queue = pipeline.add_queue("taxonomy", maxsize=1000)
+        reaction_queue = pipeline.add_queue("reaction", maxsize=1000)
+        molecule_queue = pipeline.add_queue("molecule", maxsize=1000)
+        milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
 
-            # Stage 1: Fetch from UniProt
-            pipeline.add_stage(
-                stage=UniProtReaderStage(
-                    accessions=ids,
-                    chunk_size=uniprot_chunk_size,
-                    size_per_page=uniprot_page_size,
-                ),
-                input_queues=[],
-                output_queues=[neo4j_queue],
-                task_id=fetch_task,
-            )
+        # Stage 1: Fetch from UniProt
+        pipeline.add_stage(
+            stage=UniProtReaderStage(
+                accessions=ids,
+                chunk_size=uniprot_chunk_size,
+                size_per_page=uniprot_page_size,
+            ),
+            input_queues=[],
+            output_queues=[neo4j_queue],
+            task_id=fetch_task,
+        )
 
-            # Stage 2: Neo4j (forwards to embedding)
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
-                input_queues=[neo4j_queue],
-                output_queues=[embedding_queue],
-                task_id=write_task,
-            )
+        # Stage 2: Neo4j (forwards to embedding, taxonomy, and reactions)
+        pipeline.add_stage(
+            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            input_queues=[neo4j_queue],
+            output_queues=[embedding_queue, taxonomy_queue, reaction_queue],
+            task_id=write_task,
+        )
 
-            # Stage 3: Embedding (checks Milvus, embeds new)
-            pipeline.add_stage(
-                stage=EmbeddingStage(
-                    embedder=embedder,
-                    chunk_size=embedding_chunk_size,
-                    batch_size=embedding_batch_size,
-                    vector_db=vector_db,
-                    collection_name=vector_db_collection,
-                ),
-                input_queues=[embedding_queue],
-                output_queues=[milvus_queue],
-                task_id=embed_task,
-            )
+        # Path 1: Embedding pipeline
+        # Stage 3a: Embedding (checks Milvus, embeds new)
+        pipeline.add_stage(
+            stage=EmbeddingStage(
+                embedder=embedder,
+                chunk_size=embedding_chunk_size,
+                batch_size=embedding_batch_size,
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+            ),
+            input_queues=[embedding_queue],
+            output_queues=[milvus_queue],
+            task_id=embed_task,
+        )
 
-            # Stage 4: Milvus (inserts embeddings)
-            milvus_task = bar.add_task("Add Embeddings to Milvus", total=len(ids))
-            pipeline.add_stage(
-                stage=MilvusUpsertStage(
-                    vector_db=vector_db,
-                    collection_name=vector_db_collection,
-                    batch_size=100,
-                ),
-                input_queues=[milvus_queue],
-                output_queues=[],
-                task_id=milvus_task,
-            )
-        else:
-            # Two-stage pipeline: UniProt → Neo4j (no embedding)
-            node_queue = pipeline.add_queue("nodes", maxsize=10)
+        # Stage 4a: Milvus (inserts embeddings)
+        pipeline.add_stage(
+            stage=MilvusUpsertStage(
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+                batch_size=100,
+            ),
+            input_queues=[milvus_queue],
+            output_queues=[],
+            task_id=milvus_task,
+        )
 
-            pipeline.add_stage(
-                stage=UniProtReaderStage(
-                    accessions=ids,
-                    chunk_size=uniprot_chunk_size,
-                    size_per_page=uniprot_page_size,
-                ),
-                input_queues=[],
-                output_queues=[node_queue],
-                task_id=fetch_task,
-            )
+        # Path 2: Enrichment pipeline (taxonomy → reactions → molecules)
+        # Create shared DB semaphore for all enrichment stages
+        db_semaphore = asyncio.Semaphore(20)
 
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(
-                    db=graph_db,
-                    batch_size=100,
-                ),
-                input_queues=[node_queue],
-                output_queues=[],
-                task_id=write_task,
-            )
+        pipeline.add_stage(
+            stage=TaxonomyEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[taxonomy_queue],
+            output_queues=[],
+            task_id=enrich_taxonomy_task,
+        )
+
+        pipeline.add_stage(
+            stage=ReactionEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[reaction_queue],
+            output_queues=[molecule_queue],
+            task_id=enrich_reactions_task,
+        )
+
+        pipeline.add_stage(
+            stage=MoleculeEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[molecule_queue],
+            output_queues=[],
+            task_id=enrich_molecules_task,
+        )
 
         asyncio.run(pipeline.run())
 
@@ -481,7 +484,8 @@ def ingest_interpro(
     embedding_batch_size: int = 32,
     uniprot_chunk_size: int = 50,
     uniprot_page_size: int = 50,
-    enable_embedding: bool = True,
+    enrichment_batch_size: int = 1000,
+    enrichment_max_concurrent: int = 50,
 ) -> None:
     """Ingest all proteins for an InterPro ID.
 
@@ -508,7 +512,8 @@ def ingest_interpro(
         embedding_batch_size: GPU batch size for embedding (default: 32)
         uniprot_chunk_size: Accessions per API batch (default: 50)
         uniprot_page_size: Results per page (default: 50)
-        enable_embedding: Whether to enable embedding stage (default: True)
+        enrichment_batch_size: Records to accumulate before enriching (default: 1000)
+        enrichment_max_concurrent: Maximum concurrent API requests for enrichment (default: 10)
 
     Returns:
         None
@@ -530,13 +535,18 @@ def ingest_interpro(
         transient=False,
     )
 
-    # Tasks (total unknown initially for InterPro)
+    # Tasks
     graph_db_connect_task = spin.add_task("Connecting to GraphDB", total=1)
     vector_db_connect_task = spin.add_task("Connecting to VectorDB", total=1)
     embedder_init_task = spin.add_task("Initializing ESM2Embedder", total=1)
+
     fetch_task = bar.add_task(f"Fetch from InterPro ({id})", total=None)
-    embed_task = bar.add_task("Embed Sequences", total=None)
     write_task = bar.add_task("Add Sequences to GraphDB", total=None)
+    embed_task = bar.add_task("Embed Sequences", total=None)
+    milvus_task = bar.add_task("Add Embeddings to VectorDB", total=None)
+    enrich_taxonomy_task = bar.add_task("Enrich Taxonomy", total=None)
+    enrich_reactions_task = bar.add_task("Enrich Reactions", total=None)
+    enrich_molecules_task = bar.add_task("Enrich Molecules", total=None)
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
@@ -555,124 +565,135 @@ def ingest_interpro(
             token=vector_db_token,
             collection_name=vector_db_collection,
         )
+        logger.info(f"Connected to VectorDB: {vector_db.uri}")
         spin.update(vector_db_connect_task, completed=1)
         spin.update(vector_db_connect_task, description=f"Connected to VectorDB: {vector_db.uri}")
-        logger.info(f"Connected to VectorDB: {vector_db.uri}")
 
         # Initialize ESM2Embedder (only if embedding is enabled)
-        embedder = None
-        if enable_embedding:
-            embedder = ESM2Embedder(
-                model_name=huggingface_model_name,
-                model_dtype=model_dtype,
-                return_dtype=return_dtype,
-                n_gpus=n_gpus,
-                pooling_methods=pooling_methods,
-                max_length=huggingface_model_max_seq_length,
-                huggingface_token=huggingface_token,
-            )
-            asyncio.run(embedder.initialize())
-            spin.update(embedder_init_task, completed=1)
-            spin.update(
-                embedder_init_task,
-                description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
-            )
-            logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
-        else:
-            spin.update(embedder_init_task, completed=1)
-            spin.update(embedder_init_task, description="Embedding disabled")
-            logger.info("Embedding stage disabled")
 
-        # Build pipeline with optional embedding stage
+        embedder = ESM2Embedder(
+            model_name=huggingface_model_name,
+            model_dtype=model_dtype,
+            return_dtype=return_dtype,
+            n_gpus=n_gpus,
+            pooling_methods=pooling_methods,
+            max_length=huggingface_model_max_seq_length,
+            huggingface_token=huggingface_token,
+        )
+        asyncio.run(embedder.initialize())
+        logger.info(f"Initialized {embedder.model_name} on {len(embedder.devices)} devices")
+        spin.update(embedder_init_task, completed=1)
+        spin.update(
+            embedder_init_task,
+            description=f"Initialized {embedder.model_name} on {len(embedder.devices)} devices",
+        )
+
+        # Build pipeline
         pipeline = Pipeline(progress=bar)
 
-        if enable_embedding and embedder is not None:
-            # Four-stage pipeline: InterPro → Neo4j → Embed → Milvus
-            neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
-            embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
-            milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
+        neo4j_queue = pipeline.add_queue("neo4j", maxsize=1400)
+        embedding_queue = pipeline.add_queue("embedding", maxsize=2000)
+        taxonomy_queue = pipeline.add_queue("taxonomy", maxsize=1500)
+        reaction_queue = pipeline.add_queue("reaction", maxsize=2000)
+        molecule_queue = pipeline.add_queue("molecule", maxsize=3000)
+        milvus_queue = pipeline.add_queue("milvus", maxsize=4000)
 
-            # Stage 1: Fetch from InterPro
-            pipeline.add_stage(
-                stage=InterProReaderStage(
-                    interpro_id=id,
-                    chunk_size=uniprot_chunk_size,
-                    size_per_page=uniprot_page_size,
-                ),
-                input_queues=[],
-                output_queues=[neo4j_queue],
-                task_id=fetch_task,
-            )
+        pipeline.add_stage(
+            stage=InterProReaderStage(
+                interpro_id=id,
+                chunk_size=uniprot_chunk_size,
+                size_per_page=uniprot_page_size,
+            ),
+            input_queues=[],
+            output_queues=[neo4j_queue],
+            task_id=fetch_task,
+        )
 
-            # Stage 2: Neo4j (forwards to embedding)
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
-                input_queues=[neo4j_queue],
-                output_queues=[embedding_queue],
-                task_id=write_task,
-            )
+        pipeline.add_stage(
+            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            input_queues=[neo4j_queue],
+            output_queues=[embedding_queue, taxonomy_queue, reaction_queue],
+            task_id=write_task,
+        )
 
-            # Stage 3: Embedding (checks Milvus, embeds new)
-            pipeline.add_stage(
-                stage=EmbeddingStage(
-                    embedder=embedder,
-                    chunk_size=embedding_chunk_size,
-                    batch_size=embedding_batch_size,
-                    vector_db=vector_db,
-                    collection_name=vector_db_collection,
-                ),
-                input_queues=[embedding_queue],
-                output_queues=[milvus_queue],
-                task_id=embed_task,
-            )
+        pipeline.add_stage(
+            stage=EmbeddingStage(
+                embedder=embedder,
+                chunk_size=embedding_chunk_size,
+                batch_size=embedding_batch_size,
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+            ),
+            input_queues=[embedding_queue],
+            output_queues=[milvus_queue],
+            task_id=embed_task,
+        )
 
-            # Stage 4: Milvus (inserts embeddings)
-            milvus_task = bar.add_task("Add Embeddings to Milvus", total=None)
-            pipeline.add_stage(
-                stage=MilvusUpsertStage(
-                    vector_db=vector_db,
-                    collection_name=vector_db_collection,
-                    batch_size=100,
-                ),
-                input_queues=[milvus_queue],
-                output_queues=[],
-                task_id=milvus_task,
-            )
-        else:
-            # Two-stage pipeline: InterPro → Neo4j (no embedding)
-            node_queue = pipeline.add_queue("nodes", maxsize=10)
+        pipeline.add_stage(
+            stage=MilvusUpsertStage(
+                vector_db=vector_db,
+                collection_name=vector_db_collection,
+                batch_size=100,
+            ),
+            input_queues=[milvus_queue],
+            output_queues=[],
+            task_id=milvus_task,
+        )
 
-            pipeline.add_stage(
-                stage=InterProReaderStage(
-                    interpro_id=id,
-                    chunk_size=uniprot_chunk_size,
-                    size_per_page=uniprot_page_size,
-                ),
-                input_queues=[],
-                output_queues=[node_queue],
-                task_id=fetch_task,
-            )
+        # Create shared DB semaphore for all enrichment stages
+        db_semaphore = asyncio.Semaphore(1)
 
-            pipeline.add_stage(
-                stage=Neo4jUpsertStage(
-                    db=graph_db,
-                    batch_size=100,
-                ),
-                input_queues=[node_queue],
-                output_queues=[],
-                task_id=write_task,
-            )
+        pipeline.add_stage(
+            stage=TaxonomyEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[taxonomy_queue],
+            output_queues=[],
+            task_id=enrich_taxonomy_task,
+        )
+
+        pipeline.add_stage(
+            stage=ReactionEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[reaction_queue],
+            output_queues=[molecule_queue],
+            task_id=enrich_reactions_task,
+        )
+
+        pipeline.add_stage(
+            stage=MoleculeEnrichmentStage(
+                db=graph_db,
+                db_semaphore=db_semaphore,
+                batch_size=enrichment_batch_size,
+                max_concurrent=enrichment_max_concurrent,
+            ),
+            input_queues=[molecule_queue],
+            output_queues=[],
+            task_id=enrich_molecules_task,
+        )
 
         asyncio.run(pipeline.run())
 
 
 if __name__ == "__main__":
-    # def clean_str(s: str) -> str:
-    #     return s.split("|")[1]
+    # ----
+    # Option 1: Ingest a FASTA file
+    # ----
 
-    # def extract_ox_id(s: str) -> str | None:
-    #     m = re.search(r"ox=(\d+)", s.lower())
-    #     return m.group(1) if m else None
+    # Helper methods for Taxon and Accession ID extraction
+    def clean_str(s: str) -> str:
+        return s.split("|")[1]
+
+    def extract_ox_id(s: str) -> str | None:
+        m = re.search(r"ox=(\d+)", s.lower())
+        return m.group(1) if m else None
 
     # ingest_fasta(
     #     fasta_path="/home/mha/projects/proteingraph/downloads/1000seq.fasta",
@@ -681,7 +702,18 @@ if __name__ == "__main__":
     #     n_gpus=2,
     # )
 
-    ingest_uniprot(
-        ids=["P12345", "Q9Y6X9"],
+    # ----
+    # Option 2: Ingest a list of UniProt accession IDs
+    # ----
+    # ingest_uniprot(
+    #     ids=["P12345", "Q9Y6X9"],
+    #     n_gpus=2,
+    # )
+
+    # ----
+    # Option 3: Ingest all proteins related to an InterPro ID
+    # ----
+    ingest_interpro(
+        id="IPR002133",
         n_gpus=2,
     )

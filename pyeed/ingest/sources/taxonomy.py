@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
@@ -18,110 +17,120 @@ from tenacity import (
 from ..model import Taxon
 
 TAXON_BASE_URL = "https://rest.uniprot.org/taxonomy"
+MAX_BATCH_SIZE = 50  # Maximum number of taxon IDs per batch request
 
 
 class UniProtTaxonomyAdapter:
     """Adapter for fetching taxonomy data from UniProt REST API.
 
-    Note: UniProt taxonomy API only supports single requests per endpoint.
-    For multiple taxon IDs, requests are made concurrently.
+    Uses the batch search endpoint to fetch multiple taxa in a single request,
+    significantly reducing API calls and improving performance.
     """
 
     def __init__(self) -> None:
         self.headers = {"Accept": "application/json"}
         self.timeout = httpx.Timeout(20.0)
 
+    def _build_taxon_query(self, taxon_ids: list[str]) -> str:
+        """Build OR query string for batch search.
+
+        Args:
+            taxon_ids: List of taxon ID strings
+
+        Returns:
+            Query string in format: (id1 OR id2 OR ... OR idN)
+        """
+        return f"({' OR '.join(taxon_ids)})"
+
     @retry(
         wait=wait_exponential_jitter(0.5, 3),
         stop=stop_after_attempt(5),
         retry=retry_if_exception_type(httpx.HTTPError),
     )
-    async def fetch_taxon(
+    async def _fetch_taxa_batch(
         self,
         client: httpx.AsyncClient,
-        taxon_id: int | str,
-    ) -> dict[str, Any] | None:
-        """Fetch a single taxon by NCBI taxonomy ID.
+        taxon_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        """Fetch a batch of taxa using the search endpoint.
 
         Args:
             client: httpx.AsyncClient
-            taxon_id: NCBI taxonomy ID (e.g., 9606 for human)
+            taxon_ids: List of taxon ID strings (max 500)
 
         Returns:
-            Taxon record dictionary, or None if not found
+            List of taxon record dictionaries from the results array
 
         Raises:
             httpx.HTTPError: If request fails after retries
-            ValueError: If taxon_id is invalid
+            ValueError: If taxon_ids list is empty or exceeds MAX_BATCH_SIZE
         """
-        # Validate and sanitize taxon_id
-        taxon_str = str(taxon_id).strip()
-        if not taxon_str or not taxon_str.isdigit():
-            raise ValueError(f"Invalid taxon_id format: {taxon_id!r} (must be numeric)")
+        if not taxon_ids:
+            raise ValueError("taxon_ids list cannot be empty")
+        if len(taxon_ids) > MAX_BATCH_SIZE:
+            raise ValueError(
+                f"taxon_ids list exceeds maximum batch size of {MAX_BATCH_SIZE}: "
+                f"{len(taxon_ids)} provided"
+            )
 
-        # Construct URL safely (taxon_str is now validated as digits only)
-        url = f"{TAXON_BASE_URL}/{taxon_str}"
-        r = await client.get(url, headers=self.headers, timeout=self.timeout)
+        query = self._build_taxon_query(taxon_ids)
+        url = f"{TAXON_BASE_URL}/search"
+        params = {"query": query, "size": MAX_BATCH_SIZE}
 
-        if r.status_code == 404:
-            return None
-
+        r = await client.get(url, params=params, headers=self.headers, timeout=self.timeout)
         r.raise_for_status()
-        return r.json()
+
+        data = r.json()
+        results = data.get("results", [])
+        return results
 
     async def fetch_taxa(
         self,
         client: httpx.AsyncClient,
         taxon_ids: Iterable[int | str],
-        max_concurrent: int = 10,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Fetch multiple taxa concurrently.
+        """Fetch multiple taxa using batch search endpoint.
 
-        Since the API only supports single requests, this method:
-        - Processes taxon IDs in batches
-        - Makes concurrent requests within each batch
-        - Yields results as they become available
-        - Handles errors gracefully (logs and continues)
+        Uses the UniProt taxonomy search endpoint to fetch multiple taxa in a
+        single request. If more than 500 taxon IDs are provided, splits them
+        into multiple batch requests.
 
         Args:
             client: httpx.AsyncClient
             taxon_ids: Iterable of NCBI taxonomy IDs
-            max_concurrent: Maximum number of concurrent requests
 
         Yields:
-            Taxon record dictionaries (None values and errors are skipped)
+            Taxon record dictionaries from the API results array
+
+        Raises:
+            ValueError: If any taxon_id is invalid (non-numeric)
         """
-        semaphore = asyncio.Semaphore(max_concurrent)
+        # Convert to list and validate
+        taxon_id_list: list[str] = []
+        for tid in taxon_ids:
+            taxon_str = str(tid).strip()
+            if not taxon_str or not taxon_str.isdigit():
+                logger.warning(f"Invalid taxon_id format: {tid!r} (must be numeric), skipping")
+                continue
+            taxon_id_list.append(taxon_str)
 
-        async def fetch_with_semaphore(
-            tid: int | str,
-        ) -> tuple[int | str, dict[str, Any] | None, Exception | None]:
-            """Fetch with error handling, returns (taxon_id, result, error)."""
-            async with semaphore:
-                try:
-                    result = await self.fetch_taxon(client, tid)
-                    return (tid, result, None)
-                except httpx.HTTPError as e:
-                    logger.warning(f"HTTP error fetching taxon {tid}: {e}")
-                    return (tid, None, e)
-                except ValueError as e:
-                    logger.warning(f"Invalid taxon_id {tid}: {e}")
-                    return (tid, None, e)
-                except Exception as e:
-                    logger.error(f"Unexpected error fetching taxon {tid}: {e}", exc_info=True)
-                    return (tid, None, e)
+        if not taxon_id_list:
+            return
 
-        # Create tasks for all taxon IDs
-        tasks = [fetch_with_semaphore(tid) for tid in taxon_ids]
-
-        # Process results as they complete
-        for coro in asyncio.as_completed(tasks):
-            taxon_id, result, error = await coro
-            if result is not None:
-                yield result
-            elif error is None:
-                # 404 - taxon not found (silently skipped)
-                logger.debug(f"Taxon {taxon_id} not found (404)")
+        logger.debug(f"Fetching {len(taxon_id_list)} taxa in {MAX_BATCH_SIZE}-sized batches")
+        # Split into batches of MAX_BATCH_SIZE
+        for i in range(0, len(taxon_id_list), MAX_BATCH_SIZE):
+            batch = taxon_id_list[i : i + MAX_BATCH_SIZE]
+            try:
+                results = await self._fetch_taxa_batch(client, batch)
+                for result in results:
+                    yield result
+            except httpx.HTTPError as e:
+                logger.error(f"HTTP error fetching taxon batch: {e}")
+                # Continue with next batch even if one fails
+            except Exception as e:
+                logger.error(f"Unexpected error fetching taxon batch: {e}", exc_info=True)
+                # Continue with next batch even if one fails
 
     def _extract_taxon_from_dict(self, d: dict[str, Any]) -> Taxon:
         """Extract Taxon object from API response dictionary.
@@ -169,7 +178,7 @@ class UniProtTaxonomyAdapter:
             return []
 
         taxa: list[Taxon] = []
-        seen_ids: set[int] = set()
+        seen_ids: set[str] = set()
 
         # Extract main taxon
         main_taxon_id = str(t.get("taxonId"))
@@ -244,16 +253,3 @@ class UniProtTaxonomyAdapter:
             "parent_id": parent_id,
             "lineage_ids": lineage_ids,
         }
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    from rich import print
-
-    async def run() -> None:
-        async with httpx.AsyncClient() as client:
-            taxa = await UniProtTaxonomyAdapter().fetch_taxon(client, 9606)
-            print(UniProtTaxonomyAdapter().map(taxa))
-
-    asyncio.run(run())

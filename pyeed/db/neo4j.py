@@ -9,6 +9,8 @@ from loguru import logger
 from neo4j import AsyncGraphDatabase, GraphDatabase
 from pandas.core.common import defaultdict
 
+from pyeed.ingest.model import MODEL_CLASSES
+
 from ..ingest.model.pyeedbase import PyeedBase
 from ..ingest.model.utils import collect_schema
 
@@ -32,6 +34,9 @@ class GraphDB:
         self.uri = uri
         self.async_driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+        # Synchronize schema
+        self.sync_schema(MODEL_CLASSES)
 
     async def close(self) -> None:
         """
@@ -102,7 +107,7 @@ class GraphDB:
             async for record in result:
                 yield record.value(key)
 
-    async def sync_schema(self, models: list[type[PyeedBase]]) -> None:
+    def sync_schema(self, models: list[type[PyeedBase]]) -> None:
         """
         Synchronize database schema from model definitions.
 
@@ -114,15 +119,15 @@ class GraphDB:
         """
         logger.info("Creating unique constraints ...")
         uniques, btrees, _ = collect_schema(models)
-        async with self.async_driver.session() as session:
+        with self.driver.session() as session:
             # Unique constraints
             for uniq in uniques:
                 q = (
                     f"CREATE CONSTRAINT `uniq_{uniq.label}_{uniq.prop}` IF NOT EXISTS "
                     f"FOR (n:`{uniq.label}`) REQUIRE n.`{uniq.prop}` IS UNIQUE"
                 )
-                logger.debug("Schema: %s", q)
-                await session.run(q)
+                logger.debug(f"Creating unique constraint: {q}")
+                session.run(q)
 
             # B-tree indexes
             for btree in btrees:
@@ -130,8 +135,8 @@ class GraphDB:
                     f"CREATE INDEX `idx_{btree.label}_{btree.prop}` IF NOT EXISTS "
                     f"FOR (n:`{btree.label}`) ON (n.`{btree.prop}`)"
                 )
-                logger.debug("Schema: %s", q)
-                await session.run(q)
+                logger.debug(f"Creating index: {q}")
+                session.run(q)
 
     async def upsert_nodes(
         self,

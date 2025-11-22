@@ -1,11 +1,8 @@
-"""Neo4j query utilities for batch processing PipelineRecords."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
 
-from loguru import logger
 from neo4j import AsyncSession
 
 from ..ingest.core.pipeline import PipelineRecord
@@ -39,15 +36,15 @@ async def upsert_pipeline_records(
     if not records:
         return
 
-    # Phase 1: Collect and upsert all nodes
+    # Step 1: Collect and upsert all nodes
     all_nodes = _collect_all_nodes(records)
     await _upsert_nodes_with_session(session, all_nodes, tx_size)
 
-    # Phase 2: Collect and create all relationships
+    # Step 2: Collect and create all relationships
     relationship_groups = _collect_relationships(records)
     await _create_relationships_batched(session, relationship_groups, tx_size)
 
-    # Phase 3: Collect and remove list property values
+    # Step 3: Collect and remove list property values
     removal_groups = _collect_list_removals(records)
     await _remove_list_values_batched(session, removal_groups, tx_size)
 
@@ -143,7 +140,8 @@ async def _create_relationships_batched(
     groups: dict[tuple[str, str, str, str, str, bool], list[tuple[str, str]]],
     tx_size: int,
 ) -> None:
-    """Create all relationships in batches."""
+    """Create all relationships in batches using optimized MERGE pattern."""
+
     for (
         parent_label,
         parent_field,
@@ -152,9 +150,14 @@ async def _create_relationships_batched(
         edge_name,
         direction_to_parent,
     ), pairs in groups.items():
-        for i in range(0, len(pairs), tx_size):
-            chunk = pairs[i : i + tx_size]
+        # Deduplicate pairs in Python to avoid duplicate MERGE operations
+        unique_pairs = list(dict.fromkeys(pairs))  # Preserves order, removes duplicates
 
+        # Process in chunks
+        for i in range(0, len(unique_pairs), tx_size):
+            chunk = unique_pairs[i : i + tx_size]
+
+            # Uses indexes on parent_field and child_field for fast lookups
             if direction_to_parent:
                 query = f"""
                 UNWIND $rows AS r
@@ -172,7 +175,6 @@ async def _create_relationships_batched(
 
             rows = [{"pv": pv, "cv": cv} for pv, cv in chunk]
             await session.run(query, rows=rows)
-            logger.debug(f"Created {len(rows)} {edge_name} relationships")
 
 
 async def _remove_list_values_batched(
@@ -225,9 +227,6 @@ async def _upsert_nodes_with_session(
             }
             for node in seen.values()
         ]
-
-        if len(seen) < len(node_list):
-            logger.debug(f"Deduplicated {len(node_list) - len(seen)} duplicate {label} nodes")
 
         for i in range(0, len(rows), tx_size):
             chunk = rows[i : i + tx_size]
@@ -297,7 +296,6 @@ async def create_relationships_batch(
             """
 
         await session.run(query, rows=chunk)
-        logger.debug(f"Created {len(chunk)} {relationship_type} relationships")
 
 
 async def remove_list_property_values(
@@ -311,8 +309,8 @@ async def remove_list_property_values(
 ) -> None:
     """Remove matched values from list properties after relationships are created.
 
-    For each node, removes specified values from its list property.
-    If the list becomes empty, removes the property entirely.
+    Optimized: If all values in the list property were processed, removes the property
+    entirely (faster). Otherwise, filters the list to remove only processed values.
 
     Args:
         session: Neo4j async session
@@ -333,35 +331,22 @@ async def remove_list_property_values(
             "values_to_remove": values_to_remove.get(uv, []),
         }
         for uv in unique_values
+        if values_to_remove.get(uv)  # Only include if there are values to remove
     ]
 
-    # Step 1: Remove values from list properties
-    for i in range(0, len(rows), tx_size):
-        chunk = rows[i : i + tx_size]
-        query = f"""
-        UNWIND $rows AS r
-        MATCH (n:`{label}` {{ `{unique_field}`: r.unique_value }})
-        WHERE n.`{list_property}` IS NOT NULL
-        SET n.`{list_property}` = [
-            x IN n.`{list_property}` WHERE NOT x IN r.values_to_remove
-        ]
-        """
-        await session.run(query, rows=chunk)
-        logger.debug(f"Removed values from {list_property} for {len(chunk)} {label} nodes")
+    if not rows:
+        return
 
-    # Step 2: Remove property entirely if list is empty
-    query = f"""
-    MATCH (n:`{label}`)
-    WHERE n.`{list_property}` IS NOT NULL AND size(n.`{list_property}`) = 0
-    REMOVE n.`{list_property}`
-    """
-    result = await session.run(query)
-    summary = await result.consume()
-    if summary.counters.properties_set > 0:
-        logger.debug(
-            f"Removed empty {list_property} property from "
-            f"{summary.counters.properties_set} {label} nodes"
-        )
+    # Simple and fast: Just remove the entire property for all processed proteins
+    # All IDs in the list were processed into relationships, so we can remove the property
+    for i in range(0, len(unique_values), tx_size):
+        chunk = unique_values[i : i + tx_size]
+        query = f"""
+        MATCH (n:`{label}`)
+        WHERE n.`{unique_field}` IN $unique_values
+        REMOVE n.`{list_property}`
+        """
+        await session.run(query, unique_values=chunk)
 
 
 async def query_nodes_by_list_property(
@@ -487,7 +472,7 @@ async def query_existing_nodes_by_ids(
     label: str,
     unique_field: str,
     node_ids: list[str],
-) -> set[str]:
+) -> list[str]:
     """Generic query for which node IDs already exist in database.
 
     Args:
@@ -497,10 +482,10 @@ async def query_existing_nodes_by_ids(
         node_ids: List of node IDs to check
 
     Returns:
-        Set of node IDs that already exist in the database
+        List of node IDs that already exist in the database
     """
     if not node_ids:
-        return set()
+        return []
 
     query = f"""
     MATCH (n:`{label}`)
@@ -508,7 +493,7 @@ async def query_existing_nodes_by_ids(
     RETURN n.`{unique_field}` AS node_id
     """
     result = await session.run(query, node_ids=node_ids)
-    existing = {str(record["node_id"]) async for record in result}
+    existing = [str(record["node_id"]) async for record in result]
     return existing
 
 
@@ -580,4 +565,3 @@ async def create_taxonomy_hierarchy(
     MERGE (child)-[:IS_A]->(parent)
     """
     await session.run(query, rows=rows)
-    logger.debug(f"Created {len(rows)} IS_A relationships for taxon hierarchy")

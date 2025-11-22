@@ -161,6 +161,7 @@ class InterProReaderStage:
                 limit=self.limit,
             )
             logger.info(f"Found {len(accessions)} accessions for {self.interpro_id}")
+            context.stats["total"] = len(accessions)
 
             # Update progress total if available
             if progress is not None and task_id is not None:
