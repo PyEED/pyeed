@@ -254,12 +254,12 @@ class ChebiClient:
                     else:
                         logger.debug(f"ChEBI molecule {chebi_id} not found or does not exist")
 
-            except ChebiError as e:
-                logger.warning(f"ChEBI batch fetch failed for batch {i // batch_size + 1}: {e}")
+            except ChebiError:
+                logger.exception(f"ChEBI batch fetch failed for batch {i // batch_size + 1}")
                 # Continue with next batch
                 continue
-            except ValueError as e:
-                logger.warning(f"Invalid ChEBI IDs in batch: {e}")
+            except ValueError:
+                logger.exception("Invalid ChEBI IDs in batch")
                 # Try individual fetches for this batch
                 for chebi_id in batch:
                     try:
@@ -270,8 +270,8 @@ class ChebiClient:
                                 yield entry
                     except Exception as e2:
                         logger.warning(f"Failed to fetch ChEBI {chebi_id}: {e2}")
-            except Exception as e:
-                logger.error(f"Unexpected error fetching ChEBI batch: {e}", exc_info=True)
+            except Exception:
+                logger.exception("Unexpected error fetching ChEBI batch")
                 continue
 
     def map(self, entry: ChebiEntryResult | None) -> dict[str, list[PyeedBase]]:

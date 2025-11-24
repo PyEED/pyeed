@@ -53,6 +53,9 @@ class TaxonomyEnrichmentStage:
         self.taxonomy_adapter = UniProtTaxonomyAdapter()
         self._db_semaphore = db_semaphore
         self._progress_lock = asyncio.Lock()
+        # Track unique taxon IDs we have already counted in progress.total
+        self._seen_taxon_ids: set[str] = set()
+        self._total_unique_taxa: int = 0
 
     async def run(
         self,
@@ -76,7 +79,6 @@ class TaxonomyEnrichmentStage:
         input_queue = next(iter(input_queues.values()))
         batch: list[PipelineRecord[Protein]] = []
         enrichment_tasks: list[asyncio.Task[Any]] = []
-        cumulative_protein_count = 0
 
         while True:
             item = await input_queue.get()
@@ -99,12 +101,6 @@ class TaxonomyEnrichmentStage:
 
             # Accumulate records
             batch.append(item)
-
-            # Update cumulative count and progress total dynamically
-            if progress is not None and task_id is not None:
-                cumulative_protein_count += 1
-                async with self._progress_lock:
-                    progress.update(task_id, total=cumulative_protein_count)
 
             # When batch is full, spawn background enrichment task
             if len(batch) >= self.batch_size:
@@ -132,23 +128,36 @@ class TaxonomyEnrichmentStage:
         logger.debug(f"Enriching taxonomy for batch of {len(protein_ids)} proteins")
 
         try:
-            await self._enrich_taxonomy_batch(protein_ids)
+            new_taxa = await self._enrich_taxonomy_batch(protein_ids, progress, task_id)
             logger.debug(f"Taxonomy enrichment complete for {len(protein_ids)} proteins")
 
-            # Advance progress by number of proteins processed
-            if progress is not None and task_id is not None:
+            # Advance progress by number of new unique taxon IDs processed
+            if progress is not None and task_id is not None and new_taxa > 0:
                 async with self._progress_lock:
-                    progress.advance(task_id, len(batch))
+                    progress.advance(task_id, new_taxa)
         except Exception:
             logger.exception("Taxonomy batch enrichment failed")
 
-    async def _enrich_taxonomy_batch(self, protein_ids: list[str]) -> None:
+    async def _enrich_taxonomy_batch(
+        self,
+        protein_ids: list[str],
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+    ) -> int:
         """Enrich specific proteins with taxonomy data.
 
         Args:
             protein_ids: List of protein IDs to enrich
+            progress: Optional Progress instance for updating progress
+            task_id: Optional TaskID for tracking progress
+
+        Returns:
+            Number of new unique taxon IDs encountered in this batch
         """
         logger.info(f"Starting taxonomy enrichment for {len(protein_ids)} proteins")
+
+        # Initialize new_taxon_ids to ensure it's always defined
+        new_taxon_ids: list[str] = []
 
         # Step 1: Query proteins for taxon_ids
         async with self.db.async_driver.session() as session:
@@ -177,7 +186,16 @@ class TaxonomyEnrichmentStage:
 
             if not unique_taxon_ids:
                 logger.warning("No unique taxon_ids found, skipping enrichment")
-                return
+                return 0
+
+            # Count only previously unseen taxon IDs for the progress total
+            new_taxon_ids = [tid for tid in unique_taxon_ids if tid not in self._seen_taxon_ids]
+            if new_taxon_ids:
+                self._seen_taxon_ids.update(new_taxon_ids)
+                if progress is not None and task_id is not None:
+                    async with self._progress_lock:
+                        self._total_unique_taxa += len(new_taxon_ids)
+                        progress.update(task_id, total=self._total_unique_taxa)
 
             # Check existing taxons
             existing_taxon_ids = await query_existing_nodes_by_ids(
@@ -221,6 +239,8 @@ class TaxonomyEnrichmentStage:
                 except Exception:
                     logger.exception("Failed to process new taxonomies")
                     raise
+
+        return len(new_taxon_ids)
 
     async def _link_existing_taxons_batch(
         self, taxon_ids: list[str], protein_taxon_map: dict[str, list[str]]
@@ -298,14 +318,8 @@ class TaxonomyEnrichmentStage:
         all_target_taxons: list[str] = []
         removal_map: dict[str, list[str]] = defaultdict(list)
 
-        for idx, taxonomy_response in enumerate(taxonomy_responses):
+        for taxonomy_response in taxonomy_responses:
             try:
-                # Log the response structure for debugging
-                logger.debug(
-                    f"Processing taxonomy response {idx + 1}/{len(taxonomy_responses)}. "
-                    f"Keys: {list(taxonomy_response.keys()) if isinstance(taxonomy_response, dict) else 'not a dict'}"
-                )
-
                 hierarchy_info = self.taxonomy_adapter.extract_hierarchy_info(taxonomy_response)
 
                 # Validate hierarchy_info structure

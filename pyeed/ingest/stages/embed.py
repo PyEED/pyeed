@@ -232,8 +232,6 @@ class EmbeddingStage:
             logger.debug("No new records to embed after checking Milvus")
             return
 
-        logger.debug(f"Embedding {len(to_embed)} new records")
-
         # Create async batch stream with natural backpressure
         batch_stream = self._records_to_batches(to_embed)
 
@@ -241,10 +239,6 @@ class EmbeddingStage:
         batch_count = 0
         async for embedding_batch in self.embedder.embed_stream(batch_stream):
             batch_count += 1
-            logger.debug(
-                f"Received embedding batch {batch_count} with "
-                f"{len(embedding_batch.protein_ids)} proteins"
-            )
 
             # Distribute embeddings to records
             distribute_embeddings_to_records(embedding_batch, to_embed)
@@ -257,8 +251,6 @@ class EmbeddingStage:
                     for queue in output_queues.values():
                         await queue.put(record)
                     emitted += 1
-
-            logger.debug(f"Emitted {emitted} records to output queues")
 
             # Update progress
             if progress is not None and task_id is not None:

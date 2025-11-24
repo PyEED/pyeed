@@ -52,6 +52,9 @@ class ReactionEnrichmentStage:
         self.rhea_client = RheaClient()
         self._db_semaphore = db_semaphore
         self._progress_lock = asyncio.Lock()
+        # Track unique reaction IDs we have already counted in progress.total
+        self._seen_reaction_ids: set[str] = set()
+        self._total_unique_reactions: int = 0
 
     async def run(
         self,
@@ -76,7 +79,6 @@ class ReactionEnrichmentStage:
         output_queue = next(iter(output_queues.values())) if output_queues else None
         batch: list[PipelineRecord[Protein]] = []
         enrichment_tasks: list[asyncio.Task[Any]] = []
-        cumulative_protein_count = 0
 
         while True:
             item = await input_queue.get()
@@ -105,12 +107,6 @@ class ReactionEnrichmentStage:
 
             # Accumulate records
             batch.append(item)
-
-            # Update cumulative count and progress total dynamically
-            if progress is not None and task_id is not None:
-                cumulative_protein_count += 1
-                async with self._progress_lock:
-                    progress.update(task_id, total=cumulative_protein_count)
 
             # When batch is full, spawn background enrichment task
             if len(batch) >= self.batch_size:
@@ -142,7 +138,9 @@ class ReactionEnrichmentStage:
         logger.debug(f"Enriching reactions for batch of {len(protein_ids)} proteins")
 
         try:
-            reactions = await self._enrich_reactions_batch(protein_ids)
+            reactions, new_reactions = await self._enrich_reactions_batch(
+                protein_ids, progress, task_id
+            )
             logger.debug(
                 f"Reaction enrichment complete for {len(protein_ids)} proteins, "
                 f"forwarding {len(reactions)} reactions"
@@ -153,22 +151,32 @@ class ReactionEnrichmentStage:
                 for reaction in reactions:
                     await output_queue.put(reaction)
 
-            # Advance progress by number of proteins processed
-            if progress is not None and task_id is not None:
+            # Advance progress by number of new unique reaction IDs processed
+            if progress is not None and task_id is not None and new_reactions > 0:
                 async with self._progress_lock:
-                    progress.advance(task_id, len(batch))
+                    progress.advance(task_id, new_reactions)
         except Exception:
             logger.exception("Reaction batch enrichment failed")
 
-    async def _enrich_reactions_batch(self, protein_ids: list[str]) -> list[Reaction]:
+    async def _enrich_reactions_batch(
+        self,
+        protein_ids: list[str],
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+    ) -> tuple[list[Reaction], int]:
         """Enrich specific proteins with reaction data and return Reaction objects.
 
         Args:
             protein_ids: List of protein IDs to enrich
+            progress: Optional Progress instance for updating progress
+            task_id: Optional TaskID for tracking progress
 
         Returns:
-            List of Reaction objects that were processed
+            Tuple of (list of Reaction objects that were processed, count of new unique reactions)
         """
+        # Initialize new_reaction_ids to ensure it's always defined
+        new_reaction_ids: list[str] = []
+
         # Step 1: Query proteins for reaction_ids
         async with self.db.async_driver.session() as session:
             query = """
@@ -191,7 +199,18 @@ class ReactionEnrichmentStage:
                     protein_reaction_map[reaction_id].append(protein_id)
 
             if not unique_reaction_ids:
-                return []
+                return ([], 0)
+
+            # Count only previously unseen reaction IDs for the progress total
+            new_reaction_ids = [
+                rid for rid in unique_reaction_ids if rid not in self._seen_reaction_ids
+            ]
+            if new_reaction_ids:
+                self._seen_reaction_ids.update(new_reaction_ids)
+                if progress is not None and task_id is not None:
+                    async with self._progress_lock:
+                        self._total_unique_reactions += len(new_reaction_ids)
+                        progress.update(task_id, total=self._total_unique_reactions)
 
             # Check existing reactions
             existing_reaction_ids = await query_existing_nodes_by_ids(
@@ -226,7 +245,7 @@ class ReactionEnrichmentStage:
                 )
                 all_reactions.extend(new_reactions)
 
-        return all_reactions
+        return (all_reactions, len(new_reaction_ids))
 
     async def _link_existing_reactions_batch(
         self, reaction_ids: list[str], protein_reaction_map: dict[str, list[str]]

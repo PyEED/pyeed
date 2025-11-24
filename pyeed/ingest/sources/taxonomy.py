@@ -40,7 +40,8 @@ class UniProtTaxonomyAdapter:
         Returns:
             Query string in format: (id1 OR id2 OR ... OR idN)
         """
-        return f"({' OR '.join(taxon_ids)})"
+        clauses = [f"id:{tid}" for tid in taxon_ids]
+        return "(" + " OR ".join(clauses) + ")"
 
     @retry(
         wait=wait_exponential_jitter(0.5, 3),
@@ -233,7 +234,7 @@ class UniProtTaxonomyAdapter:
         if t is None:
             return {"main_id": None, "parent_id": None, "lineage_ids": []}
 
-        main_id = str(t.get("taxonId")) if t.get("taxonId") is not None else None
+        main_id = str(t.get("taxonId"))
         parent = t.get("parent", {})
         parent_id = (
             str(parent.get("taxonId"))

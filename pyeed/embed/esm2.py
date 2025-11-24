@@ -1,23 +1,3 @@
-"""ESM2 protein embedder with GPU parallelism and per-GPU thread safety.
-
-Architecture:
-    Uses per-GPU locks to serialize model access. Multiple batches can process
-    concurrently across different GPUs, but only one batch processes per GPU
-    at a time. This prevents rotary embeddings cache corruption.
-
-Thread Safety:
-    ESM2's rotary embeddings use per-model-instance cache. Concurrent access
-    from multiple threads corrupts this cache. Per-GPU locks ensure sequential
-    access to each model instance while maintaining parallelism across GPUs.
-
-Backpressure Flow:
-    GPU processing slow → Task limit reached → embed_stream blocks →
-    Pipeline queue fills → Reader blocks → No more data ingested
-
-This prevents memory exhaustion when embedding is the bottleneck, while ensuring
-thread-safe execution and maintaining GPU utilization.
-"""
-
 import asyncio
 from collections.abc import AsyncIterator, Sequence
 
@@ -348,16 +328,6 @@ class ESM2Embedder:
 
         Yields:
             EmbeddingBatch for each processed batch (order non-deterministic)
-
-        Example:
-            ```python
-            async def batch_gen():
-                for batch in batches:
-                    yield batch
-
-            async for result in embedder.embed_stream(batch_gen()):
-                process(result)
-            ```
         """
         num_gpus = len(self.devices)
         device_idx = 0

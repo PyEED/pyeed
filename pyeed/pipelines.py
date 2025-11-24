@@ -168,10 +168,10 @@ def ingest_fasta(
 
         # Build pipeline
         pipeline = Pipeline(progress=bar)
-        neo4j_queue = pipeline.add_queue("neo4j", maxsize=1000)
-        embedding_queue = pipeline.add_queue("embedding", maxsize=1000)
-        taxonomy_queue = pipeline.add_queue("taxonomy", maxsize=1000)
-        milvus_queue = pipeline.add_queue("milvus", maxsize=1000)
+        neo4j_queue = pipeline.add_queue("neo4j", maxsize=3000)
+        embedding_queue = pipeline.add_queue("embedding", maxsize=3000)
+        taxonomy_queue = pipeline.add_queue("taxonomy", maxsize=3000)
+        milvus_queue = pipeline.add_queue("milvus", maxsize=3000)
 
         pipeline.add_stage(
             stage=FASTAReaderStage(
@@ -218,7 +218,7 @@ def ingest_fasta(
         )
 
         # Create shared DB semaphore for enrichment stages
-        db_semaphore = asyncio.Semaphore(20)
+        db_semaphore = asyncio.Semaphore(1)
 
         pipeline.add_stage(
             stage=TaxonomyEnrichmentStage(
@@ -424,7 +424,7 @@ def ingest_uniprot(
 
         # Path 2: Enrichment pipeline (taxonomy → reactions → molecules)
         # Create shared DB semaphore for all enrichment stages
-        db_semaphore = asyncio.Semaphore(20)
+        db_semaphore = asyncio.Semaphore(1)
 
         pipeline.add_stage(
             stage=TaxonomyEnrichmentStage(
@@ -713,7 +713,12 @@ if __name__ == "__main__":
     # ----
     # Option 3: Ingest all proteins related to an InterPro ID
     # ----
-    ingest_interpro(
-        id="IPR002133",
+
+    # ids.txt has one ID per line
+    with open("/home/mha/projects/proteingraph/downloads/ids.txt", encoding="utf-8") as f:
+        ids = [line.strip() for line in f if line.strip()]
+
+    ingest_uniprot(
+        ids=ids[180_000:],
         n_gpus=2,
     )
