@@ -20,19 +20,26 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from loguru import logger
 from rich.progress import Progress, TaskID
 
 from ...embed.esm2 import ESM2Embedder
-from ...embed.types import distribute_embeddings_to_records, records_to_embedding_inputs
+from ...embed.types import (
+    EmbeddingBatch,
+    distribute_embeddings_to_records,
+    records_to_embedding_inputs,
+)
 from ..core.pipeline import PipelineRecord
 from ..core.protocol import SENTINEL, PipelineContext
 from ..model.pyeedbase import PyeedBase
 
 if TYPE_CHECKING:
     from ...db.milvus import VectorDB
+
+# Type alias for clarity
+Batch: TypeAlias = tuple[list[str], list[str]]
 
 
 class EmbeddingStage:
@@ -90,26 +97,96 @@ class EmbeddingStage:
 
         logger.info("Embedding stage starting")
 
-        # Convert queue to record stream
-        record_stream = self._queue_to_records(input_queue)
+        # Bounded queue to hold length-sorted batches ready for GPU consumption.
+        # Size ties to number of devices to preserve backpressure upstream.
+        prepared_batch_queue: asyncio.Queue[Batch | object] = asyncio.Queue(
+            maxsize=max(len(self.embedder.devices) * 4, 4)
+        )
+        record_map: dict[str, PipelineRecord[PyeedBase]] = {}
+        record_map_lock = asyncio.Lock()
 
-        # Process in chunks
-        chunk_count = 0
-        async for chunk in self._chunk_records(record_stream):
-            # Check for total update on first item (pipeline is active by then)
-            if progress is not None and task_id is not None:
-                total = context.stats.get("total")
-                if total is not None:
-                    progress.update(task_id, total=total)
-            chunk_count += 1
-            logger.info(f"Processing chunk {chunk_count} with {len(chunk)} records")
-            await self._process_chunk(chunk, output_queues, progress, task_id)
+        async def batch_producer() -> None:
+            """Read from input queue, dedupe via Milvus, length-sort, enqueue batches."""
+            chunk_count = 0
+            async for chunk in self._chunk_records(self._queue_to_records(input_queue)):
+                # Check for total update on first item (pipeline is active by then)
+                if progress is not None and task_id is not None:
+                    total = context.stats.get("total")
+                    if total is not None:
+                        progress.update(task_id, total=total)
 
-        # Send SENTINEL when done
+                chunk_count += 1
+                logger.info(f"Preparing chunk {chunk_count} with {len(chunk)} records")
+
+                to_embed, already_embedded = await self._filter_existing(chunk)
+
+                # Update progress and forward already embedded records immediately
+                if progress is not None and task_id is not None and already_embedded:
+                    progress.update(task_id, advance=len(already_embedded))
+
+                if already_embedded:
+                    for record in already_embedded:
+                        for queue in output_queues.values():
+                            await queue.put(record)
+
+                if not to_embed:
+                    logger.debug("Chunk had no new records after dedupe; skipping embedding")
+                    continue
+
+                sequences, protein_ids = records_to_embedding_inputs(to_embed)
+
+                # Track records so consumer can attach embeddings
+                async with record_map_lock:
+                    for record in to_embed:
+                        record_map[record.data.id] = record
+
+                batches = self.embedder.create_length_sorted_batches(
+                    sequences,
+                    protein_ids,
+                    self.batch_size,
+                )
+                logger.debug(f"Enqueuing {len(batches)} batches from chunk {chunk_count}")
+
+                for batch in batches:
+                    await prepared_batch_queue.put(batch)
+
+            # Signal completion downstream
+            await prepared_batch_queue.put(SENTINEL)
+            logger.info(f"Batch producer finished after {chunk_count} chunks")
+
+        async def batch_consumer() -> None:
+            """Drain prepared batches, run embedding, distribute, emit."""
+            batch_id = 0
+
+            async def prepared_batch_stream() -> AsyncIterator[Batch]:
+                while True:
+                    item = await prepared_batch_queue.get()
+                    if item is SENTINEL:
+                        # Sentinel consumed; do not re-enqueue to avoid double-stop
+                        return
+                    yield item
+
+            async for embedding_batch in self.embedder.embed_stream(prepared_batch_stream()):
+                batch_id += 1
+                await self._emit_embedded_records(
+                    embedding_batch,
+                    record_map,
+                    record_map_lock,
+                    output_queues,
+                    progress,
+                    task_id,
+                )
+
+            logger.info(f"Batch consumer finished after processing {batch_id} batches")
+
+        # Launch producer/consumer concurrently to overlap preparation with GPU work
+        await asyncio.gather(batch_producer(), batch_consumer())
+
+        # Send SENTINEL when done to downstream stages
         for queue in output_queues.values():
             await queue.put(SENTINEL)
 
-        logger.info(f"Embedding stage finished. Processed {chunk_count} chunks")
+        logger.info("Embedding stage finished")
 
     async def _queue_to_records(
         self, queue: asyncio.Queue[PipelineRecord[PyeedBase] | object]
@@ -152,108 +229,57 @@ class EmbeddingStage:
         if chunk:
             yield chunk
 
-    async def _records_to_batches(
+    async def _filter_existing(
+        self, records: list[PipelineRecord[PyeedBase]]
+    ) -> tuple[list[PipelineRecord[PyeedBase]], list[PipelineRecord[PyeedBase]]]:
+        """Split records into new vs existing based on Milvus presence."""
+        if not records or not (self.vector_db and self.collection_name):
+            return records, []
+
+        protein_ids = [record.data.id for record in records]
+        try:
+            existing_ids = await asyncio.to_thread(
+                self.vector_db._check_existing_ids,
+                protein_ids,
+            )
+            if existing_ids:
+                logger.info(
+                    "Skipping already embedded records",
+                    extra={"existing": len(existing_ids)},
+                )
+        except Exception as e:
+            logger.warning(f"Failed to check existing IDs in Milvus: {e}")
+            existing_ids = set()
+
+        to_embed = [r for r in records if r.data.id not in existing_ids]
+        already_embedded = [r for r in records if r.data.id in existing_ids]
+        return to_embed, already_embedded
+
+    async def _emit_embedded_records(
         self,
-        records: list[PipelineRecord[PyeedBase]],
-    ) -> AsyncIterator[tuple[list[str], list[str]]]:
-        """Convert records to length-sorted batches with natural backpressure.
-
-        Args:
-            records: List of pipeline records to convert
-
-        Yields:
-            (sequences, protein_ids) tuples ready for embedder
-        """
-        # Extract sequences and IDs from records
-        sequences, protein_ids = records_to_embedding_inputs(records)
-
-        # Create length-sorted batches for GPU efficiency
-        batches = self.embedder.create_length_sorted_batches(
-            sequences, protein_ids, self.batch_size
-        )
-
-        logger.debug(f"Created {len(batches)} batches from {len(records)} records")
-
-        # Yield batches with async backpressure
-        for batch in batches:
-            await asyncio.sleep(0)  # Yield control to event loop for backpressure
-            yield batch
-
-    async def _process_chunk(
-        self,
-        records: list[PipelineRecord[PyeedBase]],
+        embedding_batch: EmbeddingBatch,
+        record_map: dict[str, PipelineRecord[PyeedBase]],
+        record_map_lock: asyncio.Lock,
         output_queues: dict[str, asyncio.Queue[Any]],
         progress: Progress | None,
         task_id: TaskID | None,
     ) -> None:
-        """Process one chunk: check Milvus → batch → embed → convert → emit.
-
-        Args:
-            records: List of pipeline records to embed
-            output_queues: Output queues to emit updated records
-            progress: Progress instance for tracking
-            task_id: Task ID for progress updates
-        """
-        if not records:
-            logger.debug("Empty chunk, skipping")
-            return
-
-        # Check Milvus for existing embeddings (if configured)
-        existing_ids: set[str] = set()
-        if self.vector_db and self.collection_name:
-            protein_ids = [record.data.id for record in records]
+        """Attach embeddings to records and emit downstream."""
+        async with record_map_lock:
             try:
-                existing_ids = await asyncio.to_thread(
-                    self.vector_db._check_existing_ids,
-                    protein_ids,
-                )
-                if existing_ids:
-                    logger.info(
-                        f"Found {len(existing_ids)} records with existing embeddings in Milvus, "
-                        f"skipping embedding for those"
-                    )
-            except Exception as e:
-                logger.warning(f"Failed to check existing IDs in Milvus: {e}")
+                records = [record_map[pid] for pid in embedding_batch.protein_ids]
+            except KeyError as err:
+                missing = err.args[0]
+                raise ValueError(f"EmbeddingBatch contains unknown protein_id {missing}") from err
 
-        # Split: existing vs. new
-        to_embed = [r for r in records if r.data.id not in existing_ids]
-        already_embedded = [r for r in records if r.data.id in existing_ids]
+            distribute_embeddings_to_records(embedding_batch, records)
 
-        # Update progress for skipped records
-        if progress is not None and task_id is not None and already_embedded:
-            progress.update(task_id, advance=len(already_embedded))
+            for record in records:
+                record_map.pop(record.data.id, None)
 
-        if already_embedded:
-            for record in already_embedded:
-                for queue in output_queues.values():
-                    await queue.put(record)
+        for record in records:
+            for queue in output_queues.values():
+                await queue.put(record)
 
-        if not to_embed:
-            logger.debug("No new records to embed after checking Milvus")
-            return
-
-        # Create async batch stream with natural backpressure
-        batch_stream = self._records_to_batches(to_embed)
-
-        # Stream through embedder - results arrive as they complete
-        batch_count = 0
-        async for embedding_batch in self.embedder.embed_stream(batch_stream):
-            batch_count += 1
-
-            # Distribute embeddings to records
-            distribute_embeddings_to_records(embedding_batch, to_embed)
-
-            # Emit records that got embeddings (as they complete)
-            batch_ids = set(embedding_batch.protein_ids)
-            emitted = 0
-            for record in to_embed:
-                if record.data.id in batch_ids:
-                    for queue in output_queues.values():
-                        await queue.put(record)
-                    emitted += 1
-
-            # Update progress
-            if progress is not None and task_id is not None:
-                progress.update(task_id, advance=len(embedding_batch.protein_ids))
-
-        logger.debug(f"Chunk processing complete. Processed {batch_count} batches")
+        if progress is not None and task_id is not None:
+            progress.update(task_id, advance=len(embedding_batch.protein_ids))

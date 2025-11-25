@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from collections.abc import Callable
 from typing import Literal
 
@@ -210,7 +209,7 @@ def ingest_fasta(
             stage=MilvusUpsertStage(
                 vector_db=vector_db,
                 collection_name=vector_db_collection,
-                batch_size=100,
+                batch_size=2000,
             ),
             input_queues=[milvus_queue],
             output_queues=[],
@@ -415,7 +414,7 @@ def ingest_uniprot(
             stage=MilvusUpsertStage(
                 vector_db=vector_db,
                 collection_name=vector_db_collection,
-                batch_size=100,
+                batch_size=2000,
             ),
             input_queues=[milvus_queue],
             output_queues=[],
@@ -633,7 +632,7 @@ def ingest_interpro(
             stage=MilvusUpsertStage(
                 vector_db=vector_db,
                 collection_name=vector_db_collection,
-                batch_size=100,
+                batch_size=2000,
             ),
             input_queues=[milvus_queue],
             output_queues=[],
@@ -683,42 +682,27 @@ def ingest_interpro(
 
 
 if __name__ == "__main__":
-    # ----
-    # Option 1: Ingest a FASTA file
-    # ----
 
-    # Helper methods for Taxon and Accession ID extraction
-    def clean_str(s: str) -> str:
-        return s.split("|")[1]
+    def extract_rep_id(header: str) -> str:
+        """
+        From:
+            'UniRef90_UPI002E2621C6 uncharacterized protein ...'
+        → 'UPI002E2621C6'
+        """
+        return header.split("_", 1)[1].split(" ", 1)[0]
 
-    def extract_ox_id(s: str) -> str | None:
-        m = re.search(r"ox=(\d+)", s.lower())
-        return m.group(1) if m else None
+    def extract_taxid(header: str) -> str:
+        """
+        From:
+            '... Tax=Corticium candelabrum TaxID=121492 RepID=...'
+        → '121492'
+        """
+        return header.split("TaxID=", 1)[1].split()[0]
 
-    # ingest_fasta(
-    #     fasta_path="/home/mha/projects/proteingraph/downloads/1000seq.fasta",
-    #     header_fn=clean_str,
-    #     taxon_fn=extract_ox_id,
-    #     n_gpus=2,
-    # )
-
-    # ----
-    # Option 2: Ingest a list of UniProt accession IDs
-    # ----
-    # ingest_uniprot(
-    #     ids=["P12345", "Q9Y6X9"],
-    #     n_gpus=2,
-    # )
-
-    # ----
-    # Option 3: Ingest all proteins related to an InterPro ID
-    # ----
-
-    # ids.txt has one ID per line
-    with open("/home/mha/projects/proteingraph/downloads/ids.txt", encoding="utf-8") as f:
-        ids = [line.strip() for line in f if line.strip()]
-
-    ingest_uniprot(
-        ids=ids[180_000:],
+    fasta_path = "/home/mha/downloads/uniref_parts/uniref90_part01.fasta"
+    ingest_fasta(
+        fasta_path=fasta_path,
+        header_fn=extract_rep_id,
+        taxon_fn=extract_taxid,
         n_gpus=2,
     )

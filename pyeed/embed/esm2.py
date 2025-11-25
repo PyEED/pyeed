@@ -57,7 +57,7 @@ class ESM2Embedder:
         self.pooling_configs = self._normalize_pooling_methods(pooling_methods)
 
         self.models: list[EsmModel | None] = []
-        self.tokenizer: EsmTokenizer | None = None  # Single tokenizer on CPU
+        self.tokenizer: EsmTokenizer | None = None
         self.devices: list[torch.device] = []
         self.device_ids: list[int] = []
         self._device_locks: list[asyncio.Lock] | None = None

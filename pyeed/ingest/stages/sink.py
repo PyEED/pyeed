@@ -153,7 +153,7 @@ class MilvusUpsertStage:
         self,
         vector_db: VectorDB,
         collection_name: str,
-        batch_size: int = 100,
+        batch_size: int = 2000,
     ):
         """Initialize Milvus sink.
 
