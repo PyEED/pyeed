@@ -7,6 +7,7 @@ import contextlib
 from collections import defaultdict
 from typing import Any
 
+from loguru import logger
 from rich.progress import Progress, TaskID
 
 from pyeed.db.milvus import VectorDB
@@ -85,7 +86,7 @@ class Neo4jUpsertStage:
         progress: Progress | None,
         task_id: TaskID | None,
     ) -> None:
-        """Process a batch: check existing nodes, filter, upsert new ones, forward all."""
+        """Process a batch: check existing nodes, filter, upsert new ones, forward only new ones."""
         if not batch:
             return
 
@@ -129,8 +130,8 @@ class Neo4jUpsertStage:
             async with self.db.async_driver.session() as session:
                 await upsert_pipeline_records(session, new_batch)
 
-        # Forward ALL records (both new and existing) to output queues
-        for record in batch:
+        # Forward ONLY new records (if not already present) to output queues
+        for record in new_batch:
             unique_field = record.data.get_unique_model_field()
             unique_value = str(getattr(record.data, unique_field))
             context.added_nodes[type(record.data).__name__].add(unique_value)
@@ -180,6 +181,9 @@ class MilvusUpsertStage:
 
         while True:
             item = await input_queue.get()
+
+            # Log the current size of the input queue
+            logger.debug(f"MilvusUpsertStage input queue size: {input_queue.qsize()}")
 
             if progress is not None and task_id is not None:
                 total = context.stats.get("total")

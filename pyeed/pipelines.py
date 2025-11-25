@@ -37,7 +37,7 @@ from .utils.progress import CONSOLE
 
 def ingest_fasta(
     fasta_path: str,
-    chunk_size: int = 10,
+    chunk_size: int = 512,
     header_fn: Callable[[str], str] | None = None,
     taxon_fn: Callable[[str], str] | None = None,
     graph_db_uri: str | None = None,
@@ -186,7 +186,7 @@ def ingest_fasta(
         )
 
         pipeline.add_stage(
-            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            stage=Neo4jUpsertStage(db=graph_db, batch_size=512),
             input_queues=[neo4j_queue],
             output_queues=[embedding_queue, taxonomy_queue],
             task_id=write_task,
@@ -209,7 +209,7 @@ def ingest_fasta(
             stage=MilvusUpsertStage(
                 vector_db=vector_db,
                 collection_name=vector_db_collection,
-                batch_size=2000,
+                batch_size=512,
             ),
             input_queues=[milvus_queue],
             output_queues=[],
