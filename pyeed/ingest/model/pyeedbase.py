@@ -3,13 +3,93 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from loguru import logger
 from neo4j import AsyncDriver, AsyncTransaction
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .nodes import BaseNode  # wherever BaseNode lives
+
 T = TypeVar("T", bound="BaseNode")
+TStart = TypeVar("TStart", bound=BaseNode)
+TEnd = TypeVar("TEnd", bound=BaseNode)
+
+
+class RelationGroup(Generic[TStart, TEnd]):
+    """One start node with multiple target nodes."""
+
+    __slots__ = ("start", "targets")
+
+    def __init__(self, start: TStart, targets: Iterable[TEnd]) -> None:
+        self.start = start
+        self.targets = list(targets)  # ensure re-iterable
+
+
+RelationBatch = list[RelationGroup[TStart, TEnd]]
+
+
+async def write_relations(
+    driver: AsyncDriver,
+    rel_type: str,
+    batch: RelationBatch[TStart, TEnd],
+    *,
+    session_kwargs: dict[str, Any] | None = None,
+    rel_props: dict[str, Any] | None = None,
+) -> None:
+    """Write (start)-[rel_type]->(target) relationships for a batch.
+
+    All start nodes must be same type; all target nodes must be same type.
+    """
+    if not batch:
+        return
+
+    # infer classes from first group
+    first_group = batch[0]
+    start_cls = type(first_group.start)
+    if not first_group.targets:
+        return
+    end_cls = type(first_group.targets[0])
+
+    start_pk = start_cls.pk_field
+    end_pk = end_cls.pk_field
+    rel_props = rel_props or {}
+
+    rows: list[dict[str, Any]] = []
+    for group in batch:
+        if not group.targets:
+            continue
+        from_id = getattr(group.start, start_pk)
+        for target in group.targets:
+            rows.append(
+                {
+                    "from_id": from_id,
+                    "to_id": getattr(target, end_pk),
+                    "props": rel_props,
+                }
+            )
+
+    if not rows:
+        return
+
+    cypher = f"""
+    UNWIND $rows AS row
+    MATCH (a:`{start_cls.__name__}` {{ {start_pk}: row.from_id }})
+    MATCH (b:`{end_cls.__name__}` {{ {end_pk}: row.to_id }})
+    MERGE (a)-[r:`{rel_type}`]->(b)
+    SET r += row.props
+    """
+
+    session_kwargs = session_kwargs or {}
+    async with driver.session(**session_kwargs) as session:
+
+        async def _tx(tx: AsyncTransaction, rows: list[dict[str, Any]]) -> None:
+            await tx.run(cypher, rows=rows)
+
+        try:
+            await session.execute_write(_tx, rows)
+        except Exception:
+            logger.exception("Failed to write relations")
 
 
 @dataclass(frozen=True)
@@ -18,6 +98,7 @@ class LabelProperty:
     Influences the Neo4j schema creation.
     """
 
+    unique: bool = False
     index: bool = False
 
 
@@ -61,7 +142,6 @@ class BaseNode(BaseModel):
                 f"Found {len(indexed)} indexed fields in {cls.__name__}: {indexed}"
             )
 
-        # cls._index_checked = True
         return self
 
     @field_validator("custom")
@@ -217,88 +297,3 @@ def _is_neo4j_prop_value(v: object) -> bool:
     if isinstance(v, list | tuple):
         return all(_is_primitive(e) for e in v)
     return False
-
-
-# ============================================================================
-# TEST CODE - Remove before production
-# ============================================================================
-if __name__ == "__main__":
-    from typing import Annotated
-
-    from rich import print
-
-    print("=" * 60)
-    print("Testing BaseNode with LabelProperty(index=True)")
-    print("=" * 60)
-
-    # Test 1: Valid node with indexed field
-    print("\n1. Testing valid node with indexed field:")
-    try:
-
-        class TestNode(BaseNode):
-            iddd: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID")
-            name: str = Field(..., description="Name")
-
-        node = TestNode(iddd="test-123", name="Test Node")
-        print(f"   ✓ Created node: {node}")
-        print(f"   ✓ unique_field: {node.get_unique_field()}")
-        print(f"   ✓ unique_field (class): {TestNode.get_unique_field()}")
-        print(f"   ✓ to_dict(): {node.to_dict()}")
-    except Exception as e:
-        print(f"   ✗ Error: {e}")
-
-    # Test 2: Node without indexed field (should raise error)
-    print("\n2. Testing node without indexed field (should fail):")
-    try:
-
-        class NoIndexNode(BaseNode):
-            name: str = Field(..., description="Name")
-
-        node = NoIndexNode(name="Test")
-        print(f"   ✗ Should have failed! unique_field: {node.get_unique_field()}")
-    except ValueError as e:
-        print(f"   ✓ Correctly raised ValueError: {e}")
-
-    # Test 3: Node with multiple indexed fields (should raise error)
-    print("\n3. Testing node with multiple indexed fields (should fail):")
-    try:
-
-        class MultiIndexNode(BaseNode):
-            id: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID")
-            code: Annotated[str, LabelProperty(index=True)] = Field(..., description="Code")
-
-        node = MultiIndexNode(id="test", code="code")
-        print(f"   ✗ Should have failed! Created: {node}")
-    except ValueError as e:
-        print(f"   ✓ Correctly raised ValueError: {e}")
-
-    # Test 4: Custom field validation - dict values not allowed
-    print("\n4. Testing custom field with dict value (should fail):")
-    try:
-
-        class TestNode2(BaseNode):
-            id: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID")
-
-        node = TestNode2(id="test", custom={"nested": {"key": "value"}})
-        print(f"   ✗ Should have failed! Created: {node}")
-    except ValueError as e:
-        print(f"   ✓ Correctly raised ValueError: {e}")
-
-    # Test 5: Valid custom fields
-    print("\n5. Testing valid custom fields:")
-    try:
-
-        class TestNode3(BaseNode):
-            id: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID")
-
-        node = TestNode3(
-            id="test", custom={"extra_field": "value", "number": 42, "tags": ["tag1", "tag2"]}
-        )
-        print(f"   ✓ Created node with custom fields: {node}")
-        print(f"   ✓ to_dict(): {node.to_dict()}")
-    except Exception as e:
-        print(f"   ✗ Error: {e}")
-
-    print("\n" + "=" * 60)
-    print("Tests completed!")
-    print("=" * 60)

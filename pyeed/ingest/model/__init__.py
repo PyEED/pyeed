@@ -3,22 +3,22 @@ from .annotationtype import AnnotationType
 from .goannotation import GOAnnotation
 from .molecule import Molecule
 from .protein import Protein
-from .pyeedbase import PyeedBase
+from .pyeedbase import BaseNode
 from .reaction import Reaction
 from .taxon import Taxon
 
 __all__ = [
     "Annotation",
     "AnnotationType",
+    "BaseNode",
     "GOAnnotation",
     "Molecule",
     "Protein",
-    "PyeedBase",
     "Reaction",
     "Taxon",
 ]
 
-MODEL_CLASSES: list[type[PyeedBase]] = [
+MODEL_CLASSES: list[type[BaseNode]] = [
     Annotation,
     GOAnnotation,
     Molecule,

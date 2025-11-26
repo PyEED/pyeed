@@ -2,15 +2,15 @@ from typing import Annotated
 
 from pydantic import Field
 
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import BaseNode, LabelProperty
 
 
-class Molecule(PyeedBase):
+class Molecule(BaseNode):
     """Chemical molecule information."""
 
-    id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(
+    inchi_key: Annotated[str, LabelProperty(index=True)] = Field(
         ...,
-        description="Molecule identifier (ChEBI ID)",
+        description="InChI key",
     )
     name: str | None = Field(
         default=None,
@@ -24,3 +24,21 @@ class Molecule(PyeedBase):
         default=None,
         description="InChI representation",
     )
+
+
+from rdkit import Chem
+from rdkit.Chem import inchi
+
+
+def smiles_to_inchikey(smiles: str) -> str:
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise ValueError(f"Could not parse SMILES: {smiles}")
+    inchi_str = inchi.MolToInchi(mol)  # uses IUPAC InChI under the hood
+    inchikey = inchi.InchiToInchiKey(inchi_str)
+    return inchikey
+
+
+smiles = "C1CCCCC1"
+inchikey = smiles_to_inchikey(smiles)
+print(inchikey)

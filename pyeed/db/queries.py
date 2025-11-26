@@ -174,7 +174,7 @@ async def _create_relationships_batched(
                 """
 
             rows = [{"pv": pv, "cv": cv} for pv, cv in chunk]
-            await session.run(query, rows=rows)
+            await session.execute_write(query, rows=rows)
 
 
 async def _remove_list_values_batched(

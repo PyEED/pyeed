@@ -699,7 +699,7 @@ if __name__ == "__main__":
         """
         return header.split("TaxID=", 1)[1].split()[0]
 
-    fasta_path = "/home/mha/downloads/uniref_parts/uniref90_part01.fasta"
+    fasta_path = "/home/mha/downloads/uniref_parts/uniref90_part03.fasta"
     ingest_fasta(
         fasta_path=fasta_path,
         header_fn=extract_rep_id,

@@ -2,15 +2,15 @@ from typing import Annotated, Any
 
 from pydantic import Field, field_validator
 
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import BaseNode, LabelProperty
 
 
-class Protein(PyeedBase):
+class Protein(BaseNode):
     """Protein sequence and metadata."""
 
     id: Annotated[
         str,
-        LabelProperty(unique=True, index=True),
+        LabelProperty(index=True),
     ] = Field(
         ...,
         description="Protein identifier (UniProt accession)",
@@ -34,26 +34,6 @@ class Protein(PyeedBase):
     ec_numbers: list[str] | None = Field(
         None,
         description="Enzyme Commission numbers associated with the protein",
-    )
-    taxon_ids: list[str] = Field(
-        default_factory=list,
-        description="Taxonomy IDs of the organism the protein originates from",
-    )
-    structure_ids: list[str] = Field(
-        default_factory=list,
-        description="Structure identifiers",
-    )
-    go_ids: list[str] = Field(
-        default_factory=list,
-        description="Gene Ontology identifiers",
-    )
-    reaction_ids: list[str] = Field(
-        default_factory=list,
-        description="RHEA reaction identifiers",
-    )
-    annotation_ids: list[str] = Field(
-        default_factory=list,
-        description="Sequence annotation identifiers",
     )
 
     @field_validator("sequence")
