@@ -22,6 +22,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "pymilvus>=2.6.3",
     "python-dotenv>=1.1.1",
+    "rdkit>=2025.9.1",
     "rich>=14.1.0",
     "scikit-bio>=0.7.1.post1",
     "tenacity>=9.1.2",
@@ -58,6 +59,7 @@ max-statements = 100
 [dependency-groups]
 dev = [
     "pytest>=9.0.0",
+    "pytest-asyncio>=0.25.2",
     "pytest-sugar>=1.1.1",
     "ruff>=0.12.12",
     "ruff-lsp>=0.0.62",
