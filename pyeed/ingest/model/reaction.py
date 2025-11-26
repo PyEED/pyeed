@@ -2,10 +2,10 @@ from typing import Annotated
 
 from pydantic import Field
 
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import BaseNode, LabelProperty, PyeedBase
 
 
-class Reaction(PyeedBase):
+class Reaction(BaseNode):
     """Chemical reaction information."""
 
     id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(

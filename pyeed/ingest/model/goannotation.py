@@ -2,10 +2,10 @@ from typing import Annotated
 
 from pydantic import Field
 
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import BaseNode, LabelProperty
 
 
-class GOAnnotation(PyeedBase):
+class GOAnnotation(BaseNode):
     """Gene Ontology annotation."""
 
     id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(

@@ -4,10 +4,10 @@ from uuid import uuid4
 from pydantic import Field
 
 from .annotationtype import AnnotationType
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import LabelProperty, BaseNode
 
 
-class Annotation(PyeedBase):
+class Annotation(BaseNode):
     """Sequence annotation with positions and metadata."""
 
     id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(

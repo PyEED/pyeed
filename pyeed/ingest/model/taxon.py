@@ -2,17 +2,17 @@ from typing import Annotated
 
 from pydantic import Field
 
-from .pyeedbase import LabelProperty, PyeedBase
+from .pyeedbase import BaseNode, LabelProperty
 
 
-class Taxon(PyeedBase):
+class Taxon(BaseNode):
     """Generic taxon node used for lineage and parent."""
 
     id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(
         ...,
         description="Taxonomy ID",
     )
-    scientific_name: str = Field(
+    scientific_name: str | None = Field(
         default=None,
         description="Scientific name of the taxon",
     )

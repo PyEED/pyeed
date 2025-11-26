@@ -208,7 +208,7 @@ class TestGetUniqueField:
             name: str = Field(..., description="Name")
 
         with pytest.raises(ValueError, match="No field with LabelProperty"):
-            NoIndexNode.get_unique_field()
+            NoIndexNode.get_index_field()
 
     def test_error_message_helpful(self):
         """Test that error message provides guidance."""
@@ -219,7 +219,7 @@ class TestGetUniqueField:
         with pytest.raises(
             ValueError, match="To mark a field as indexed, use: Annotated.*LabelProperty"
         ):
-            NoIndexNode.get_unique_field()
+            NoIndexNode.get_index_field()
 
 
 # ============================================================================
@@ -438,7 +438,7 @@ class TestIntegration:
         assert child.child_field == "child"
 
         # Verify get_unique_field works on child
-        assert child.get_unique_field() == "id"
+        assert child.get_index_field() == "id"
 
         # Verify to_dict includes all fields
         d = child.to_dict()

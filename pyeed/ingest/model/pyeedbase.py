@@ -3,93 +3,14 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from loguru import logger
 from neo4j import AsyncDriver, AsyncTransaction
+from neo4j._async.work import AsyncManagedTransaction
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .nodes import BaseNode  # wherever BaseNode lives
-
 T = TypeVar("T", bound="BaseNode")
-TStart = TypeVar("TStart", bound=BaseNode)
-TEnd = TypeVar("TEnd", bound=BaseNode)
-
-
-class RelationGroup(Generic[TStart, TEnd]):
-    """One start node with multiple target nodes."""
-
-    __slots__ = ("start", "targets")
-
-    def __init__(self, start: TStart, targets: Iterable[TEnd]) -> None:
-        self.start = start
-        self.targets = list(targets)  # ensure re-iterable
-
-
-RelationBatch = list[RelationGroup[TStart, TEnd]]
-
-
-async def write_relations(
-    driver: AsyncDriver,
-    rel_type: str,
-    batch: RelationBatch[TStart, TEnd],
-    *,
-    session_kwargs: dict[str, Any] | None = None,
-    rel_props: dict[str, Any] | None = None,
-) -> None:
-    """Write (start)-[rel_type]->(target) relationships for a batch.
-
-    All start nodes must be same type; all target nodes must be same type.
-    """
-    if not batch:
-        return
-
-    # infer classes from first group
-    first_group = batch[0]
-    start_cls = type(first_group.start)
-    if not first_group.targets:
-        return
-    end_cls = type(first_group.targets[0])
-
-    start_pk = start_cls.pk_field
-    end_pk = end_cls.pk_field
-    rel_props = rel_props or {}
-
-    rows: list[dict[str, Any]] = []
-    for group in batch:
-        if not group.targets:
-            continue
-        from_id = getattr(group.start, start_pk)
-        for target in group.targets:
-            rows.append(
-                {
-                    "from_id": from_id,
-                    "to_id": getattr(target, end_pk),
-                    "props": rel_props,
-                }
-            )
-
-    if not rows:
-        return
-
-    cypher = f"""
-    UNWIND $rows AS row
-    MATCH (a:`{start_cls.__name__}` {{ {start_pk}: row.from_id }})
-    MATCH (b:`{end_cls.__name__}` {{ {end_pk}: row.to_id }})
-    MERGE (a)-[r:`{rel_type}`]->(b)
-    SET r += row.props
-    """
-
-    session_kwargs = session_kwargs or {}
-    async with driver.session(**session_kwargs) as session:
-
-        async def _tx(tx: AsyncTransaction, rows: list[dict[str, Any]]) -> None:
-            await tx.run(cypher, rows=rows)
-
-        try:
-            await session.execute_write(_tx, rows)
-        except Exception:
-            logger.exception("Failed to write relations")
 
 
 @dataclass(frozen=True)
@@ -98,7 +19,6 @@ class LabelProperty:
     Influences the Neo4j schema creation.
     """
 
-    unique: bool = False
     index: bool = False
 
 
@@ -124,7 +44,7 @@ class BaseNode(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _check_indexed_fields(self):
+    def _check_indexed_fields(self) -> Self:
         cls = type(self)
         if getattr(cls, "_index_checked", False):
             return self
@@ -216,7 +136,7 @@ class BaseNode(BaseModel):
         if not rows:
             return
 
-        index_field_name = cls._get_indexed_field()
+        index_field_name = cls.get_index_field()
 
         cypher = f"""
         UNWIND $rows AS row
@@ -227,7 +147,7 @@ class BaseNode(BaseModel):
         kwargs = session_kwargs or {}
         async with driver.session(**kwargs) as session:
 
-            async def _tx(tx: AsyncTransaction, rows: list[dict[str, Any]]) -> None:
+            async def _tx(tx: AsyncManagedTransaction, rows: list[dict[str, Any]]) -> None:
                 await tx.run(cypher, rows=rows)
 
             try:
@@ -265,7 +185,7 @@ class BaseNode(BaseModel):
         return result
 
     @classmethod
-    def _get_indexed_field(cls) -> str:
+    def get_index_field(cls) -> str:
         """Returns the name of the field marked with LabelProperty(index=True)."""
         for field_name, field_info in cls.model_fields.items():
             metadata = field_info.metadata
@@ -279,12 +199,6 @@ class BaseNode(BaseModel):
             f"Annotated[<type>, LabelProperty(index=True)] as the type hint annotation."
         )
 
-    @classmethod
-    def get_unique_field(cls) -> str:
-        """Returns the name of the field marked with LabelProperty(index=True)."""
-        return cls._get_indexed_field()
-
-
 def _is_primitive(x: object) -> bool:
     """Check if a value is a primitive type."""
     return isinstance(x, str | int | float | bool) or x is None
@@ -297,3 +211,81 @@ def _is_neo4j_prop_value(v: object) -> bool:
     if isinstance(v, list | tuple):
         return all(_is_primitive(e) for e in v)
     return False
+
+
+
+TStart = TypeVar("TStart", bound=BaseNode)
+TEnd = TypeVar("TEnd", bound=BaseNode)
+
+
+class RelationGroup(Generic[TStart, TEnd]):
+    """One start node with multiple target nodes."""
+
+    __slots__ = ("start", "targets")
+
+    def __init__(self, start: TStart, targets: Iterable[TEnd]) -> None:
+        self.start = start
+        self.targets = list(targets)
+
+
+RelationBatch = list[RelationGroup[TStart, TEnd]]
+
+
+async def write_relations(
+    driver: AsyncDriver,
+    rel_type: str,
+    batch: RelationBatch[TStart, TEnd],
+    *,
+    session_kwargs: dict[str, Any] | None = None,
+    rel_props: dict[str, Any] | None = None,
+) -> None:
+    """Write (start)-[rel_type]->(target) relationships for a batch.
+
+    All start nodes must be same type; all target nodes must be same type.
+    """
+    if not batch:
+        return
+
+    rows: list[dict[str, Any]] = []
+    for group in batch:
+        if not group.targets:
+            continue
+        from_id = getattr(group.start, group.start.get_index_field())
+        from_label = group.start.__class__.__name__
+        assert all(isinstance(t, (type(group.targets[0]))) for t in group.targets)
+        for target in group.targets:
+            to_id = getattr(target, target.get_index_field())
+            to_label = target.__class__.__name__
+            rows.append(
+                {
+                    "from_label": from_label,
+                    "from_id": from_id,
+                    "to_label": to_label,
+                    "to_id": to_id,
+                    "props": rel_props,
+                }
+            )
+
+    if not rows:
+        return
+
+    #TODO: Check if the cypher syntax is valid
+
+    cypher = f"""
+    UNWIND $rows AS row
+    MATCH (a:`{row.from_label}` {{ {row.from_id}: row.from_id }})
+    MATCH (b:`{row.to_label}` {{ {row.to_id}: row.to_id }})
+    MERGE (a)-[r:`{rel_type}`]->(b)
+    SET r += row.props
+    """
+
+    session_kwargs = session_kwargs or {}
+    async with driver.session(**session_kwargs) as session:
+
+        async def _tx(tx: AsyncManagedTransaction, rows: list[dict[str, Any]]) -> None:
+            await tx.run(cypher, rows=rows)
+
+        try:
+            await session.execute_write(_tx, rows)
+        except Exception:
+            logger.exception("Failed to write relations")
