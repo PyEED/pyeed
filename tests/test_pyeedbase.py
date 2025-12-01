@@ -186,20 +186,20 @@ class TestToDictMethod:
 
 
 # ============================================================================
-# Test get_unique_field Method
+# Test get_index_field Method
 # ============================================================================
 
 
-class TestGetUniqueField:
-    """Tests for get_unique_field() method."""
+class TestGetIndexField:
+    """Tests for get_index_field() method."""
 
     def test_returns_indexed_field_name(self, valid_node_class):
-        """Test that get_unique_field returns the indexed field name."""
-        assert valid_node_class.get_unique_field() == "id"
+        """Test that get_index_field returns the indexed field name."""
+        assert valid_node_class.get_index_field() == "id"
 
     def test_instance_method_works(self, sample_node):
-        """Test that get_unique_field works on instance."""
-        assert sample_node.get_unique_field() == "id"
+        """Test that get_index_field works on instance."""
+        assert sample_node.get_index_field() == "id"
 
     def test_no_indexed_field_raises_error(self):
         """Test that class without indexed field raises ValueError."""
@@ -408,8 +408,8 @@ class TestIntegration:
         assert node.name == "Integration Test"
         assert node.age == 99
 
-        # Verify get_unique_field
-        assert node.get_unique_field() == "id"
+        # Verify get_index_field
+        assert node.get_index_field() == "id"
 
         # Verify to_dict includes everything
         d = node.to_dict()
@@ -437,7 +437,7 @@ class TestIntegration:
         assert child.parent_field == "parent"
         assert child.child_field == "child"
 
-        # Verify get_unique_field works on child
+        # Verify get_index_field works on child
         assert child.get_index_field() == "id"
 
         # Verify to_dict includes all fields

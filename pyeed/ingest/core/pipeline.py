@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 from rich.progress import Progress, TaskID
 
 from ...utils.progress import create_progress
@@ -13,7 +13,7 @@ from .protocol import PipelineContext, PipelineStage
 
 
 @dataclass
-class ChildRecord[T: BaseNode]:
+class Relation[T: BaseNode]:
     data: list[T]
     parent_label: str
     parent_field: str
@@ -23,11 +23,10 @@ class ChildRecord[T: BaseNode]:
     remove_parent_value_on_join: bool
 
 
-@dataclass
-class PipelineRecord[T: BaseNode]:
-    data: T
-    children: list[ChildRecord[T]] = field(default_factory=list)
-    embeddings: dict[str, np.ndarray] = field(default_factory=dict)
+@dataclass(slots=True)
+class IngestItem[T: BaseNode]:
+    node: T
+    relations: Mapping[str, list[str]] | None = None
 
 
 @dataclass

@@ -67,7 +67,7 @@ async def sync_schema(models: list[type[BaseNode]], driver: AsyncDriver) -> None
 
             await session.execute_write(_tx)
 
-    logger.info("Synchronized schema for the following indices: %s", added_indices)
+    logger.info(f"Synchronized schema for the following indices: {added_indices}")
 
     # async def async_query_iter(self, query: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
     #     """

@@ -8,7 +8,7 @@ from typing import Any
 from loguru import logger
 from rich.progress import Progress, TaskID
 
-from pyeed.ingest.core.pipeline import PipelineRecord
+from pyeed.ingest.core.pipeline import IngestItem
 
 from ..core.protocol import SENTINEL, PipelineContext
 from ..model import Protein
@@ -18,9 +18,6 @@ from ..sources.fasta import read_fasta_chunks_async
 class FASTAReaderStage:
     """Reads FASTA file and emits Protein objects to queue."""
 
-    # Add class-level regex for valid protein IDs
-    # Allow: alphanumeric, underscore, hyphen, pipe, dot
-    # This covers UniProt format (sp|Q6GZX4|001R_FRG3G) and simple IDs
     VALID_PROTEIN_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_|.\-]+$")
     MAX_PROTEIN_ID_LENGTH = 255
 
@@ -55,9 +52,10 @@ class FASTAReaderStage:
         Returns:
             True if valid, False otherwise
         """
-        if not protein_id or len(protein_id) > self.MAX_PROTEIN_ID_LENGTH:
-            return False
-        return bool(self.VALID_PROTEIN_ID_PATTERN.match(protein_id))
+        return (
+            bool(self.VALID_PROTEIN_ID_PATTERN.match(protein_id))
+            and len(protein_id) <= self.MAX_PROTEIN_ID_LENGTH
+        )
 
     async def run(
         self,
@@ -67,7 +65,16 @@ class FASTAReaderStage:
         progress: Progress | None,
         task_id: TaskID | None,
     ) -> None:
-        """Read FASTA and emit protein records."""
+        """Read FASTA and emit protein records.
+
+        Args:
+            input_queues: Input queues (unused for reader stage)
+            output_queues: Output queues to emit PipelineRecords
+            context: Pipeline context for tracking state
+            progress: Rich progress instance for updates
+            task_id: Task ID for progress tracking
+        """
+
         skipped_count = 0
 
         async for chunk in read_fasta_chunks_async(
@@ -88,19 +95,17 @@ class FASTAReaderStage:
                     skipped_count += 1
                     continue
 
-                # Create Protein with optional taxon_id
-                protein_data: dict[str, Any] = {
-                    "id": seq_id,
-                    "sequence": sequence,
-                    "seq_length": len(sequence),
-                }
-                if taxon_id:
-                    protein_data["taxon_ids"] = [taxon_id]
+                protein = Protein(
+                    id=seq_id,
+                    sequence=sequence,
+                    seq_length=len(sequence),
+                )  # type: ignore
 
-                protein = Protein(**protein_data)
-                record = PipelineRecord(data=protein)
+                relations = {"TAXON": [taxon_id]} if taxon_id else None
+                record = IngestItem(node=protein, relations=relations)
                 for output_queue in output_queues.values():
                     await output_queue.put(record)
+
                 valid_count += 1
 
             if progress is not None and task_id is not None:
