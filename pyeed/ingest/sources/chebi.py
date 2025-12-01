@@ -9,7 +9,7 @@ import httpx
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..model import Molecule, PyeedBase
+from ..model import BaseNode, Molecule
 
 __all__ = ["ChebiClient", "ChebiError"]
 
@@ -274,16 +274,16 @@ class ChebiClient:
                 logger.exception("Unexpected error fetching ChEBI batch")
                 continue
 
-    def map(self, entry: ChebiEntryResult | None) -> dict[str, list[PyeedBase]]:
-        """Map ChEBI entry to dictionary of PyeedBase objects.
+    def map(self, entry: ChebiEntryResult | None) -> dict[str, list[BaseNode]]:
+        """Map ChEBI entry to dictionary of BaseNode objects.
 
         Args:
             entry: ChebiEntryResult from API, or None
 
         Returns:
-            Dictionary mapping class names to lists of PyeedBase objects
+            Dictionary mapping class names to lists of BaseNode objects
         """
-        results: dict[str, list[PyeedBase]] = defaultdict(list)
+        results: dict[str, list[BaseNode]] = defaultdict(list)
 
         # Extract molecules
         molecules = self._extract_molecules(entry)

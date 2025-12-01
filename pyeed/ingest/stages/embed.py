@@ -33,7 +33,6 @@ from ...embed.types import (
 )
 from ..core.pipeline import PipelineRecord
 from ..core.protocol import SENTINEL, PipelineContext
-from ..model.pyeedbase import PyeedBase
 
 if TYPE_CHECKING:
     from ...db.milvus import VectorDB
@@ -91,7 +90,7 @@ class EmbeddingStage:
             progress: Progress instance for tracking
             task_id: Task ID for progress updates
         """
-        input_queue: asyncio.Queue[PipelineRecord[PyeedBase] | object] = next(
+        input_queue: asyncio.Queue[PipelineRecord[BaseNode] | object] = next(
             iter(input_queues.values())
         )
 

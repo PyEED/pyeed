@@ -8,9 +8,9 @@ from typing import Any
 
 import httpx
 from loguru import logger
+from neo4j import AsyncDriver
 from rich.progress import Progress, TaskID
 
-from pyeed.db.neo4j import GraphDB
 from pyeed.db.queries import (
     _upsert_nodes_with_session,
     create_relationships_batch,
@@ -34,7 +34,7 @@ class TaxonomyEnrichmentStage:
 
     def __init__(
         self,
-        db: GraphDB,
+        driver: AsyncDriver,
         db_semaphore: asyncio.Semaphore,
         batch_size: int = 1000,
         max_concurrent: int = 50,
@@ -42,12 +42,12 @@ class TaxonomyEnrichmentStage:
         """Initialize taxonomy enrichment stage.
 
         Args:
-            db: GraphDB instance for Neo4j operations
+            driver: Neo4j async driver
             db_semaphore: Shared semaphore for DB operations (REQUIRED)
             batch_size: Number of records to accumulate before enriching
             max_concurrent: Maximum concurrent API requests
         """
-        self.db = db
+        self.driver = driver
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
         self.taxonomy_adapter = UniProtTaxonomyAdapter()
@@ -160,7 +160,7 @@ class TaxonomyEnrichmentStage:
         new_taxon_ids: list[str] = []
 
         # Step 1: Query proteins for taxon_ids
-        async with self.db.async_driver.session() as session:
+        async with self.driver.session() as session:
             query = """
             MATCH (p:Protein)
             WHERE p.id IN $protein_ids AND p.taxon_ids IS NOT NULL AND size(p.taxon_ids) > 0
@@ -272,7 +272,7 @@ class TaxonomyEnrichmentStage:
             return
 
         # Transaction 1: Create relationships
-        async with self._db_semaphore, self.db.async_driver.session() as session:
+        async with self._db_semaphore, self.driver.session() as session:
             await create_relationships_batch(
                 session=session,
                 source_label="Protein",
@@ -394,13 +394,13 @@ class TaxonomyEnrichmentStage:
             # Transaction 1: Upsert all taxon nodes
             if all_taxon_nodes:
                 logger.debug(f"Upserting {len(all_taxon_nodes)} taxon nodes")
-                async with self._db_semaphore, self.db.async_driver.session() as session:
+                async with self._db_semaphore, self.driver.session() as session:
                     await _upsert_nodes_with_session(session, all_taxon_nodes)
 
             # Transaction 2: Create all hierarchy relationships
             if hierarchy_infos:
                 logger.debug(f"Creating {len(hierarchy_infos)} hierarchy chains")
-                async with self._db_semaphore, self.db.async_driver.session() as session:
+                async with self._db_semaphore, self.driver.session() as session:
                     for idx, hierarchy_info in enumerate(hierarchy_infos):
                         try:
                             # Validate hierarchy_info before use
@@ -429,7 +429,7 @@ class TaxonomyEnrichmentStage:
             # Transaction 3: Create all protein-taxon relationships
             if all_source_proteins:
                 logger.info(f"Creating {len(all_source_proteins)} ORIGINATES_FROM relationships")
-                async with self._db_semaphore, self.db.async_driver.session() as session:
+                async with self._db_semaphore, self.driver.session() as session:
                     await create_relationships_batch(
                         session=session,
                         source_label="Protein",
@@ -446,7 +446,7 @@ class TaxonomyEnrichmentStage:
             # Transaction 4: Remove all taxon_ids from proteins
             if removal_map:
                 logger.debug(f"Removing taxon_ids from {len(removal_map)} proteins")
-                async with self._db_semaphore, self.db.async_driver.session() as session:
+                async with self._db_semaphore, self.driver.session() as session:
                     await remove_list_property_values(
                         session=session,
                         label="Protein",

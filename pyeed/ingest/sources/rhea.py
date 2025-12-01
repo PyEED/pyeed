@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from ..model import Molecule, PyeedBase, Reaction
+from ..model import BaseNode, Molecule, Reaction
 
 _RHEA_TABLE_URL = "https://www.rhea-db.org/rhea/"
 _RHEA_COLS = "rhea-id,equation,chebi-id"
@@ -258,8 +258,8 @@ class RheaClient:
         meta: dict[str, Any] | None,
         chebi_enricher: Callable[[str], dict[str, Any] | None] | None = None,
         rhea_id: str | None = None,
-    ) -> dict[str, list[PyeedBase]]:
-        """Map Rhea data to dictionary of PyeedBase objects.
+    ) -> dict[str, list[BaseNode]]:
+        """Map Rhea data to dictionary of BaseNode objects.
 
         Args:
             row: Table row dictionary from _fetch_table_row()
@@ -268,9 +268,9 @@ class RheaClient:
             rhea_id: Fallback Rhea ID if not in row
 
         Returns:
-            Dictionary mapping class names to lists of PyeedBase objects
+            Dictionary mapping class names to lists of BaseNode objects
         """
-        results: dict[str, list[PyeedBase]] = defaultdict(list)
+        results: dict[str, list[BaseNode]] = defaultdict(list)
 
         # Extract reaction
         reactions = self._extract_reaction(row, meta, rhea_id)
