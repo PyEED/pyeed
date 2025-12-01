@@ -19,10 +19,10 @@ from rich.progress import (
 )
 
 from pyeed.db.milvus import VectorDB
+from pyeed.db.neo4j import get_async_driver
 from pyeed.embed.esm2 import ESM2Embedder
 from pyeed.embed.pooling import PoolingLike, mean_pooling
 
-from .db.neo4j import GraphDB
 from .ingest.core.pipeline import Pipeline
 from .ingest.sources.fasta import build_header_index
 from .ingest.stages.embed import EmbeddingStage
@@ -119,14 +119,14 @@ def ingest_fasta(
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
-        graph_db = GraphDB(
+        driver = get_async_driver(
             uri=graph_db_uri,
             user=graph_db_user,
             password=graph_db_password,
         )
-        logger.info(f"Connected to GraphDB: {graph_db.uri}")
+        logger.info(f"Connected to GraphDB: {graph_db_uri}")
         spin.update(graph_db_connect_task, completed=1)
-        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db.uri}")
+        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db_uri}")
 
         # Connect to VectorDB
         vector_db = VectorDB(
@@ -186,7 +186,7 @@ def ingest_fasta(
         )
 
         pipeline.add_stage(
-            stage=Neo4jUpsertStage(db=graph_db, batch_size=512),
+            stage=Neo4jUpsertStage(driver=driver, batch_size=512),
             input_queues=[neo4j_queue],
             output_queues=[embedding_queue, taxonomy_queue],
             task_id=write_task,
@@ -221,7 +221,7 @@ def ingest_fasta(
 
         pipeline.add_stage(
             stage=TaxonomyEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -328,14 +328,14 @@ def ingest_uniprot(
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
-        graph_db = GraphDB(
+        driver = get_async_driver(
             uri=graph_db_uri,
             user=graph_db_user,
             password=graph_db_password,
         )
-        logger.info(f"Connected to GraphDB: {graph_db.uri}")
+        logger.info(f"Connected to GraphDB: {graph_db_uri}")
         spin.update(graph_db_connect_task, completed=1)
-        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db.uri}")
+        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db_uri}")
 
         # Connect to VectorDB
         vector_db = VectorDB(
@@ -388,7 +388,7 @@ def ingest_uniprot(
 
         # Stage 2: Neo4j (forwards to embedding, taxonomy, and reactions)
         pipeline.add_stage(
-            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            stage=Neo4jUpsertStage(driver=driver, batch_size=100),
             input_queues=[neo4j_queue],
             output_queues=[embedding_queue, taxonomy_queue, reaction_queue],
             task_id=write_task,
@@ -427,7 +427,7 @@ def ingest_uniprot(
 
         pipeline.add_stage(
             stage=TaxonomyEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -439,7 +439,7 @@ def ingest_uniprot(
 
         pipeline.add_stage(
             stage=ReactionEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -451,7 +451,7 @@ def ingest_uniprot(
 
         pipeline.add_stage(
             stage=MoleculeEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -549,14 +549,14 @@ def ingest_interpro(
 
     with Live(Group(spin, bar), console=CONSOLE, refresh_per_second=8):
         # Connect to GraphDB
-        graph_db = GraphDB(
+        driver = get_async_driver(
             uri=graph_db_uri,
             user=graph_db_user,
             password=graph_db_password,
         )
-        logger.info(f"Connected to GraphDB: {graph_db.uri}")
+        logger.info(f"Connected to GraphDB: {graph_db_uri}")
         spin.update(graph_db_connect_task, completed=1)
-        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db.uri}")
+        spin.update(graph_db_connect_task, description=f"Connected to GraphDB: {graph_db_uri}")
 
         # Connect to VectorDB
         vector_db = VectorDB(
@@ -609,7 +609,7 @@ def ingest_interpro(
         )
 
         pipeline.add_stage(
-            stage=Neo4jUpsertStage(db=graph_db, batch_size=100),
+            stage=Neo4jUpsertStage(driver=driver, batch_size=100),
             input_queues=[neo4j_queue],
             output_queues=[embedding_queue, taxonomy_queue, reaction_queue],
             task_id=write_task,
@@ -644,7 +644,7 @@ def ingest_interpro(
 
         pipeline.add_stage(
             stage=TaxonomyEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -656,7 +656,7 @@ def ingest_interpro(
 
         pipeline.add_stage(
             stage=ReactionEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,
@@ -668,7 +668,7 @@ def ingest_interpro(
 
         pipeline.add_stage(
             stage=MoleculeEnrichmentStage(
-                db=graph_db,
+                driver=driver,
                 db_semaphore=db_semaphore,
                 batch_size=enrichment_batch_size,
                 max_concurrent=enrichment_max_concurrent,

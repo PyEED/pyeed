@@ -3,20 +3,19 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Self
 
 from loguru import logger
-from neo4j import AsyncDriver, AsyncTransaction
-from neo4j._async.work import AsyncManagedTransaction
+from neo4j import AsyncDriver, AsyncManagedTransaction
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-T = TypeVar("T", bound="BaseNode")
 
 
 @dataclass(frozen=True)
 class LabelProperty:
-    """
-    Influences the Neo4j schema creation.
+    """Influences the Neo4j schema creation.
+
+    Attributes:
+        index: Whether this field should be indexed in Neo4j.
     """
 
     index: bool = False
@@ -32,9 +31,12 @@ class BaseNode(BaseModel):
         from pydantic import Field
 
         class MyNode(BaseNode):
-            id: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID field")
+            id: Annotated[str, LabelProperty(index=True)] = Field(
+                ..., description="ID field"
+            )
 
-    Note: Only one field per class can be marked with ``index=True``.
+    Note:
+        Only one field per class can be marked with ``index=True``.
     """
 
     model_config = ConfigDict(frozen=False, validate_assignment=True, use_enum_values=True)
@@ -45,9 +47,15 @@ class BaseNode(BaseModel):
 
     @model_validator(mode="after")
     def _check_indexed_fields(self) -> Self:
+        """Validate that only one field is marked as indexed.
+
+        Returns:
+            Self: The validated instance.
+
+        Raises:
+            ValueError: If more than one field is marked with index=True.
+        """
         cls = type(self)
-        if getattr(cls, "_index_checked", False):
-            return self
 
         indexed = []
         for name, field in cls.model_fields.items():
@@ -67,7 +75,19 @@ class BaseNode(BaseModel):
     @field_validator("custom")
     @classmethod
     def validate_keys(cls, v: dict[str, Any], info: Any) -> dict[str, Any]:
-        """Validate that custom keys don't conflict with existing attributes."""
+        """Validate that custom keys don't conflict with existing attributes.
+
+        Args:
+            v: The custom dictionary to validate.
+            info: Validation context information.
+
+        Returns:
+            The validated custom dictionary.
+
+        Raises:
+            ValueError: If keys conflict with existing attributes, contain invalid
+                characters, or contain nested dictionaries.
+        """
         if not v:
             return v
 
@@ -105,21 +125,21 @@ class BaseNode(BaseModel):
 
         if conflicting_keys:
             raise ValueError(
-                f"Custom field keys cannot conflict with existing attributes or be 'custom': "
-                f"{conflicting_keys}"
+                f"Custom field keys cannot conflict with existing attributes or be "
+                f"'custom': {conflicting_keys}"
             )
 
         if invalid_keys:
             raise ValueError(
                 f"Invalid custom field keys: {invalid_keys}. "
-                f"Keys must start with a letter or underscore and contain only letters, digits, "
-                f"or underscores."
+                f"Keys must start with a letter or underscore and contain only "
+                f"letters, digits, or underscores."
             )
 
         return v
 
     @classmethod
-    async def bulk_upsert(
+    async def bulk_upsert[T: BaseNode](
         cls: type[T],
         driver: AsyncDriver,
         nodes: Iterable[T],
@@ -131,6 +151,9 @@ class BaseNode(BaseModel):
             driver: Neo4j async driver.
             nodes: Iterable of node instances to upsert.
             session_kwargs: Optional session keyword arguments.
+
+        Raises:
+            ValueError: If no index field is defined for this node type.
         """
         rows = [node.to_dict() for node in nodes]
         if not rows:
@@ -146,16 +169,12 @@ class BaseNode(BaseModel):
 
         kwargs = session_kwargs or {}
         async with driver.session(**kwargs) as session:
-
-            async def _tx(tx: AsyncManagedTransaction, rows: list[dict[str, Any]]) -> None:
-                await tx.run(cypher, rows=rows)
-
             try:
-                await session.execute_write(_tx, rows)
+                await session.execute_write(_tx, cypher, rows)
             except Exception:
                 logger.exception("Failed to batch upsert nodes")
 
-    async def upsert(
+    async def upsert[T: BaseNode](
         self: T,
         driver: AsyncDriver,
         session_kwargs: dict[str, Any] | None = None,
@@ -172,40 +191,181 @@ class BaseNode(BaseModel):
             session_kwargs=session_kwargs,
         )
 
+    @classmethod
+    async def _bulk_create_relationships[S: BaseNode, E: BaseNode](
+        cls: type[S],
+        driver: AsyncDriver,
+        rel_type: str,
+        pairs: Iterable[tuple[S, E]],
+        *,
+        session_kwargs: dict[str, Any] | None = None,
+        rel_props: dict[str, Any] | None = None,
+    ) -> None:
+        """Create (start:cls)-[rel_type]->(target) relationships for many pairs.
+
+        Args:
+            driver: Neo4j async driver.
+            rel_type: Relationship type.
+            pairs: Iterable of (start, target) pairs.
+            session_kwargs: Optional session keyword arguments.
+            rel_props: Optional relationship properties.
+
+        Raises:
+            ValueError: If pairs is empty, contains mixed types, or start nodes
+                don't match the calling class.
+        """
+        pairs_list = list(pairs)
+        if not pairs_list:
+            return
+
+        first_start, first_target = pairs_list[0]
+
+        # Validate that start nodes match the calling class
+        if not isinstance(first_start, cls):
+            raise ValueError(
+                f"_bulk_create_relationships must be called on the start class; "
+                f"expected {cls.__name__}, got {type(first_start).__name__}"
+            )
+
+        # Get target class from first pair
+        target_cls = type(first_target)
+
+        # Validate all pairs have consistent types
+        for i, (start, target) in enumerate(pairs_list, start=1):
+            if not isinstance(start, cls):
+                raise ValueError(
+                    f"Inconsistent start node type at index {i}: "
+                    f"expected {cls.__name__}, got {type(start).__name__}"
+                )
+            if not isinstance(target, target_cls):
+                raise ValueError(
+                    f"Inconsistent target node type at index {i}: "
+                    f"expected {target_cls.__name__}, got {type(target).__name__}"
+                )
+
+        start_key = cls.get_index_field()
+        target_label = target_cls.__name__
+        target_key = target_cls.get_index_field()
+
+        props = rel_props or {}
+        rows = [
+            {
+                "from_id": getattr(start, start_key),
+                "to_id": getattr(target, target_key),
+                "props": props,
+            }
+            for start, target in pairs_list
+        ]
+
+        cypher = f"""
+        UNWIND $rows AS row
+        MATCH (a:`{cls.__name__}` {{ `{start_key}`: row.from_id }})
+        MATCH (b:`{target_label}` {{ `{target_key}`: row.to_id }})
+        MERGE (a)-[r:`{rel_type}`]->(b)
+        SET r += row.props
+        """
+
+        session_kwargs = session_kwargs or {}
+        async with driver.session(**session_kwargs) as session:
+            try:
+                await session.execute_write(_tx, cypher, rows)
+            except Exception:
+                logger.exception(
+                    "Failed to write relations for %s(%s) -> %s(%s)",
+                    cls.__name__,
+                    start_key,
+                    target_label,
+                    target_key,
+                )
+
+    async def _relate[S: BaseNode, E: BaseNode](
+        self: S,
+        driver: AsyncDriver,
+        rel_type: str,
+        targets: Iterable[E] | E,
+        *,
+        session_kwargs: dict[str, Any] | None = None,
+        rel_props: dict[str, Any] | None = None,
+    ) -> None:
+        """Create (self)-[rel_type]->(targets) relationships.
+
+        Wrapper around `_bulk_create_relationships` for one start node.
+
+        Args:
+            driver: Neo4j async driver.
+            rel_type: Relationship type.
+            targets: Single target node or iterable of target nodes.
+            session_kwargs: Optional session keyword arguments.
+            rel_props: Optional relationship properties.
+        """
+        pairs = [(self, targets)] if isinstance(targets, BaseNode) else [(self, t) for t in targets]
+
+        await type(self)._bulk_create_relationships(
+            driver=driver,
+            rel_type=rel_type,
+            pairs=pairs,
+            session_kwargs=session_kwargs,
+            rel_props=rel_props,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Convert the model to a Neo4j-safe dictionary.
 
-        - flatten `custom`
-        - keep only primitives or list-of-primitives
+        Flattens the `custom` field and keeps only primitives or lists of
+        primitives.
+
+        Returns:
+            Dictionary with Neo4j-compatible property values.
         """
         d = self.model_dump(exclude_none=True, exclude_unset=True)
         custom = d.pop("custom", {}) or {}
         flat = {**d, **custom}
-        result = {k: v for k, v in flat.items() if _is_neo4j_prop_value(v)}
-        return result
+        return {k: v for k, v in flat.items() if _is_neo4j_prop_value(v)}
 
     @classmethod
     def get_index_field(cls) -> str:
-        """Returns the name of the field marked with LabelProperty(index=True)."""
+        """Returns the name of the field marked with LabelProperty(index=True).
+
+        Returns:
+            The name of the indexed field.
+
+        Raises:
+            ValueError: If no field is marked as indexed.
+        """
         for field_name, field_info in cls.model_fields.items():
-            metadata = field_info.metadata
-            for m in metadata:
+            for m in field_info.metadata:
                 if isinstance(m, LabelProperty) and m.index:
                     return field_name
 
         raise ValueError(
             f"No field with LabelProperty(index=True) found in {cls.__name__}. "
             f"To mark a field as indexed, use: "
-            f"Annotated[<type>, LabelProperty(index=True)] as the type hint annotation."
+            f"Annotated[<type>, LabelProperty(index=True)] as the type hint "
+            f"annotation."
         )
 
+
 def _is_primitive(x: object) -> bool:
-    """Check if a value is a primitive type."""
+    """Check if a value is a primitive type.
+
+    Args:
+        x: Value to check.
+
+    Returns:
+        True if the value is a primitive type (str, int, float, bool, or None).
+    """
     return isinstance(x, str | int | float | bool) or x is None
 
 
 def _is_neo4j_prop_value(v: object) -> bool:
-    """Check if a value is a Neo4j property value."""
+    """Check if a value is a valid Neo4j property value.
+
+    Args:
+        v: Value to check.
+
+    Returns:
+        True if the value is a primitive or a list/tuple of primitives.
+    """
     if _is_primitive(v):
         return True
     if isinstance(v, list | tuple):
@@ -213,79 +373,16 @@ def _is_neo4j_prop_value(v: object) -> bool:
     return False
 
 
-
-TStart = TypeVar("TStart", bound=BaseNode)
-TEnd = TypeVar("TEnd", bound=BaseNode)
-
-
-class RelationGroup(Generic[TStart, TEnd]):
-    """One start node with multiple target nodes."""
-
-    __slots__ = ("start", "targets")
-
-    def __init__(self, start: TStart, targets: Iterable[TEnd]) -> None:
-        self.start = start
-        self.targets = list(targets)
-
-
-RelationBatch = list[RelationGroup[TStart, TEnd]]
-
-
-async def write_relations(
-    driver: AsyncDriver,
-    rel_type: str,
-    batch: RelationBatch[TStart, TEnd],
-    *,
-    session_kwargs: dict[str, Any] | None = None,
-    rel_props: dict[str, Any] | None = None,
+async def _tx(
+    tx: AsyncManagedTransaction,
+    cypher: str,
+    rows: list[dict[str, Any]],
 ) -> None:
-    """Write (start)-[rel_type]->(target) relationships for a batch.
+    """Execute a Cypher query in a transaction.
 
-    All start nodes must be same type; all target nodes must be same type.
+    Args:
+        tx: Neo4j transaction.
+        cypher: Cypher query to execute.
+        rows: Parameter rows for the query.
     """
-    if not batch:
-        return
-
-    rows: list[dict[str, Any]] = []
-    for group in batch:
-        if not group.targets:
-            continue
-        from_id = getattr(group.start, group.start.get_index_field())
-        from_label = group.start.__class__.__name__
-        assert all(isinstance(t, (type(group.targets[0]))) for t in group.targets)
-        for target in group.targets:
-            to_id = getattr(target, target.get_index_field())
-            to_label = target.__class__.__name__
-            rows.append(
-                {
-                    "from_label": from_label,
-                    "from_id": from_id,
-                    "to_label": to_label,
-                    "to_id": to_id,
-                    "props": rel_props,
-                }
-            )
-
-    if not rows:
-        return
-
-    #TODO: Check if the cypher syntax is valid
-
-    cypher = f"""
-    UNWIND $rows AS row
-    MATCH (a:`{row.from_label}` {{ {row.from_id}: row.from_id }})
-    MATCH (b:`{row.to_label}` {{ {row.to_id}: row.to_id }})
-    MERGE (a)-[r:`{rel_type}`]->(b)
-    SET r += row.props
-    """
-
-    session_kwargs = session_kwargs or {}
-    async with driver.session(**session_kwargs) as session:
-
-        async def _tx(tx: AsyncManagedTransaction, rows: list[dict[str, Any]]) -> None:
-            await tx.run(cypher, rows=rows)
-
-        try:
-            await session.execute_write(_tx, rows)
-        except Exception:
-            logger.exception("Failed to write relations")
+    await tx.run(cypher, rows=rows)

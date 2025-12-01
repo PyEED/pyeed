@@ -8,7 +8,7 @@ from .pyeedbase import BaseNode, LabelProperty
 class Taxon(BaseNode):
     """Generic taxon node used for lineage and parent."""
 
-    id: Annotated[str, LabelProperty(unique=True, index=True)] = Field(
+    id: Annotated[str, LabelProperty(index=True)] = Field(
         ...,
         description="Taxonomy ID",
     )

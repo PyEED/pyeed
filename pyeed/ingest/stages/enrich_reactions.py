@@ -7,9 +7,9 @@ from collections import defaultdict
 from typing import Any
 
 from loguru import logger
+from neo4j import AsyncDriver
 from rich.progress import Progress, TaskID
 
-from pyeed.db.neo4j import GraphDB
 from pyeed.db.queries import (
     _upsert_nodes_with_session,
     create_relationships_batch,
@@ -33,7 +33,7 @@ class ReactionEnrichmentStage:
 
     def __init__(
         self,
-        db: GraphDB,
+        driver: AsyncDriver,
         db_semaphore: asyncio.Semaphore,
         batch_size: int = 1000,
         max_concurrent: int = 50,
@@ -41,12 +41,12 @@ class ReactionEnrichmentStage:
         """Initialize reaction enrichment stage.
 
         Args:
-            db: GraphDB instance for Neo4j operations
+            driver: Neo4j async driver
             db_semaphore: Shared semaphore for DB operations (REQUIRED)
             batch_size: Number of records to accumulate before enriching
             max_concurrent: Maximum concurrent API requests
         """
-        self.db = db
+        self.driver = driver
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
         self.rhea_client = RheaClient()
@@ -178,7 +178,7 @@ class ReactionEnrichmentStage:
         new_reaction_ids: list[str] = []
 
         # Step 1: Query proteins for reaction_ids
-        async with self.db.async_driver.session() as session:
+        async with self.driver.session() as session:
             query = """
             MATCH (p:Protein)
             WHERE p.id IN $protein_ids AND p.reaction_ids IS NOT NULL AND size(p.reaction_ids) > 0
@@ -281,7 +281,7 @@ class ReactionEnrichmentStage:
 
         # Query existing Reaction nodes to get their data
         reaction_objects: list[Reaction] = []
-        async with self.db.async_driver.session() as session:
+        async with self.driver.session() as session:
             query = """
             MATCH (r:Reaction)
             WHERE r.id IN $reaction_ids
@@ -302,7 +302,7 @@ class ReactionEnrichmentStage:
                 reaction_objects.append(reaction)
 
         # Transaction 1: Create relationships
-        async with self._db_semaphore, self.db.async_driver.session() as session:
+        async with self._db_semaphore, self.driver.session() as session:
             await create_relationships_batch(
                 session=session,
                 source_label="Protein",
@@ -318,7 +318,7 @@ class ReactionEnrichmentStage:
 
         # Transaction 2: Remove properties
         if removal_map:
-            async with self._db_semaphore, self.db.async_driver.session() as session:
+            async with self._db_semaphore, self.driver.session() as session:
                 await remove_list_property_values(
                     session=session,
                     label="Protein",
@@ -379,9 +379,9 @@ class ReactionEnrichmentStage:
 
         # Single transaction for all reactions
         try:
-            async with self._db_semaphore, self.db.async_driver.session() as session:
+            async with self._db_semaphore, self.driver.session() as session:
                 # Upsert all reaction nodes
-                await _upsert_nodes_with_session(session, all_reaction_nodes)
+                await _upsert_nodes_with_session(session, list(all_reaction_nodes))
 
                 # Link all Reactions to Proteins
                 if all_source_proteins:

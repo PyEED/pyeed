@@ -8,15 +8,15 @@ from collections import defaultdict
 from typing import Any
 
 from loguru import logger
+from neo4j import AsyncDriver
 from rich.progress import Progress, TaskID
 
 from pyeed.db.milvus import VectorDB
-from pyeed.db.neo4j import GraphDB
 from pyeed.db.queries import query_existing_nodes_by_ids, upsert_pipeline_records
 from pyeed.embed.types import EmbeddingBatch
 from pyeed.ingest.core.pipeline import PipelineContext, PipelineRecord
 from pyeed.ingest.core.protocol import SENTINEL
-from pyeed.ingest.model.pyeedbase import PyeedBase
+from pyeed.ingest.model.pyeedbase import BaseNode
 
 
 class Neo4jUpsertStage:
@@ -26,14 +26,14 @@ class Neo4jUpsertStage:
     to minimize database round trips.
     """
 
-    def __init__(self, db: GraphDB, batch_size: int):
+    def __init__(self, driver: AsyncDriver, batch_size: int):
         """Initialize Neo4j sink.
 
         Args:
-            db: GraphDB instance
+            driver: Neo4j async driver
             batch_size: Number of records to accumulate before upserting
         """
-        self.db = db
+        self.driver = driver
         self.batch_size = batch_size
 
     async def run(
@@ -45,10 +45,10 @@ class Neo4jUpsertStage:
         task_id: TaskID | None,
     ) -> None:
         """Consume PipelineRecords, batch, upsert to Neo4j, and forward to all output queues."""
-        input_queue: asyncio.Queue[PipelineRecord[PyeedBase]] = next(iter(input_queues.values()))
+        input_queue: asyncio.Queue[PipelineRecord[BaseNode]] = next(iter(input_queues.values()))
 
         item_dict: dict[str, set[str]] = defaultdict(set)
-        batch: list[PipelineRecord[PyeedBase]] = []
+        batch: list[PipelineRecord[BaseNode]] = []
 
         while True:
             item = await input_queue.get()
@@ -80,7 +80,7 @@ class Neo4jUpsertStage:
 
     async def _process_batch(
         self,
-        batch: list[PipelineRecord[PyeedBase]],
+        batch: list[PipelineRecord[BaseNode]],
         output_queues: dict[str, asyncio.Queue[Any]],
         context: PipelineContext,
         progress: Progress | None,
@@ -91,14 +91,14 @@ class Neo4jUpsertStage:
             return
 
         # Group records by label for batch existence checking
-        by_label: dict[str, list[PipelineRecord[PyeedBase]]] = defaultdict(list)
+        by_label: dict[str, list[PipelineRecord[BaseNode]]] = defaultdict(list)
         for record in batch:
             label = type(record.data).__name__
             by_label[label].append(record)
 
         # Check which nodes already exist, grouped by label
         existing_ids: set[tuple[str, str]] = set()  # (label, unique_value)
-        async with self.db.async_driver.session() as session:
+        async with self.driver.session() as session:
             for label, label_records in by_label.items():
                 if not label_records:
                     continue
@@ -116,7 +116,7 @@ class Neo4jUpsertStage:
                     existing_ids.add((label, unique_value))
 
         # Filter batch: keep only records where parent doesn't exist
-        new_batch: list[PipelineRecord[PyeedBase]] = []
+        new_batch: list[PipelineRecord[BaseNode]] = []
         for record in batch:
             label = type(record.data).__name__
             unique_field = record.data.get_unique_model_field()
@@ -127,7 +127,7 @@ class Neo4jUpsertStage:
 
         # Upsert only new records
         if new_batch:
-            async with self.db.async_driver.session() as session:
+            async with self.driver.session() as session:
                 await upsert_pipeline_records(session, new_batch)
 
         # Forward ONLY new records (if not already present) to output queues
@@ -177,7 +177,7 @@ class MilvusUpsertStage:
     ) -> None:
         """Consume PipelineRecords with embeddings, batch, upsert to Milvus."""
         input_queue = next(iter(input_queues.values()))
-        batch: list[PipelineRecord[PyeedBase]] = []
+        batch: list[PipelineRecord[BaseNode]] = []
 
         while True:
             item = await input_queue.get()
@@ -210,7 +210,7 @@ class MilvusUpsertStage:
 
     async def _process_batch(
         self,
-        batch: list[PipelineRecord[PyeedBase]],
+        batch: list[PipelineRecord[BaseNode]],
         output_queues: dict[str, asyncio.Queue[Any]],
         progress: Progress | None,
         task_id: TaskID | None,
@@ -232,7 +232,7 @@ class MilvusUpsertStage:
             )
 
         # Filter batch: keep only records where protein_id doesn't exist
-        new_batch: list[PipelineRecord[PyeedBase]] = [
+        new_batch: list[PipelineRecord[BaseNode]] = [
             record for record in batch if record.data.id not in existing_ids
         ]
 
@@ -256,7 +256,7 @@ class MilvusUpsertStage:
 
     def _convert_to_embedding_batch(
         self,
-        records: list[PipelineRecord[PyeedBase]],
+        records: list[PipelineRecord[BaseNode]],
     ) -> EmbeddingBatch:
         """Convert PipelineRecords to EmbeddingBatch.
 

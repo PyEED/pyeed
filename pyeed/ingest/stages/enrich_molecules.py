@@ -6,9 +6,9 @@ import asyncio
 from typing import Any
 
 from loguru import logger
+from neo4j import AsyncDriver
 from rich.progress import Progress, TaskID
 
-from pyeed.db.neo4j import GraphDB
 from pyeed.db.queries import (
     _upsert_nodes_with_session,
     create_reaction_molecule_relationships,
@@ -29,7 +29,7 @@ class MoleculeEnrichmentStage:
 
     def __init__(
         self,
-        db: GraphDB,
+        driver: AsyncDriver,
         db_semaphore: asyncio.Semaphore,
         batch_size: int = 1000,
         max_concurrent: int = 50,
@@ -37,12 +37,12 @@ class MoleculeEnrichmentStage:
         """Initialize molecule enrichment stage.
 
         Args:
-            db: GraphDB instance for Neo4j operations
+            driver: Neo4j async driver
             db_semaphore: Shared semaphore for DB operations (REQUIRED)
             batch_size: Number of reactions to accumulate before enriching
             max_concurrent: Maximum concurrent API requests
         """
-        self.db = db
+        self.driver = driver
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
         self.chebi_client = ChebiClient()
@@ -162,7 +162,7 @@ class MoleculeEnrichmentStage:
         logger.debug(f"Enriching {len(all_chebi_ids)} unique molecules")
 
         # Check which molecules already exist
-        async with self._db_semaphore, self.db.async_driver.session() as session:
+        async with self._db_semaphore, self.driver.session() as session:
             existing_molecule_ids = await query_existing_nodes_by_ids(
                 session, "Molecule", "id", list(all_chebi_ids)
             )
@@ -186,12 +186,12 @@ class MoleculeEnrichmentStage:
         try:
             # Transaction 1: Upsert molecules
             if all_molecule_nodes:
-                async with self._db_semaphore, self.db.async_driver.session() as session:
-                    await _upsert_nodes_with_session(session, all_molecule_nodes)
+                async with self._db_semaphore, self.driver.session() as session:
+                    await _upsert_nodes_with_session(session, list(all_molecule_nodes))
 
             # Transaction 2: Create all reaction-molecule relationships
             if substrate_map or product_map:
-                async with self._db_semaphore, self.db.async_driver.session() as session:
+                async with self._db_semaphore, self.driver.session() as session:
                     await create_reaction_molecule_relationships(
                         session=session,
                         substrate_map=substrate_map,

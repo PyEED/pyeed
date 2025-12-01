@@ -8,12 +8,12 @@ import numpy as np
 from rich.progress import Progress, TaskID
 
 from ...utils.progress import create_progress
-from ..model.pyeedbase import PyeedBase
+from ..model.pyeedbase import BaseNode
 from .protocol import PipelineContext, PipelineStage
 
 
 @dataclass
-class ChildRecord[T: PyeedBase]:
+class ChildRecord[T: BaseNode]:
     data: list[T]
     parent_label: str
     parent_field: str
@@ -24,7 +24,7 @@ class ChildRecord[T: PyeedBase]:
 
 
 @dataclass
-class PipelineRecord[T: PyeedBase]:
+class PipelineRecord[T: BaseNode]:
     data: T
     children: list[ChildRecord[T]] = field(default_factory=list)
     embeddings: dict[str, np.ndarray] = field(default_factory=dict)
