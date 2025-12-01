@@ -1,8 +1,14 @@
 from typing import Annotated, Any
 
+from neo4j import AsyncDriver
 from pydantic import Field, field_validator
 
+from pyeed.ingest.model.annotation import Annotation
+
+from .goannotation import GOAnnotation
 from .pyeedbase import BaseNode, LabelProperty
+from .reaction import Reaction
+from .taxon import Taxon
 
 
 class Protein(BaseNode):
@@ -65,3 +71,21 @@ class Protein(BaseNode):
             raise ValueError("Sequence length must be positive")
 
         return v
+
+    async def relate_to_reaction(
+        self, driver: AsyncDriver, reaction: Reaction | list[Reaction]
+    ) -> None:
+        await self._relate(driver, "CATALYZES", reaction)
+
+    async def relate_to_taxon(self, driver: AsyncDriver, taxon: Taxon | list[Taxon]) -> None:
+        await self._relate(driver, "ORIGINATES_FROM", taxon)
+
+    async def relate_to_go_annotation(
+        self, driver: AsyncDriver, go_annotation: GOAnnotation | list[GOAnnotation]
+    ) -> None:
+        await self._relate(driver, "HAS_GO_ANNOTATION", go_annotation)
+
+    async def relate_to_annotation(
+        self, driver: AsyncDriver, annotation: Annotation | list[Annotation]
+    ) -> None:
+        await self._relate(driver, "HAS_ANNOTATION", annotation)
