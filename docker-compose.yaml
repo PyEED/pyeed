@@ -120,6 +120,36 @@ services:
       - "milvus"
     networks:
       - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: pyeed-api
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: pyeed-mcp
+    restart: unless-stopped
+    env_file: .env     
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    networks:
+      - backend
       
 networks:
   backend:

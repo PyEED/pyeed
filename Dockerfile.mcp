@@ -1,0 +1,14 @@
+FROM python:3.13-slim AS base
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+
+COPY pyproject.toml uv.lock* ./
+RUN pip install --upgrade pip \
+ && pip install "uv" \
+ && uv sync --frozen --no-dev
+
+COPY . .
+
+EXPOSE 8081
+CMD ["uv", "run", "uvicorn", "pyeed.mcp:app", "--host", "0.0.0.0", "--port", "8081"]
