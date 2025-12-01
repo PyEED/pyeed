@@ -1,5 +1,3 @@
-"""UniProt taxonomy adapter for fetching organism taxonomy information."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterable
@@ -16,9 +14,6 @@ from tenacity import (
 
 from ..model import Taxon
 
-TAXON_BASE_URL = "https://rest.uniprot.org/taxonomy"
-MAX_BATCH_SIZE = 50  # Maximum number of taxon IDs per batch request
-
 
 class UniProtTaxonomyAdapter:
     """Adapter for fetching taxonomy data from UniProt REST API.
@@ -30,6 +25,8 @@ class UniProtTaxonomyAdapter:
     def __init__(self) -> None:
         self.headers = {"Accept": "application/json"}
         self.timeout = httpx.Timeout(20.0)
+        self.base_url = "https://rest.uniprot.org/taxonomy"
+        self.max_batch_size = 50
 
     def _build_taxon_query(self, taxon_ids: list[str]) -> str:
         """Build OR query string for batch search.
@@ -52,7 +49,7 @@ class UniProtTaxonomyAdapter:
         self,
         client: httpx.AsyncClient,
         taxon_ids: list[str],
-    ) -> list[dict[str, Any]]:
+    ) -> Any:
         """Fetch a batch of taxa using the search endpoint.
 
         Args:
@@ -64,19 +61,19 @@ class UniProtTaxonomyAdapter:
 
         Raises:
             httpx.HTTPError: If request fails after retries
-            ValueError: If taxon_ids list is empty or exceeds MAX_BATCH_SIZE
+            ValueError: If taxon_ids list is empty or exceeds self.max_batch_size
         """
         if not taxon_ids:
             raise ValueError("taxon_ids list cannot be empty")
-        if len(taxon_ids) > MAX_BATCH_SIZE:
+        if len(taxon_ids) > self.max_batch_size:
             raise ValueError(
-                f"taxon_ids list exceeds maximum batch size of {MAX_BATCH_SIZE}: "
+                f"taxon_ids list exceeds maximum batch size of {self.max_batch_size}: "
                 f"{len(taxon_ids)} provided"
             )
 
         query = self._build_taxon_query(taxon_ids)
-        url = f"{TAXON_BASE_URL}/search"
-        params = {"query": query, "size": MAX_BATCH_SIZE}
+        url = f"{self.base_url}/search"
+        params = {"query": query, "size": str(self.max_batch_size)}
 
         r = await client.get(url, params=params, headers=self.headers, timeout=self.timeout)
         r.raise_for_status()
@@ -118,10 +115,10 @@ class UniProtTaxonomyAdapter:
         if not taxon_id_list:
             return
 
-        logger.debug(f"Fetching {len(taxon_id_list)} taxa in {MAX_BATCH_SIZE}-sized batches")
-        # Split into batches of MAX_BATCH_SIZE
-        for i in range(0, len(taxon_id_list), MAX_BATCH_SIZE):
-            batch = taxon_id_list[i : i + MAX_BATCH_SIZE]
+        logger.debug(f"Fetching {len(taxon_id_list)} taxa in {self.max_batch_size}-sized batches")
+        # Split into batches of self.max_batch_size
+        for i in range(0, len(taxon_id_list), self.max_batch_size):
+            batch = taxon_id_list[i : i + self.max_batch_size]
             try:
                 results = await self._fetch_taxa_batch(client, batch)
                 for result in results:

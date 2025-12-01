@@ -1,5 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Self
 
+from neo4j import AsyncDriver
 from pydantic import Field
 
 from .pyeedbase import BaseNode, LabelProperty
@@ -32,3 +33,18 @@ class Taxon(BaseNode):
         default_factory=list,
         description="Synonyms of the taxon",
     )
+
+    @classmethod
+    async def connect_lineage(cls, driver: AsyncDriver, lineage: list[Self]) -> None:
+        """Connect the lineage of the taxon.
+
+        Args:
+            driver: Neo4j async driver.
+            lineage: List of taxon nodes in the lineage.
+        """
+        pairs = [(lineage[i], lineage[i + 1]) for i in range(len(lineage) - 1)]
+        await cls._bulk_create_relationships(
+            driver,
+            "IS_A",
+            pairs,
+        )

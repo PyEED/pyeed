@@ -101,8 +101,10 @@ class FASTAReaderStage:
                     seq_length=len(sequence),
                 )  # type: ignore
 
-                relations = {"TAXON": [taxon_id]} if taxon_id else None
-                record = IngestItem(node=protein, relations=relations)
+                record = IngestItem(
+                    node=protein,
+                    relations={"TAXON": [taxon_id]} if taxon_id else None,
+                )
                 for output_queue in output_queues.values():
                     await output_queue.put(record)
 
