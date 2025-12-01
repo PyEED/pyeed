@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from ..ingest.core.pipeline import PipelineRecord
-    from ..ingest.model.pyeedbase import PyeedBase
+    from ..ingest.model.pyeedbase import BaseNode
 
 __all__ = [
     "NP_DTYPE_MAP",
@@ -81,7 +81,7 @@ def flatten_embedding_record(
     return d
 
 
-def records_to_embedding_inputs[T: PyeedBase](
+def records_to_embedding_inputs[T: BaseNode](
     records: list[PipelineRecord[T]],
 ) -> tuple[list[str], list[str]]:
     """Extract sequences and protein IDs from pipeline records for embedder input.
@@ -106,7 +106,7 @@ def records_to_embedding_inputs[T: PyeedBase](
     return sequences, protein_ids
 
 
-def distribute_embeddings_to_records[T: PyeedBase](
+def distribute_embeddings_to_records[T: BaseNode](
     embedding_batch: EmbeddingBatch,
     records: list[PipelineRecord[T]],
 ) -> list[PipelineRecord[T]]:

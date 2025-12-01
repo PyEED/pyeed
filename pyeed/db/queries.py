@@ -6,12 +6,12 @@ from typing import Any
 from neo4j import AsyncSession
 
 from ..ingest.core.pipeline import PipelineRecord
-from ..ingest.model.pyeedbase import PyeedBase
+from ..ingest.model.pyeedbase import BaseNode
 
 
 async def upsert_pipeline_records(
     session: AsyncSession,
-    records: list[PipelineRecord[PyeedBase]],
+    records: list[PipelineRecord[BaseNode]],
     tx_size: int = 5000,
 ) -> None:
     """Batch upsert PipelineRecords: nodes, children, relationships, cleanup.
@@ -49,7 +49,7 @@ async def upsert_pipeline_records(
     await _remove_list_values_batched(session, removal_groups, tx_size)
 
 
-def _collect_all_nodes(records: list[PipelineRecord[PyeedBase]]) -> list[PyeedBase]:
+def _collect_all_nodes(records: list[PipelineRecord[BaseNode]]) -> list[BaseNode]:
     """Collect all nodes from records (parent + children)."""
     nodes = []
     for record in records:
@@ -60,7 +60,7 @@ def _collect_all_nodes(records: list[PipelineRecord[PyeedBase]]) -> list[PyeedBa
 
 
 def _collect_relationships(
-    records: list[PipelineRecord[PyeedBase]],
+    records: list[PipelineRecord[BaseNode]],
 ) -> dict[tuple[str, str, str, str, str, bool], list[tuple[str, str]]]:
     """Collect all relationships grouped by type.
 
@@ -101,7 +101,7 @@ def _collect_relationships(
 
 
 def _collect_list_removals(
-    records: list[PipelineRecord[PyeedBase]],
+    records: list[PipelineRecord[BaseNode]],
 ) -> dict[tuple[str, str, str], dict[str, list[str]]]:
     """Collect list property values to remove.
 
@@ -197,7 +197,7 @@ async def _remove_list_values_batched(
 
 async def _upsert_nodes_with_session(
     session: AsyncSession,
-    nodes: list[PyeedBase],
+    nodes: list[BaseNode],
     tx_size: int = 5000,
 ) -> None:
     """Upsert nodes using provided session (internal helper)."""
@@ -205,7 +205,7 @@ async def _upsert_nodes_with_session(
         return
 
     # Group by label
-    by_label: dict[str, list[PyeedBase]] = {}
+    by_label: dict[str, list[BaseNode]] = {}
     for node in nodes:
         label = type(node).__name__
         by_label.setdefault(label, []).append(node)
@@ -214,7 +214,7 @@ async def _upsert_nodes_with_session(
         unique_field = node_list[0].get_unique_model_field()
 
         # Deduplicate by unique field (last occurrence wins - most recent data)
-        seen: dict[str, PyeedBase] = {}
+        seen: dict[str, BaseNode] = {}
         for node in node_list:
             unique_value = str(getattr(node, unique_field))
             seen[unique_value] = node
