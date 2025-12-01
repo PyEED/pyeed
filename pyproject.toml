@@ -30,6 +30,7 @@ dependencies = [
     "tenacity>=9.1.2",
     "torch>=2.8.0",
     "transformers>=4.48.1",
+    "uvicorn[standard]>=0.38.0",
 ]
 
 [tool.mypy]

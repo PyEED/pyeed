@@ -163,13 +163,11 @@ examples/clustering/data
 
 pyrightconfig.json
 
-poetry.lock
-
 .ruff_cache
 
 # Test python files
 test.py
 
-docker-compose.yml
+
 .DS_Store
 uv.lock

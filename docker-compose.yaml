@@ -1,30 +1,38 @@
 services:
   neo4j:
-    image: neo4j:5.26-community
+    image: neo4j:2025.10.1-community-bullseye
     container_name: neo4j
     restart: unless-stopped
 
     ports:
-      - "7474:7474"   # Neo4j Browser / HTTP
-      - "7687:7687"   # Bolt
+      - "${NEO4J_HTTP_PORT}:7474"
+      - "${NEO4J_BOLT_PORT}:7687"
 
     environment:
-      NEO4J_AUTH: "neo4j/12345678"
+      # authentication
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
 
-      # memory tuning
-      NEO4J_server_memory_heap_initial__size: 16g
-      NEO4J_server_memory_heap_max__size: 16g
-      NEO4J_server_memory_pagecache_size: 64g
+      # memory
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INITIAL_SIZE}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX_SIZE}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE_SIZE}
 
       # plugins
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
       NEO4J_PLUGINS: '["apoc","apoc-extended","graph-data-science"]'
 
     volumes:
-      - /home/mha/dbs/neo4j/proteingraph/data:/data
-      - /home/mha/dbs/neo4j/proteingraph/logs:/logs
-      - /home/mha/dbs/neo4j/proteingraph/import:/import
-      - /home/mha/dbs/neo4j/proteingraph/plugins:/plugins
+      - ${NEO4J_DATA_DIR}:/data
+      - ${NEO4J_LOGS_DIR}:/logs
+      - ${NEO4J_IMPORT_DIR}:/import
+      - ${NEO4J_PLUGIN_DIR}:/plugins
+
+    healthcheck:
+      test: [ "CMD", "cypher-shell", "-u", "${NEO4J_USER}", "-p", "${NEO4J_PASSWORD}", "RETURN 1" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
 
     networks:
       - backend
@@ -34,19 +42,16 @@ services:
     image: quay.io/coreos/etcd:v3.5.18
     restart: unless-stopped
     environment:
-      ETCD_AUTO_COMPACTION_MODE: revision
-      ETCD_AUTO_COMPACTION_RETENTION: "1000"
-      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
-      ETCD_SNAPSHOT_COUNT: "50000"
+      ETCD_AUTO_COMPACTION_MODE: ${ETCD_AUTO_COMPACTION_MODE}
+      ETCD_AUTO_COMPACTION_RETENTION: ${ETCD_AUTO_COMPACTION_RETENTION}
+      ETCD_QUOTA_BACKEND_BYTES: ${ETCD_QUOTA_BACKEND_BYTES}
+      ETCD_SNAPSHOT_COUNT: ${ETCD_SNAPSHOT_COUNT}
     command: >
-      etcd
-      -advertise-client-urls=http://etcd:2379
-      -listen-client-urls=http://0.0.0.0:2379
-      --data-dir=/etcd
+      etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
     volumes:
       - /home/mha/dbs/milvus/etcd:/etcd
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -54,20 +59,20 @@ services:
       - backend
 
   minio:
-    container_name: milvus-minio
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: milvus-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: ["server", "/minio_data", "--console-address", ":9001"]
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: [ "server", "/minio_data", "--console-address", ":9001" ]
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # MinIO console
+      - "${MINIO_API_PORT}:9000" # S3 API
+      - "${MINIO_CONSOLE_PORT}:9001" # MinIO console
     volumes:
-      - /home/mha/dbs/milvus/minio:/minio_data
+      - ${MINIO_DATA_DIR}:/minio_data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -78,26 +83,26 @@ services:
     container_name: milvus-standalone
     image: milvusdb/milvus:v2.6.4
     restart: unless-stopped
-    command: ["milvus", "run", "standalone"]
+    command: [ "milvus", "run", "standalone" ]
     security_opt:
       - seccomp:unconfined
 
     environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MQ_TYPE: woodpecker
-      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ETCD_ENDPOINTS: ${ETCD_ENDPOINTS}
+      MINIO_ADDRESS: ${MINIO_ADDRESS}
+      MQ_TYPE: ${MQ_TYPE}
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
 
     ports:
-      - "19530:19530" # gRPC
-      - "9091:9091"   # REST / metrics / healthz
+      - "${MILVUS_GRPC_PORT}:19530"
+      - "${MILVUS_REST_PORT}:9091"
 
     volumes:
-      - /home/mha/dbs/milvus/data:/var/lib/milvus
+      - ${MILVUS_DATA_DIR}:/var/lib/milvus
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:${MILVUS_REST_PORT}/healthz" ]
       interval: 30s
       start_period: 90s
       timeout: 20s
@@ -113,7 +118,7 @@ services:
     container_name: attu
     image: zilliz/attu:v2.6.1
     environment:
-      MILVUS_URL: milvus-standalone:19530
+      MILVUS_URL: ${MILVUS_URL}
     ports:
       - "8000:3000"
     depends_on:
@@ -131,10 +136,19 @@ services:
     depends_on:
       neo4j:
         condition: service_healthy
+      milvus:
+        condition: service_healthy
+
     ports:
-      - "8080:8080"
+      - "${REST_PORT}:8080"
     networks:
       - backend
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   mcp:
     build:
@@ -142,15 +156,17 @@ services:
       dockerfile: Dockerfile.mcp
     container_name: pyeed-mcp
     restart: unless-stopped
-    env_file: .env     
+    env_file: .env
     depends_on:
       neo4j:
         condition: service_healthy
+      milvus:
+        condition: service_healthy
     ports:
-      - "8081:8081"
+      - "${MCP_PORT}:8081"
     networks:
       - backend
-      
+
 networks:
   backend:
     driver: bridge

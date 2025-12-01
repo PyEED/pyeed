@@ -1,14 +1,50 @@
-FROM python:3.13-slim AS base
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
-ENV PYTHONUNBUFFERED=1
 
-COPY pyproject.toml uv.lock* ./
-RUN pip install --upgrade pip \
- && pip install "uv" \
- && uv sync --frozen --no-dev
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-COPY . .
+# Copy dependency files
+COPY pyproject.toml README.md ./
+
+# Copy source code (needed to build the package!)
+COPY pyeed ./pyeed
+
+# Create venv and install dependencies
+RUN uv venv /app/.venv && \
+    uv pip install --python=/app/.venv/bin/python .
+
+# Runtime stage
+FROM python:3.13-slim AS runtime
+
+# Create non-root user with home directory
+RUN groupadd -r appuser && \
+    useradd -r -g appuser -m -d /home/appuser appuser && \
+    mkdir -p /home/appuser/.cache && \
+    chown -R appuser:appuser /home/appuser
+
+WORKDIR /app
+
+# Copy uv binary
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application code
+COPY --chown=appuser:appuser pyeed ./pyeed
+
+# Ensure appuser owns /app directory (needed for log files)
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+ENV PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH" \
+    HOME=/home/appuser \
+    UV_SYSTEM_PYTHON=0
 
 EXPOSE 8080
-CMD ["uv", "run", "uvicorn", "pyeed.api:app", "--host", "0.0.0.0", "--port", "8080"]
+
+CMD ["uvicorn", "pyeed.api:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
