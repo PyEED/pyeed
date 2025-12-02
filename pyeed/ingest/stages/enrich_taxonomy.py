@@ -85,7 +85,7 @@ class TaxonomyEnrichmentStage:
 
         # 3) upsert fetched taxons
         if taxon_nodes:
-            await Taxon.bulk_upsert(self.driver, taxon_nodes)
+            await Taxon._bulk_upsert(self.driver, taxon_nodes)
 
         # 4) link proteins -> taxons (both existing and newly fetched)
         by_id = {t.id: t for t in taxon_nodes}

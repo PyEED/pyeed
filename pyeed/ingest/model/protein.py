@@ -93,7 +93,7 @@ class Protein(BaseNode):
             driver: Neo4j async driver.
             pairs: List of (protein, reaction) pairs.
         """
-        await cls._bulk_create_relationships(driver, "CATALYZES", pairs)
+        await cls._bulk_relate(driver, "CATALYZES", pairs)
 
     async def relate_to_taxon(self, driver: AsyncDriver, taxon: Taxon | list[Taxon]) -> None:
         """Relate protein to taxon.
@@ -114,7 +114,7 @@ class Protein(BaseNode):
             driver: Neo4j async driver.
             pairs: List of (protein, taxon) pairs.
         """
-        await cls._bulk_create_relationships(driver, "ORIGINATES_FROM", pairs)
+        await cls._bulk_relate(driver, "ORIGINATES_FROM", pairs)
 
     async def relate_to_go_annotation(
         self, driver: AsyncDriver, go_annotation: GOAnnotation | list[GOAnnotation]
@@ -137,7 +137,7 @@ class Protein(BaseNode):
             driver: Neo4j async driver.
             pairs: List of (protein, GO annotation) pairs.
         """
-        await cls._bulk_create_relationships(driver, "HAS_GO_ANNOTATION", pairs)
+        await cls._bulk_relate(driver, "HAS_GO_ANNOTATION", pairs)
 
     async def relate_to_annotation(
         self, driver: AsyncDriver, annotation: Annotation | list[Annotation]
@@ -160,4 +160,4 @@ class Protein(BaseNode):
             driver: Neo4j async driver.
             pairs: List of (protein, annotation) pairs.
         """
-        await cls._bulk_create_relationships(driver, "HAS_ANNOTATION", pairs)
+        await cls._bulk_relate(driver, "HAS_ANNOTATION", pairs)

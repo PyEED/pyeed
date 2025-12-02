@@ -18,14 +18,14 @@ class Reaction(BaseNode):
         None,
         description="Reaction description",
     )
-    substrate_ids: list[str] = Field(
-        default_factory=list,
-        description="List of molecule identifiers (ChEBI IDs)",
-    )
-    product_ids: list[str] = Field(
-        default_factory=list,
-        description="List of molecule identifiers (ChEBI IDs)",
-    )
+    # substrate_ids: list[str] = Field(
+    #     default_factory=list,
+    #     description="List of molecule identifiers (ChEBI IDs)",
+    # )
+    # product_ids: list[str] = Field(
+    #     default_factory=list,
+    #     description="List of molecule identifiers (ChEBI IDs)",
+    # )
     reversible: bool = Field(
         default=False,
         description="Whether the reaction is reversible",

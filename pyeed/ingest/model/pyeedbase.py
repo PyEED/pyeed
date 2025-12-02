@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Literal, Self, overload
 
-from loguru import logger
-from neo4j import AsyncDriver, AsyncManagedTransaction
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from neo4j import AsyncDriver
+from pydantic import BaseModel, ConfigDict, model_validator
+
+from ...db.query_utils import (
+    execute_read,
+    execute_write,
+    process_multiple_records,
+    process_single_record,
+)
 
 
 @dataclass(frozen=True)
@@ -39,10 +44,11 @@ class BaseNode(BaseModel):
         Only one field per class can be marked with ``index=True``.
     """
 
-    model_config = ConfigDict(frozen=False, validate_assignment=True, use_enum_values=True)
-
-    custom: dict[str, Any] = Field(
-        default_factory=dict, description="Arbitrary custom data as key-value pairs"
+    model_config = ConfigDict(
+        frozen=False,
+        validate_assignment=True,
+        use_enum_values=True,
+        populate_by_name=True,
     )
 
     @model_validator(mode="after")
@@ -72,74 +78,27 @@ class BaseNode(BaseModel):
 
         return self
 
-    @field_validator("custom")
-    @classmethod
-    def validate_keys(cls, v: dict[str, Any], info: Any) -> dict[str, Any]:
-        """Validate that custom keys don't conflict with existing attributes.
+    # --------- Upsert methods --------- #
+
+    async def _upsert[T: BaseNode](
+        self: T,
+        driver: AsyncDriver,
+        session_kwargs: dict[str, Any] | None = None,
+    ) -> None:
+        """Upsert this node instance.
 
         Args:
-            v: The custom dictionary to validate.
-            info: Validation context information.
-
-        Returns:
-            The validated custom dictionary.
-
-        Raises:
-            ValueError: If keys conflict with existing attributes, contain invalid
-                characters, or contain nested dictionaries.
+            driver: Neo4j async driver.
+            session_kwargs: Optional session keyword arguments.
         """
-        if not v:
-            return v
-
-        # Get all field names from the current class and its parents
-        field_names = set()
-        current_class = info.data.get("__class__", cls)
-
-        # Collect field names from current class and all parent classes
-        while current_class and current_class != BaseModel:
-            field_names.update(current_class.model_fields.keys())
-            current_class = current_class.__bases__[0] if current_class.__bases__ else None
-
-        # Check for conflicts
-        conflicting_keys = []
-        invalid_keys = []
-
-        # Regex pattern for valid Python variable names
-        valid_var_pattern = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-
-        for key, value in v.items():
-            # Check for conflicts with existing attributes
-            if key in field_names or key == "custom":
-                conflicting_keys.append(key)
-
-            # Check if key is a valid Python variable name
-            if not valid_var_pattern.match(key):
-                invalid_keys.append(key)
-
-            # Check for nested dictionaries (not allowed)
-            if isinstance(value, dict):
-                raise ValueError(
-                    f"Nested dictionaries are not allowed in custom fields. "
-                    f"Key '{key}' contains a dictionary value."
-                )
-
-        if conflicting_keys:
-            raise ValueError(
-                f"Custom field keys cannot conflict with existing attributes or be "
-                f"'custom': {conflicting_keys}"
-            )
-
-        if invalid_keys:
-            raise ValueError(
-                f"Invalid custom field keys: {invalid_keys}. "
-                f"Keys must start with a letter or underscore and contain only "
-                f"letters, digits, or underscores."
-            )
-
-        return v
+        await type(self)._bulk_upsert(
+            driver,
+            [self],
+            session_kwargs=session_kwargs,
+        )
 
     @classmethod
-    async def bulk_upsert[T: BaseNode](
+    async def _bulk_upsert[T: BaseNode](
         cls: type[T],
         driver: AsyncDriver,
         nodes: Iterable[T],
@@ -151,11 +110,8 @@ class BaseNode(BaseModel):
             driver: Neo4j async driver.
             nodes: Iterable of node instances to upsert.
             session_kwargs: Optional session keyword arguments.
-
-        Raises:
-            ValueError: If no index field is defined for this node type.
         """
-        rows = [node.to_dict() for node in nodes]
+        rows = [node.model_dump() for node in nodes]
         if not rows:
             return
 
@@ -167,32 +123,47 @@ class BaseNode(BaseModel):
         SET n += row
         """
 
-        kwargs = session_kwargs or {}
-        async with driver.session(**kwargs) as session:
-            try:
-                await session.execute_write(_tx, cypher, rows)
-            except Exception:
-                logger.exception("Failed to batch upsert nodes")
-
-    async def upsert[T: BaseNode](
-        self: T,
-        driver: AsyncDriver,
-        session_kwargs: dict[str, Any] | None = None,
-    ) -> None:
-        """Upsert this node instance.
-
-        Args:
-            driver: Neo4j async driver.
-            session_kwargs: Optional session keyword arguments.
-        """
-        await type(self).bulk_upsert(
-            driver,
-            [self],
+        await execute_write(
+            driver=driver,
+            query=cypher,
+            rows=rows,
             session_kwargs=session_kwargs,
         )
 
+    # --------- Relationship methods --------- #
+
+    async def _relate[S: BaseNode, E: BaseNode](
+        self: S,
+        driver: AsyncDriver,
+        rel_type: str,
+        targets: Iterable[E] | E,
+        *,
+        session_kwargs: dict[str, Any] | None = None,
+        rel_props: dict[str, Any] | None = None,
+    ) -> None:
+        """Create (self)-[rel_type]->(targets) relationships.
+
+        Wrapper around `_bulk_create_relationships` for one start node.
+
+        Args:
+            driver: Neo4j async driver.
+            rel_type: Relationship type.
+            targets: Single target node or iterable of target nodes.
+            session_kwargs: Optional session keyword arguments.
+            rel_props: Optional relationship properties.
+        """
+        pairs = [(self, targets)] if isinstance(targets, BaseNode) else [(self, t) for t in targets]
+
+        await type(self)._bulk_relate(
+            driver=driver,
+            rel_type=rel_type,
+            pairs=pairs,
+            session_kwargs=session_kwargs,
+            rel_props=rel_props,
+        )
+
     @classmethod
-    async def _bulk_create_relationships[S: BaseNode, E: BaseNode](
+    async def _bulk_relate[S: BaseNode, E: BaseNode](
         cls: type[S],
         driver: AsyncDriver,
         rel_type: str,
@@ -265,62 +236,12 @@ class BaseNode(BaseModel):
         SET r += row.props
         """
 
-        session_kwargs = session_kwargs or {}
-        async with driver.session(**session_kwargs) as session:
-            try:
-                await session.execute_write(_tx, cypher, rows)
-            except Exception:
-                logger.exception(
-                    "Failed to write relations for %s(%s) -> %s(%s)",
-                    cls.__name__,
-                    start_key,
-                    target_label,
-                    target_key,
-                )
-
-    async def _relate[S: BaseNode, E: BaseNode](
-        self: S,
-        driver: AsyncDriver,
-        rel_type: str,
-        targets: Iterable[E] | E,
-        *,
-        session_kwargs: dict[str, Any] | None = None,
-        rel_props: dict[str, Any] | None = None,
-    ) -> None:
-        """Create (self)-[rel_type]->(targets) relationships.
-
-        Wrapper around `_bulk_create_relationships` for one start node.
-
-        Args:
-            driver: Neo4j async driver.
-            rel_type: Relationship type.
-            targets: Single target node or iterable of target nodes.
-            session_kwargs: Optional session keyword arguments.
-            rel_props: Optional relationship properties.
-        """
-        pairs = [(self, targets)] if isinstance(targets, BaseNode) else [(self, t) for t in targets]
-
-        await type(self)._bulk_create_relationships(
+        await execute_write(
             driver=driver,
-            rel_type=rel_type,
-            pairs=pairs,
+            query=cypher,
+            rows=rows,
             session_kwargs=session_kwargs,
-            rel_props=rel_props,
         )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a Neo4j-safe dictionary.
-
-        Flattens the `custom` field and keeps only primitives or lists of
-        primitives.
-
-        Returns:
-            Dictionary with Neo4j-compatible property values.
-        """
-        d = self.model_dump(exclude_none=True, exclude_unset=True)
-        custom = d.pop("custom", {}) or {}
-        flat = {**d, **custom}
-        return {k: v for k, v in flat.items() if _is_neo4j_prop_value(v)}
 
     @classmethod
     def get_index_field(cls) -> str:
@@ -344,45 +265,236 @@ class BaseNode(BaseModel):
             f"annotation."
         )
 
+    # --------- Query methods --------- #
 
-def _is_primitive(x: object) -> bool:
-    """Check if a value is a primitive type.
+    @classmethod
+    @overload
+    async def get(
+        cls,
+        driver: AsyncDriver,
+        *,
+        id: str,
+    ) -> Self | None:
+        """Get a single node by its indexed field value."""
+        ...
 
-    Args:
-        x: Value to check.
+    @classmethod
+    @overload
+    async def get(
+        cls,
+        driver: AsyncDriver,
+        *,
+        ids: list[str],
+    ) -> list[Self]:
+        """Get multiple nodes by their indexed field values."""
+        ...
 
-    Returns:
-        True if the value is a primitive type (str, int, float, bool, or None).
-    """
-    return isinstance(x, str | int | float | bool) or x is None
+    @classmethod
+    async def get(
+        cls,
+        driver: AsyncDriver,
+        *,
+        id: str | None = None,
+        ids: list[str] | None = None,
+    ) -> Self | list[Self] | None:
+        """Get node(s) by indexed field.
 
+        Args:
+            driver: Neo4j async driver.
+            id: Single ID to fetch (returns one node or None).
+            ids: Multiple IDs to fetch (returns list).
 
-def _is_neo4j_prop_value(v: object) -> bool:
-    """Check if a value is a valid Neo4j property value.
+        Returns:
+            Single node, list of nodes, or None.
 
-    Args:
-        v: Value to check.
+        Raises:
+            ValueError: If neither id nor ids is provided, or both are provided.
+        """
+        if id is not None and ids is not None:
+            raise ValueError("Provide either 'id' or 'ids', not both")
+        if id is None and ids is None:
+            raise ValueError("Provide either 'id' or 'ids'")
 
-    Returns:
-        True if the value is a primitive or a list/tuple of primitives.
-    """
-    if _is_primitive(v):
-        return True
-    if isinstance(v, list | tuple):
-        return all(_is_primitive(e) for e in v)
-    return False
+        index_field = cls.get_index_field()
+        label = cls.__name__
 
+        if id is not None:
+            # Single lookup
+            query = f"MATCH (n:{label} {{{index_field}: $value}}) RETURN properties(n) AS node"
+            data = await execute_read(
+                driver=driver,
+                query=query,
+                params={"value": id},
+                processor=process_single_record,
+            )
+            if not data:
+                return None
+            return cls(**data["node"])
 
-async def _tx(
-    tx: AsyncManagedTransaction,
-    cypher: str,
-    rows: list[dict[str, Any]],
-) -> None:
-    """Execute a Cypher query in a transaction.
+        else:
+            # Batch lookup
+            query = (
+                f"MATCH (n:{label}) WHERE n.{index_field} IN $values RETURN properties(n) AS node"
+            )
+            records = await execute_read(
+                driver=driver,
+                query=query,
+                params={"values": ids},
+                processor=process_multiple_records,
+            )
+            return [cls(**r["node"]) for r in records]
 
-    Args:
-        tx: Neo4j transaction.
-        cypher: Cypher query to execute.
-        rows: Parameter rows for the query.
-    """
-    await tx.run(cypher, rows=rows)
+    @classmethod
+    async def get_by(
+        cls,
+        driver: AsyncDriver,
+        **filters: Any,
+    ) -> list[Self]:
+        """Get nodes by arbitrary field filters.
+
+        Validates that filter keys are valid model fields.
+
+        Args:
+            driver: Neo4j async driver.
+            **filters: Field name to value mappings.
+
+        Returns:
+            List of matching nodes.
+
+        Raises:
+            ValueError: If a filter key is not a valid field name.
+
+        Example:
+            proteins = await Protein.get_by(driver, name="Hemoglobin")
+            reactions = await Reaction.get_by(driver, reversible=True)
+        """
+        # Validate all filter keys are valid fields
+        valid_fields = set(cls.model_fields.keys())
+        invalid_keys = set(filters.keys()) - valid_fields
+        if invalid_keys:
+            raise ValueError(
+                f"Invalid filter keys for {cls.__name__}: {invalid_keys}. "
+                f"Valid fields: {valid_fields}"
+            )
+
+        if not filters:
+            raise ValueError("At least one filter must be provided")
+
+        label = cls.__name__
+
+        # Build WHERE clause
+        conditions = [f"n.{key} = ${key}" for key in filters]
+        where_clause = " AND ".join(conditions)
+
+        query = f"MATCH (n:{label}) WHERE {where_clause} RETURN properties(n) AS node"
+
+        records = await execute_read(
+            driver=driver,
+            query=query,
+            params=filters,
+            processor=process_multiple_records,
+        )
+        return [cls(**r["node"]) for r in records]
+
+    @classmethod
+    async def get_all(
+        cls,
+        driver: AsyncDriver,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Self]:
+        """Get all nodes of this type with pagination.
+
+        Args:
+            driver: Neo4j async driver.
+            limit: Maximum number of results.
+            offset: Number of results to skip.
+
+        Returns:
+            List of nodes.
+        """
+        label = cls.__name__
+        query = f"MATCH (n:{label}) RETURN properties(n) AS node SKIP $offset LIMIT $limit"
+
+        records = await execute_read(
+            driver=driver,
+            query=query,
+            params={"limit": limit, "offset": offset},
+            processor=process_multiple_records,
+        )
+        return [cls(**r["node"]) for r in records]
+
+    @classmethod
+    async def count(cls, driver: AsyncDriver) -> int:
+        """Count all nodes of this type.
+
+        Args:
+            driver: Neo4j async driver.
+
+        Returns:
+            Number of nodes.
+        """
+        label = cls.__name__
+        query = f"MATCH (n:{label}) RETURN count(n) AS count"
+
+        data = await execute_read(
+            driver=driver,
+            query=query,
+            params={},
+            processor=process_single_record,
+        )
+        return data["count"] if data else 0
+
+    @classmethod
+    async def get_related[S: BaseNode, E: BaseNode](
+        cls: type[S],
+        target_cls: type[E],
+        *,
+        driver: AsyncDriver,
+        id: str,
+        rel_type: str | None = None,
+        direction: Literal["out", "in", "both"] = "out",
+    ) -> list[E]:
+        """Get one-hop related nodes of another class.
+
+        Finds all `target_cls` nodes that are directly connected to the node of
+        this class identified by its indexed LabelProperty field.
+
+        Args:
+            target_cls: Target node class (must inherit from BaseNode).
+            driver: Neo4j async driver.
+            id: Indexed field value of the start node.
+            rel_type: Optional relationship type to match. If None, any type is matched.
+            direction: Relationship direction: 'out', 'in', or 'both'.
+
+        Returns:
+            List of target_cls instances.
+        """
+        start_label = cls.__name__
+        start_key = cls.get_index_field()
+        target_label = target_cls.__name__
+
+        dir_normalized = direction.lower()
+        if dir_normalized == "out":
+            rel_pattern = f"-[r:`{rel_type}`]->" if rel_type else "-[r]->"
+        elif dir_normalized == "in":
+            rel_pattern = f"<-[r:`{rel_type}`]-" if rel_type else "<-[r]-"
+        elif dir_normalized == "both":
+            rel_pattern = f"-[r:`{rel_type}`]-" if rel_type else "-[r]-"
+        else:
+            raise ValueError("direction must be 'out', 'in', or 'both'")
+
+        query = f"""
+        MATCH (start:`{start_label}` {{ `{start_key}`: $id }})
+              {rel_pattern}(target:`{target_label}`)
+        RETURN properties(target) AS node
+        """
+
+        records = await execute_read(
+            driver=driver,
+            query=query,
+            params={"id": id},
+            processor=process_multiple_records,
+        )
+        return [target_cls(**r["node"]) for r in records]

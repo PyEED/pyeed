@@ -43,7 +43,7 @@ class Taxon(BaseNode):
             lineage: List of taxon nodes in the lineage.
         """
         pairs = [(lineage[i], lineage[i + 1]) for i in range(len(lineage) - 1)]
-        await cls._bulk_create_relationships(
+        await cls._bulk_relate(
             driver,
             "IS_A",
             pairs,
