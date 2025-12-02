@@ -43,8 +43,9 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH" \
     HOME=/home/appuser \
-    UV_SYSTEM_PYTHON=0
+    UV_SYSTEM_PYTHON=0 \
+    PORT=8080
 
 EXPOSE 8080
 
-CMD ["uvicorn", "pyeed.api:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
+CMD uvicorn pyeed.graphql.app:app --host 0.0.0.0 --port ${PORT:-8080} --workers 4

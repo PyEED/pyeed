@@ -133,6 +133,10 @@ services:
     container_name: pyeed-api
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Override with Docker service names for internal networking
+      NEO4J_URI: "neo4j://neo4j:7687"
+      MILVUS_URI: "http://milvus:19530"
     depends_on:
       neo4j:
         condition: service_healthy
@@ -143,12 +147,6 @@ services:
       - "${REST_PORT}:8080"
     networks:
       - backend
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
 
   mcp:
     build:

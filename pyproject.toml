@@ -11,7 +11,7 @@ authors = [
 ]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.123.0",
     "httpx>=0.28.1",
@@ -27,6 +27,7 @@ dependencies = [
     "rdkit>=2025.9.1",
     "rich>=14.1.0",
     "scikit-bio>=0.7.1.post1",
+    "strawberry-graphql[asgi,cli]==0.287.0",
     "tenacity>=9.1.2",
     "torch>=2.8.0",
     "transformers>=4.48.1",
