@@ -35,6 +35,16 @@ class UploadStats:
     failed_inserts: int = 0
 
 
+def get_async_milvus_client(
+    uri: str | None = None,
+    token: str | None = None,
+) -> AsyncMilvusClient:
+    dotenv.load_dotenv()
+    uri = uri or os.getenv("MILVUS_URL")
+    token = token or os.getenv("MILVUS_TOKEN")
+    return AsyncMilvusClient(uri=uri, token=token)
+
+
 class VectorDB:
     MAX_HITLIST_SIZE = 16384
 
