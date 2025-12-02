@@ -74,21 +74,24 @@ async def get_protein_by_id(
     )
 
     if protein_data and "protein" in protein_data:
-        return Protein(**protein_data["protein"])
+        return Protein.from_dict(protein_data["protein"])
     return None
 
 
-async def get_all_proteins(neo4j_driver: AsyncDriver) -> list[Protein]:
-    query = "MATCH (p:Protein) RETURN properties(p) AS protein"
+async def get_proteins_by_ids(
+    ids: list[str],
+    neo4j_driver: AsyncDriver,
+) -> list[Protein]:
+    query = "MATCH (p:Protein {id: $id}) RETURN properties(p) AS protein"
 
     records = await execute_read_transaction(
         neo4j_driver=neo4j_driver,
         query=query,
-        params={},
+        params={"ids": ids},
         result_processor=process_multiple_records,
     )
 
-    return [Protein(**record["protein"]) for record in records]
+    return [Protein.from_dict(record["protein"]) for record in records]
 
 
 async def count_nodes_per_label(neo4j_driver: AsyncDriver) -> dict[str, int]:
@@ -191,7 +194,13 @@ async def get_similar_proteins_by_ids(
                 )
             )
 
-    return search_results
+    unique_target_ids = list(set([result.target_id for result in search_results]))
+    proteins = await get_proteins_by_ids(
+        ids=unique_target_ids,
+        neo4j_driver=neo4j_driver,
+    )
+
+    return proteins
 
 
 async def main() -> None:

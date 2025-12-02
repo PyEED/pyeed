@@ -369,46 +369,46 @@ class VectorDB:
 
         # get
 
-    def _get_search_load_params(
-        self,
-        n_hits: int,
-        n_queries: int | None = None,
-        *,
-        max_total_hits_per_request: int = 16384,
-        request_size_limit_mb: float = 64.0,
-        safety: float = 0.6,
-        id_bytes: int = 8,
-        dist_bytes: int = 4,
-        wire_overhead: float = 1.6,
-    ) -> tuple[int, int]:
-        """Return (hitlist_size, queries_per_search) without exceeding limits.
+    # def _get_search_load_params(
+    #     self,
+    #     n_hits: int,
+    #     n_queries: int | None = None,
+    #     *,
+    #     max_total_hits_per_request: int = 16384,
+    #     request_size_limit_mb: float = 64.0,
+    #     safety: float = 0.6,
+    #     id_bytes: int = 8,
+    #     dist_bytes: int = 4,
+    #     wire_overhead: float = 1.6,
+    # ) -> tuple[int, int]:
+    #     """Return (hitlist_size, queries_per_search) without exceeding limits.
 
-        n_hits: desired results per query (topK).
-        n_queries: optional cap on queries per network request.
-        """
+    #     n_hits: desired results per query (topK).
+    #     n_queries: optional cap on queries per network request.
+    #     """
 
-        # Byte-budget-derived cap on total results we can return in one request.
-        request_budget_bytes = int(request_size_limit_mb * (1024**2) * safety)
-        bytes_per_result = int((id_bytes + dist_bytes) * wire_overhead)
-        budget_cap_total_hits = request_budget_bytes // bytes_per_result
+    #     # Byte-budget-derived cap on total results we can return in one request.
+    #     request_budget_bytes = int(request_size_limit_mb * (1024**2) * safety)
+    #     bytes_per_result = int((id_bytes + dist_bytes) * wire_overhead)
+    #     budget_cap_total_hits = request_budget_bytes // bytes_per_result
 
-        # Effective total-results cap per request respects both byte budget and server max.
-        total_hits_cap = min(budget_cap_total_hits, max_total_hits_per_request)
+    #     # Effective total-results cap per request respects both byte budget and server max.
+    #     total_hits_cap = min(budget_cap_total_hits, max_total_hits_per_request)
 
-        # Per-query result count cannot exceed requested n_hits nor the total cap.
-        hitlist_size = min(n_hits, total_hits_cap)
+    #     # Per-query result count cannot exceed requested n_hits nor the total cap.
+    #     hitlist_size = min(n_hits, total_hits_cap)
 
-        # Number of queries we can pack while staying within the total results cap.
-        queries_per_search = total_hits_cap // hitlist_size
+    #     # Number of queries we can pack while staying within the total results cap.
+    #     queries_per_search = total_hits_cap // hitlist_size
 
-        if n_queries is not None:
-            queries_per_search = min(queries_per_search, n_queries)
+    #     if n_queries is not None:
+    #         queries_per_search = min(queries_per_search, n_queries)
 
-        # Ensure product stays within the cap (guard against rounding).
-        if queries_per_search * hitlist_size > total_hits_cap:
-            queries_per_search = total_hits_cap // hitlist_size
+    #     # Ensure product stays within the cap (guard against rounding).
+    #     if queries_per_search * hitlist_size > total_hits_cap:
+    #         queries_per_search = total_hits_cap // hitlist_size
 
-        return hitlist_size, queries_per_search
+    #     return hitlist_size, queries_per_search
 
     def get_all_vectors(
         self,

@@ -223,7 +223,7 @@ async def _upsert_nodes_with_session(
         rows = [
             {
                 "key": str(getattr(node, unique_field)),
-                "props": node.to_dict(),
+                "props": node.model_dump(),
             }
             for node in seen.values()
         ]
