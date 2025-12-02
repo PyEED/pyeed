@@ -78,114 +78,6 @@ class TestLabelPropertyValidation:
 
 
 # ============================================================================
-# Test Custom Field Validation
-# ============================================================================
-
-
-class TestCustomFieldValidation:
-    """Tests for custom field validation."""
-
-    def test_valid_custom_fields(self, valid_node_class):
-        """Test that valid custom fields are accepted."""
-        node = valid_node_class(
-            id="test",
-            name="Node",
-            custom={"extra": "value", "count": 42, "tags": ["a", "b"], "flag": True},
-        )
-        assert node.custom["extra"] == "value"
-        assert node.custom["count"] == 42
-        assert node.custom["tags"] == ["a", "b"]
-        assert node.custom["flag"] is True
-
-    def test_dict_value_raises_error(self, valid_node_class):
-        """Test that dict values in custom fields raise ValueError."""
-        with pytest.raises(ValueError, match="Nested dictionaries are not allowed"):
-            valid_node_class(id="test", name="Node", custom={"nested": {"key": "value"}})
-
-    def test_conflicting_key_raises_error(self, valid_node_class):
-        """Test that keys conflicting with field names raise ValueError."""
-        with pytest.raises(ValueError, match="cannot conflict with existing attributes"):
-            valid_node_class(id="test", name="Node", custom={"id": "conflict"})
-
-        with pytest.raises(ValueError, match="cannot conflict with existing attributes"):
-            valid_node_class(id="test", name="Node", custom={"name": "conflict"})
-
-    def test_custom_key_raises_error(self, valid_node_class):
-        """Test that 'custom' as a key raises ValueError."""
-        with pytest.raises(ValueError, match="cannot conflict with existing attributes"):
-            valid_node_class(id="test", name="Node", custom={"custom": "value"})
-
-    def test_invalid_key_format_raises_error(self, valid_node_class):
-        """Test that invalid Python variable names raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid custom field keys"):
-            valid_node_class(id="test", name="Node", custom={"123invalid": "value"})
-
-        with pytest.raises(ValueError, match="Invalid custom field keys"):
-            valid_node_class(id="test", name="Node", custom={"my-key": "value"})
-
-        with pytest.raises(ValueError, match="Invalid custom field keys"):
-            valid_node_class(id="test", name="Node", custom={"my key": "value"})
-
-    def test_empty_custom_allowed(self, valid_node_class):
-        """Test that empty custom dict is allowed."""
-        node = valid_node_class(id="test", name="Node", custom={})
-        assert node.custom == {}
-
-    def test_none_values_in_custom_allowed(self, valid_node_class):
-        """Test that None values in custom fields are allowed."""
-        node = valid_node_class(id="test", name="Node", custom={"optional": None})
-        assert node.custom["optional"] is None
-
-
-# ============================================================================
-# Test to_dict Method
-# ============================================================================
-
-
-class TestToDictMethod:
-    """Tests for to_dict() method."""
-
-    def test_basic_to_dict(self, sample_node):
-        """Test basic to_dict conversion."""
-        d = sample_node.to_dict()
-        assert d["id"] == "test-123"
-        assert d["name"] == "Test Node"
-        assert d["age"] == 42
-
-    def test_custom_fields_flattened(self, valid_node_class):
-        """Test that custom fields are flattened into the dict."""
-        node = valid_node_class(id="test", name="Node", custom={"extra": "value", "count": 42})
-        d = node.to_dict()
-        assert d["extra"] == "value"
-        assert d["count"] == 42
-        assert "custom" not in d
-
-    def test_none_values_excluded(self, valid_node_class):
-        """Test that None values are excluded from dict."""
-        node = valid_node_class(id="test", name="Node", age=None)
-        d = node.to_dict()
-        assert "age" not in d
-
-    def test_only_neo4j_compatible_values(self, valid_node_class):
-        """Test that only Neo4j-compatible values are included."""
-        node = valid_node_class(id="test", name="Node")
-        # Add a complex object that shouldn't be included
-        node.custom = {"valid_str": "text", "valid_list": [1, 2, 3]}
-        d = node.to_dict()
-        assert "valid_str" in d
-        assert "valid_list" in d
-
-    def test_list_of_primitives_included(self, valid_node_class):
-        """Test that lists of primitives are included."""
-        node = valid_node_class(
-            id="test", name="Node", custom={"tags": ["a", "b"], "numbers": [1, 2, 3]}
-        )
-        d = node.to_dict()
-        assert d["tags"] == ["a", "b"]
-        assert d["numbers"] == [1, 2, 3]
-
-
-# ============================================================================
 # Test get_index_field Method
 # ============================================================================
 
@@ -255,17 +147,17 @@ def mock_neo4j_transaction():
 
 
 class TestBulkUpsert:
-    """Tests for bulk_upsert() method with mocked Neo4j."""
+    """Tests for _bulk_upsert() method with mocked Neo4j."""
 
     @pytest.mark.asyncio
-    async def test_bulk_upsert_basic(self, valid_node_class, mock_neo4j_driver):
+    async def test__bulk_upsert_basic(self, valid_node_class, mock_neo4j_driver):
         """Test basic bulk upsert operation."""
         nodes = [
             valid_node_class(id="id1", name="Node 1"),
             valid_node_class(id="id2", name="Node 2"),
         ]
 
-        await valid_node_class.bulk_upsert(mock_neo4j_driver, nodes)
+        await valid_node_class._bulk_upsert(mock_neo4j_driver, nodes)
 
         # Verify driver.session was called
         mock_neo4j_driver.session.assert_called_once()
@@ -276,7 +168,7 @@ class TestBulkUpsert:
         nodes = [valid_node_class(id="id1", name="Node 1")]
         session_kwargs = {"database": "test_db"}
 
-        await valid_node_class.bulk_upsert(mock_neo4j_driver, nodes, session_kwargs=session_kwargs)
+        await valid_node_class._bulk_upsert(mock_neo4j_driver, nodes, session_kwargs=session_kwargs)
 
         # Verify session was called with kwargs
         mock_neo4j_driver.session.assert_called_once_with(**session_kwargs)
@@ -284,7 +176,7 @@ class TestBulkUpsert:
     @pytest.mark.asyncio
     async def test_bulk_upsert_empty_list(self, valid_node_class, mock_neo4j_driver):
         """Test bulk upsert with empty list does nothing."""
-        await valid_node_class.bulk_upsert(mock_neo4j_driver, [])
+        await valid_node_class._bulk_upsert(mock_neo4j_driver, [])
 
         # Should not call session
         mock_neo4j_driver.session.assert_not_called()
@@ -294,66 +186,31 @@ class TestBulkUpsert:
         """Test that bulk upsert generates correct Cypher query."""
         nodes = [valid_node_class(id="id1", name="Node 1")]
 
-        # Mock the transaction execution to capture the cypher
-        captured_cypher = None
+        # Capture arguments passed to execute_write
+        captured_query = None
         captured_rows = None
 
-        async def mock_execute_write(tx_func, rows):
-            nonlocal captured_cypher, captured_rows
-            # Create a mock transaction
-            mock_tx = AsyncMock()
+        async def mock_execute_write(driver, query, params=None, rows=None, session_kwargs=None):
+            nonlocal captured_query, captured_rows
+            captured_query = query
+            captured_rows = rows
 
-            async def capture_run(cypher, **kwargs):
-                nonlocal captured_cypher, captured_rows
-                captured_cypher = cypher
-                captured_rows = kwargs.get("rows")
-
-            mock_tx.run = capture_run
-            await tx_func(mock_tx, rows)
-
-        mock_neo4j_driver.session.return_value.__aenter__.return_value.execute_write = (
-            mock_execute_write
-        )
-
-        await valid_node_class.bulk_upsert(mock_neo4j_driver, nodes)
+        with patch("pyeed.ingest.model.pyeedbase.execute_write", side_effect=mock_execute_write):
+            await valid_node_class._bulk_upsert(mock_neo4j_driver, nodes)
 
         # Verify Cypher contains expected elements
-        assert captured_cypher is not None
-        assert "UNWIND $rows AS row" in captured_cypher
-        assert "MERGE" in captured_cypher
-        assert "TestNode" in captured_cypher
-        assert "id: row.id" in captured_cypher
-        assert "SET n += row" in captured_cypher
+        assert captured_query is not None
+        assert "UNWIND $rows AS row" in captured_query
+        assert "MERGE" in captured_query
+        assert "TestNode" in captured_query
+        assert "id: row.id" in captured_query
+        assert "SET n += row" in captured_query
 
         # Verify rows data
         assert captured_rows is not None
         assert len(captured_rows) == 1
         assert captured_rows[0]["id"] == "id1"
         assert captured_rows[0]["name"] == "Node 1"
-
-    @pytest.mark.asyncio
-    async def test_bulk_upsert_with_custom_fields(self, valid_node_class, mock_neo4j_driver):
-        """Test bulk upsert includes custom fields."""
-        nodes = [valid_node_class(id="id1", name="Node 1", custom={"extra": "value", "count": 42})]
-
-        captured_rows = None
-
-        async def mock_execute_write(tx_func, rows):
-            nonlocal captured_rows
-            captured_rows = rows
-            mock_tx = AsyncMock()
-            mock_tx.run = AsyncMock()
-            await tx_func(mock_tx, rows)
-
-        mock_neo4j_driver.session.return_value.__aenter__.return_value.execute_write = (
-            mock_execute_write
-        )
-
-        await valid_node_class.bulk_upsert(mock_neo4j_driver, nodes)
-
-        # Verify custom fields are flattened into rows
-        assert captured_rows[0]["extra"] == "value"
-        assert captured_rows[0]["count"] == 42
 
 
 class TestUpsert:
@@ -362,8 +219,8 @@ class TestUpsert:
     @pytest.mark.asyncio
     async def test_upsert_calls_bulk_upsert(self, sample_node, mock_neo4j_driver):
         """Test that upsert calls bulk_upsert with single node."""
-        with patch.object(type(sample_node), "bulk_upsert", new_callable=AsyncMock) as mock_bulk:
-            await sample_node.upsert(mock_neo4j_driver)
+        with patch.object(type(sample_node), "_bulk_upsert", new_callable=AsyncMock) as mock_bulk:
+            await sample_node._upsert(mock_neo4j_driver)
 
             # Verify bulk_upsert was called with single node in list
             mock_bulk.assert_called_once()
@@ -377,8 +234,8 @@ class TestUpsert:
         """Test upsert passes session kwargs."""
         session_kwargs = {"database": "test_db"}
 
-        with patch.object(type(sample_node), "bulk_upsert", new_callable=AsyncMock) as mock_bulk:
-            await sample_node.upsert(mock_neo4j_driver, session_kwargs=session_kwargs)
+        with patch.object(type(sample_node), "_bulk_upsert", new_callable=AsyncMock) as mock_bulk:
+            await sample_node._upsert(mock_neo4j_driver, session_kwargs=session_kwargs)
 
             # Verify session_kwargs was passed
             call_args = mock_bulk.call_args
@@ -395,12 +252,11 @@ class TestIntegration:
 
     def test_complete_workflow(self, valid_node_class):
         """Test complete workflow: create, validate, convert to dict."""
-        # Create node with custom fields
+        # Create node
         node = valid_node_class(
             id="test-123",
             name="Integration Test",
             age=99,
-            custom={"tags": ["tag1", "tag2"], "score": 95.5},
         )
 
         # Verify node creation
@@ -411,14 +267,11 @@ class TestIntegration:
         # Verify get_index_field
         assert node.get_index_field() == "id"
 
-        # Verify to_dict includes everything
-        d = node.to_dict()
+        # Verify model_dump includes everything
+        d = node.model_dump()
         assert d["id"] == "test-123"
         assert d["name"] == "Integration Test"
         assert d["age"] == 99
-        assert d["tags"] == ["tag1", "tag2"]
-        assert d["score"] == 95.5
-        assert "custom" not in d
 
     def test_inheritance_works(self):
         """Test that inheritance from BaseNode works correctly."""
@@ -440,8 +293,142 @@ class TestIntegration:
         # Verify get_index_field works on child
         assert child.get_index_field() == "id"
 
-        # Verify to_dict includes all fields
-        d = child.to_dict()
+        # Verify model_dump includes all fields
+        d = child.model_dump()
         assert d["id"] == "child-1"
         assert d["parent_field"] == "parent"
         assert d["child_field"] == "child"
+
+
+# ============================================================================
+# Test Query Methods
+# ============================================================================
+
+
+class TestQueryMethods:
+    """Tests for query methods (get, get_by, get_all, count)."""
+
+    @pytest.mark.asyncio
+    async def test_get_single_id(self, valid_node_class, mock_neo4j_driver):
+        """Test get() with single id parameter."""
+        mock_data = {"node": {"id": "test-123", "name": "Test Node", "age": 42}}
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_data
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            result = await valid_node_class.get(mock_neo4j_driver, id="test-123")
+
+        assert result is not None
+        assert result.id == "test-123"
+        assert result.name == "Test Node"
+        assert result.age == 42
+
+    @pytest.mark.asyncio
+    async def test_get_single_id_not_found(self, valid_node_class, mock_neo4j_driver):
+        """Test get() returns None when node not found."""
+
+        async def mock_execute_read(driver, query, params, processor):
+            return None
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            result = await valid_node_class.get(mock_neo4j_driver, id="nonexistent")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_multiple_ids(self, valid_node_class, mock_neo4j_driver):
+        """Test get() with multiple ids parameter."""
+        mock_records = [
+            {"node": {"id": "id1", "name": "Node 1", "age": 10}},
+            {"node": {"id": "id2", "name": "Node 2", "age": 20}},
+        ]
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await valid_node_class.get(mock_neo4j_driver, ids=["id1", "id2"])
+
+        assert len(results) == 2
+        assert results[0].id == "id1"
+        assert results[1].id == "id2"
+
+    @pytest.mark.asyncio
+    async def test_get_raises_error_both_params(self, valid_node_class, mock_neo4j_driver):
+        """Test get() raises error when both id and ids provided."""
+        with pytest.raises(ValueError, match="Provide either 'id' or 'ids', not both"):
+            await valid_node_class.get(mock_neo4j_driver, id="test", ids=["test"])
+
+    @pytest.mark.asyncio
+    async def test_get_raises_error_no_params(self, valid_node_class, mock_neo4j_driver):
+        """Test get() raises error when neither id nor ids provided."""
+        with pytest.raises(ValueError, match="Provide either 'id' or 'ids'"):
+            await valid_node_class.get(mock_neo4j_driver)
+
+    @pytest.mark.asyncio
+    async def test_get_by_valid_filters(self, valid_node_class, mock_neo4j_driver):
+        """Test get_by() with valid field filters."""
+        mock_records = [{"node": {"id": "test-123", "name": "Test Node", "age": 42}}]
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await valid_node_class.get_by(mock_neo4j_driver, name="Test Node")
+
+        assert len(results) == 1
+        assert results[0].name == "Test Node"
+
+    @pytest.mark.asyncio
+    async def test_get_by_invalid_filter_key(self, valid_node_class, mock_neo4j_driver):
+        """Test get_by() raises error for invalid filter keys."""
+        with pytest.raises(ValueError, match="Invalid filter keys"):
+            await valid_node_class.get_by(mock_neo4j_driver, invalid_field="value")
+
+    @pytest.mark.asyncio
+    async def test_get_by_no_filters(self, valid_node_class, mock_neo4j_driver):
+        """Test get_by() raises error when no filters provided."""
+        with pytest.raises(ValueError, match="At least one filter must be provided"):
+            await valid_node_class.get_by(mock_neo4j_driver)
+
+    @pytest.mark.asyncio
+    async def test_get_all_with_pagination(self, valid_node_class, mock_neo4j_driver):
+        """Test get_all() with pagination."""
+        mock_records = [
+            {"node": {"id": "id1", "name": "Node 1"}},
+            {"node": {"id": "id2", "name": "Node 2"}},
+        ]
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await valid_node_class.get_all(mock_neo4j_driver, limit=10, offset=0)
+
+        assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_count(self, valid_node_class, mock_neo4j_driver):
+        """Test count() method."""
+        mock_data = {"count": 42}
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_data
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            count = await valid_node_class.count(mock_neo4j_driver)
+
+        assert count == 42
+
+    @pytest.mark.asyncio
+    async def test_count_returns_zero_when_no_data(self, valid_node_class, mock_neo4j_driver):
+        """Test count() returns 0 when no data returned."""
+
+        async def mock_execute_read(driver, query, params, processor):
+            return None
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            count = await valid_node_class.count(mock_neo4j_driver)
+
+        assert count == 0
