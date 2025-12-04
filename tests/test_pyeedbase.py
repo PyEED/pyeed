@@ -389,7 +389,7 @@ class TestQueryMethods:
     @pytest.mark.asyncio
     async def test_get_by_no_filters(self, valid_node_class, mock_neo4j_driver):
         """Test get_by() raises error when no filters provided."""
-        with pytest.raises(ValueError, match="At least one filter must be provided"):
+        with pytest.raises(ValueError, match="At least one filter or range must be provided"):
             await valid_node_class.get_by(mock_neo4j_driver)
 
     @pytest.mark.asyncio
@@ -432,3 +432,224 @@ class TestQueryMethods:
             count = await valid_node_class.count(mock_neo4j_driver)
 
         assert count == 0
+
+
+# ============================================================================
+# Test get_by() with Ranges Parameter
+# ============================================================================
+
+
+class TestGetByWithRanges:
+    """Tests for get_by() method with ranges parameter."""
+
+    @pytest.fixture
+    def numeric_node_class(self):
+        """Create a node class with numeric fields for range testing."""
+
+        class NumericNode(BaseNode):
+            id: Annotated[str, LabelProperty(index=True)] = Field(..., description="ID")
+            name: str = Field(..., description="Name")
+            age: int | None = Field(None, description="Age")
+            weight: float | None = Field(None, description="Weight")
+
+        return NumericNode
+
+    @pytest.mark.asyncio
+    async def test_get_by_with_ranges_only(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() with ranges parameter only."""
+        mock_records = [
+            {"node": {"id": "id1", "name": "Node 1", "age": 25, "weight": 70.5}},
+            {"node": {"id": "id2", "name": "Node 2", "age": 30, "weight": 75.0}},
+        ]
+
+        captured_query = None
+        captured_params = None
+
+        async def mock_execute_read(driver, query, params, processor):
+            nonlocal captured_query, captured_params
+            captured_query = query
+            captured_params = params
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                ranges={"age": (20, 35)},
+            )
+
+        assert len(results) == 2
+        assert captured_query is not None
+        assert "n.`age` >= $age_min" in captured_query
+        assert "n.`age` <= $age_max" in captured_query
+        assert captured_params["age_min"] == 20
+        assert captured_params["age_max"] == 35
+
+    @pytest.mark.asyncio
+    async def test_get_by_with_ranges_and_exact_filters(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() with both ranges and exact filters."""
+        mock_records = [{"node": {"id": "id1", "name": "Test", "age": 25, "weight": 70.5}}]
+
+        captured_query = None
+        captured_params = None
+
+        async def mock_execute_read(driver, query, params, processor):
+            nonlocal captured_query, captured_params
+            captured_query = query
+            captured_params = params
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                name="Test",
+                ranges={"age": (20, 35)},
+            )
+
+        assert len(results) == 1
+        assert captured_query is not None
+        # Verify both exact match and range conditions
+        assert "n.`name` = $name" in captured_query
+        assert "n.`age` >= $age_min" in captured_query
+        assert "n.`age` <= $age_max" in captured_query
+        assert captured_params["name"] == "Test"
+        assert captured_params["age_min"] == 20
+        assert captured_params["age_max"] == 35
+
+    @pytest.mark.asyncio
+    async def test_get_by_with_open_range_min_only(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() with range having only min value (no upper bound)."""
+        mock_records = [{"node": {"id": "id1", "name": "Node 1", "age": 50, "weight": 80.0}}]
+
+        captured_query = None
+        captured_params = None
+
+        async def mock_execute_read(driver, query, params, processor):
+            nonlocal captured_query, captured_params
+            captured_query = query
+            captured_params = params
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                ranges={"age": (30, None)},
+            )
+
+        assert len(results) == 1
+        assert captured_query is not None
+        assert "n.`age` >= $age_min" in captured_query
+        assert "age_max" not in captured_query
+        assert captured_params["age_min"] == 30
+        assert "age_max" not in captured_params
+
+    @pytest.mark.asyncio
+    async def test_get_by_with_open_range_max_only(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() with range having only max value (no lower bound)."""
+        mock_records = [{"node": {"id": "id1", "name": "Node 1", "age": 20, "weight": 60.0}}]
+
+        captured_query = None
+        captured_params = None
+
+        async def mock_execute_read(driver, query, params, processor):
+            nonlocal captured_query, captured_params
+            captured_query = query
+            captured_params = params
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                ranges={"age": (None, 25)},
+            )
+
+        assert len(results) == 1
+        assert captured_query is not None
+        assert "age_min" not in captured_query
+        assert "n.`age` <= $age_max" in captured_query
+        assert "age_min" not in captured_params
+        assert captured_params["age_max"] == 25
+
+    @pytest.mark.asyncio
+    async def test_get_by_with_multiple_ranges(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() with multiple range filters."""
+        mock_records = [{"node": {"id": "id1", "name": "Node 1", "age": 30, "weight": 75.0}}]
+
+        captured_query = None
+        captured_params = None
+
+        async def mock_execute_read(driver, query, params, processor):
+            nonlocal captured_query, captured_params
+            captured_query = query
+            captured_params = params
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                ranges={
+                    "age": (25, 35),
+                    "weight": (70.0, 80.0),
+                },
+            )
+
+        assert len(results) == 1
+        assert captured_query is not None
+        # Verify both range conditions
+        assert "n.`age` >= $age_min" in captured_query
+        assert "n.`age` <= $age_max" in captured_query
+        assert "n.`weight` >= $weight_min" in captured_query
+        assert "n.`weight` <= $weight_max" in captured_query
+        assert captured_params["age_min"] == 25
+        assert captured_params["age_max"] == 35
+        assert captured_params["weight_min"] == 70.0
+        assert captured_params["weight_max"] == 80.0
+
+    @pytest.mark.asyncio
+    async def test_get_by_invalid_range_key(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() raises error for invalid range field names."""
+        with pytest.raises(ValueError, match="Invalid range keys"):
+            await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                ranges={"invalid_field": (10, 20)},
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_by_empty_ranges_and_filters_raises_error(
+        self, numeric_node_class, mock_neo4j_driver
+    ):
+        """Test get_by() raises error when both ranges and filters are empty."""
+        with pytest.raises(ValueError, match="At least one filter or range must be provided"):
+            await numeric_node_class.get_by(mock_neo4j_driver, ranges={})
+
+    @pytest.mark.asyncio
+    async def test_get_by_none_ranges_with_filters(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() works with ranges=None and exact filters provided."""
+        mock_records = [{"node": {"id": "id1", "name": "Test", "age": 30, "weight": 70.0}}]
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            results = await numeric_node_class.get_by(
+                mock_neo4j_driver,
+                name="Test",
+                ranges=None,
+            )
+
+        assert len(results) == 1
+        assert results[0].name == "Test"
+
+    @pytest.mark.asyncio
+    async def test_get_by_backward_compatibility(self, numeric_node_class, mock_neo4j_driver):
+        """Test get_by() maintains backward compatibility without ranges parameter."""
+        mock_records = [{"node": {"id": "id1", "name": "Test", "age": 30, "weight": 70.0}}]
+
+        async def mock_execute_read(driver, query, params, processor):
+            return mock_records
+
+        with patch("pyeed.ingest.model.pyeedbase.execute_read", side_effect=mock_execute_read):
+            # Call without ranges parameter (backward compatible)
+            results = await numeric_node_class.get_by(mock_neo4j_driver, name="Test")
+
+        assert len(results) == 1
+        assert results[0].name == "Test"
