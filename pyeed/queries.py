@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -60,38 +60,15 @@ async def execute_read_transaction(
         return await session.execute_read(result_processor, query, params)
 
 
-async def get_protein_by_id(
-    id: str,
-    neo4j_driver: AsyncDriver,
-) -> Protein | None:
-    query = "MATCH (p:Protein {id: $id}) RETURN properties(p) AS protein"
-
-    protein_data = await execute_read_transaction(
-        neo4j_driver=neo4j_driver,
-        query=query,
-        params={"id": id},
-        result_processor=process_single_record,
-    )
-
-    if protein_data and "protein" in protein_data:
-        return Protein.from_dict(protein_data["protein"])
-    return None
-
-
 async def get_proteins_by_ids(
     ids: list[str],
     neo4j_driver: AsyncDriver,
 ) -> list[Protein]:
-    query = "MATCH (p:Protein {id: $id}) RETURN properties(p) AS protein"
-
-    records = await execute_read_transaction(
-        neo4j_driver=neo4j_driver,
-        query=query,
-        params={"ids": ids},
-        result_processor=process_multiple_records,
+    proteins = await Protein.get_filtered(
+        driver=neo4j_driver,
+        ids=ids,
     )
-
-    return [Protein.from_dict(record["protein"]) for record in records]
+    return proteins
 
 
 async def count_nodes_per_label(neo4j_driver: AsyncDriver) -> dict[str, int]:
@@ -195,12 +172,80 @@ async def get_similar_proteins_by_ids(
             )
 
     unique_target_ids = list(set([result.target_id for result in search_results]))
-    proteins = await get_proteins_by_ids(
+    proteins = await Protein.get_filtered(
+        driver=neo4j_driver,
         ids=unique_target_ids,
-        neo4j_driver=neo4j_driver,
     )
 
     return proteins
+
+
+@overload
+async def get_vectors(
+    milvus_client: AsyncMilvusClient,
+    collection_name: str,
+    protein_ids: list[str],
+    vector_field_name: str = "mean_pooling",
+    *,
+    as_list: Literal[True],
+) -> list[list[float]]:
+    """Get vectors as list of lists of floats."""
+    ...
+
+
+@overload
+async def get_vectors(
+    milvus_client: AsyncMilvusClient,
+    collection_name: str,
+    protein_ids: list[str],
+    vector_field_name: str = "mean_pooling",
+    *,
+    as_list: Literal[False] = False,
+) -> npt.NDArray[np.float32] | npt.NDArray[np.float16]:
+    """Get vectors as numpy array (default)."""
+    ...
+
+
+async def get_vectors(
+    milvus_client: AsyncMilvusClient,
+    collection_name: str,
+    protein_ids: list[str],
+    vector_field_name: str = "mean_pooling",
+    *,
+    as_list: bool = False,
+) -> list[list[float]] | npt.NDArray[np.float32] | npt.NDArray[np.float16]:
+    """Get vectors from Milvus.
+
+    Args:
+        milvus_client: Async Milvus client.
+        collection_name: Collection name.
+        protein_ids: List of protein IDs.
+        vector_field_name: Vector field name.
+        as_list: If True, return as list[list[float]], else return numpy array.
+
+    Returns:
+        If as_list=True: list[list[float]] (each inner list is one vector).
+        If as_list=False: numpy array of shape [n_vectors, dim].
+    """
+    response = await milvus_client.get(
+        collection_name, ids=protein_ids, output_fields=[vector_field_name]
+    )
+
+    schema = await milvus_client.describe_collection(collection_name)
+    for field in schema["fields"]:
+        if field["name"] == vector_field_name:
+            dtype = MILVUS_TO_NP_DTYPE_MAP[field["type"]]
+            break
+    else:
+        raise ValueError(
+            f"Vector field '{vector_field_name}' not found in collection '{collection_name}'"
+        )
+
+    np_array = np.vstack([result[vector_field_name] for result in response]).astype(dtype)
+
+    if as_list:
+        return np_array.tolist()
+    return np_array
 
 
 async def main() -> None:

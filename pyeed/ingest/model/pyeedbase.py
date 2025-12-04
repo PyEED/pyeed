@@ -348,28 +348,48 @@ class BaseNode(BaseModel):
     async def get_by(
         cls,
         driver: AsyncDriver,
+        *,
+        ranges: dict[str, tuple[Any | None, Any | None]] | None = None,
         **filters: Any,
     ) -> list[Self]:
-        """Get nodes by arbitrary field filters.
+        """Get nodes by arbitrary field filters with optional range support.
 
         Validates that filter keys are valid model fields.
 
         Args:
             driver: Neo4j async driver.
-            **filters: Field name to value mappings.
+            ranges: Optional dict mapping field names to (min, max) tuples.
+                None values in tuples are ignored. Example:
+                {"seq_length": (100, 200), "mol_weight": (50000.0, None)}
+            **filters: Field name to value mappings for exact matches.
 
         Returns:
             List of matching nodes.
 
         Raises:
-            ValueError: If a filter key is not a valid field name.
+            ValueError: If a filter key is not a valid field name, or if both
+                filters and ranges are empty.
 
         Example:
+            # Exact match
             proteins = await Protein.get_by(driver, name="Hemoglobin")
-            reactions = await Reaction.get_by(driver, reversible=True)
+
+            # Range query
+            proteins = await Protein.get_by(
+                driver,
+                ranges={"seq_length": (100, 200), "mol_weight": (50000.0, None)}
+            )
+
+            # Combined exact match and range
+            proteins = await Protein.get_by(
+                driver,
+                name="Hemoglobin",
+                ranges={"seq_length": (100, None)}
+            )
         """
-        # Validate all filter keys are valid fields
         valid_fields = set(cls.model_fields.keys())
+
+        # Validate exact match filter keys
         invalid_keys = set(filters.keys()) - valid_fields
         if invalid_keys:
             raise ValueError(
@@ -377,21 +397,46 @@ class BaseNode(BaseModel):
                 f"Valid fields: {valid_fields}"
             )
 
-        if not filters:
-            raise ValueError("At least one filter must be provided")
+        # Validate range filter keys
+        if ranges:
+            invalid_range_keys = set(ranges.keys()) - valid_fields
+            if invalid_range_keys:
+                raise ValueError(
+                    f"Invalid range keys for {cls.__name__}: {invalid_range_keys}. "
+                    f"Valid fields: {valid_fields}"
+                )
+
+        if not filters and not ranges:
+            raise ValueError("At least one filter or range must be provided")
 
         label = cls.__name__
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
 
-        # Build WHERE clause
-        conditions = [f"n.{key} = ${key}" for key in filters]
+        # Build exact match conditions
+        for key, value in filters.items():
+            conditions.append(f"n.`{key}` = ${key}")
+            params[key] = value
+
+        # Build range conditions
+        if ranges:
+            for field, (min_val, max_val) in ranges.items():
+                if min_val is not None:
+                    param_name = f"{field}_min"
+                    conditions.append(f"n.`{field}` >= ${param_name}")
+                    params[param_name] = min_val
+                if max_val is not None:
+                    param_name = f"{field}_max"
+                    conditions.append(f"n.`{field}` <= ${param_name}")
+                    params[param_name] = max_val
+
         where_clause = " AND ".join(conditions)
-
-        query = f"MATCH (n:{label}) WHERE {where_clause} RETURN properties(n) AS node"
+        query = f"MATCH (n:`{label}`) WHERE {where_clause} RETURN properties(n) AS node"
 
         records = await execute_read(
             driver=driver,
             query=query,
-            params=filters,
+            params=params,
             processor=process_multiple_records,
         )
         return [cls(**r["node"]) for r in records]
@@ -446,6 +491,7 @@ class BaseNode(BaseModel):
         )
         return data["count"] if data else 0
 
+    @overload
     @classmethod
     async def get_related[S: BaseNode, E: BaseNode](
         cls: type[S],
@@ -456,21 +502,60 @@ class BaseNode(BaseModel):
         rel_type: str | None = None,
         direction: Literal["out", "in", "both"] = "out",
     ) -> list[E]:
-        """Get one-hop related nodes of another class.
+        """Get related nodes for a single start node."""
+        ...
 
-        Finds all `target_cls` nodes that are directly connected to the node of
-        this class identified by its indexed LabelProperty field.
+    @overload
+    @classmethod
+    async def get_related[S: BaseNode, E: BaseNode](
+        cls: type[S],
+        target_cls: type[E],
+        *,
+        driver: AsyncDriver,
+        ids: list[str],
+        rel_type: str | None = None,
+        direction: Literal["out", "in", "both"] = "out",
+    ) -> dict[str, list[E]]:
+        """Get related nodes for multiple start nodes.
+
+        Returns:
+            Dict mapping start node ID to list of related nodes.
+        """
+        ...
+
+    @classmethod
+    async def get_related[S: BaseNode, E: BaseNode](
+        cls: type[S],
+        target_cls: type[E],
+        *,
+        driver: AsyncDriver,
+        id: str | None = None,
+        ids: list[str] | None = None,
+        rel_type: str | None = None,
+        direction: Literal["out", "in", "both"] = "out",
+    ) -> list[E] | dict[str, list[E]]:
+        """Get one-hop related nodes of another class.
 
         Args:
             target_cls: Target node class (must inherit from BaseNode).
             driver: Neo4j async driver.
-            id: Indexed field value of the start node.
+            id: Single start node ID (returns list of related nodes).
+            ids: Multiple start node IDs (returns dict mapping ID to list of related nodes).
             rel_type: Optional relationship type to match. If None, any type is matched.
             direction: Relationship direction: 'out', 'in', or 'both'.
 
         Returns:
-            List of target_cls instances.
+            If `id` provided: List of target_cls instances.
+            If `ids` provided: Dict mapping start node ID to list of target_cls instances.
+
+        Raises:
+            ValueError: If neither id nor ids is provided, or both are provided.
         """
+        if id is not None and ids is not None:
+            raise ValueError("Provide either 'id' or 'ids', not both")
+        if id is None and ids is None:
+            raise ValueError("Provide either 'id' or 'ids'")
+
         start_label = cls.__name__
         start_key = cls.get_index_field()
         target_label = target_cls.__name__
@@ -485,16 +570,220 @@ class BaseNode(BaseModel):
         else:
             raise ValueError("direction must be 'out', 'in', or 'both'")
 
-        query = f"""
-        MATCH (start:`{start_label}` {{ `{start_key}`: $id }})
-              {rel_pattern}(target:`{target_label}`)
-        RETURN properties(target) AS node
-        """
+        if id is not None:
+            # Single lookup
+            query = f"""
+            MATCH (start:`{start_label}` {{ `{start_key}`: $id }}){rel_pattern}(target:`{target_label}`)
+            RETURN properties(target) AS node
+            """
+            records = await execute_read(
+                driver=driver,
+                query=query,
+                params={"id": id},
+                processor=process_multiple_records,
+            )
+            return [target_cls(**r["node"]) for r in records]
 
-        records = await execute_read(
-            driver=driver,
-            query=query,
-            params={"id": id},
-            processor=process_multiple_records,
-        )
-        return [target_cls(**r["node"]) for r in records]
+        else:
+            # Batch lookup
+            query = f"""
+            MATCH (start:`{start_label}`){rel_pattern}(target:`{target_label}`)
+            WHERE start.`{start_key}` IN $ids
+            RETURN start.`{start_key}` AS start_id, properties(target) AS node
+            """
+            records = await execute_read(
+                driver=driver,
+                query=query,
+                params={"ids": ids},
+                processor=process_multiple_records,
+            )
+            # Group by start_id
+            result: dict[str, list[E]] = {}
+            for r in records:
+                start_id = r["start_id"]
+                if start_id not in result:
+                    result[start_id] = []
+                result[start_id].append(target_cls(**r["node"]))
+            return result
+
+    @classmethod
+    @overload
+    async def get_filtered(
+        cls,
+        driver: AsyncDriver,
+        *,
+        id: str,
+        ranges: dict[str, tuple[Any | None, Any | None]] | None = None,
+        **filters: Any,
+    ) -> Self | None:
+        """Get a single node by index field with additional filters and ranges."""
+        ...
+
+    @classmethod
+    @overload
+    async def get_filtered(
+        cls,
+        driver: AsyncDriver,
+        *,
+        ids: list[str],
+        ranges: dict[str, tuple[Any | None, Any | None]] | None = None,
+        **filters: Any,
+    ) -> list[Self]:
+        """Get multiple nodes by index field with additional filters and ranges."""
+        ...
+
+    @classmethod
+    @overload
+    async def get_filtered(
+        cls,
+        driver: AsyncDriver,
+        *,
+        ranges: dict[str, tuple[Any | None, Any | None]] | None = None,
+        **filters: Any,
+    ) -> list[Self]:
+        """Get nodes by filters and ranges only (no index field filtering)."""
+        ...
+
+    @classmethod
+    async def get_filtered(
+        cls,
+        driver: AsyncDriver,
+        *,
+        id: str | None = None,
+        ids: list[str] | None = None,
+        ranges: dict[str, tuple[Any | None, Any | None]] | None = None,
+        **filters: Any,
+    ) -> Self | list[Self] | None:
+        """Get node(s) by index field with additional filters and ranges.
+
+        Combines index field filtering (from `get`) with arbitrary field filtering
+        and ranges (from `get_by`). Can also be used without index field filtering
+        (like `get_by`).
+
+        Args:
+            driver: Neo4j async driver.
+            id: Single index field value to match (returns one node or None).
+            ids: Multiple index field values to match (returns list).
+            ranges: Optional dict mapping field names to (min, max) tuples.
+                None values in tuples are ignored.
+            **filters: Field name to value mappings for exact matches.
+
+        Returns:
+            Single node (if `id` provided), list of nodes (if `ids` provided or
+            neither `id` nor `ids` provided), or None.
+
+        Raises:
+            ValueError: If both `id` and `ids` are provided, or if no filtering
+                criteria is provided (at least one of: `id`, `ids`, `filters`, or
+                `ranges` must be provided), or if a filter/range key is not a
+                valid field name.
+
+        Example:
+            # Single ID with additional filter
+            protein = await Protein.get_filtered(
+                driver,
+                id="P12345",
+                name="Hemoglobin"
+            )
+
+            # Multiple IDs with range filter
+            proteins = await Protein.get_filtered(
+                driver,
+                ids=["P12345", "P0CW62"],
+                ranges={"seq_length": (100, 200)}
+            )
+
+            # Filter only (no index field) - like get_by
+            proteins = await Protein.get_filtered(
+                driver,
+                name="Hemoglobin",
+                ranges={"seq_length": (100, 200)}
+            )
+
+            # Range only (no index field)
+            proteins = await Protein.get_filtered(
+                driver,
+                ranges={"mol_weight": (50000.0, None)}
+            )
+        """
+        if id is not None and ids is not None:
+            raise ValueError("Provide either 'id' or 'ids', not both")
+
+        # Require at least one filtering criterion
+        if id is None and ids is None and not filters and not ranges:
+            raise ValueError(
+                "At least one filtering criterion must be provided: id, ids, filters, or ranges"
+            )
+
+        valid_fields = set(cls.model_fields.keys())
+        index_field = cls.get_index_field()
+        label = cls.__name__
+
+        # Validate exact match filter keys
+        invalid_keys = set(filters.keys()) - valid_fields
+        if invalid_keys:
+            raise ValueError(
+                f"Invalid filter keys for {cls.__name__}: {invalid_keys}. "
+                f"Valid fields: {valid_fields}"
+            )
+
+        # Validate range filter keys
+        if ranges:
+            invalid_range_keys = set(ranges.keys()) - valid_fields
+            if invalid_range_keys:
+                raise ValueError(
+                    f"Invalid range keys for {cls.__name__}: {invalid_range_keys}. "
+                    f"Valid fields: {valid_fields}"
+                )
+
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+
+        # Build index field condition (only if id/ids provided)
+        if id is not None:
+            conditions.append(f"n.`{index_field}` = $index_value")
+            params["index_value"] = id
+        elif ids is not None:
+            conditions.append(f"n.`{index_field}` IN $index_values")
+            params["index_values"] = ids
+
+        # Build exact match conditions
+        for key, value in filters.items():
+            conditions.append(f"n.`{key}` = ${key}")
+            params[key] = value
+
+        # Build range conditions
+        if ranges:
+            for field, (min_val, max_val) in ranges.items():
+                if min_val is not None:
+                    param_name = f"{field}_min"
+                    conditions.append(f"n.`{field}` >= ${param_name}")
+                    params[param_name] = min_val
+                if max_val is not None:
+                    param_name = f"{field}_max"
+                    conditions.append(f"n.`{field}` <= ${param_name}")
+                    params[param_name] = max_val
+
+        where_clause = " AND ".join(conditions)
+        query = f"MATCH (n:`{label}`) WHERE {where_clause} RETURN properties(n) AS node"
+
+        if id is not None:
+            # Single lookup - return single node or None
+            records = await execute_read(
+                driver=driver,
+                query=query,
+                params=params,
+                processor=process_multiple_records,
+            )
+            if not records:
+                return None
+            return cls(**records[0]["node"])
+        else:
+            # Batch lookup or filter-only - return list
+            records = await execute_read(
+                driver=driver,
+                query=query,
+                params=params,
+                processor=process_multiple_records,
+            )
+            return [cls(**r["node"]) for r in records]
