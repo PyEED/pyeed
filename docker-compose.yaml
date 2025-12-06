@@ -49,7 +49,7 @@ services:
     command: >
       etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
     volumes:
-      - /home/mha/dbs/milvus/etcd:/etcd
+      - ${ETCD_DATA_DIR}:/etcd
     healthcheck:
       test: [ "CMD", "etcdctl", "endpoint", "health" ]
       interval: 30s
