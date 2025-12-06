@@ -21,7 +21,14 @@ class CustomGraphQL(GraphQL):
     """Custom GraphQL ASGI app with context injection."""
 
     async def get_context(self, request, response):
-        """Override to provide custom context."""
+        """Override to provide custom context.
+
+        Contains:
+        - Neo4j driver
+        - Milvus client
+        - Protein vector loader
+        - loaders to get multiple relationships at once for each db entity
+        """
         neo4j_driver = get_async_driver()
         milvus_client = get_async_milvus_client()
         return GraphQLContext(
