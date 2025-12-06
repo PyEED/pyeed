@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 from neo4j import AsyncDriver
 from pydantic import Field, field_validator
@@ -40,6 +40,13 @@ class Protein(BaseNode):
     ec_numbers: list[str] | None = Field(
         None,
         description="Enzyme Commission numbers associated with the protein",
+    )
+
+    # Embedding state
+
+    embedding_status: Literal["pending", "in_progress", "complete", "failed"] = Field(
+        default="pending",
+        description="Embedding pipeline status for this protein.",
     )
 
     @field_validator("sequence")
