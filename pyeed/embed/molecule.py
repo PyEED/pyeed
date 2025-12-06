@@ -1,287 +1,301 @@
-"""Async SELFIES-based embedding using IBM materials.selfies-ted.
-
-This module exposes `embed_smiles` to compute embeddings for one or many
-SMILES strings, optionally using multiple CUDA devices.
-
-Example:
-    import asyncio
-    from selfies_embedder import embed_smiles
-
-    async def main() -> None:
-        emb = await embed_smiles(["c1ccccc1", "CCO"], device=-1)
-        print(emb.shape)
-
-    asyncio.run(main())
-"""
-
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import AsyncIterator, Sequence
 from typing import Final
 
 import numpy as np
 import selfies as sf
 import torch
-from transformers import AutoModel, AutoTokenizer
+from loguru import logger
+from transformers import BartModel, PreTrainedTokenizerFast
 
 _MODEL_NAME: Final[str] = "ibm/materials.selfies-ted"
 
-# Global tokenizer; model instances are created per device.
-_TOKENIZER: Final = AutoTokenizer.from_pretrained(_MODEL_NAME)
-_DEVICE_MODELS: dict[str, AutoModel] = {}
-
-
-def _get_devices(device: int) -> list[str]:
-    """Return list of device strings to use.
-
-    Args:
-        device: CUDA device index. -1 uses all available devices.
-            Any non-negative index uses that CUDA device if available.
-            Fallback is CPU if CUDA is not available.
-
-    Returns:
-        List of torch device strings.
-    """
-    if not torch.cuda.is_available():
-        return ["cpu"]
-
-    if device == -1:
-        count = torch.cuda.device_count()
-        return [f"cuda:{i}" for i in range(count)] if count > 0 else ["cpu"]
-
-    if device >= 0:
-        idx = min(device, max(torch.cuda.device_count() - 1, 0))
-        return [f"cuda:{idx}"]
-
-    return ["cpu"]
-
-
-def _get_model_for_device(device: str) -> AutoModel:
-    """Return a model instance placed on the given device."""
-    if device not in _DEVICE_MODELS:
-        model = AutoModel.from_pretrained(_MODEL_NAME)
-        model.to(device)
-        model.eval()
-        _DEVICE_MODELS[device] = model
-    return _DEVICE_MODELS[device]
-
-
-def _smiles_to_selfies(smiles_list: Sequence[str]) -> list[str]:
-    """Convert SMILES to spaced SELFIES tokens."""
-    selfies_list: list[str] = []
-    for smi in smiles_list:
-        s = sf.encoder(smi)
-        s = s.replace("][", "] [")
-        selfies_list.append(s)
-    return selfies_list
-
-
-def _chunk_indices(n: int, k: int) -> list[tuple[int, int]]:
-    """Split range(n) into k nearly equal contiguous chunks."""
-    if k <= 1 or n <= 1:
-        return [(0, n)]
-    base = n // k
-    rem = n % k
-    chunks: list[tuple[int, int]] = []
-    start = 0
-    for i in range(k):
-        size = base + (1 if i < rem else 0)
-        end = start + size
-        if size > 0:
-            chunks.append((start, end))
-        start = end
-    return chunks
-
-
-def _embed_on_device(
-    selfies_list: Sequence[str],
-    device: str,
-    max_length: int,
-) -> torch.Tensor:
-    """Blocking embedding computation on a single device."""
-    model = _get_model_for_device(device)
-    with torch.inference_mode():
-        tokens = _TOKENIZER(
-            list(selfies_list),
-            return_tensors="pt",
-            max_length=max_length,
-            truncation=True,
-            padding="max_length",
-        )
-        input_ids = tokens["input_ids"].to(device)
-        attention_mask = tokens["attention_mask"].to(device)
-
-        outputs = model.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        hidden = outputs.last_hidden_state  # (batch, seq, dim)
-
-        mask_expanded = attention_mask.unsqueeze(-1).expand(hidden.size()).float()
-        summed = torch.sum(hidden * mask_expanded, dim=1)
-        mask_sum = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
-        pooled = summed / mask_sum
-
-    return pooled.to("cpu")
-
-
-def _tensor_rows_to_numpy(tensor: torch.Tensor) -> list[np.ndarray]:
-    """Convert a 2D tensor on CPU to a list of numpy arrays."""
-    if tensor.numel() == 0:
-        return []
-    # Ensure contiguous before view, then convert once
-    arr = tensor.contiguous().numpy().astype(np.float32, copy=False)
-    return [arr[i] for i in range(arr.shape[0])]
-
-
-async def embed_smiles(
-    smiles: str | Sequence[str],
-    device: int = 0,
-    max_length: int = 128,
-) -> torch.Tensor:
-    """Compute SELFIES-TED embeddings for SMILES strings asynchronously.
-
-    Args:
-        smiles: Single SMILES string or a sequence of SMILES strings.
-        device: CUDA device index to use.
-            -1: use all available CUDA devices (data-parallel).
-             0+: use the given CUDA device index.
-             Any value when CUDA is unavailable falls back to CPU.
-        max_length: Maximum token length for the tokenizer.
-
-    Returns:
-        A tensor of shape (N, D) with embeddings on CPU, where
-        N is the number of input SMILES strings.
-    """
-    smiles_list = [smiles] if isinstance(smiles, str) else list(smiles)
-
-    if not smiles_list:
-        raise AssertionError("Smiles list cannot be empty")
-
-    selfies_list = _smiles_to_selfies(smiles_list)
-    devices = _get_devices(device)
-
-    if len(devices) == 1:
-        return await asyncio.to_thread(
-            _embed_on_device,
-            selfies_list,
-            devices[0],
-            max_length,
-        )
-
-    chunks = _chunk_indices(len(selfies_list), len(devices))
-    tasks: list[asyncio.Task[torch.Tensor]] = []
-    for (start, end), dev in zip(chunks, devices, strict=False):
-        sub = selfies_list[start:end]
-        if not sub:
-            continue
-        tasks.append(
-            asyncio.to_thread(
-                _embed_on_device,
-                sub,
-                dev,
-                max_length,
-            )
-        )
-
-    results = await asyncio.gather(*tasks)
-    return torch.cat(results, dim=0)
-
 
 class MoleculeEmbedder:
-    """SELFIES/SMILES embedder with multi-device support and backpressure."""
+    """SELFIES/SMILES embedder with multi-device support.
 
-    Record = dict[str, object]
-    BatchResult = list[Record]
+    Args:
+        device: Device selection strategy.
+            -1: use all available CUDA devices (default).
+            0+: use specific CUDA device index.
+            Falls back to CPU when CUDA is unavailable.
+    """
 
-    def __init__(
-        self,
-        device: int = -1,
-        max_length: int = 128,
-        max_in_flight: int | None = None,
-    ):
-        """
-        Initialize embedder configuration.
-
-        Args:
-            device: -1 for all GPUs, 0+ for specific GPU, falls back to CPU.
-            max_length: Maximum token length for tokenizer.
-            max_in_flight: Optional cap of concurrent batches (defaults to 2×num_devices).
-        """
-        self.device = device
-        self.max_length = max_length
-        self.max_in_flight = max_in_flight
+    def __init__(self, device: int = -1) -> None:
+        self._device_arg = device
         self._initialized = False
-        self._num_devices = 1
+        self._devices: list[str] = []
+        self._tokenizer: PreTrainedTokenizerFast | None = None
+        self._tokenizer_lock = threading.Lock()
+        self._models: dict[str, BartModel] = {}
+        self._max_length: int = 0
 
-    async def initialize(self) -> None:
-        """Prepare embedder. Idempotent."""
+    async def _initialize(self) -> None:
+        """Lazy initialization of tokenizer and device list."""
         if self._initialized:
             return
 
-        if self.device == -1:
-            self._num_devices = (torch.cuda.device_count() if torch.cuda.is_available() else 1) or 1
-        else:
-            self._num_devices = 1
+        self._tokenizer = await asyncio.to_thread(
+            PreTrainedTokenizerFast.from_pretrained, _MODEL_NAME
+        )
+        self._max_length = self._tokenizer.model_max_length
+        self._devices = self._resolve_devices()
         self._initialized = True
 
-    async def embed_batch(
+    def _resolve_devices(self) -> list[str]:
+        """Resolve device strings based on configuration."""
+        if not torch.cuda.is_available():
+            return ["cpu"]
+
+        if self._device_arg == -1:
+            count = torch.cuda.device_count()
+            return [f"cuda:{i}" for i in range(count)] if count > 0 else ["cpu"]
+
+        if self._device_arg >= 0:
+            idx = min(self._device_arg, max(torch.cuda.device_count() - 1, 0))
+            return [f"cuda:{idx}"]
+
+        return ["cpu"]
+
+    def _get_model(self, device: str) -> BartModel:
+        """Get or create model for a specific device."""
+        if device not in self._models:
+            model = BartModel.from_pretrained(_MODEL_NAME)
+            model.to(device)
+            model.eval()
+            self._models[device] = model
+        return self._models[device]
+
+    def _prepare_molecules(
         self,
+        ids: list[str],
+        smiles_list: list[str],
+    ) -> tuple[list[str], list[str]]:
+        """Convert SMILES to SELFIES and filter invalid molecules.
+
+        Validates each molecule by:
+        1. Converting SMILES to SELFIES (skips on EncoderError)
+        2. Checking token length against model max (skips if exceeded)
+
+        Args:
+            ids: Molecule identifiers.
+            smiles_list: SMILES strings to convert.
+
+        Returns:
+            Tuple of (valid_ids, valid_selfies) for molecules that passed
+            all validation. Invalid molecules are logged and excluded.
+        """
+        assert self._tokenizer is not None
+
+        valid_ids: list[str] = []
+        valid_selfies: list[str] = []
+
+        for mol_id, smiles in zip(ids, smiles_list, strict=True):
+            # Convert SMILES to SELFIES
+            try:
+                selfies_str = sf.encoder(smiles).replace("][", "] [")
+            except sf.exceptions.EncoderError as e:
+                logger.warning(
+                    f"Skipping molecule {mol_id}: SELFIES encoding failed",
+                    extra={"id": mol_id, "error": e},
+                )
+                continue
+
+            # Check token length (with lock for thread safety)
+            with self._tokenizer_lock:
+                tokens = self._tokenizer(selfies_str, add_special_tokens=True)
+            token_len = len(tokens["input_ids"])
+
+            if token_len > self._max_length:
+                logger.warning(
+                    f"Skipping molecule {mol_id}: tokens exceed max length",
+                    extra={"id": mol_id, "token_len": token_len, "max_length": self._max_length},
+                )
+                continue
+
+            valid_ids.append(mol_id)
+            valid_selfies.append(selfies_str)
+
+        return valid_ids, valid_selfies
+
+    def _chunk_indices(self, n: int, k: int) -> list[tuple[int, int]]:
+        """Split range(n) into k nearly equal contiguous chunks."""
+        if k <= 1 or n <= 1:
+            return [(0, n)]
+
+        base, rem = divmod(n, k)
+        chunks: list[tuple[int, int]] = []
+        start = 0
+        for i in range(k):
+            size = base + (1 if i < rem else 0)
+            if size > 0:
+                chunks.append((start, start + size))
+                start += size
+        return chunks
+
+    def _embed_on_device(self, selfies_list: list[str], device: str) -> np.ndarray:
+        """Blocking embedding computation on a single device."""
+        model = self._get_model(device)
+        assert self._tokenizer is not None
+
+        with torch.inference_mode():
+            # Tokenize with lock for thread safety
+            with self._tokenizer_lock:
+                tokens = self._tokenizer(
+                    selfies_list,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=self._max_length,
+                    padding=True,
+                )
+            input_ids = tokens["input_ids"].to(device)
+            attention_mask = tokens["attention_mask"].to(device)
+
+            outputs = model.encoder(input_ids=input_ids, attention_mask=attention_mask)
+            hidden = outputs.last_hidden_state
+
+            mask_expanded = attention_mask.unsqueeze(-1).expand(hidden.size()).float()
+            summed = torch.sum(hidden * mask_expanded, dim=1)
+            mask_sum = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
+            pooled = summed / mask_sum
+
+        return pooled.cpu().numpy().astype(np.float32)
+
+    async def embed(
+        self,
+        ids: Sequence[str],
         smiles: Sequence[str],
-        ids: Sequence[str] | None = None,
-    ) -> BatchResult:
-        """Embed a single batch and return list-of-dict records."""
-        if not self._initialized:
-            await self.initialize()
+    ) -> list[tuple[str, np.ndarray]]:
+        """Compute embeddings for SMILES strings.
 
-        ids = ids or [f"mol_{i}" for i in range(len(smiles))]
-        embeddings = await embed_smiles(smiles, device=self.device, max_length=self.max_length)
+        Args:
+            ids: Identifiers for each molecule (must match smiles length).
+            smiles: SMILES strings to embed.
 
-        emb_rows = _tensor_rows_to_numpy(embeddings)
-        return [
-            {
-                "id": mol_id,
-                "smiles": smi,
-                "embedding": emb,
-                "embedding_name": "selfies_ted",
-            }
-            for mol_id, smi, emb in zip(ids, smiles, emb_rows, strict=False)
-        ]
+        Returns:
+            List of (id, embedding) tuples. Invalid molecules (encoding errors
+            or exceeding token limit) are logged and excluded. Order is
+            preserved for valid molecules.
+
+        Raises:
+            ValueError: If ids and smiles have different lengths or are empty.
+        """
+        if len(ids) != len(smiles):
+            raise ValueError(f"ids and smiles must have same length: {len(ids)} != {len(smiles)}")
+        if len(ids) == 0:
+            raise ValueError("ids and smiles cannot be empty")
+
+        await self._initialize()
+
+        # Validate and convert molecules
+        valid_ids, valid_selfies = await asyncio.to_thread(
+            self._prepare_molecules, list(ids), list(smiles)
+        )
+
+        if not valid_ids:
+            logger.warning("No valid molecules to embed, returning empty results")
+            return []
+
+        # Compute embeddings
+        if len(self._devices) == 1:
+            embeddings = await asyncio.to_thread(
+                self._embed_on_device, valid_selfies, self._devices[0]
+            )
+        else:
+            chunks = self._chunk_indices(len(valid_selfies), len(self._devices))
+            tasks: list[asyncio.Task[np.ndarray]] = []
+
+            for (start, end), device in zip(chunks, self._devices, strict=False):
+                chunk_selfies = valid_selfies[start:end]
+                if chunk_selfies:
+                    task = asyncio.create_task(
+                        asyncio.to_thread(self._embed_on_device, chunk_selfies, device)
+                    )
+                    tasks.append(task)
+
+            results = await asyncio.gather(*tasks)
+            embeddings = np.vstack(results)
+
+        return [(mol_id, embeddings[i]) for i, mol_id in enumerate(valid_ids)]
 
     async def embed_stream(
         self,
         batches: AsyncIterator[tuple[list[str], list[str]]],
-    ) -> AsyncIterator[BatchResult]:
-        """Process batches concurrently with bounded in-flight tasks."""
-        if not self._initialized:
-            await self.initialize()
+        max_in_flight: int | None = None,
+    ) -> AsyncIterator[list[tuple[str, np.ndarray]]]:
+        """Process batches concurrently with bounded in-flight tasks.
 
-        max_tasks = self.max_in_flight or max(1, self._num_devices * 2)
-        pending: set[asyncio.Task[BatchResult]] = set()
+        Args:
+            batches: Async iterator yielding (ids, smiles) tuples.
+            max_in_flight: Maximum concurrent batches. Defaults to 2 * num_devices.
 
-        async def _submit(ids: list[str], smi: list[str]) -> None:
-            pending.add(asyncio.create_task(self.embed_batch(smi, ids)))
+        Yields:
+            List of (id, embedding) tuples for each batch. Invalid molecules
+            are logged and excluded. Order within each batch is preserved;
+            batch completion order may vary.
+        """
+        await self._initialize()
 
-        async for ids, smi in batches:
-            while len(pending) >= max_tasks:
+        concurrency = max_in_flight or max(1, len(self._devices) * 2)
+        pending: set[asyncio.Task[list[tuple[str, np.ndarray]]]] = set()
+
+        async for batch_ids, batch_smiles in batches:
+            while len(pending) >= concurrency:
                 done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
                 for task in done:
                     yield task.result()
-            await _submit(ids, smi)
+
+            task = asyncio.create_task(self.embed(batch_ids, batch_smiles))
+            pending.add(task)
 
         while pending:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 yield task.result()
 
+    async def cleanup(self) -> None:
+        """Clean up models and free resources."""
+        logger.debug("Cleaning up MoleculeEmbedder")
+        self._models.clear()
+        self._tokenizer = None
+        self._devices.clear()
+        self._initialized = False
+        logger.debug("MoleculeEmbedder cleanup complete")
+
+    async def __aenter__(self) -> MoleculeEmbedder:
+        """Async context manager entry."""
+        await self._initialize()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
+        """Async context manager exit with cleanup."""
+        await self.cleanup()
+
 
 if __name__ == "__main__":
-    import asyncio
-
-    from rich import print
+    from rich import print as rprint
 
     async def main() -> None:
-        emb = await embed_smiles(["c1ccccc1", "CCO"], device=-1)
-        print(emb)
-        print(emb.shape)
-        print(emb.dtype)
+        embedder = MoleculeEmbedder()
+        results = await embedder.embed(
+            ["benzene", "ethanol", "too_long", "invalid_smiles"],
+            [
+                "c1ccccc1",
+                "CCO",
+                "C" * 5000,
+                "not_a_valid_smiles!!!",
+            ],
+        )
+        rprint(f"Returned {len(results)} embeddings:")
+        for mol_id, embedding in results:
+            rprint(f"  {mol_id}: shape={embedding.shape}, dtype={embedding.dtype}")
 
     asyncio.run(main())

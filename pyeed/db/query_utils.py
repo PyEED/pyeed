@@ -94,11 +94,13 @@ async def execute_write(
         raise ValueError("Provide either 'params' or 'rows', not both")
 
     async def _tx(
-        tx: AsyncManagedTransaction, q: str, p: dict[str, Any] | list[dict[str, Any]]
+        tx: AsyncManagedTransaction,
+        q: str,
+        p: dict[str, Any] | list[dict[str, Any]],
     ) -> None:
         await tx.run(q, p)
 
     kwargs = session_kwargs or {}
     async with driver.session(**kwargs) as session:
-        payload = rows if rows is not None else (params or {})
+        payload = {"rows": rows} if rows is not None else (params or {})
         await session.execute_write(_tx, query, payload)
