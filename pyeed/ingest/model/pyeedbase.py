@@ -102,6 +102,7 @@ class BaseNode(BaseModel):
         cls: type[T],
         driver: AsyncDriver,
         nodes: Iterable[T],
+        tx_size: int = 5000,
         session_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Upsert multiple nodes of this type in a single UNWIND batch.
@@ -109,6 +110,7 @@ class BaseNode(BaseModel):
         Args:
             driver: Neo4j async driver.
             nodes: Iterable of node instances to upsert.
+            tx_size: Transaction batch size.
             session_kwargs: Optional session keyword arguments.
         """
         rows = [node.model_dump() for node in nodes]
@@ -123,12 +125,15 @@ class BaseNode(BaseModel):
         SET n += row
         """
 
-        await execute_write(
-            driver=driver,
-            query=cypher,
-            rows=rows,
-            session_kwargs=session_kwargs,
-        )
+        # Process in chunks
+        for i in range(0, len(rows), tx_size):
+            chunk = rows[i : i + tx_size]
+            await execute_write(
+                driver=driver,
+                query=cypher,
+                rows=chunk,
+                session_kwargs=session_kwargs,
+            )
 
     # --------- Relationship methods --------- #
 
