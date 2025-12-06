@@ -1,49 +1,46 @@
-"""
-FastMCP quickstart example.
+from __future__ import annotations
 
-Run from the repository root:
-    uv run examples/snippets/servers/fastmcp_quickstart.py
-"""
+from fastmcp import FastMCP
+from toon_format import encode
 
-from loguru import logger
-from mcp.server.fastmcp import FastMCP
+from pyeed.db.milvus import get_async_milvus_client
+from pyeed.db.neo4j import get_async_driver
+from pyeed.ingest.model.protein import Protein
+from pyeed.queries import get_similar_proteins_by_ids
 
-# Create an MCP server
-mcp = FastMCP(
-    name="PyEED MCP Server",
-    port=8081,
-    host="0.0.0.0",
-)
+mcp = FastMCP("Pyeed MCP Server")
+
+driver = get_async_driver()
+milvus_client = get_async_milvus_client()
 
 
-# Add an addition tool
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two numbers"""
-    logger.info(f"Adding {a} and {b}")
-    return a + b
+@mcp.tool
+async def get_proteins(ids: list[str]) -> str:
+    """Get proteins from the database by IDs."""
+
+    proteins = await Protein.get_filtered(driver, ids=ids)
+    return encode([p.model_dump(exclude_unset=True) for p in proteins])
 
 
-# Add a dynamic greeting resource
-@mcp.resource("greeting://{name}")
-def get_greeting(name: str) -> str:
-    """Get a personalized greeting"""
-    return f"Hello, {name}!"
+@mcp.tool
+async def protein_similarity_search(ids: list[str], limit: int = 10) -> str:
+    """Search for similar proteins by IDs.
+
+    Args:
+        ids: List of protein IDs to search for.
+        limit: Maximum number of similar proteins to return (default: 10).
+
+    """
+    proteins = await get_similar_proteins_by_ids(
+        ids=ids,
+        neo4j_driver=driver,
+        milvus_client=milvus_client,
+        collection_name="pyeed",
+        limit=limit,
+        vector_field_name="mean_pooling",
+    )
+    return encode([p.model_dump(exclude_unset=True) for p in proteins])
 
 
-# Add a prompt
-@mcp.prompt()
-def greet_user(name: str, style: str = "friendly") -> str:
-    """Generate a greeting prompt"""
-    styles = {
-        "friendly": "Please write a warm, friendly greeting",
-        "formal": "Please write a formal, professional greeting",
-        "casual": "Please write a casual, relaxed greeting",
-    }
-
-    return f"{styles.get(style, styles['friendly'])} for someone named {name}."
-
-
-# Run with streamable HTTP transport - bind to all interfaces
 if __name__ == "__main__":
     mcp.run(transport="sse")
