@@ -34,10 +34,12 @@ from loguru import logger
 from neo4j import AsyncDriver
 from pymilvus import AsyncMilvusClient
 from rich.progress import (
-    BarColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
     SpinnerColumn,
+    Task,
+    Text,
     TextColumn,
     TimeElapsedColumn,
 )
@@ -46,6 +48,15 @@ from pyeed.db.milvus import initialize_collection_from_dict, insert
 from pyeed.embed.esm2 import ESM2Embedder
 
 type DType = Literal["float16", "float32"]
+
+
+class IterPerSecColumn(ProgressColumn):
+    """Show iterations per second."""
+
+    def render(self, task: Task) -> Text:
+        if task.speed is None:
+            return Text("- it/s")
+        return Text(f"{task.speed:.0f} it/s")
 
 
 # =============================================================================
@@ -187,20 +198,17 @@ async def flush_accumulated_batch(
     collection_name: str,
     accumulated_ids: list[str],
     accumulated_records: list[dict],
-    stats: dict[str, int],
-) -> None:
+) -> dict[str, int]:
     """Flush accumulated records to Milvus and update status.
 
-    Args:
-        driver: Neo4j async driver.
-        client: AsyncMilvusClient instance.
-        collection_name: Name of Milvus collection.
-        accumulated_ids: List of protein IDs in batch.
-        accumulated_records: List of records to insert.
-        stats: Statistics dict to update.
+    Returns:
+        {'completed': n_completed, 'failed': n_failed}
     """
     if not accumulated_records:
-        return
+        return {"completed": 0, "failed": 0}
+
+    completed = 0
+    failed = 0
 
     try:
         await insert(
@@ -209,16 +217,16 @@ async def flush_accumulated_batch(
             client=client,
         )
         await update_protein_status(driver, accumulated_ids, "complete")
-        stats["completed"] += len(accumulated_ids)
+        completed = len(accumulated_ids)
 
-        logger.info(
-            f"Flushed {len(accumulated_ids)} embeddings to Milvus (total: {stats['completed']})"
-        )
+        logger.info(f"Flushed {len(accumulated_ids)} embeddings to Milvus")
 
     except Exception as e:
         logger.error(f"Insert failed for {len(accumulated_ids)} proteins: {e}")
         await update_protein_status(driver, accumulated_ids, "failed")
-        stats["failed"] += len(accumulated_ids)
+        failed = len(accumulated_ids)
+
+    return {"completed": completed, "failed": failed}
 
 
 # =============================================================================
@@ -236,37 +244,19 @@ async def embed_pending_proteins(
     model_name: str = "facebook/esm2_t33_650M_UR50D",
     dtype: DType = "float16",
     max_length: int = 1024,
-    devices: list[int] = [0],
+    devices: list[int] | None = None,
     max_seq_length: int | None = None,
+    max_flush_in_flight: int = 4,
 ) -> dict[str, int]:
-    """Embed pending proteins: stream → embed → insert → update status.
+    if devices is None:
+        devices = [0]
 
-    Fetches proteins in large batches, sorts by length to avoid ESM2 cache
-    mismatches, then streams through the embedder with built-in backpressure.
-    Accumulates embeddings and inserts in batches to reduce database overhead.
-
-    Args:
-        driver: Neo4j async driver.
-        client: AsyncMilvusClient instance.
-        collection_name: Name of Milvus collection to store embeddings.
-        batch_size: Number of proteins per embedding batch.
-        prefetch_size: Number of proteins to fetch and sort at once.
-        insert_batch_size: Number of embeddings to accumulate before inserting.
-        model_name: HuggingFace model identifier for ESM2.
-        dtype: Data type for model computation and embeddings.
-        max_length: Maximum token length for ESM2.
-        device: GPU device index (0, 1, ...) or -1 for all GPUs.
-        max_seq_length: Optional maximum amino acid sequence length filter.
-
-    Returns:
-        Statistics dict with 'completed' and 'failed' counts.
-    """
     stats = {"completed": 0, "failed": 0}
     collection_initialized = collection_name in await client.list_collections()
 
-    # Accumulators for batched inserts
     accumulated_ids: list[str] = []
     accumulated_records: list[dict] = []
+    flush_tasks: set[asyncio.Task[dict[str, int]]] = set()
 
     logger.info(
         f"Starting embedding pipeline (batch_size={batch_size}, "
@@ -277,7 +267,7 @@ async def embed_pending_proteins(
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]{task.description}"),
-        BarColumn(),
+        IterPerSecColumn(),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
     ) as progress:
@@ -290,37 +280,29 @@ async def embed_pending_proteins(
                 max_length=max_length,
                 devices=devices,
             ) as embedder:
-                # Stream length-sorted proteins into embedder
                 protein_stream = stream_pending_proteins(
                     driver, batch_size, prefetch_size, max_seq_length
                 )
 
-                # Track IDs as they enter the embedding pipeline
                 pending_batch_ids: list[list[str]] = []
 
-                async def tracked_stream() -> AsyncIterator[tuple[list[str], list[str]]]:
-                    """Stream that tracks original IDs."""
+                async def tracked_stream():
                     async for ids, sequences in protein_stream:
                         pending_batch_ids.append(ids)
                         yield ids, sequences
 
                 async for batch_results in embedder.embed_stream(tracked_stream()):
-                    # Get the original IDs for this batch
                     original_ids = pending_batch_ids.pop(0) if pending_batch_ids else []
-
                     if not original_ids:
                         continue
 
-                    # Extract successfully embedded IDs
                     embedded_ids = {pid for pid, _ in batch_results} if batch_results else set()
-
-                    # Identify skipped IDs (marked in_progress but not embedded)
                     skipped_ids = [pid for pid in original_ids if pid not in embedded_ids]
 
                     if skipped_ids:
                         logger.warning(
                             f"Marking {len(skipped_ids)} skipped proteins as failed "
-                            f"(exceeded max_length)"
+                            "(exceeded max_length)"
                         )
                         await update_protein_status(driver, skipped_ids, "failed")
                         stats["failed"] += len(skipped_ids)
@@ -332,7 +314,6 @@ async def embed_pending_proteins(
                     ids = [pid for pid, _ in batch_results]
                     records = [{"id": pid, "embedding": emb} for pid, emb in batch_results]
 
-                    # Initialize collection lazily on first batch
                     if not collection_initialized:
                         await initialize_collection_from_dict(
                             collection_name=collection_name,
@@ -343,45 +324,68 @@ async def embed_pending_proteins(
                         collection_initialized = True
                         logger.info(f"Initialized collection '{collection_name}'")
 
-                    # Accumulate records
                     accumulated_ids.extend(ids)
                     accumulated_records.extend(records)
 
                     logger.debug(
                         f"Accumulated {len(accumulated_records)}/{insert_batch_size} records"
                     )
+                    # Progress is about proteins processed, not flushes:
                     progress.update(task, advance=len(records))
 
-                    # Flush when we reach the insert batch size
                     if len(accumulated_records) >= insert_batch_size:
-                        await flush_accumulated_batch(
-                            driver,
-                            client,
-                            collection_name,
-                            accumulated_ids,
-                            accumulated_records,
-                            stats,
-                        )
-
-                        # Clear accumulators
+                        # snapshot current batch for flushing
+                        ids_to_flush = accumulated_ids
+                        records_to_flush = accumulated_records
                         accumulated_ids = []
                         accumulated_records = []
+
+                        flush_task = asyncio.create_task(
+                            flush_accumulated_batch(
+                                driver,
+                                client,
+                                collection_name,
+                                ids_to_flush,
+                                records_to_flush,
+                            )
+                        )
+                        flush_tasks.add(flush_task)
+
+                        # limit number of concurrent flushes
+                        if len(flush_tasks) >= max_flush_in_flight:
+                            logger.debug(f"Waiting for {len(flush_tasks)} flush tasks to complete")
+                            done, flush_tasks = await asyncio.wait(
+                                flush_tasks, return_when=asyncio.FIRST_COMPLETED
+                            )
+                            for t in done:
+                                delta = t.result()
+                                stats["completed"] += delta["completed"]
+                                stats["failed"] += delta["failed"]
 
         except (KeyboardInterrupt, asyncio.CancelledError) as e:
             logger.warning(f"Pipeline interrupted: {type(e).__name__}")
         finally:
-            # Always flush remaining records on exit (normal or interrupted)
+            # flush remaining accumulated records
             if accumulated_records:
-                logger.info(f"Flushing final batch of {len(accumulated_records)} records")
-                await flush_accumulated_batch(
-                    driver,
-                    client,
-                    collection_name,
-                    accumulated_ids,
-                    accumulated_records,
-                    stats,
+                logger.info(f"Scheduling final flush of {len(accumulated_records)} records")
+                flush_task = asyncio.create_task(
+                    flush_accumulated_batch(
+                        driver,
+                        client,
+                        collection_name,
+                        accumulated_ids,
+                        accumulated_records,
+                    )
                 )
-                progress.update(task, advance=len(accumulated_ids))
+                flush_tasks.add(flush_task)
+
+            # wait for all outstanding flushes and merge stats
+            if flush_tasks:
+                done, _ = await asyncio.wait(flush_tasks)
+                for t in done:
+                    delta = t.result()
+                    stats["completed"] += delta["completed"]
+                    stats["failed"] += delta["failed"]
 
     logger.info(f"Pipeline complete: {stats['completed']} completed, {stats['failed']} failed")
     return stats
@@ -393,27 +397,161 @@ async def embed_pending_proteins(
 
 
 if __name__ == "__main__":
+    import argparse
+    import sys
+
     from rich import print as rprint
 
     from pyeed.db.milvus import get_async_milvus_client
     from pyeed.db.neo4j import get_async_driver
 
+    def parse_devices(devices_str: str) -> list[int]:
+        """Parse comma-separated device IDs into list of integers.
+
+        Args:
+            devices_str: Comma-separated device IDs, e.g., "0,1,2" or "2,0".
+
+        Returns:
+            List of device IDs as integers.
+
+        Raises:
+            ValueError: If device IDs cannot be parsed as integers.
+        """
+        if not devices_str:
+            return [0]
+        try:
+            return [int(d.strip()) for d in devices_str.split(",") if d.strip()]
+        except ValueError as e:
+            msg = (
+                f"Invalid device IDs format: {devices_str}. "
+                "Use comma-separated integers, e.g., '0,1,2'"
+            )
+            raise ValueError(msg) from e
+
     async def main() -> None:
+        parser = argparse.ArgumentParser(
+            description="Embed pending proteins from Neo4j and store in Milvus",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  # Use default settings (device 0, collection 'proteins')
+  python -m pyeed.embed.embed_pending_proteins
+
+  # Use multiple GPUs (devices 2 and 0)
+  python -m pyeed.embed.embed_pending_proteins --devices 2,0
+
+  # Custom collection and batch sizes
+  python -m pyeed.embed.embed_pending_proteins --collection my_proteins --batch-size 128
+
+  # Limit to sequences <= 512 amino acids
+  python -m pyeed.embed.embed_pending_proteins --max-seq-length 512
+            """,
+        )
+
+        parser.add_argument(
+            "--collection",
+            type=str,
+            default="proteins",
+            help="Name of Milvus collection to store embeddings (default: 'proteins')",
+        )
+        parser.add_argument(
+            "--devices",
+            type=str,
+            default="0",
+            help="Comma-separated CUDA device IDs, e.g., '0,1,2' or '2,0' (default: '0')",
+        )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=64,
+            help="Number of proteins per embedding batch (default: 64)",
+        )
+        parser.add_argument(
+            "--prefetch-size",
+            type=int,
+            default=12800,
+            help="Number of proteins to fetch and sort at once (default: 12800)",
+        )
+        parser.add_argument(
+            "--insert-batch-size",
+            type=int,
+            default=1024,
+            help="Number of embeddings to accumulate before inserting (default: 1024)",
+        )
+        parser.add_argument(
+            "--model-name",
+            type=str,
+            default="facebook/esm2_t33_650M_UR50D",
+            help="HuggingFace model identifier for ESM2 (default: 'facebook/esm2_t33_650M_UR50D')",
+        )
+        parser.add_argument(
+            "--dtype",
+            type=str,
+            choices=["float16", "float32"],
+            default="float16",
+            help="Data type for model computation and embeddings (default: 'float16')",
+        )
+        parser.add_argument(
+            "--max-length",
+            type=int,
+            default=1024,
+            help="Maximum token length for ESM2 (default: 1024)",
+        )
+        parser.add_argument(
+            "--max-seq-length",
+            type=int,
+            default=None,
+            help="Optional maximum amino acid sequence length filter (default: None)",
+        )
+        parser.add_argument(
+            "--max-flush-in-flight",
+            type=int,
+            default=4,
+            help="Maximum number of concurrent flush operations (default: 4)",
+        )
+
+        args = parser.parse_args()
+
+        try:
+            devices = parse_devices(args.devices)
+        except ValueError as e:
+            rprint(f"[red]Error:[/red] {e}")
+            sys.exit(1)
+
         driver = get_async_driver()
         client = get_async_milvus_client()
+
+        rprint(
+            f"[cyan]Starting embedding pipeline...[/cyan]\n"
+            f"  Collection: {args.collection}\n"
+            f"  Devices: {devices}\n"
+            f"  Batch size: {args.batch_size}\n"
+            f"  Prefetch size: {args.prefetch_size}\n"
+            f"  Insert batch size: {args.insert_batch_size}\n"
+            f"  Model: {args.model_name}\n"
+            f"  Dtype: {args.dtype}\n"
+            f"  Max length: {args.max_length}"
+        )
+        if args.max_seq_length:
+            rprint(f"  Max sequence length: {args.max_seq_length}")
 
         try:
             stats = await embed_pending_proteins(
                 driver=driver,
                 client=client,
-                collection_name="proteins",
-                batch_size=64,
-                prefetch_size=12800,
-                insert_batch_size=1000,
-                dtype="float16",
-                devices=[0, 2],
+                collection_name=args.collection,
+                batch_size=args.batch_size,
+                prefetch_size=args.prefetch_size,
+                insert_batch_size=args.insert_batch_size,
+                model_name=args.model_name,
+                dtype=args.dtype,
+                max_length=args.max_length,
+                devices=devices,
+                max_seq_length=args.max_seq_length,
+                max_flush_in_flight=args.max_flush_in_flight,
             )
-            rprint(f"[green]Done:[/green] {stats}")
+            rprint("[green]Done![/green]")
+            rprint(stats)
         finally:
             await client.close()
             await driver.close()
