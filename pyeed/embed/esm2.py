@@ -351,7 +351,7 @@ class ESM2Embedder:
         """
         await self._initialize()
 
-        concurrency = max_in_flight or max(1, len(self._devices) * 2)
+        concurrency = max_in_flight or max(1, len(self._devices) * 1)
         pending: set[asyncio.Task[list[tuple[str, np.ndarray]]]] = set()
 
         async for batch_ids, batch_sequences in batches:
