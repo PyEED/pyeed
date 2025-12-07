@@ -40,13 +40,6 @@ from rich.progress import (
 
 from pyeed.ingest.model import Protein, Taxon
 
-__all__ = [
-    "LineIndex",
-    "build_line_index",
-    "ingest_proteins_from_jsonl",
-    "stream_proteins_from_jsonl",
-]
-
 type ProteinTaxonMap = dict[str, str]
 
 
