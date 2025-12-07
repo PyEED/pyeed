@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
 from toon_format import encode
 
 from pyeed.db.milvus import get_async_milvus_client
@@ -22,7 +23,7 @@ async def get_proteins(ids: list[str]) -> str:
     return encode([p.model_dump(exclude_unset=True) for p in proteins])
 
 
-@mcp.tool
+@mcp.tool()
 async def protein_similarity_search(ids: list[str], limit: int = 10) -> str:
     """Search for similar proteins by IDs.
 
@@ -40,6 +41,20 @@ async def protein_similarity_search(ids: list[str], limit: int = 10) -> str:
         vector_field_name="mean_pooling",
     )
     return encode([p.model_dump(exclude_unset=True) for p in proteins])
+
+
+@mcp.tool
+async def plot_graph(time: list[float], value: list[float]) -> Image:
+    import io
+
+    import matplotlib.pyplot as plt
+
+    buf = io.BytesIO()
+    plt.plot(time, value)
+    plt.savefig(buf, format="png")
+    plt.close()  # Free resources by closing the figure
+    buf.seek(0)
+    return Image(data=buf.read(), format="png")
 
 
 if __name__ == "__main__":
