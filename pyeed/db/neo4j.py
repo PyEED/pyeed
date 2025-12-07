@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections import defaultdict
+from dataclasses import dataclass
 
 import dotenv
 from loguru import logger
@@ -69,53 +71,140 @@ async def sync_schema(models: list[type[BaseNode]], driver: AsyncDriver) -> None
 
     logger.info(f"Synchronized schema for the following indices: {added_indices}")
 
-    # async def async_query_iter(self, query: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
-    #     """
-    #     Iterate over the results of a query.
 
-    #     Args:
-    #         query: The query to execute.
-    #         params: The parameters to pass to the query.
-
-    #     Returns:
-    #         An iterator over the results of the query.
-    #     """
-    #     async with self.async_driver.session() as session:
-    #         result = await session.run(query, **params)
-    #         async for record in result:
-    #             yield record.data()
-
-    # async def async_value_iter(self, query: str, key: str, **params: Any) -> AsyncIterator[Any]:
-    #     """
-    #     Iterate over the values of a key from the results of a query.
-
-    #     Args:
-    #         query: The query to execute.
-    #         key: The key to iterate over.
-    #         params: The parameters to pass to the query.
-
-    #     Returns:
-    #         An iterator over the values of the key.
-    #     """
-    #     async with self.async_driver.session() as session:
-    #         result = await session.run(query, **params)
-    #         async for record in result:
-    #             yield record.value(key)
+@dataclass
+class Relationship:
+    from_label: str
+    rel_type: str
+    to_label: str
 
 
-async def main() -> None:
-    uri = "neo4j://127.0.0.1:7687"
-    user = "neo4j"
-    password = "12345678"
-    driver = get_async_driver(uri, user, password)
-    try:
-        await sync_schema(MODEL_CLASSES, driver)
-    finally:
-        await driver.close()
-    print("Done")
+@dataclass
+class Property:
+    name: str
+    is_index: bool = False
+
+
+@dataclass
+class Label:
+    name: str
+    properties: list[Property]
+
+
+@dataclass
+class Schema:
+    labels: list[Label]
+    relationships: list[Relationship]
+
+
+async def get_labels(driver: AsyncDriver) -> list[Label]:
+    """
+    Get the labels of the database.
+
+    Args:
+        driver: Neo4j async driver.
+
+    Returns:
+        list[Label]: The labels of the database.
+    """
+    query = """
+    CALL apoc.meta.schema() YIELD value AS schemaMap
+    UNWIND keys(schemaMap) AS label
+    WITH label, schemaMap[label] AS data
+    WHERE data.type = 'node'
+    UNWIND keys(data.properties) AS prop
+    WITH label, prop, data.properties[prop] AS propData
+    RETURN
+      label              AS label_name,
+      prop               AS property_name,
+      coalesce(propData.indexed, false) AS is_index
+    """
+    async with driver.session() as session:
+
+        async def _tx(tx: AsyncManagedTransaction):
+            result = await tx.run(query)
+            return [record async for record in result]
+
+        rows = await session.execute_read(_tx)
+
+    by_label: defaultdict[str, list[Property]] = defaultdict(list)
+
+    for row in rows:
+        by_label[row["label_name"]].append(
+            Property(
+                name=row["property_name"],
+                is_index=row["is_index"],
+            )
+        )
+
+    return [Label(name=label_name, properties=props) for label_name, props in by_label.items()]
+
+
+async def get_relationships(driver: AsyncDriver) -> list[Relationship]:
+    """
+    Get the relationships of the database.
+
+    Args:
+        driver: Neo4j async driver.
+
+    Returns:
+        list[Relationship]: The relationships of the database.
+    """
+    query = """
+    CALL apoc.meta.graph()
+    YIELD relationships
+    UNWIND relationships AS rel
+    UNWIND labels(startNode(rel)) AS from_label
+    UNWIND labels(endNode(rel))   AS to_label
+    WITH DISTINCT from_label, type(rel) AS rel_type, to_label
+    RETURN from_label, rel_type, to_label
+    ORDER BY from_label, rel_type, to_label;
+    """
+
+    async with driver.session() as session:
+
+        async def _tx(tx: AsyncManagedTransaction):
+            result = await tx.run(query)
+            return [record async for record in result]
+
+        rows = await session.execute_read(_tx)
+
+    relationships = []
+    for row in rows:
+        relationships.append(
+            Relationship(
+                from_label=row.get("from_label"),
+                rel_type=row.get("rel_type"),
+                to_label=row.get("to_label"),
+            )
+        )
+
+    return relationships
+
+
+async def get_schema(driver: AsyncDriver) -> Schema:
+    """
+    Get the schema of the database.
+
+    Args:
+        driver: Neo4j async driver.
+
+    Returns:
+        Schema: The schema of the database.
+    """
+    labels = await get_labels(driver)
+    relationships = await get_relationships(driver)
+    return Schema(labels=labels, relationships=relationships)
 
 
 if __name__ == "__main__":
-    from pyeed.ingest.model import MODEL_CLASSES
+    from rich import print
+
+    driver = get_async_driver()
+
+    async def main() -> None:
+        schema = await get_schema(driver)
+        print(schema)
+        await driver.close()
 
     asyncio.run(main())
