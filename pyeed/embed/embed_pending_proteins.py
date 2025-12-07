@@ -236,7 +236,7 @@ async def embed_pending_proteins(
     model_name: str = "facebook/esm2_t33_650M_UR50D",
     dtype: DType = "float16",
     max_length: int = 1024,
-    device: int = 0,
+    devices: list[int] = [0],
     max_seq_length: int | None = None,
 ) -> dict[str, int]:
     """Embed pending proteins: stream → embed → insert → update status.
@@ -271,7 +271,7 @@ async def embed_pending_proteins(
     logger.info(
         f"Starting embedding pipeline (batch_size={batch_size}, "
         f"prefetch_size={prefetch_size}, insert_batch_size={insert_batch_size}, "
-        f"device={device})"
+        f"devices={devices})"
     )
 
     with Progress(
@@ -288,7 +288,7 @@ async def embed_pending_proteins(
                 model_name=model_name,
                 dtype=dtype,
                 max_length=max_length,
-                device=device,
+                devices=devices,
             ) as embedder:
                 # Stream length-sorted proteins into embedder
                 protein_stream = stream_pending_proteins(
@@ -411,7 +411,7 @@ if __name__ == "__main__":
                 prefetch_size=12800,
                 insert_batch_size=1000,
                 dtype="float16",
-                device=0,
+                devices=[0, 2],
             )
             rprint(f"[green]Done:[/green] {stats}")
         finally:

@@ -35,14 +35,14 @@ class ESM2Embedder:
         pooling: Pooling function to reduce sequence dimension. None for raw hidden states.
         normalize: Whether to L2-normalize output embeddings.
         max_length: Maximum sequence length (tokens). Sequences exceeding this are skipped.
-        device: Device selection strategy.
-            -1: use all available CUDA devices (default).
-            0+: use specific CUDA device index.
+        devices: List of CUDA device indices to use.
+            Empty list []: use all available CUDA devices (default).
+            [0, 4]: use specific CUDA devices (cuda:0 and cuda:4).
             Falls back to CPU when CUDA is unavailable.
         huggingface_token: HuggingFace token for private models.
 
     Example:
-        >>> embedder = ESM2Embedder(dtype="float16", device=0)
+        >>> embedder = ESM2Embedder(dtype="float16", devices=[0])
         >>> results = await embedder.embed(["P12345"], ["MVLSPADKTN..."])
         >>> for protein_id, embedding in results:
         ...     print(f"{protein_id}: {embedding.shape}")
@@ -56,7 +56,7 @@ class ESM2Embedder:
         normalize: bool = True,
         max_length: int = 1024,
         huggingface_token: str | None = None,
-        device: int = -1,
+        devices: list[int] | None = None,
     ) -> None:
         self._model_name = model_name
         self._dtype = dtype
@@ -66,7 +66,7 @@ class ESM2Embedder:
         self._normalize = normalize
         self._max_length = max_length
         self._huggingface_token = huggingface_token or _login_hf()
-        self._device_arg = device
+        self._device_args = devices if devices is not None else []
 
         self._initialized = False
         self._devices: list[str] = []
@@ -74,6 +74,8 @@ class ESM2Embedder:
         self._tokenizer_lock = threading.Lock()
         self._models: dict[str, EsmModel] = {}
         self._hf_token: str | None = None
+        # Serialize embed() calls to avoid concurrent model forwards on same device
+        self._embed_lock = asyncio.Lock()
 
     async def _initialize(self) -> None:
         """Lazy initialization of tokenizer and device list."""
@@ -103,19 +105,34 @@ class ESM2Embedder:
             )
 
     def _resolve_devices(self) -> list[str]:
-        """Resolve device strings based on configuration."""
+        """Resolve device strings based on configuration.
+
+        Returns:
+            List of device strings (e.g., ["cuda:0", "cuda:4"] or ["cpu"]).
+        """
         if not torch.cuda.is_available():
             return ["cpu"]
 
-        if self._device_arg == -1:
+        # Empty list means use all available CUDA devices
+        if not self._device_args:
             count = torch.cuda.device_count()
             return [f"cuda:{i}" for i in range(count)] if count > 0 else ["cpu"]
 
-        if self._device_arg >= 0:
-            idx = min(self._device_arg, max(torch.cuda.device_count() - 1, 0))
-            return [f"cuda:{idx}"]
+        # Use specific device indices
+        max_device = torch.cuda.device_count() - 1
+        device_strings: list[str] = []
+        for idx in self._device_args:
+            if idx < 0:
+                logger.warning(f"Invalid device index {idx}, skipping")
+                continue
+            if idx > max_device:
+                logger.warning(
+                    f"Device index {idx} exceeds available devices (max: {max_device}), skipping"
+                )
+                continue
+            device_strings.append(f"cuda:{idx}")
 
-        return ["cpu"]
+        return device_strings if device_strings else ["cpu"]
 
     def _get_model(self, device: str) -> EsmModel:
         """Get or create model for a specific device."""
@@ -293,45 +310,46 @@ class ESM2Embedder:
         Raises:
             ValueError: If ids and sequences have different lengths or are empty.
         """
-        if len(ids) != len(sequences):
-            raise ValueError(
-                f"ids and sequences must have same length: {len(ids)} != {len(sequences)}"
+        async with self._embed_lock:
+            if len(ids) != len(sequences):
+                raise ValueError(
+                    f"ids and sequences must have same length: {len(ids)} != {len(sequences)}"
+                )
+            if len(ids) == 0:
+                raise ValueError("ids and sequences cannot be empty")
+
+            await self._initialize()
+
+            # Validate sequences
+            valid_ids, valid_sequences = await asyncio.to_thread(
+                self._prepare_sequences, list(ids), list(sequences)
             )
-        if len(ids) == 0:
-            raise ValueError("ids and sequences cannot be empty")
 
-        await self._initialize()
+            if not valid_ids:
+                logger.warning("No valid sequences to embed, returning empty results")
+                return []
 
-        # Validate sequences
-        valid_ids, valid_sequences = await asyncio.to_thread(
-            self._prepare_sequences, list(ids), list(sequences)
-        )
+            # Compute embeddings
+            if len(self._devices) == 1:
+                embeddings = await asyncio.to_thread(
+                    self._embed_on_device, valid_sequences, self._devices[0]
+                )
+            else:
+                chunks = self._chunk_indices(len(valid_sequences), len(self._devices))
+                tasks: list[asyncio.Task[np.ndarray]] = []
 
-        if not valid_ids:
-            logger.warning("No valid sequences to embed, returning empty results")
-            return []
+                for (start, end), device in zip(chunks, self._devices, strict=False):
+                    chunk_sequences = valid_sequences[start:end]
+                    if chunk_sequences:
+                        task = asyncio.create_task(
+                            asyncio.to_thread(self._embed_on_device, chunk_sequences, device)
+                        )
+                        tasks.append(task)
 
-        # Compute embeddings
-        if len(self._devices) == 1:
-            embeddings = await asyncio.to_thread(
-                self._embed_on_device, valid_sequences, self._devices[0]
-            )
-        else:
-            chunks = self._chunk_indices(len(valid_sequences), len(self._devices))
-            tasks: list[asyncio.Task[np.ndarray]] = []
+                results = await asyncio.gather(*tasks)
+                embeddings = np.vstack(results)
 
-            for (start, end), device in zip(chunks, self._devices, strict=False):
-                chunk_sequences = valid_sequences[start:end]
-                if chunk_sequences:
-                    task = asyncio.create_task(
-                        asyncio.to_thread(self._embed_on_device, chunk_sequences, device)
-                    )
-                    tasks.append(task)
-
-            results = await asyncio.gather(*tasks)
-            embeddings = np.vstack(results)
-
-        return [(protein_id, embeddings[i]) for i, protein_id in enumerate(valid_ids)]
+            return [(protein_id, embeddings[i]) for i, protein_id in enumerate(valid_ids)]
 
     async def embed_stream(
         self,
