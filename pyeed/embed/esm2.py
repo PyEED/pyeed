@@ -427,7 +427,7 @@ if __name__ == "__main__":
     from rich import print as rprint
 
     async def main() -> None:
-        embedder = ESM2Embedder(dtype="float16", device=0)
+        embedder = ESM2Embedder(dtype="float16", devices=[0])
         await embedder._initialize()
 
         results = await embedder.embed(
@@ -441,6 +441,7 @@ if __name__ == "__main__":
         )
 
         rprint(f"Returned {len(results)} embeddings:")
+        rprint(results)
         await embedder.cleanup()
 
     asyncio.run(main())

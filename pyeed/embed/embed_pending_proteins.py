@@ -98,27 +98,23 @@ async def fetch_pending_batch(
     limit: int,
     max_seq_length: int | None = None,
 ) -> list[tuple[str, str]]:
-    """Fetch a batch of pending proteins from Neo4j.
-
-    Args:
-        driver: Neo4j async driver.
-        limit: Maximum number of proteins to fetch.
-        max_seq_length: Optional maximum sequence length filter.
-
-    Returns:
-        List of (id, sequence) tuples.
-    """
-    conditions = ["p.sequence IS NOT NULL"]
+    conditions = ["p.embedding_status = 'pending'"]
     if max_seq_length:
         conditions.append("p.seq_length <= $max_seq_length")
 
     where = " AND ".join(conditions)
-    query = f"""
+
+    query = """
+    CALL () {
     MATCH (p:Protein)
-    WHERE {where}
-      AND (p.embedding_status IS NULL OR p.embedding_status = 'pending')
+    WHERE p.embedding_status = 'pending'
     RETURN p.id AS id, p.sequence AS sequence
     LIMIT $limit
+    }
+    WITH id, sequence
+    MATCH (p:Protein {id: id})
+    SET p.embedding_status = 'in_progress'
+    RETURN id, sequence;
     """
 
     params: dict = {"limit": limit}
@@ -135,7 +131,7 @@ async def fetch_pending_batch(
 async def stream_pending_proteins(
     driver: AsyncDriver,
     batch_size: int = 64,
-    prefetch_size: int = 12800,
+    prefetch_size: int = 1024,
     max_seq_length: int | None = None,
 ) -> AsyncIterator[tuple[list[str], list[str]]]:
     """Stream pending proteins as length-sorted (ids, sequences) batches.
@@ -156,7 +152,9 @@ async def stream_pending_proteins(
 
     while True:
         # Fetch large batch from Neo4j
+        logger.debug(f"Fetching {prefetch_size} pending proteins")
         proteins = await fetch_pending_batch(driver, prefetch_size, max_seq_length)
+        logger.debug(f"Fetched {len(proteins)} proteins")
 
         if not proteins:
             logger.info("No more pending proteins")
@@ -182,9 +180,6 @@ async def stream_pending_proteins(
             batch_min = len(sequences[0])
             batch_max = len(sequences[-1])
             logger.debug(f"Batch: {len(ids)} proteins (length {batch_min}-{batch_max})")
-
-            # Mark as in_progress BEFORE yielding
-            await update_protein_status(driver, ids, "in_progress")
 
             yield ids, sequences
 
