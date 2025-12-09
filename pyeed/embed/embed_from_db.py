@@ -255,7 +255,7 @@ async def main() -> None:
                 collection_name="proteins",
                 progress=progress,
                 progress_task_id=task_id,
-                devices=[0, 1],
+                devices=[0],
             )
     finally:
         await milvus_client.close()
