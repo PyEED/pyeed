@@ -9,6 +9,7 @@ from typing import Literal, NamedTuple
 import numpy as np
 import torch
 from loguru import logger
+from rich.progress import Progress, TaskID
 from transformers import EsmModel, EsmTokenizer
 
 from .pooling import PoolingFn, l2_normalize, mean_pooling
@@ -115,7 +116,16 @@ class ESM2DeviceWorker:
 
         out = list(zip(ids, arr, strict=True))
 
-        print(f"Embedding time: {time.time() - t0}")
+        elapsed = time.time() - t0
+        if elapsed > 5.0:
+            logger.debug(
+                "Embedding batch slow",
+                extra={
+                    "batch_size": len(batch),
+                    "elapsed_s": round(elapsed, 3),
+                    "device": self.device,
+                },
+            )
         return out
 
 
@@ -136,6 +146,8 @@ class ESM2Processor[T, R]:
         per_device_queue_size: int = 3,
         source_chunk_size: int = 2048,
         length_key: Callable[[T], int] | None = None,
+        progress: Progress | None = None,
+        progress_task_id: TaskID | None = None,
     ) -> None:
         self.model_name = model_name
         self.dtype = dtype
@@ -155,6 +167,11 @@ class ESM2Processor[T, R]:
         self.length_key: Callable[[T], int] = (
             length_key if length_key is not None else (lambda item: len(item[1]))  # type: ignore[index, arg-type]
         )
+        if progress is None and progress_task_id is not None:
+            msg = "progress_task_id provided without a Progress instance"
+            raise ValueError(msg)
+        self.progress = progress
+        self.progress_task_id = progress_task_id
 
         self._initialized = False
         self._devices: list[str] = []
@@ -270,7 +287,15 @@ class ESM2Processor[T, R]:
 
             if new_padded > self.max_padded_tokens:
                 batches.append(batch)
-                print(f"Batch created with {len(batch)} items")
+                logger.debug(
+                    "Split batch due to padded budget",
+                    extra={
+                        "batch_size": len(batch),
+                        "new_item_len": L,
+                        "padded_tokens": new_padded,
+                        "budget": self.max_padded_tokens,
+                    },
+                )
                 batch = [item]
                 max_len = L
                 continue
@@ -325,6 +350,8 @@ class ESM2Processor[T, R]:
 
                 _, batch_results = await out_q.get()
                 processed_jobs += 1
+                if self.progress is not None and self.progress_task_id is not None:
+                    self.progress.advance(self.progress_task_id, len(batch_results))
 
                 for inp, res in batch_results:
                     yield inp, res
@@ -409,7 +436,7 @@ if __name__ == "__main__":
             records = await res.data()
             # Output as list of tuple (convert list of dict to list of tuple)
             tuples = [(rec["p.id"], rec["p.sequence"]) for rec in records]
-            n = len(tuples)
+            total = len(tuples)
 
             # make list of tuple as async iterable
             async def aiter() -> AsyncIterator[tuple[str, str]]:
@@ -418,13 +445,22 @@ if __name__ == "__main__":
 
             # initialize ESM2Processor
             print("Initializing processor")
-            processor = ESM2Processor(devices=[0, 2], max_padded_tokens=30000)
+            with Progress() as progress:
+                task_id = progress.add_task("embedding", total=total)
+                processor = ESM2Processor(
+                    devices=[0, 2],
+                    max_padded_tokens=30000,
+                    dtype="float16",
+                    progress=progress,
+                    progress_task_id=task_id,
+                )
 
-            # run processor, timing the embedding only (exclude db query)
-            print("Running processor")
-            t0 = time.time()
-            results = await processor.work(aiter())
-            t1 = time.time()
+                # run processor, timing the embedding only (exclude db query)
+                print("Running processor")
+                t0 = time.time()
+                results = await processor.work(aiter())
+                t1 = time.time()
+
             elapsed = t1 - t0
             rate = len(results) / elapsed if elapsed > 0 else float("inf")
             print("Processor completed")
@@ -472,7 +508,9 @@ if __name__ == "__main__":
 #     completed_ids: list[str] = []
 #     vector_buf: list[tuple[str, np.ndarray]] = []
 
-#     async for pid_seq, emb in processor.stream_work(processor._to_chunk_stream(valid_iter(valid))):
+#     async for pid_seq, emb in processor.stream_work(
+#         processor._to_chunk_stream(valid_iter(valid))
+#     ):
 #         # pid_seq is your input item (id, seq)
 #         pid = pid_seq[0]
 
