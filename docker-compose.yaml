@@ -130,7 +130,7 @@ services:
       - ${MILVUS_DATA_DIR}:/var/lib/milvus
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${MILVUS_REST_PORT}/healthz" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
       interval: 30s
       start_period: 90s
       timeout: 20s

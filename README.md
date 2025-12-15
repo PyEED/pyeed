@@ -1,6 +1,6 @@
 <div align="center">
-<h1 align="center">pyeed</h2>
-<h2 align="center" >Python Enzyme Engineering Database</h2>
+<h1 align="center">pyeed</h1>
+<h2 align="center">Python Enzyme Engineering Database</h2>
 </div>
 
 
