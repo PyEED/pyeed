@@ -287,15 +287,6 @@ class ESM2Processor[T, R]:
 
             if new_padded > self.max_padded_tokens:
                 batches.append(batch)
-                logger.debug(
-                    "Split batch due to padded budget",
-                    extra={
-                        "batch_size": len(batch),
-                        "new_item_len": L,
-                        "padded_tokens": new_padded,
-                        "budget": self.max_padded_tokens,
-                    },
-                )
                 batch = [item]
                 max_len = L
                 continue

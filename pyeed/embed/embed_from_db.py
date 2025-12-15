@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 from collections.abc import AsyncIterator
 from time import monotonic
@@ -9,7 +10,16 @@ import numpy as np
 from loguru import logger
 from neo4j import AsyncDriver
 from pymilvus import AsyncMilvusClient
-from rich.progress import Progress, TaskID
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from ..db.milvus import (
     get_async_milvus_client,
@@ -33,6 +43,34 @@ _PENDING_QUERY: Final[str] = """
 MATCH (p:Protein {embedding_status: 'pending'})
 RETURN p.id AS id, p.sequence AS sequence
 """
+
+_STATUS_COUNTS_QUERY: Final[str] = """
+MATCH (p:Protein)
+RETURN p.embedding_status AS status, count(*) AS count
+"""
+
+
+async def count_pending(driver: AsyncDriver) -> tuple[int, dict[str, int]]:
+    """Return pending count and counts by status for logging/progress."""
+    async with driver.session() as session:
+        result = await session.run(_STATUS_COUNTS_QUERY)
+        rows = await result.data()
+    counts = {row["status"]: row["count"] for row in rows}
+    return int(counts.get("pending", 0)), counts
+
+
+def parse_devices(devices_str: str) -> list[int]:
+    """Parse comma-separated CUDA device IDs, or 'cpu' for CPU-only."""
+    if not devices_str:
+        return []
+    lowered = devices_str.strip().lower()
+    if lowered == "cpu":
+        return [-1]  # sentinel to force CPU in ESM2Processor
+    try:
+        return [int(d.strip()) for d in devices_str.split(",") if d.strip()]
+    except ValueError as exc:
+        msg = "Invalid --devices value. Use comma-separated integers like '0,1' or 'cpu'."
+        raise ValueError(msg) from exc
 
 
 async def update_protein_status(
@@ -122,6 +160,17 @@ async def run_embedding_job(
     Streams pending proteins from Neo4j, marks them in progress, embeds with
     ESM2, writes embeddings to Milvus, and updates statuses to complete/failed.
     """
+    pending_total, status_counts = await count_pending(neo4j_driver)
+    logger.info(
+        "Embedding job starting",
+        extra={"pending": pending_total, "status_counts": status_counts},
+    )
+    if pending_total == 0:
+        logger.info("No pending proteins to embed; exiting")
+        return
+    if progress is not None and progress_task_id is not None:
+        progress.update(progress_task_id, total=pending_total)
+
     out_q: asyncio.Queue[VectorResult | None] = asyncio.Queue(writer_queue_size)
     collection_initialized = collection_name in await milvus_client.list_collections()
 
@@ -241,22 +290,140 @@ async def run_embedding_job(
     await writer_task
 
 
-async def main() -> None:
-    """Example entry point for running the embedding job."""
+async def main(argv: list[str] | None = None) -> None:
+    """CLI entry point for running the embedding job."""
+    parser = argparse.ArgumentParser(description="Embed pending proteins from Neo4j into Milvus")
+    parser.add_argument(
+        "--collection",
+        type=str,
+        default="proteins",
+        help="Milvus collection name (default: proteins)",
+    )
+    parser.add_argument(
+        "--devices",
+        type=str,
+        default="0",
+        help="Comma-separated CUDA device IDs (e.g. '0,1') or 'cpu' (default: 0)",
+    )
+    parser.add_argument(
+        "--dtype",
+        type=str,
+        choices=["float16", "float32"],
+        default="float16",
+        help="Embedding dtype (default: float16)",
+    )
+    parser.add_argument(
+        "--max-padded-tokens",
+        type=int,
+        default=30_000,
+        help="Max padded tokens per batch for ESM2 (default: 30000)",
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=1_024,
+        help="Max tokens per sequence (default: 1024)",
+    )
+    parser.add_argument(
+        "--source-chunk-size",
+        type=int,
+        default=2_048,
+        help="Chunk size for source stream into the embedder (default: 2048)",
+    )
+    parser.add_argument(
+        "--read-batch-size",
+        type=int,
+        default=5_000,
+        help="Rows to read from Neo4j per batch (default: 5000)",
+    )
+    parser.add_argument(
+        "--writer-queue-size",
+        type=int,
+        default=2_000,
+        help="Max queue items between embedder and writer (default: 2000)",
+    )
+    parser.add_argument(
+        "--writer-batch-size",
+        type=int,
+        default=1_000,
+        help="Embeddings to flush to Milvus per batch (default: 1000)",
+    )
+    parser.add_argument(
+        "--status-batch-size",
+        type=int,
+        default=1_000,
+        help="Embeddings to trigger status flush (default: 1000)",
+    )
+    parser.add_argument(
+        "--huggingface-token",
+        type=str,
+        default=None,
+        help="Optional HuggingFace token (otherwise uses cached login)",
+    )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable Rich progress bar output",
+    )
+
+    args = parser.parse_args(argv)
+
+    try:
+        devices = parse_devices(args.devices)
+    except ValueError as exc:
+        parser.error(str(exc))
+
     driver = get_async_driver()
     milvus_client = get_async_milvus_client()
+
+    progress_columns = [
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+    ]
+
     try:
-        # Progress total is unknown until we count; use indeterminate progress.
-        with Progress() as progress:
-            task_id = progress.add_task("embedding", total=None)
+        if args.no_progress:
             await run_embedding_job(
                 neo4j_driver=driver,
                 milvus_client=milvus_client,
-                collection_name="proteins",
-                progress=progress,
-                progress_task_id=task_id,
-                devices=[0],
+                collection_name=args.collection,
+                devices=devices,
+                dtype=args.dtype,
+                max_padded_tokens=args.max_padded_tokens,
+                max_length=args.max_length,
+                source_chunk_size=args.source_chunk_size,
+                read_batch_size=args.read_batch_size,
+                writer_queue_size=args.writer_queue_size,
+                writer_batch_size=args.writer_batch_size,
+                status_batch_size=args.status_batch_size,
+                huggingface_token=args.huggingface_token,
+                progress=None,
+                progress_task_id=None,
             )
+        else:
+            with Progress(*progress_columns) as progress:
+                task_id = progress.add_task("embedding", total=None)
+                await run_embedding_job(
+                    neo4j_driver=driver,
+                    milvus_client=milvus_client,
+                    collection_name=args.collection,
+                    devices=devices,
+                    dtype=args.dtype,
+                    max_padded_tokens=args.max_padded_tokens,
+                    max_length=args.max_length,
+                    source_chunk_size=args.source_chunk_size,
+                    read_batch_size=args.read_batch_size,
+                    writer_queue_size=args.writer_queue_size,
+                    writer_batch_size=args.writer_batch_size,
+                    status_batch_size=args.status_batch_size,
+                    huggingface_token=args.huggingface_token,
+                    progress=progress,
+                    progress_task_id=task_id,
+                )
     finally:
         await milvus_client.close()
         await driver.close()

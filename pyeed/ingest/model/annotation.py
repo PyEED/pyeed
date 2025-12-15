@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from pydantic import Field
 
-from .annotationtype import AnnotationType
+from .annotationcategroy import AnnotationCategory
 from .pyeedbase import BaseNode, LabelProperty
 
 
@@ -14,15 +14,27 @@ class Annotation(BaseNode):
         default_factory=lambda: str(uuid4()),
         description="Annotation identifier",
     )
-    annotation_type: AnnotationType = Field(
+    category: AnnotationCategory = Field(
         ...,
-        description="Type of annotation",
+        description="Category of the annotation",
     )
-    positions: list[int] = Field(
-        ...,
-        description="Sorted list of positions",
+    name: str | None = Field(
+        default=None,
+        description="Type of annotation",
     )
     description: str | None = Field(
         default=None,
         description="Description of the annotation",
     )
+
+
+if __name__ == "__main__":
+    from rich import print
+
+    # test the annotation class
+    annotation = Annotation(
+        category=AnnotationCategory.SITE,
+        name="Site",
+        description="Site of the annotation",
+    )
+    print(annotation)
