@@ -1,5 +1,5 @@
 from .annotation import Annotation
-from .annotationtype import AnnotationType
+from .annotationcategroy import AnnotationCategory
 from .goannotation import GOAnnotation
 from .molecule import Molecule
 from .protein import Protein
@@ -9,7 +9,7 @@ from .taxon import Taxon
 
 __all__ = [
     "Annotation",
-    "AnnotationType",
+    "AnnotationCategory",
     "BaseNode",
     "GOAnnotation",
     "Molecule",

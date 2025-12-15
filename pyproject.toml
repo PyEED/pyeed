@@ -25,6 +25,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "pymilvus>=2.6.3",
     "python-dotenv>=1.1.1",
+    "rdflib>=7.5.0",
     "rdkit>=2025.9.1",
     "rich>=14.1.0",
     "scikit-bio>=0.7.1.post1",
