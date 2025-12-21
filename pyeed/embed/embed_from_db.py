@@ -6,7 +6,6 @@ from collections.abc import AsyncIterator
 from time import monotonic
 from typing import Final, Literal
 
-import numpy as np
 from loguru import logger
 from neo4j import AsyncDriver
 from pymilvus import AsyncMilvusClient
@@ -27,7 +26,8 @@ from ..db.milvus import (
     insert,
 )
 from ..db.neo4j import get_async_driver
-from .new_embed import DType, ESM2Processor
+from .embedder import ESM2Processor
+from .types import EmbeddingRecord, SequenceItem, TorchDTypeName
 
 __all__ = [
     "run_embedding_job",
@@ -35,28 +35,12 @@ __all__ = [
     "update_protein_status",
 ]
 
-type ProteinRow = tuple[str, str]
-type VectorResult = tuple[str, np.ndarray]
 type StatusLiteral = Literal["pending", "in_progress", "complete", "failed"]
 
 _PENDING_QUERY: Final[str] = """
 MATCH (p:Protein {embedding_status: 'pending'})
 RETURN p.id AS id, p.sequence AS sequence
 """
-
-_STATUS_COUNTS_QUERY: Final[str] = """
-MATCH (p:Protein)
-RETURN p.embedding_status AS status, count(*) AS count
-"""
-
-
-async def count_pending(driver: AsyncDriver) -> tuple[int, dict[str, int]]:
-    """Return pending count and counts by status for logging/progress."""
-    async with driver.session() as session:
-        result = await session.run(_STATUS_COUNTS_QUERY)
-        rows = await result.data()
-    counts = {row["status"]: row["count"] for row in rows}
-    return int(counts.get("pending", 0)), counts
 
 
 def parse_devices(devices_str: str) -> list[int]:
@@ -101,7 +85,7 @@ async def stream_pending_proteins(
     *,
     batch_size: int = 5_000,
     mark_in_progress: bool = True,
-) -> AsyncIterator[list[ProteinRow]]:
+) -> AsyncIterator[list[SequenceItem]]:
     """Stream pending protein ids and sequences in bounded batches.
 
     Keeps the Neo4j session open for streaming to avoid loading all rows into
@@ -111,11 +95,11 @@ async def stream_pending_proteins(
     async with driver.session() as session:
         result = await session.run(_PENDING_QUERY)
 
-        buffer: list[ProteinRow] = []
+        buffer: list[SequenceItem] = []
         async for record in result:
             protein_id = record["id"]
             sequence = record["sequence"]
-            buffer.append((protein_id, sequence))
+            buffer.append(SequenceItem(id=protein_id, sequence=sequence))
 
             if len(buffer) >= batch_size:
                 logger.debug(
@@ -123,7 +107,7 @@ async def stream_pending_proteins(
                     extra={"batch_size": len(buffer)},
                 )
                 if mark_in_progress:
-                    await update_protein_status(driver, [pid for pid, _ in buffer], "in_progress")
+                    await update_protein_status(driver, [item.id for item in buffer], "in_progress")
                 yield buffer
                 buffer = []
 
@@ -133,7 +117,7 @@ async def stream_pending_proteins(
                 extra={"batch_size": len(buffer)},
             )
             if mark_in_progress:
-                await update_protein_status(driver, [pid for pid, _ in buffer], "in_progress")
+                await update_protein_status(driver, [item.id for item in buffer], "in_progress")
             yield buffer
 
 
@@ -143,12 +127,12 @@ async def run_embedding_job(
     milvus_client: AsyncMilvusClient,
     collection_name: str,
     devices: list[int] | None = None,
-    dtype: DType = "float16",
+    dtype: TorchDTypeName = "float16",
     max_padded_tokens: int = 30_000,
     max_length: int = 1_024,
     source_chunk_size: int = 2_048,
     read_batch_size: int = 5_000,
-    writer_queue_size: int = 2_000,
+    writer_queue_size: int = 10_000,
     writer_batch_size: int = 1_000,
     status_batch_size: int = 1_000,
     huggingface_token: str | None = None,
@@ -160,28 +144,21 @@ async def run_embedding_job(
     Streams pending proteins from Neo4j, marks them in progress, embeds with
     ESM2, writes embeddings to Milvus, and updates statuses to complete/failed.
     """
-    pending_total, status_counts = await count_pending(neo4j_driver)
-    logger.info(
-        "Embedding job starting",
-        extra={"pending": pending_total, "status_counts": status_counts},
-    )
-    if pending_total == 0:
-        logger.info("No pending proteins to embed; exiting")
-        return
+    logger.info("Embedding job starting")
     if progress is not None and progress_task_id is not None:
-        progress.update(progress_task_id, total=pending_total)
+        progress.update(progress_task_id, total=None)
 
-    out_q: asyncio.Queue[VectorResult | None] = asyncio.Queue(writer_queue_size)
+    out_q: asyncio.Queue[EmbeddingRecord | None] = asyncio.Queue(writer_queue_size)
     collection_initialized = collection_name in await milvus_client.list_collections()
 
-    async def flush(batch: list[VectorResult]) -> None:
+    async def flush(batch: list[EmbeddingRecord]) -> None:
         nonlocal collection_initialized
         if not batch:
             return
         batch_count = len(batch)
-        batch_ids = [pid for pid, _ in batch]
+        batch_ids = [record.id for record in batch]
         start = monotonic()
-        records = [{"id": pid, "embedding": emb} for pid, emb in batch]
+        records = [{"id": record.id, "embedding": record.vector} for record in batch]
 
         try:
             if not collection_initialized:
@@ -197,18 +174,28 @@ async def run_embedding_job(
                     extra={"collection": collection_name},
                 )
 
+            insert_start = monotonic()
             await insert(
                 collection_name=collection_name,
                 records=records,
                 client=milvus_client,
             )
-            await update_protein_status(neo4j_driver, batch_ids, "complete")
+            insert_elapsed = monotonic() - insert_start
 
+            status_start = monotonic()
+            await update_protein_status(neo4j_driver, batch_ids, "complete")
+            status_elapsed = monotonic() - status_start
+
+            total_elapsed = round(monotonic() - start, 3)
+            insert_elapsed_rounded = round(insert_elapsed, 3)
+            status_elapsed_rounded = round(status_elapsed, 3)
             logger.debug(
-                "Writer flushed batch",
+                f"Writer flushed batch in {total_elapsed}s",
                 extra={
                     "items": batch_count,
-                    "elapsed_s": round(monotonic() - start, 3),
+                    "total_elapsed_s": total_elapsed,
+                    "insert_elapsed_s": insert_elapsed_rounded,
+                    "status_elapsed_s": status_elapsed_rounded,
                 },
             )
         except Exception:
@@ -226,9 +213,19 @@ async def run_embedding_job(
         finally:
             batch.clear()
 
+    async def flush_with_semaphore(
+        batch: list[EmbeddingRecord],
+        sem: asyncio.Semaphore,
+    ) -> None:
+        async with sem:
+            await flush(batch)  # your existing flush logic
+
     async def writer() -> None:
-        buffer: list[VectorResult] = []
-        backlog_warned = False
+        # Allow up to 3 concurrent flushes
+        sem = asyncio.Semaphore(3)
+        buffer: list[EmbeddingRecord] = []
+        flush_tasks: list[asyncio.Task] = []
+
         while True:
             item = await out_q.get()
             try:
@@ -236,27 +233,18 @@ async def run_embedding_job(
                     break
                 buffer.append(item)
 
-                qsize = out_q.qsize()
-                maxsize = out_q.maxsize
-                if maxsize and qsize > maxsize * 0.8 and not backlog_warned:
-                    backlog_warned = True
-                    logger.debug(
-                        "Writer backlog high",
-                        extra={"qsize": qsize, "maxsize": maxsize},
-                    )
-                elif backlog_warned and maxsize and qsize < maxsize * 0.5:
-                    backlog_warned = False
-
                 if len(buffer) >= writer_batch_size:
-                    await flush(buffer)
-                    # batch cleared inside flush
-                if len(buffer) >= status_batch_size:
-                    await flush(buffer)
+                    # Start flush in background
+                    task = asyncio.create_task(flush_with_semaphore(buffer.copy(), sem))
+                    flush_tasks.append(task)
+                    buffer.clear()
             finally:
                 out_q.task_done()
 
+        # Flush remaining and wait for all tasks
         if buffer:
             await flush(buffer)
+        await asyncio.gather(*flush_tasks)
 
     chunks = stream_pending_proteins(neo4j_driver, batch_size=read_batch_size)
     writer_task = asyncio.create_task(writer())
@@ -271,15 +259,15 @@ async def run_embedding_job(
         progress=progress,
         progress_task_id=progress_task_id,
     ) as processor:
-        async for protein_id, embedding in processor.stream_work(chunks):
+        async for record in processor.stream_work(chunks):
             put_start = monotonic()
-            await out_q.put((protein_id, embedding))
+            await out_q.put(record)
             waited = monotonic() - put_start
             if waited > 0.1:
                 logger.debug(
                     "Backpressure on embedding queue",
                     extra={
-                        "wait_s": round(waited, 3),
+                        "waited_s": round(waited, 3),
                         "qsize": out_q.qsize(),
                         "queue_max": out_q.maxsize,
                     },
@@ -315,7 +303,7 @@ async def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--max-padded-tokens",
         type=int,
-        default=30_000,
+        default=50_000,
         help="Max padded tokens per batch for ESM2 (default: 30000)",
     )
     parser.add_argument(
@@ -339,20 +327,20 @@ async def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--writer-queue-size",
         type=int,
-        default=2_000,
+        default=2000,
         help="Max queue items between embedder and writer (default: 2000)",
     )
     parser.add_argument(
         "--writer-batch-size",
         type=int,
-        default=1_000,
-        help="Embeddings to flush to Milvus per batch (default: 1000)",
+        default=400,
+        help="Embeddings to flush to Milvus per batch (default: 2000)",
     )
     parser.add_argument(
         "--status-batch-size",
         type=int,
-        default=1_000,
-        help="Embeddings to trigger status flush (default: 1000)",
+        default=400,
+        help="Embeddings to trigger status flush (default: 2000)",
     )
     parser.add_argument(
         "--huggingface-token",

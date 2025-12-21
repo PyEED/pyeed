@@ -1,8 +1,21 @@
+"""Legacy ingest pipelines.
+
+DEPRECATED: This module uses the old ESM2Embedder and VectorDB infrastructure
+that has been replaced by ESM2Processor and the async Milvus client.
+
+For protein embedding, use the new pipeline:
+    python -m pyeed.embed.embed_from_db --collection proteins
+
+This module is kept for reference but requires refactoring to use the new
+embed.embedder.ESM2Processor and db.milvus async functions.
+"""
+
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections.abc import Callable
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 from loguru import logger
@@ -18,26 +31,90 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from pyeed.db.milvus import VectorDB
 from pyeed.db.neo4j import get_async_driver
-from pyeed.embed.esm2 import ESM2Embedder
 from pyeed.embed.pooling import PoolingLike, mean_pooling
 
 from .ingest.core.pipeline import Pipeline
 from .ingest.sources.fasta import build_header_index
-from .ingest.stages.embed import EmbeddingStage
 from .ingest.stages.enrich_molecules import MoleculeEnrichmentStage
 from .ingest.stages.enrich_reactions import ReactionEnrichmentStage
 from .ingest.stages.enrich_taxonomy import TaxonomyEnrichmentStage
 from .ingest.stages.fasta import FASTAReaderStage
-from .ingest.stages.sink import MilvusUpsertStage, Neo4jUpsertStage
+from .ingest.stages.sink import Neo4jUpsertStage
 from .ingest.stages.uniprot import InterProReaderStage, UniProtReaderStage
 from .utils.progress import CONSOLE
+
+# Stub classes for deprecated imports - these need refactoring
+if TYPE_CHECKING:
+    pass
+
+
+class VectorDB:
+    """DEPRECATED: Use pyeed.db.milvus.get_async_milvus_client() instead."""
+
+    def __init__(self, uri: str | None = None, token: str | None = None, collection_name: str = "pyeed") -> None:
+        self.uri = uri or "deprecated"
+        self.token = token
+        self.collection_name = collection_name
+        warnings.warn(
+            "VectorDB is deprecated. Use get_async_milvus_client() from pyeed.db.milvus",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+class ESM2Embedder:
+    """DEPRECATED: Use pyeed.embed.ESM2Processor instead."""
+
+    def __init__(self, **kwargs: object) -> None:
+        self.model_name = kwargs.get("model_name", "deprecated")
+        self.devices: list[str] = []
+        warnings.warn(
+            "ESM2Embedder is deprecated. Use ESM2Processor from pyeed.embed",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    async def initialize(self) -> None:
+        raise NotImplementedError("ESM2Embedder is deprecated. Use ESM2Processor.")
+
+
+class EmbeddingStage:
+    """DEPRECATED: Embedding stage needs refactoring for ESM2Processor."""
+
+    def __init__(self, **kwargs: object) -> None:
+        warnings.warn(
+            "EmbeddingStage is deprecated. Use embed_from_db.run_embedding_job()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+class MilvusUpsertStage:
+    """DEPRECATED: Use bulk_insert from pyeed.db.milvus instead."""
+
+    def __init__(self, **kwargs: object) -> None:
+        warnings.warn(
+            "MilvusUpsertStage is deprecated. Use bulk_insert from pyeed.db.milvus",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+def _deprecated_pipeline_warning() -> None:
+    warnings.warn(
+        "This ingest pipeline is deprecated and needs refactoring. "
+        "For embedding, use: python -m pyeed.embed.embed_from_db",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def ingest_fasta(
     fasta_path: str,
     chunk_size: int = 512,
+    *,
+    _deprecated: bool = True,
     header_fn: Callable[[str], str] | None = None,
     taxon_fn: Callable[[str], str] | None = None,
     graph_db_uri: str | None = None,

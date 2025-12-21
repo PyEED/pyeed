@@ -79,7 +79,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8g
+          memory: 32g
           cpus: "2.0"
 
     environment:
@@ -107,6 +107,9 @@ services:
     security_opt:
       - seccomp:unconfined
 
+    volumes:
+      - ${MILVUS_DATA_DIR}:/var/lib/milvus
+
     deploy:
       resources:
         limits:
@@ -125,9 +128,6 @@ services:
     ports:
       - "${MILVUS_GRPC_PORT}:19530"
       - "${MILVUS_REST_PORT}:9091"
-
-    volumes:
-      - ${MILVUS_DATA_DIR}:/var/lib/milvus
 
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]

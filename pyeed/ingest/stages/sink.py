@@ -1,22 +1,31 @@
-"""Neo4j and Milvus sink stages for batch processing PipelineRecords."""
+"""Neo4j and Milvus sink stages for batch processing PipelineRecords.
+
+Note: MilvusUpsertStage is deprecated. Use pyeed.db.milvus.bulk_insert() with
+the new async Milvus client for embedding storage.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import warnings
 from collections import defaultdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from neo4j import AsyncDriver
 from rich.progress import Progress, TaskID
 
-from pyeed.db.milvus import VectorDB
 from pyeed.db.queries import query_existing_nodes_by_ids, upsert_pipeline_records
-from pyeed.embed.types import EmbeddingBatch
 from pyeed.ingest.core.pipeline import PipelineContext, PipelineRecord
 from pyeed.ingest.core.protocol import SENTINEL
 from pyeed.ingest.model.pyeedbase import BaseNode
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class VectorDBProtocol(Protocol):
+        def _check_existing_ids(self, ids: list[str]) -> set[str]: ...
+        async def insert_async(self, collection: str, batch: Any, **kw: object) -> None: ...
 
 
 class Neo4jUpsertStage:
@@ -144,25 +153,31 @@ class Neo4jUpsertStage:
 
 
 class MilvusUpsertStage:
-    """Batches PipelineRecord embeddings and upserts to Milvus.
+    """DEPRECATED: Batches PipelineRecord embeddings and upserts to Milvus.
 
-    Only processes records with embeddings. Sequences are NOT stored
-    in Milvus (already in Neo4j).
+    This stage uses the legacy VectorDB class. For new code, use:
+    - pyeed.db.milvus.bulk_insert() for column-oriented inserts
+    - pyeed.embed.embed_from_db.run_embedding_job() for full pipeline
     """
 
     def __init__(
         self,
-        vector_db: VectorDB,
+        vector_db: Any,  # VectorDB (legacy)
         collection_name: str,
         batch_size: int = 2000,
     ):
         """Initialize Milvus sink.
 
         Args:
-            vector_db: VectorDB instance
+            vector_db: VectorDB instance (legacy)
             collection_name: Milvus collection name
             batch_size: Records to accumulate before writing
         """
+        warnings.warn(
+            "MilvusUpsertStage is deprecated. Use pyeed.db.milvus.bulk_insert()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.vector_db = vector_db
         self.collection_name = collection_name
         self.batch_size = batch_size
@@ -257,26 +272,28 @@ class MilvusUpsertStage:
     def _convert_to_embedding_batch(
         self,
         records: list[PipelineRecord[BaseNode]],
-    ) -> EmbeddingBatch:
-        """Convert PipelineRecords to EmbeddingBatch.
+    ) -> dict[str, Any]:
+        """Convert PipelineRecords to embedding batch dict.
 
         Args:
             records: List of PipelineRecord with embeddings
 
         Returns:
-            EmbeddingBatch with combined embeddings
+            Dict with protein_ids, sequences, and embeddings by pooling method
         """
-        batch = EmbeddingBatch()
+        batch: dict[str, Any] = {
+            "protein_ids": [],
+            "sequences": [],
+            "embeddings": {},
+        }
 
         for record in records:
-            # Extract protein ID and sequence
-            batch.protein_ids.append(record.data.id)
-            batch.sequences.append(record.data.sequence)
+            batch["protein_ids"].append(record.data.id)
+            batch["sequences"].append(record.data.sequence)
 
-            # Group embeddings by pooling method
             for pooling_name, embedding in record.embeddings.items():
-                if pooling_name not in batch.embeddings:
-                    batch.embeddings[pooling_name] = []
-                batch.embeddings[pooling_name].append(embedding)
+                if pooling_name not in batch["embeddings"]:
+                    batch["embeddings"][pooling_name] = []
+                batch["embeddings"][pooling_name].append(embedding)
 
         return batch
